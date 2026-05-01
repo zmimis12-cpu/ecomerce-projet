@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, ImageIcon } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
 import { ProductForm } from "@/components/products/product-form";
 import { createProduct } from "@/lib/products/actions";
@@ -29,6 +29,15 @@ export default async function NewProductPage() {
         <h1 className="text-xl font-semibold tracking-tight">Nouveau produit</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Remplissez les informations du produit et sa structure de coûts.
+        </p>
+      </div>
+
+      {/* Image info banner */}
+      <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+        <ImageIcon className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+        <p className="text-sm text-blue-700">
+          Les images peuvent être ajoutées après la création du produit.
+          Enregistrez d&apos;abord, puis ajoutez vos photos depuis la page du produit.
         </p>
       </div>
 
