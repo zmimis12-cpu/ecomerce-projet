@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingCart } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingCart, PhoneCall } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/admin",          label: "Dashboard",  icon: LayoutDashboard, exact: true },
-  { href: "/admin/products", label: "Produits",   icon: Package,          exact: false },
-  { href: "/admin/orders",   label: "Commandes",  icon: ShoppingCart,     exact: false },
-  // Future modules added here
+  { href: "/admin",              label: "Dashboard",    icon: LayoutDashboard, exact: true },
+  { href: "/admin/products",     label: "Produits",     icon: Package,          exact: false },
+  { href: "/admin/orders",       label: "Commandes",    icon: ShoppingCart,     exact: false },
+  { href: "/admin/call-center",  label: "Call Center",  icon: PhoneCall,        exact: false },
 ];
 
 export function AdminSidebar() {
@@ -43,7 +43,7 @@ export function AdminSidebar() {
       </nav>
 
       <div className="px-4 py-3 border-t">
-        <p className="text-xs text-muted-foreground">v2.0 — Foundation</p>
+        <p className="text-xs text-muted-foreground">v2.0</p>
       </div>
     </aside>
   );
