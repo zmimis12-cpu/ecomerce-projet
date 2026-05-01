@@ -6,11 +6,10 @@ import { hasRole } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Produits" };
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export default async function ProductsPage() {
   const session = await requireRole(["super_admin", "admin", "manager", "finance", "viewer"]);
-  const products = await getProducts();
+  const [products] = await Promise.all([getProducts()]);
   const canManage = hasRole(session.role, ["super_admin", "admin", "manager"]);
 
   return (

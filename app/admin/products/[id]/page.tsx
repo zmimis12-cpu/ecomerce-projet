@@ -13,7 +13,6 @@ import { cn } from "@/lib/utils";
 import { DeleteProductButton } from "@/components/products/delete-product-button";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export async function generateMetadata({
   params,

@@ -11,11 +11,10 @@ import { TrackingEditor } from "@/components/orders/tracking-editor";
 import { DeleteOrderButton } from "@/components/orders/delete-order-button";
 import { hasRole } from "@/lib/auth/roles";
 import { DuplicateBadge } from "@/components/orders/duplicate-badge";
-import { formatOrderDate, STATUS_LABELS } from "@/types/orders";
+import { formatOrderDate } from "@/types/orders";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;

@@ -4,15 +4,15 @@ import { DashboardPlaceholder } from "@/components/admin/dashboard-placeholder";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export default async function AdminDashboardPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
+  // React cache() deduplicates this with the layout's ensureProfile() call
   const session = await requireUser();
-  const params = await searchParams;
+  const params  = await searchParams;
 
   return (
     <DashboardPlaceholder

@@ -4,8 +4,8 @@ import { AdminSidebar } from "@/components/admin/sidebar";
 import { AdminHeader } from "@/components/admin/header";
 import { MissingProfileBanner } from "@/components/admin/missing-profile-banner";
 
+// Layout must be dynamic — auth session is per-request
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await ensureProfile();

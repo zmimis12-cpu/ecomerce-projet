@@ -5,12 +5,15 @@
  * Safe policy: auth.uid() = id only.
  */
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { AppUser, UserRole, SessionUser } from "@/types/database";
 
 export type { SessionUser };
 
-async function fetchProfile(userId: string): Promise<AppUser | null> {
+// cache() deduplicates this call within a single server render pass.
+// Layout calls ensureProfile(), page calls requireUser() — same userId → one DB query.
+const fetchProfile = cache(async function fetchProfile(userId: string): Promise<AppUser | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("users")
@@ -23,7 +26,7 @@ async function fetchProfile(userId: string): Promise<AppUser | null> {
     return null;
   }
   return data as AppUser | null;
-}
+});
 
 export async function getSession(): Promise<SessionUser | null> {
   try {
