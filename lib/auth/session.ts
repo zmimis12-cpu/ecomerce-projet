@@ -1,106 +1,137 @@
 /**
- * lib/auth/session.ts — v3
- * Fixed: use raw upsert via supabaseAdmin for profile creation (bypasses RLS + type stub issues).
- * Fixed: always re-fetch after any upsert so actual DB role is returned, never stale default.
+ * lib/auth/session.ts — DEBUG VERSION
+ * All errors surfaced. No auto-create fallback. No silent catches.
  */
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
-import type { AppUser, UserRole, SessionUser } from "@/types/database";
+import type { UserRole, SessionUser } from "@/types/database";
 
 export type { SessionUser };
 
-// ─── Fetch profile by auth UUID (fresh, no cache) ─────────────────────────────
-async function fetchProfile(userId: string): Promise<AppUser | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("users")
-    .select("id, email, full_name, role, is_active, avatar_url, phone, metadata, created_at, updated_at")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("[session] fetchProfile error:", error.message);
-    return null;
-  }
-  return data as AppUser | null;
+export interface DebugSession {
+  authId: string | null;
+  authEmail: string | null;
+  authError: string | null;
+  profileId: string | null;
+  profileEmail: string | null;
+  profileRole: string | null;
+  profileIsActive: boolean | null;
+  profileFetchError: string | null;
+  profileFetchStatus: "found" | "not_found" | "error" | "no_auth";
+  hasProfile: boolean;
+  supabaseUrl: string;
+  role: UserRole;
+  displayName: string;
 }
 
-// ─── Create missing profile then re-fetch ─────────────────────────────────────
-// Uses supabaseAdmin to bypass RLS — only called when profile is confirmed missing.
-// Re-fetches after insert so the ACTUAL role in the DB is returned.
-async function createAndFetchProfile(
-  userId: string,
-  email: string
-): Promise<{ profile: AppUser | null; wasCreated: boolean }> {
-  // Use raw SQL upsert to avoid TypeScript stub inference issues
-  const { error: upsertError } = await supabaseAdmin
-    .from("users" as "shops") // cast to satisfy strict stub — admin client accepts any table
-    .upsert(
-      { id: userId, email, full_name: email, role: "viewer", is_active: true } as never,
-      { onConflict: "id", ignoreDuplicates: true }
-    );
+/**
+ * getDebugSession()
+ * Returns ALL raw data from Supabase — no fallbacks, no silent errors.
+ * Used by debug page and temporarily by admin layout.
+ */
+export async function getDebugSession(): Promise<DebugSession> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "NOT_SET";
 
-  if (upsertError) {
-    console.error("[session] createAndFetchProfile upsert error:", upsertError.message);
-  }
+  // Step 1 — get auth user
+  let authId: string | null = null;
+  let authEmail: string | null = null;
+  let authError: string | null = null;
 
-  // ALWAYS re-fetch — if row already existed with super_admin, that comes back
-  const profile = await fetchProfile(userId);
-  return { profile, wasCreated: true };
-}
-
-// ─── Public API ────────────────────────────────────────────────────────────────
-
-export async function getSession(): Promise<SessionUser | null> {
   try {
     const supabase = await createClient();
     const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) return null;
-
-    const profile = await fetchProfile(user.id);
-
-    return {
-      authId: user.id,
-      authEmail: user.email ?? "",
-      profile,
-      role: (profile?.role ?? "viewer") as UserRole,
-      displayName: profile?.full_name ?? user.email ?? "Utilisateur",
-      hasProfile: profile !== null,
-    };
+    if (error) authError = error.message;
+    authId = user?.id ?? null;
+    authEmail = user?.email ?? null;
   } catch (e) {
-    console.error("[session] getSession error:", e);
-    return null;
+    authError = String(e);
   }
+
+  if (!authId) {
+    return {
+      authId, authEmail, authError,
+      profileId: null, profileEmail: null, profileRole: null,
+      profileIsActive: null,
+      profileFetchError: null,
+      profileFetchStatus: "no_auth",
+      hasProfile: false,
+      supabaseUrl,
+      role: "viewer",
+      displayName: "Unknown",
+    };
+  }
+
+  // Step 2 — fetch public.users by id — NO fallback, NO auto-create
+  let profileId: string | null = null;
+  let profileEmail: string | null = null;
+  let profileRole: string | null = null;
+  let profileIsActive: boolean | null = null;
+  let profileFetchError: string | null = null;
+  let profileFetchStatus: DebugSession["profileFetchStatus"] = "not_found";
+
+  try {
+    const supabase = await createClient();
+    const { data, error, status, statusText } = await supabase
+      .from("users")
+      .select("id, email, full_name, role, is_active")
+      .eq("id", authId)
+      .maybeSingle();
+
+    if (error) {
+      profileFetchError = `[${status} ${statusText}] ${error.message} | code: ${error.code} | hint: ${error.hint ?? "none"} | details: ${error.details ?? "none"}`;
+      profileFetchStatus = "error";
+    } else if (!data) {
+      profileFetchStatus = "not_found";
+      profileFetchError = `No row in public.users where id = '${authId}'`;
+    } else {
+      const row = data as Record<string, unknown>;
+      profileId = String(row.id);
+      profileEmail = String(row.email);
+      profileRole = String(row.role);
+      profileIsActive = Boolean(row.is_active);
+      profileFetchStatus = "found";
+    }
+  } catch (e) {
+    profileFetchError = `Exception: ${String(e)}`;
+    profileFetchStatus = "error";
+  }
+
+  return {
+    authId,
+    authEmail,
+    authError,
+    profileId,
+    profileEmail,
+    profileRole,
+    profileIsActive,
+    profileFetchError,
+    profileFetchStatus,
+    hasProfile: profileFetchStatus === "found",
+    supabaseUrl,
+    role: (profileRole ?? "viewer") as UserRole,
+    displayName: profileEmail ?? authEmail ?? "Unknown",
+  };
+}
+
+/**
+ * getSession() — wraps getDebugSession for normal use
+ */
+export async function getSession(): Promise<SessionUser | null> {
+  const debug = await getDebugSession();
+  if (!debug.authId) return null;
+  return {
+    authId: debug.authId,
+    authEmail: debug.authEmail ?? "",
+    profile: null,
+    role: debug.role,
+    displayName: debug.displayName,
+    hasProfile: debug.hasProfile,
+  };
 }
 
 export async function ensureProfile(): Promise<SessionUser | null> {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-
-    let profile = await fetchProfile(user.id);
-    let wasCreated = false;
-
-    if (!profile) {
-      const result = await createAndFetchProfile(user.id, user.email ?? "");
-      profile = result.profile;
-      wasCreated = result.wasCreated;
-    }
-
-    return {
-      authId: user.id,
-      authEmail: user.email ?? "",
-      profile,
-      role: (profile?.role ?? "viewer") as UserRole,
-      displayName: profile?.full_name ?? user.email ?? "Utilisateur",
-      hasProfile: !wasCreated,
-    };
-  } catch (e) {
-    console.error("[session] ensureProfile error:", e);
-    return null;
-  }
+  // During debug: same as getSession — NO auto-create
+  return getSession();
 }
 
 export async function requireUser(): Promise<SessionUser> {
