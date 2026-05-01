@@ -6,7 +6,7 @@ import { toggleProductStatus } from "@/lib/products/actions";
 import { formatMAD } from "@/types/products";
 import { cn } from "@/lib/utils";
 import type { ProductListItem } from "@/types/products";
-import { Package, Plus, Edit2, TrendingUp, TrendingDown, ImageIcon } from "lucide-react";
+import { Package, Plus, Edit2, TrendingUp, TrendingDown, ImageIcon, ZoomIn } from "lucide-react";
 
 interface ProductListProps {
   products: ProductListItem[];
@@ -17,6 +17,7 @@ export function ProductList({ products, canManage }: ProductListProps) {
   const [items, setItems] = useState(products);
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
+  const [lightbox, setLightbox] = useState<string | null>(null);
 
   const filtered = items.filter(
     (p) =>
@@ -37,6 +38,28 @@ export function ProductList({ products, canManage }: ProductListProps) {
 
   return (
     <div className="space-y-4">
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setLightbox(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightbox}
+            alt="Aperçu"
+            className="max-w-full max-h-full rounded-xl object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            className="absolute top-4 right-4 text-white bg-white/20 hover:bg-white/40 rounded-full h-9 w-9 flex items-center justify-center text-lg font-bold transition-colors"
+            onClick={() => setLightbox(null)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="flex items-center gap-3">
         <input
@@ -109,24 +132,47 @@ export function ProductList({ products, canManage }: ProductListProps) {
                       {/* Product cell */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-lg overflow-hidden border bg-secondary/30 shrink-0 flex items-center justify-center">
-                            {product.primary_image_url ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={product.primary_image_url} alt={product.name} className="h-full w-full object-cover" />
-                            ) : (
-                              <ImageIcon className="h-4 w-4 text-muted-foreground/40" />
-                            )}
+                          {/* Thumbnail — cliquable */}
+                          <div className="relative group/thumb shrink-0">
+                            <div className="h-10 w-10 rounded-lg overflow-hidden border bg-secondary/30 flex items-center justify-center">
+                              {product.primary_image_url ? (
+                                <>
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={product.primary_image_url}
+                                    alt={product.name}
+                                    className="h-full w-full object-cover"
+                                  />
+                                  {/* Zoom overlay */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setLightbox(product.primary_image_url!)}
+                                    className="absolute inset-0 bg-black/50 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center rounded-lg"
+                                    title="Agrandir"
+                                  >
+                                    <ZoomIn className="h-4 w-4 text-white" />
+                                  </button>
+                                </>
+                              ) : (
+                                <ImageIcon className="h-4 w-4 text-muted-foreground/40" />
+                              )}
+                            </div>
                           </div>
+
                           <div className="min-w-0">
                             <p className="font-medium truncate max-w-[180px]">{product.name}</p>
                             {product.slug && (
-                              <p className="text-xs text-muted-foreground font-mono truncate max-w-[180px]">{product.slug}</p>
+                              <p className="text-xs text-muted-foreground font-mono truncate max-w-[180px]">
+                                {product.slug}
+                              </p>
                             )}
                           </div>
                         </div>
                       </td>
 
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{product.sku}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                        {product.sku}
+                      </td>
 
                       <td className="px-4 py-3 text-right font-mono font-medium">
                         {formatMAD(product.sale_price_mad)}
@@ -137,8 +183,13 @@ export function ProductList({ products, canManage }: ProductListProps) {
                       </td>
 
                       <td className="px-4 py-3 text-right font-mono">
-                        <span className={cn("flex items-center justify-end gap-1", isProfit ? "text-green-600" : "text-red-600")}>
-                          {isProfit ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                        <span className={cn(
+                          "flex items-center justify-end gap-1",
+                          isProfit ? "text-green-600" : "text-red-600"
+                        )}>
+                          {isProfit
+                            ? <TrendingUp className="h-3 w-3" />
+                            : <TrendingDown className="h-3 w-3" />}
                           {formatMAD(profit)}
                         </span>
                       </td>
@@ -167,13 +218,15 @@ export function ProductList({ products, canManage }: ProductListProps) {
                           >
                             <span className={cn(
                               "inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform",
-                              product.is_active ? "translate-x-4.5" : "translate-x-1"
+                              product.is_active ? "translate-x-[18px]" : "translate-x-1"
                             )} />
                           </button>
                         ) : (
                           <span className={cn(
                             "inline-block rounded-full px-2 py-0.5 text-xs font-medium",
-                            product.is_active ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"
+                            product.is_active
+                              ? "bg-green-100 text-green-700"
+                              : "bg-slate-100 text-slate-500"
                           )}>
                             {product.is_active ? "Actif" : "Inactif"}
                           </span>
