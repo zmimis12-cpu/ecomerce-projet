@@ -1,20 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, Trash2 } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
 import { getProduct } from "@/lib/products/queries";
 import { ProductForm } from "@/components/products/product-form";
 import { ImageManager } from "@/components/products/image-manager";
-import { deleteProduct, updateProduct } from "@/lib/products/actions";
+import { updateProduct } from "@/lib/products/actions";
 import { hasRole } from "@/lib/auth/roles";
 import { formatMAD } from "@/types/products";
 import { cn } from "@/lib/utils";
+import { DeleteProductButton } from "@/components/products/delete-product-button";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
   const { id } = await params;
   const product = await getProduct(id);
   return { title: product ? `${product.name} — Produits` : "Produit introuvable" };
@@ -26,7 +31,9 @@ export default async function ProductDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await requireRole(["super_admin", "admin", "manager", "finance", "viewer"]);
+  const session = await requireRole([
+    "super_admin", "admin", "manager", "finance", "viewer",
+  ]);
   const product = await getProduct(id);
   if (!product) notFound();
 
@@ -35,11 +42,6 @@ export default async function ProductDetailPage({
   async function handleUpdate(formData: FormData) {
     "use server";
     return updateProduct(id, formData);
-  }
-
-  async function handleDelete() {
-    "use server";
-    await deleteProduct(id);
   }
 
   const profit = product.estimated_profit_mad ?? 0;
@@ -58,29 +60,21 @@ export default async function ProductDetailPage({
             Produits
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="text-sm font-medium truncate max-w-[200px]">{product.name}</span>
+          <span className="text-sm font-medium truncate max-w-[200px]">
+            {product.name}
+          </span>
         </div>
 
+        {/* Delete button — client component to avoid onClick in server component */}
         {canManage && (
-          <form action={handleDelete}>
-            <button
-              type="submit"
-              onClick={(e) => {
-                if (!confirm(`Supprimer "${product.name}" définitivement ?`)) e.preventDefault();
-              }}
-              className="flex items-center gap-1.5 text-xs text-red-600 hover:text-red-700 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-50"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Supprimer
-            </button>
-          </form>
+          <DeleteProductButton productId={id} productName={product.name} />
         )}
       </div>
 
       {/* Header stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Prix de vente" value={formatMAD(product.sale_price_mad)} />
-        <StatCard label="Coût total" value={formatMAD(product.total_cost_mad)} />
+        <StatCard label="Prix de vente"   value={formatMAD(product.sale_price_mad)} />
+        <StatCard label="Coût total"      value={formatMAD(product.total_cost_mad)} />
         <StatCard
           label="Profit estimé"
           value={formatMAD(profit)}
@@ -89,7 +83,11 @@ export default async function ProductDetailPage({
         <StatCard
           label="Marge"
           value={`${margin.toFixed(1)}%`}
-          className={margin >= 20 ? "text-green-600" : margin >= 10 ? "text-amber-600" : "text-red-600"}
+          className={
+            margin >= 20 ? "text-green-600" :
+            margin >= 10 ? "text-amber-600" :
+            "text-red-600"
+          }
         />
       </div>
 
@@ -97,15 +95,22 @@ export default async function ProductDetailPage({
       <div className="flex items-center gap-2">
         <span className={cn(
           "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium",
-          product.is_active ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-600"
+          product.is_active
+            ? "bg-green-100 text-green-800"
+            : "bg-slate-100 text-slate-600"
         )}>
-          <span className={cn("h-1.5 w-1.5 rounded-full", product.is_active ? "bg-green-500" : "bg-slate-400")} />
+          <span className={cn(
+            "h-1.5 w-1.5 rounded-full",
+            product.is_active ? "bg-green-500" : "bg-slate-400"
+          )} />
           {product.is_active ? "Actif" : "Inactif"}
         </span>
-        <span className="text-xs text-muted-foreground font-mono">SKU: {product.sku}</span>
+        <span className="text-xs text-muted-foreground font-mono">
+          SKU: {product.sku}
+        </span>
       </div>
 
-      {/* Two column layout on large screens */}
+      {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Form — 2/3 */}
         <div className="lg:col-span-2">
@@ -145,28 +150,38 @@ export default async function ProductDetailPage({
   );
 }
 
-function StatCard({ label, value, className }: { label: string; value: string; className?: string }) {
+function StatCard({
+  label, value, className,
+}: {
+  label: string; value: string; className?: string;
+}) {
   return (
     <div className="rounded-xl border bg-card p-4 space-y-1">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={cn("text-lg font-bold font-mono", className ?? "text-foreground")}>{value}</p>
+      <p className={cn("text-lg font-bold font-mono", className ?? "text-foreground")}>
+        {value}
+      </p>
     </div>
   );
 }
 
-function ReadOnlyProduct({ product }: { product: import("@/types/products").Product }) {
+function ReadOnlyProduct({
+  product,
+}: {
+  product: import("@/types/products").Product;
+}) {
   const fields = [
-    { label: "Nom", value: product.name },
-    { label: "SKU", value: product.sku },
-    { label: "Slug", value: product.slug ?? "—" },
-    { label: "Description", value: product.description ?? "—" },
+    { label: "Nom",           value: product.name },
+    { label: "SKU",           value: product.sku },
+    { label: "Slug",          value: product.slug ?? "—" },
+    { label: "Description",   value: product.description ?? "—" },
     { label: "Prix de vente", value: formatMAD(product.sale_price_mad) },
-    { label: "Prix d'achat", value: formatMAD(product.purchase_price_mad) },
-    { label: "Emballage", value: formatMAD(product.packaging_cost_mad) },
-    { label: "Confirmation", value: formatMAD(product.confirmation_cost_mad) },
-    { label: "Livraison", value: formatMAD(product.shipping_cost_mad) },
-    { label: "Publicité", value: formatMAD(product.ads_cost_mad) },
-    { label: "Autres coûts", value: formatMAD(product.other_costs_mad) },
+    { label: "Prix d'achat",  value: formatMAD(product.purchase_price_mad) },
+    { label: "Emballage",     value: formatMAD(product.packaging_cost_mad) },
+    { label: "Confirmation",  value: formatMAD(product.confirmation_cost_mad) },
+    { label: "Livraison",     value: formatMAD(product.shipping_cost_mad) },
+    { label: "Publicité",     value: formatMAD(product.ads_cost_mad) },
+    { label: "Autres coûts",  value: formatMAD(product.other_costs_mad) },
   ];
 
   return (
