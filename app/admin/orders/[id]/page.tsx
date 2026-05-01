@@ -10,6 +10,7 @@ import { AgentAssigner } from "@/components/orders/agent-assigner";
 import { TrackingEditor } from "@/components/orders/tracking-editor";
 import { DeleteOrderButton } from "@/components/orders/delete-order-button";
 import { hasRole } from "@/lib/auth/roles";
+import { DuplicateBadge } from "@/components/orders/duplicate-badge";
 import { formatOrderDate, STATUS_LABELS } from "@/types/orders";
 import { cn } from "@/lib/utils";
 
@@ -54,6 +55,15 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         </div>
         {canManage && <DeleteOrderButton orderId={id} orderNumber={order.order_number} />}
       </div>
+
+      {/* Duplicate warning */}
+      {order.is_duplicate && (
+        <DuplicateBadge
+          variant="full"
+          duplicateOfId={order.duplicate_of}
+          duplicateOfNumber={null}
+        />
+      )}
 
       {/* Header stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

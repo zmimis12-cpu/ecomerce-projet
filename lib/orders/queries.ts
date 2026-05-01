@@ -7,7 +7,7 @@ import type { Order, OrderListItem, OrderStatus } from "@/types/orders";
 const ORDER_LIST_FIELDS = `
   id, order_number, customer_name, customer_phone, customer_city,
   status, total_amount_mad, estimated_profit, assigned_to,
-  source, notes, delivery_tracking_number, created_at
+  source, notes, delivery_tracking_number, is_duplicate, duplicate_of, created_at
 `;
 
 const ORDER_DETAIL_FIELDS = `
@@ -120,6 +120,8 @@ export async function getOrders(
       source: o.source,
       notes: o.notes,
       delivery_tracking_number: o.delivery_tracking_number,
+      is_duplicate: o.is_duplicate ?? false,
+      duplicate_of: o.duplicate_of ?? null,
       created_at: o.created_at,
     } as OrderListItem;
   });

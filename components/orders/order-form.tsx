@@ -13,7 +13,7 @@ interface Agent { id: string; full_name: string; email: string; role: string; }
 interface OrderFormProps {
   products: Product[];
   agents: Agent[];
-  onSubmit: (fd: FormData) => Promise<{ success: boolean; errors?: Record<string, string>; orderId?: string; orderNumber?: string }>;
+  onSubmit: (fd: FormData) => Promise<{ success: boolean; errors?: Record<string, string>; orderId?: string; orderNumber?: string; isDuplicate?: boolean; duplicateOfNumber?: string | null }>;
 }
 
 export function OrderForm({ products, agents, onSubmit }: OrderFormProps) {
@@ -64,8 +64,11 @@ export function OrderForm({ products, agents, onSubmit }: OrderFormProps) {
     startTransition(async () => {
       const result = await onSubmit(fd);
       if (result.success) {
-        setToast({ type: "success", msg: `Commande ${result.orderNumber} créée !` });
-        setTimeout(() => { router.push(`/admin/orders/${result.orderId}`); }, 800);
+        const msg = result.isDuplicate
+          ? `Commande ${result.orderNumber} créée — ⚠️ doublon suspect détecté.`
+          : `Commande ${result.orderNumber} créée !`;
+        setToast({ type: result.isDuplicate ? "error" : "success", msg });
+        setTimeout(() => { router.push(`/admin/orders/${result.orderId}`); }, 1200);
       } else {
         setErrors(result.errors ?? {});
         setToast({ type: "error", msg: result.errors?._form ?? "Erreur." });

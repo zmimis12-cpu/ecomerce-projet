@@ -74,6 +74,10 @@ export interface Order {
   // Source
   source: string | null;
 
+  // Duplicate detection
+  is_duplicate: boolean;
+  duplicate_of: string | null;
+
   created_at: string;
   updated_at: string;
 
@@ -111,6 +115,8 @@ export interface OrderListItem {
   source: string | null;
   notes: string | null;
   delivery_tracking_number: string | null;
+  is_duplicate: boolean;
+  duplicate_of: string | null;
   created_at: string;
 }
 

@@ -11,6 +11,7 @@ import {
   ShoppingCart, Plus, Edit2, Phone, MapPin,
   TrendingUp, TrendingDown, Search, Filter
 } from "lucide-react";
+import { DuplicateBadge } from "./duplicate-badge";
 
 interface OrderListProps {
   orders: OrderListItem[];
@@ -153,6 +154,11 @@ export function OrderList({ orders, canManage }: OrderListProps) {
                         <span className="font-mono text-xs font-medium text-foreground">
                           {order.order_number}
                         </span>
+                        {order.is_duplicate && (
+                          <div className="mt-1">
+                            <DuplicateBadge variant="compact" duplicateOfId={order.duplicate_of} />
+                          </div>
+                        )}
                         {order.source && (
                           <p className="text-xs text-muted-foreground mt-0.5">{order.source}</p>
                         )}
