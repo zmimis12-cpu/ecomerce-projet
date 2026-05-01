@@ -2,16 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  // Future modules will be added here
+  { href: "/admin",          label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/admin/products", label: "Produits",  icon: Package,          exact: false },
+  // Future modules added here
 ];
 
 export function AdminSidebar() {
   const pathname = usePathname();
+
+  function isActive(href: string, exact: boolean) {
+    return exact ? pathname === href : pathname.startsWith(href);
+  }
 
   return (
     <aside className="w-56 shrink-0 border-r bg-card flex flex-col">
@@ -25,13 +30,13 @@ export function AdminSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 space-y-0.5">
-        {navItems.map(({ href, label, icon: Icon }) => (
+        {navItems.map(({ href, label, icon: Icon, exact }) => (
           <Link
             key={href}
             href={href}
             className={cn(
               "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              pathname === href
+              isActive(href, exact)
                 ? "bg-secondary text-foreground"
                 : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
             )}
