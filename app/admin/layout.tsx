@@ -4,7 +4,6 @@ import { AdminSidebar } from "@/components/admin/sidebar";
 import { AdminHeader } from "@/components/admin/header";
 import { MissingProfileBanner } from "@/components/admin/missing-profile-banner";
 
-// Force fresh session/profile on every request
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 

@@ -3,8 +3,6 @@ import { requireUser } from "@/lib/auth/session";
 import { DashboardPlaceholder } from "@/components/admin/dashboard-placeholder";
 
 export const metadata: Metadata = { title: "Dashboard" };
-
-// Force fresh data on every request — no caching
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
