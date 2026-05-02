@@ -112,7 +112,6 @@ export default async function CCOrderCallPage({ params }: { params: Promise<{ id
           key={timerKey}
           orderId={id}
           customerPhone={order.customer_phone}
-          onComplete={() => {}}
         />
       </div>
 

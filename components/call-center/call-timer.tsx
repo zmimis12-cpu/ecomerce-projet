@@ -14,12 +14,11 @@ import { Phone, PhoneOff, Clock } from "lucide-react";
 interface CallTimerProps {
   orderId: string;
   customerPhone: string;
-  onComplete: (result: CallResult) => void;
 }
 
 type Phase = "idle" | "calling" | "done";
 
-export function CallTimer({ orderId, customerPhone, onComplete }: CallTimerProps) {
+export function CallTimer({ orderId, customerPhone }: CallTimerProps) {
   const [phase, setPhase]       = useState<Phase>("idle");
   const [elapsed, setElapsed]   = useState(0);
   const [notes, setNotes]       = useState("");
@@ -59,7 +58,6 @@ export function CallTimer({ orderId, customerPhone, onComplete }: CallTimerProps
       if (res.success) {
         setToast({ type: "success", msg: `Appel enregistré : ${CALL_RESULT_LABELS[result]}` });
         setTimeout(() => setToast(null), 3000);
-        onComplete(result);
       } else {
         setToast({ type: "error", msg: res.error ?? "Erreur." });
         setTimeout(() => setToast(null), 5000);
