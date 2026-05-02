@@ -162,6 +162,8 @@ export const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string; dot:
   pending:          { bg: "bg-slate-50",  text: "text-slate-600", dot: "bg-slate-400" },
   shipped:          { bg: "bg-cyan-50",   text: "text-cyan-700",  dot: "bg-cyan-500" },
   partially_returned:{ bg:"bg-amber-50",  text: "text-amber-700", dot: "bg-amber-400" },
+  in_transit:        { bg: "bg-blue-50",   text: "text-blue-700",  dot: "bg-blue-500" },
+  refused_delivery:  { bg: "bg-red-50",    text: "text-red-700",   dot: "bg-red-500" },
 };
 
 // Which statuses a call_center_agent can set
@@ -184,6 +186,8 @@ export const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   pending:          ["confirmed", "cancelled"],
   shipped:          ["delivered", "returned"],
   partially_returned:["returned"],
+  in_transit:       ["delivered", "refused_delivery", "returned"],
+  refused_delivery: ["returned"],
 };
 
 export function formatOrderDate(dateStr: string): string {
