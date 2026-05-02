@@ -15,7 +15,9 @@ export type OrderStatus =
   | "cancelled"
   | "pending"
   | "shipped"
-  | "partially_returned";
+  | "partially_returned"
+  | "in_transit"
+  | "refused_delivery";
 
 export interface OrderItem {
   id: string;
@@ -135,6 +137,8 @@ export const STATUS_LABELS: Record<OrderStatus, string> = {
   no_answer:        "Sans réponse",
   processing:       "En traitement",
   sent_to_delivery: "Envoyé en livraison",
+  in_transit:       "En transit",
+  refused_delivery: "Refusé à la livraison",
   delivered:        "Livré",
   paid:             "Payé",
   returned:         "Retourné",

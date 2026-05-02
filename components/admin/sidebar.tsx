@@ -1,24 +1,22 @@
 "use client";
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingCart, PhoneCall } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingCart, PhoneCall, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/admin",              label: "Dashboard",    icon: LayoutDashboard, exact: true },
-  { href: "/admin/products",     label: "Produits",     icon: Package,          exact: false },
-  { href: "/admin/orders",       label: "Commandes",    icon: ShoppingCart,     exact: false },
-  { href: "/admin/call-center",  label: "Call Center",  icon: PhoneCall,        exact: false },
+  { href: "/admin",              label: "Dashboard",   icon: LayoutDashboard, exact: true },
+  { href: "/admin/products",     label: "Produits",    icon: Package,          exact: false },
+  { href: "/admin/orders",       label: "Commandes",   icon: ShoppingCart,     exact: false },
+  { href: "/admin/call-center",  label: "Call Center", icon: PhoneCall,        exact: false },
+  { href: "/admin/delivery",     label: "Livraison",   icon: Truck,            exact: false },
 ];
 
 export function AdminSidebar() {
   const pathname = usePathname();
-
   function isActive(href: string, exact: boolean) {
     return exact ? pathname === href : pathname.startsWith(href);
   }
-
   return (
     <aside className="w-56 shrink-0 border-r bg-card flex flex-col">
       <div className="flex items-center gap-2.5 px-4 py-5 border-b">
@@ -27,7 +25,6 @@ export function AdminSidebar() {
         </div>
         <span className="font-semibold text-sm tracking-tight">GestionPro</span>
       </div>
-
       <nav className="flex-1 px-2 py-3 space-y-0.5">
         {navItems.map(({ href, label, icon: Icon, exact }) => (
           <Link key={href} href={href} className={cn(
@@ -41,7 +38,6 @@ export function AdminSidebar() {
           </Link>
         ))}
       </nav>
-
       <div className="px-4 py-3 border-t">
         <p className="text-xs text-muted-foreground">v2.0</p>
       </div>
