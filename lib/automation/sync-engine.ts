@@ -24,6 +24,7 @@ interface OrderRow {
   customer_city: string;
   total_amount_mad: number;
   product_sku: string;
+  product_name: string;
   quantity: number;
   notes: string | null;
   delivery_tracking_number: string | null;
@@ -39,7 +40,7 @@ function orderToSheetRow(o: OrderRow): (string | number | null)[] {
     o.customer_address,
     o.customer_city,
     o.total_amount_mad,
-    o.product_sku,
+    o.product_name,
     o.quantity,
     o.notes ?? "",
     o.delivery_tracking_number ?? "",
@@ -68,18 +69,19 @@ async function fetchOrderForSync(orderId: string): Promise<OrderRow | null> {
   // Get first product SKU and quantity from order_items
   const { data: items } = await supabaseAdmin
     .from("order_items")
-    .select("product_sku, quantity")
+    .select("product_sku, product_name, quantity")
     .eq("order_id", orderId)
     .limit(1)
     .single();
 
   const o = order as unknown as OrderRow;
-  const item = items as unknown as { product_sku: string; quantity: number } | null;
+  const item = items as unknown as { product_sku: string; product_name: string; quantity: number } | null;
 
   return {
     ...o,
-    product_sku: item?.product_sku ?? "",
-    quantity:    item?.quantity    ?? 1,
+    product_sku:  item?.product_sku  ?? "",
+    product_name: item?.product_name ?? "",
+    quantity:     item?.quantity     ?? 1,
   };
 }
 
