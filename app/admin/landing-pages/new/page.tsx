@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { LandingPageForm } from "@/components/landing/landing-page-form";
+import { LPBuilderForm } from "@/components/landing-builder/lp-builder-form";
 
 export const metadata: Metadata = { title: "Nouvelle Landing Page" };
 
@@ -18,7 +18,7 @@ export default async function NewLandingPage({
 
   const { data: products } = await supabase
     .from("products")
-    .select("id, name, slug, description, sale_price_mad")
+    .select("id, name, slug, sale_price_mad")
     .eq("is_active", true)
     .order("name");
 
@@ -33,15 +33,15 @@ export default async function NewLandingPage({
         <span className="text-sm font-medium">Nouvelle page</span>
       </div>
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Nouvelle Landing Page</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Nouveau Builder</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Sélectionnez un produit — le formulaire se remplit automatiquement.
+          Sélectionnez un produit + template, puis générez avec l&apos;IA.
         </p>
       </div>
-      <LandingPageForm
-        products={(products ?? []) as unknown as { id: string; name: string; slug: string; description: string | null; sale_price_mad: number }[]}
-        preselectedProductId={params.product_id}
+      <LPBuilderForm
+        products={(products ?? []) as unknown as { id: string; name: string; slug: string; sale_price_mad: number }[]}
         mode="create"
+        defaultValues={params.product_id ? { product_id: params.product_id } : undefined}
       />
     </div>
   );

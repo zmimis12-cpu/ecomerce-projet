@@ -1,6 +1,7 @@
 "use client";
 
 export default function LPError({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   error: _error,
   reset,
 }: {

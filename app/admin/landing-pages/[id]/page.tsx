@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { LandingPageForm } from "@/components/landing/landing-page-form";
+import { LPBuilderForm } from "@/components/landing-builder/lp-builder-form";
 
 export const metadata: Metadata = { title: "Modifier Landing Page" };
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export default async function EditLandingPage({ params }: { params: Promise<{ id
 
   const { data: lp } = await supabase
     .from("landing_pages")
-    .select("id, product_id, slug, title, subtitle, description, offer_text, meta_pixel_id, tiktok_pixel_id, is_active")
+    .select("*")
     .eq("id", id)
     .single();
 
@@ -24,15 +24,9 @@ export default async function EditLandingPage({ params }: { params: Promise<{ id
 
   const { data: products } = await supabase
     .from("products")
-    .select("id, name, slug, description, sale_price_mad")
+    .select("id, name, slug, sale_price_mad")
     .eq("is_active", true)
     .order("name");
-
-  const page = lp as unknown as {
-    id: string; product_id: string; slug: string; title: string;
-    subtitle: string | null; description: string | null; offer_text: string | null;
-    meta_pixel_id: string | null; tiktok_pixel_id: string | null; is_active: boolean;
-  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -42,24 +36,13 @@ export default async function EditLandingPage({ params }: { params: Promise<{ id
           <ChevronLeft className="h-4 w-4" /> Landing Pages
         </Link>
         <span className="text-muted-foreground">/</span>
-        <span className="text-sm font-medium truncate">{page.title}</span>
+        <span className="text-sm font-medium truncate">{(lp as { title: string }).title}</span>
       </div>
       <h1 className="text-xl font-semibold tracking-tight">Modifier la page</h1>
-      <LandingPageForm
-        products={(products ?? []) as unknown as { id: string; name: string; slug: string; description: string | null; sale_price_mad: number }[]}
+      <LPBuilderForm
+        products={(products ?? []) as unknown as { id: string; name: string; slug: string; sale_price_mad: number }[]}
         mode="edit"
-        defaultValues={{
-          id:              page.id,
-          product_id:      page.product_id,
-          slug:            page.slug,
-          title:           page.title,
-          subtitle:        page.subtitle        ?? "",
-          description:     page.description     ?? "",
-          offer_text:      page.offer_text      ?? "",
-          meta_pixel_id:   page.meta_pixel_id   ?? "",
-          tiktok_pixel_id: page.tiktok_pixel_id ?? "",
-          is_active:       page.is_active,
-        }}
+        defaultValues={lp as unknown as Record<string, unknown>}
       />
     </div>
   );
