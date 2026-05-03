@@ -47,6 +47,7 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
   const [b1,           setB1]           = useState<string>(String(defaultValues?.bundle_1_price ?? ""));
   const [b2,           setB2]           = useState<string>(String(defaultValues?.bundle_2_price ?? ""));
   const [b3,           setB3]           = useState<string>(String(defaultValues?.bundle_3_price ?? ""));
+  const [aiAnalysis,   setAiAnalysis]   = useState<Record<string, string> | null>(null);
   const [sections,     setSections]     = useState<LPSection[]>(
     (defaultValues?.sections as LPSection[]) ?? buildDefaultSections(templateKey)
   );
@@ -73,7 +74,7 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
   }
 
   // Apply AI generated content
-  function handleAIGenerated(content: GeneratedContent) {
+  function handleAIGenerated(content: GeneratedContent, _analysisData?: Record<string, string>) {
     setTitle(content.title || title);
     setSubtitle(content.subtitle || subtitle);
     setHeroHeadline(content.hero_headline);
@@ -84,6 +85,7 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
     setStockText(content.stock_text);
     setCtaText(content.cta_text);
     setSections(content.sections);
+    if (content.ai_analysis) setAiAnalysis(content.ai_analysis as unknown as Record<string, string>);
     setToast({ type: "success", msg: "✨ Contenu généré avec succès!" });
     setTimeout(() => setToast(null), 3000);
     setActiveTab("content");
@@ -117,6 +119,7 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
           template_key:     templateKey,
           sections,
           is_active:        isActive,
+          ai_analysis:     aiAnalysis ?? undefined,
           bundle_1_price:   b1 ? parseFloat(b1) : null,
           bundle_2_price:   b2 ? parseFloat(b2) : null,
           bundle_3_price:   b3 ? parseFloat(b3) : null,
@@ -314,6 +317,34 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
               />
             </div>
           </Card>
+
+          {aiAnalysis && (
+            <Card title="Analyse produit détectée">
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: "Type produit",  val: String(aiAnalysis.product_type  ?? aiAnalysis.fingerprint ?? "—") },
+                  { label: "Template",      val: String(aiAnalysis.templateKey   ?? "—") },
+                  { label: "Audience",      val: String(aiAnalysis.target_audience ?? "—") },
+                  { label: "Problème",      val: String(aiAnalysis.main_problem  ?? "—") },
+                  { label: "Bénéfice",      val: String(aiAnalysis.main_benefit  ?? "—") },
+                  { label: "Émotion",       val: String(aiAnalysis.emotional_angle ?? "—") },
+                ].map(({ label, val }) => (
+                  <div key={label} className="rounded-lg bg-secondary/30 p-2.5">
+                    <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
+                    <p className="text-xs font-medium text-foreground" dir="auto">{val}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 mt-3">
+                {previewUrl && (
+                  <a href={previewUrl} target="_blank" rel="noopener noreferrer"
+                    className="flex-1 text-center rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-secondary/50 transition-colors">
+                    Prévisualiser la page →
+                  </a>
+                )}
+              </div>
+            </Card>
+          )}
 
           <Card title="Textes Hero">
             {[

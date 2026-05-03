@@ -45,6 +45,7 @@ export async function upsertLandingPage(id: string | null, data: {
   bundle_1_price?: number | null;
   bundle_2_price?: number | null;
   bundle_3_price?: number | null;
+  ai_analysis?: unknown;
 }) {
   await requireRole([...MANAGER_ROLES]);
   const supabase = await createClient();
@@ -119,9 +120,9 @@ export async function smartGenerateLandingPage(productId: string) {
   const generated = await generateLandingPageContent(p, analysis.templateKey);
 
   return {
-    success:    true,
-    content:    generated,
-    analysis,
+    success:     true,
+    content:     generated,
+    analysis:    generated.ai_analysis,
     templateKey: analysis.templateKey,
   };
 }

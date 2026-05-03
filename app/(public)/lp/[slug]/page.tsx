@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getLandingPage } from "@/lib/public/queries";
 import { OrderFormPublic } from "@/components/landing/order-form-public";
 import { StockCounter } from "@/components/landing/stock-counter";
+import { FaqAccordion } from "@/components/landing/faq-accordion";
 import type { LPSection } from "@/lib/templates";
 
 export const revalidate = 3600;
@@ -14,9 +15,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const page = await getLandingPage(slug);
   if (!page) return { title: "منتج غير موجود" };
   return {
-    title:       page.title,
+    title: page.title,
     description: page.description ?? page.product.name,
-    robots:      { index: true, follow: false },
+    robots: { index: true, follow: false },
     openGraph: {
       title:  page.title,
       images: page.product.images[0]?.public_url ? [page.product.images[0].public_url] : [],
@@ -27,10 +28,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function LandingPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  // Fetch full landing page data (includes extended fields)
   const { data: lpData } = await supabaseAdmin
     .from("landing_pages")
-    .select("*, products(id, name, slug, description, sale_price_mad)")
+    .select("*")
     .eq("slug", slug)
     .eq("is_active", true)
     .maybeSingle();
@@ -42,84 +42,89 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
   const lp      = (lpData ?? {}) as Record<string, unknown>;
   const product = page.product;
-  const sections = (lp.sections as LPSection[]) ?? [];
-  const hasSections = sections.length > 0;
 
-  const primaryImage  = product.images.find((i) => i.is_primary) ?? product.images[0] ?? null;
-  const galleryImages = product.images.slice(0, 6);
-
-  // Derived values
-  const price        = product.sale_price_mad;
-  const heroHeadline = String(lp.hero_headline   ?? page.title);
-  const heroSub      = String(lp.hero_subheadline ?? page.subtitle ?? `🚀 توصيل سريع + الدفع عند الاستلام`);
-  const offerText    = String(lp.offer_text       ?? "عرض محدود — الكميات محدودة!");
-  const oldPriceText = String(lp.old_price_text   ?? `${(price * 1.3).toFixed(0)} درهم`);
-  // stockText reserved for future use
-  // const stockText = String(lp.stock_text ?? "⚠️ المخزون محدود");
-  const ctaText      = String(lp.cta_text         ?? "🛒 اطلب الآن");
-  const whatsapp     = String(lp.whatsapp_number  ?? "");
-
-  const b1 = Number(lp.bundle_1_price ?? price);
-  const b2 = Number(lp.bundle_2_price ?? (price * 2 * 0.9).toFixed(2));
-  const b3 = Number(lp.bundle_3_price ?? (price * 3 * 0.8).toFixed(2));
-
-  // Get section data helpers
+  // Section helpers
+  const sections     = (lp.sections as LPSection[]) ?? [];
   function getSection(type: string): LPSection | null {
     return sections.find((s) => s.type === type && s.enabled !== false) ?? null;
   }
 
-  // Default reviews
-  const defaultReviews = [
-    { name: "فاطمة الزهراء", city: "الدار البيضاء", stars: 5, text: "منتج رائع جداً! توصل في يومين والجودة ممتازة ❤️" },
-    { name: "محمد أمين",     city: "مراكش",          stars: 5, text: "نتائج مذهلة. يستحق كل درهم! سأطلب مرة أخرى." },
-    { name: "خديجة بنعلي",   city: "فاس",            stars: 5, text: "الدفع عند الاستلام والتوصيل في الوقت المحدد ✅" },
-  ];
+  // Core values
+  const price        = product.sale_price_mad;
+  const heroHeadline = String(lp.hero_headline    ?? page.title);
+  const heroSub      = String(lp.hero_subheadline ?? `توصيل سريع · الدفع عند الاستلام · ضمان الجودة`);
+  const offerText    = String(lp.offer_text       ?? "");
+  const ctaText      = String(lp.cta_text         ?? "اطلب الآن");
+  const oldPriceText = String(lp.old_price_text   ?? `${(price * 1.3).toFixed(0)} درهم`);
+  const whatsapp     = String(lp.whatsapp_number  ?? "");
 
-  const reviewsSection = getSection("reviews");
-  const reviews = (reviewsSection?.items as typeof defaultReviews) ?? defaultReviews;
+  const b1 = Number(lp.bundle_1_price || price);
+  const b2 = Number(lp.bundle_2_price || (price * 2 * 0.9).toFixed(2));
+  const b3 = Number(lp.bundle_3_price || (price * 3 * 0.8).toFixed(2));
 
-  const benefitsSection = getSection("benefits");
-  const defaultBenefits = [
-    { icon: "⚡", title: "سريع وفعال",      desc: "نتائج احترافية" },
-    { icon: "💪", title: "متين وصامد",       desc: "مصنوع ليدوم سنوات" },
-    { icon: "🎯", title: "دقيق ومضمون",      desc: "أداء احترافي" },
-    { icon: "🔋", title: "بطارية طويلة",     desc: "10+ ساعات استمرارية" },
-    { icon: "📦", title: "طقم كامل",          desc: "كل الملحقات في الصندوق" },
-    { icon: "🛡️", title: "ضمان سنة",        desc: "خدمة ما بعد البيع" },
-  ];
-  const benefits = (benefitsSection?.items as typeof defaultBenefits) ?? defaultBenefits;
+  const primaryImage  = product.images.find((i) => i.is_primary) ?? product.images[0] ?? null;
+  const galleryImages = product.images.slice(0, 6);
 
-  const faqSection = getSection("faq");
-  const defaultFaq = [
-    { q: "كيفاش يجي التوصيل؟", a: "خلال 2-4 أيام عمل لجميع مدن المغرب." },
-    { q: "واش ممكن ترجع المنتج؟", a: "نعم، ضمان الإرجاع خلال 7 أيام." },
-    { q: "كيفاش كتدفع؟", a: "الدفع عند الاستلام فقط — ما كتدفعش مسبقاً." },
-    { q: "كيفاش تتواصل معنا؟", a: "عبر الهاتف أو واتساب، فريقنا متاح 24/7." },
-  ];
-  const faqItems = (faqSection?.items as typeof defaultFaq) ?? defaultFaq;
-
+  // Sections data
   const psSection = getSection("problem_solution");
+  const benefitsSection = getSection("benefits");
+  const reviewsSection  = getSection("reviews");
+  const faqSection      = getSection("faq");
+  const formSection     = getSection("order_form");
 
-  const formSection = getSection("order_form");
-  const formHeadline = String(formSection?.headline ?? "🛒 اطلب الآن — الدفع عند الاستلام");
-  const formSub      = String(formSection?.sub      ?? "أملا البيانات وفريقنا كيتصل بيك للتأكيد");
+  const benefits = (benefitsSection?.items as { icon: string; title: string; desc: string }[]) ?? [
+    { icon: "✓", title: "جودة ممتازة",      desc: "مضمون ومعتمد" },
+    { icon: "✓", title: "توصيل سريع",        desc: "2-4 أيام عمل" },
+    { icon: "✓", title: "دعم مستمر",         desc: "فريقنا متاح دائماً" },
+    { icon: "✓", title: "ضمان سنة",          desc: "استرجاع مجاني" },
+  ];
 
-  // ── Inline styles shared ──────────────────────────────────────────────────────
-  const S = {
-    page:    { fontFamily: "'Cairo', sans-serif", overflowX: "hidden" as const, minHeight: "100vh", backgroundColor: "#f9fafb" },
-    wrap:    { maxWidth: "520px", margin: "0 auto", padding: "0 16px" },
-    section: (bg = "white") => ({ backgroundColor: bg, marginTop: "8px", padding: "28px 0" }),
-    h2:      { textAlign: "center" as const, fontSize: "21px", fontWeight: 900, color: "#111827", margin: "0 0 20px" },
-    card:    { backgroundColor: "#f9fafb", borderRadius: "16px", padding: "16px", border: "1px solid #f3f4f6" },
-    btn:     (bg = "#16a34a") => ({
-      display: "block", width: "100%", textAlign: "center" as const,
-      backgroundColor: bg, color: "white", fontSize: "19px", fontWeight: 900,
-      padding: "17px 24px", borderRadius: "16px", textDecoration: "none",
-      boxSizing: "border-box" as const, border: "none", cursor: "pointer",
-      fontFamily: "'Cairo', sans-serif",
-      boxShadow: `0 4px 20px ${bg}55`,
-    }),
-  };
+  const reviews = (reviewsSection?.items as { name: string; city: string; stars: number; text: string }[]) ?? [
+    { name: "فاطمة الزهراء", city: "الدار البيضاء", stars: 5, text: "منتج ممتاز، توصل في يومين. الجودة فاقت توقعاتي تماماً." },
+    { name: "محمد أمين",     city: "مراكش",          stars: 5, text: "جربته وأنصح به. السعر معقول والنتيجة احترافية." },
+    { name: "خديجة بنعلي",   city: "فاس",            stars: 5, text: "الدفع عند الاستلام أهم شيء. وصل في الوقت المحدد." },
+  ];
+
+  const faqItems = (faqSection?.items as { q: string; a: string }[]) ?? [
+    { q: "كيف يتم التوصيل؟",         a: "خلال 2-4 أيام عمل لجميع مدن المغرب." },
+    { q: "هل يمكن إرجاع المنتج؟",    a: "نعم، إرجاع مجاني خلال 7 أيام." },
+    { q: "كيف يتم الدفع؟",           a: "الدفع عند الاستلام فقط — لا دفع مسبق." },
+    { q: "هل هناك ضمان؟",            a: "نعم، ضمان سنة كاملة مع دعم فني." },
+  ];
+
+  const formHeadline = String(formSection?.headline ?? "اطلب الآن — الدفع عند الاستلام");
+
+  // ── Shared CSS vars ────────────────────────────────────────────────────────────
+  const CSS = `
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --green:#16a34a; --green-dark:#15803d; --green-light:#f0fdf4; --green-border:#bbf7d0;
+      --text:#111827; --text-2:#374151; --text-3:#6b7280; --text-4:#9ca3af;
+      --bg:#f8fafc; --card:#ffffff; --border:#e5e7eb; --radius:14px;
+      --shadow:0 1px 3px rgba(0,0,0,.08),0 4px 12px rgba(0,0,0,.06);
+      --shadow-lg:0 4px 16px rgba(0,0,0,.1),0 12px 32px rgba(0,0,0,.08);
+    }
+    html{scroll-behavior:smooth}
+    body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}
+    .wrap{max-width:520px;margin:0 auto;padding:0 16px}
+    .card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow)}
+    .btn-green{
+      display:block;width:100%;text-align:center;
+      background:var(--green);color:#fff;
+      font-family:'Cairo',sans-serif;font-size:18px;font-weight:800;
+      padding:16px 24px;border-radius:var(--radius);
+      text-decoration:none;border:none;cursor:pointer;
+      transition:background .15s,transform .1s;
+    }
+    .btn-green:active{transform:scale(.98);background:var(--green-dark)}
+    .section{background:var(--card);margin-top:8px;padding:28px 0}
+    .section-title{font-size:20px;font-weight:800;color:var(--text);text-align:center;margin-bottom:20px}
+    .badge{display:inline-flex;align-items:center;gap:5px;background:var(--green-light);
+      border:1px solid var(--green-border);color:#15803d;
+      font-size:12px;font-weight:600;padding:5px 12px;border-radius:9999px}
+    .star{color:#f59e0b}
+    @media(min-width:640px){.sticky-bar{display:none!important}}
+  `;
 
   return (
     <>
@@ -128,109 +133,160 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${page.meta_pixel_id}');fbq('track','PageView');`
         }} />
       )}
+      <style>{CSS}</style>
 
-      <div style={S.page}>
-        {/* ── PROMO BAR ── */}
-        <div style={{ backgroundColor: "#dc2626", color: "white", textAlign: "center", padding: "10px 16px", fontSize: "13px", fontWeight: 700 }}>
-          🔥 {offerText}
-        </div>
+      <div dir="rtl" lang="ar">
 
-        {/* ── HERO ── */}
-        <section style={{ backgroundColor: "white", paddingBottom: "24px" }}>
-          <div style={S.wrap}>
-            <div style={{ padding: "20px 0 0" }}>
-              {/* Badge */}
-              <div style={{ textAlign: "center", marginBottom: "14px" }}>
-                <span style={{ display: "inline-block", backgroundColor: "#dc2626", color: "white", padding: "6px 18px", borderRadius: "9999px", fontSize: "13px", fontWeight: 700 }}>
-                  🔥 {offerText}
-                </span>
+        {/* ── 1. OFFER BAR ── */}
+        {offerText && (
+          <div style={{ background:"#111827", color:"white", textAlign:"center",
+            padding:"9px 16px", fontSize:"13px", fontWeight:600, letterSpacing:".01em" }}>
+            {offerText}
+          </div>
+        )}
+
+        {/* ── 2. HERO ── */}
+        <section style={{ background:"var(--card)", paddingBottom:"28px" }}>
+          <div className="wrap" style={{ paddingTop:"20px" }}>
+
+            {/* Headline */}
+            <h1 style={{ fontSize:"clamp(20px,5vw,26px)", fontWeight:900,
+              color:"var(--text)", lineHeight:1.35, textAlign:"center",
+              marginBottom:"8px" }}>
+              {heroHeadline}
+            </h1>
+            <p style={{ textAlign:"center", color:"var(--text-3)", fontSize:"14px",
+              marginBottom:"16px", lineHeight:1.6 }}>
+              {heroSub}
+            </p>
+
+            {/* Trust badges */}
+            <div style={{ display:"flex", justifyContent:"center", flexWrap:"wrap",
+              gap:"6px", marginBottom:"18px" }}>
+              {["الدفع عند الاستلام", "توصيل سريع", "ضمان الجودة"].map((b) => (
+                <span key={b} className="badge">{b}</span>
+              ))}
+            </div>
+
+            {/* Product image */}
+            {primaryImage && (
+              <div style={{ position:"relative", width:"100%", aspectRatio:"1/1",
+                borderRadius:"16px", overflow:"hidden",
+                boxShadow:"var(--shadow-lg)", marginBottom:"20px",
+                background:"#f3f4f6" }}>
+                <Image src={primaryImage.public_url} alt={product.name}
+                  fill style={{ objectFit:"cover" }} priority
+                  sizes="(max-width:520px) 100vw,520px" unoptimized />
               </div>
+            )}
 
-              {/* Headline */}
-              <h1 style={{ textAlign: "center", fontSize: "clamp(20px,5vw,28px)", fontWeight: 900, color: "#111827", lineHeight: 1.35, margin: "0 0 8px" }}>
-                {heroHeadline}
-              </h1>
-              <p style={{ textAlign: "center", color: "#6b7280", fontSize: "15px", margin: "0 0 16px" }}>{heroSub}</p>
-
-              {/* Trust */}
-              <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "6px", marginBottom: "18px" }}>
-                {["✅ الدفع عند الاستلام", "🚀 توصيل سريع", "⭐ 4.9/5"].map((b) => (
-                  <span key={b} style={{ backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534", fontSize: "11px", fontWeight: 600, padding: "5px 10px", borderRadius: "9999px" }}>{b}</span>
-                ))}
-              </div>
-
-              {/* Image */}
-              {primaryImage && (
-                <div style={{ position: "relative", width: "100%", borderRadius: "16px", overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.12)", marginBottom: "18px", aspectRatio: "1/1", backgroundColor: "#f3f4f6" }}>
-                  <Image src={primaryImage.public_url} alt={product.name} fill style={{ objectFit: "cover" }} priority sizes="(max-width:520px) 100vw,520px" unoptimized />
-                </div>
-              )}
-
-              {/* Price row */}
-              <div style={{ backgroundColor: "#f9fafb", borderRadius: "16px", padding: "14px 16px", marginBottom: "18px", border: "1px solid #e5e7eb" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-                      <span style={{ fontSize: "36px", fontWeight: 900, color: "#16a34a", lineHeight: 1 }}>{price.toFixed(0)}</span>
-                      <span style={{ fontSize: "16px", fontWeight: 700, color: "#9ca3af" }}>درهم</span>
-                      <span style={{ fontSize: "13px", color: "#ef4444", textDecoration: "line-through" }}>{oldPriceText}</span>
-                    </div>
-                    <p style={{ color: "#16a34a", fontSize: "11px", fontWeight: 600, margin: "4px 0 0" }}>✓ شامل التوصيل المجاني</p>
+            {/* Price card */}
+            <div className="card" style={{ padding:"16px", marginBottom:"18px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div>
+                  <p style={{ color:"var(--text-3)", fontSize:"12px", marginBottom:"3px" }}>السعر</p>
+                  <div style={{ display:"flex", alignItems:"baseline", gap:"8px" }}>
+                    <span style={{ fontSize:"38px", fontWeight:900, color:"var(--green)", lineHeight:1 }}>
+                      {price.toFixed(0)}
+                    </span>
+                    <span style={{ fontSize:"16px", fontWeight:700, color:"var(--text-4)" }}>درهم</span>
+                    <span style={{ fontSize:"13px", color:"#ef4444", textDecoration:"line-through" }}>
+                      {oldPriceText}
+                    </span>
                   </div>
-                  <StockCounter />
+                  <p style={{ color:"var(--green)", fontSize:"12px", fontWeight:600, marginTop:"3px" }}>
+                    شامل التوصيل المجاني
+                  </p>
                 </div>
-              </div>
-
-              <a href="#order-form" style={S.btn()}>{ctaText}</a>
-
-              {/* WhatsApp button */}
-              {whatsapp && (
-                <a href={`https://wa.me/${whatsapp.replace(/\+/g, "")}`} target="_blank" rel="noopener noreferrer"
-                  style={{ ...S.btn("#25d366"), marginTop: "10px" }}>
-                  💬 تواصل عبر واتساب
-                </a>
-              )}
-
-              <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "12px", fontSize: "11px", color: "#9ca3af", marginTop: "12px" }}>
-                <span>🔒 طلب آمن</span><span>🚚 توصيل لجميع المدن</span><span>📞 دعم 24/7</span>
+                <StockCounter />
               </div>
             </div>
+
+            <a href="#order-form" className="btn-green">{ctaText}</a>
+
+            {whatsapp && (
+              <a href={`https://wa.me/${whatsapp.replace(/\+/g,"")}`}
+                target="_blank" rel="noopener noreferrer"
+                style={{ display:"block", width:"100%", textAlign:"center",
+                  background:"#25d366", color:"white",
+                  fontFamily:"'Cairo',sans-serif", fontSize:"15px", fontWeight:700,
+                  padding:"13px 24px", borderRadius:"var(--radius)",
+                  textDecoration:"none", marginTop:"10px" }}>
+                تواصل عبر واتساب
+              </a>
+            )}
           </div>
         </section>
 
-        {/* ── PROBLEM / SOLUTION ── */}
-        {(!hasSections || psSection) && (
-          <section style={S.section()}>
-            <div style={S.wrap}>
-              <h2 style={S.h2}>{psSection ? String(psSection.before_title ?? "قبل وبعد") : "قبل وبعد 🔄"}</h2>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                {[
-                  { label: "قبل ❌", color: "#fef2f2", border: "#fecaca", text: "#dc2626",
-                    points: (psSection?.before_points as string[]) ?? ["❌ جهد كبير", "❌ نتائج ضعيفة", "❌ تكلفة عالية"] },
-                  { label: "بعد ✅", color: "#f0fdf4", border: "#bbf7d0", text: "#16a34a",
-                    points: (psSection?.after_points as string[]) ?? ["✅ نتائج فورية", "✅ سهل الاستخدام", "✅ اقتصادي"] },
-                ].map((col) => (
-                  <div key={col.label} style={{ backgroundColor: col.color, border: `2px solid ${col.border}`, borderRadius: "14px", padding: "14px" }}>
-                    <p style={{ fontWeight: 900, color: col.text, fontSize: "14px", margin: "0 0 10px", textAlign: "center" }}>{col.label}</p>
-                    {col.points.map((pt, i) => (
-                      <p key={i} style={{ fontSize: "12px", color: "#374151", margin: "0 0 5px", lineHeight: 1.4 }}>{pt}</p>
-                    ))}
-                  </div>
-                ))}
+        {/* ── 3. PROBLEM / SOLUTION ── */}
+        {psSection && (
+          <section className="section">
+            <div className="wrap">
+              <h2 className="section-title">هل تعاني من هذا؟</h2>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
+                <div className="card" style={{ padding:"16px",
+                  borderColor:"#fca5a5", background:"#fff7f7" }}>
+                  <p style={{ fontWeight:800, color:"#dc2626", fontSize:"13px",
+                    marginBottom:"12px", textAlign:"center" }}>
+                    قبل
+                  </p>
+                  {((psSection.before_points as string[]) ?? []).map((pt, i) => (
+                    <p key={i} style={{ fontSize:"12px", color:"var(--text-2)",
+                      marginBottom:"6px", lineHeight:1.5 }}>
+                      {pt}
+                    </p>
+                  ))}
+                </div>
+                <div className="card" style={{ padding:"16px",
+                  borderColor:"var(--green-border)", background:"var(--green-light)" }}>
+                  <p style={{ fontWeight:800, color:"var(--green)", fontSize:"13px",
+                    marginBottom:"12px", textAlign:"center" }}>
+                    بعد
+                  </p>
+                  {((psSection.after_points as string[]) ?? []).map((pt, i) => (
+                    <p key={i} style={{ fontSize:"12px", color:"var(--text-2)",
+                      marginBottom:"6px", lineHeight:1.5 }}>
+                      {pt}
+                    </p>
+                  ))}
+                </div>
               </div>
             </div>
           </section>
         )}
 
-        {/* ── GALLERY ── */}
+        {/* ── 4. BENEFITS ── */}
+        <section className="section">
+          <div className="wrap">
+            <h2 className="section-title">مميزات المنتج</h2>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px" }}>
+              {benefits.map((b, i) => (
+                <div key={i} className="card" style={{ padding:"14px",
+                  display:"flex", alignItems:"flex-start", gap:"10px" }}>
+                  <span style={{ fontSize:"20px", flexShrink:0, lineHeight:1 }}>{b.icon}</span>
+                  <div>
+                    <p style={{ fontWeight:700, color:"var(--text)", fontSize:"13px",
+                      marginBottom:"2px" }}>{b.title}</p>
+                    <p style={{ color:"var(--text-3)", fontSize:"11px",
+                      lineHeight:1.4 }}>{b.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── 5. GALLERY ── */}
         {galleryImages.length > 1 && (
-          <section style={S.section()}>
-            <div style={S.wrap}>
-              <p style={{ textAlign: "center", fontSize: "11px", fontWeight: 700, color: "#9ca3af", letterSpacing: "0.05em", marginBottom: "12px" }}>صور المنتج</p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px" }}>
+          <section className="section">
+            <div className="wrap">
+              <h2 className="section-title" style={{ fontSize:"16px" }}>صور المنتج</h2>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"8px" }}>
                 {galleryImages.map((img) => (
-                  <div key={img.id} style={{ position: "relative", borderRadius: "12px", overflow: "hidden", aspectRatio: "1/1", backgroundColor: "#f3f4f6" }}>
-                    <Image src={img.public_url} alt={product.name} fill style={{ objectFit: "cover" }} sizes="33vw" unoptimized />
+                  <div key={img.id} style={{ position:"relative", borderRadius:"12px",
+                    overflow:"hidden", aspectRatio:"1/1", background:"#f3f4f6" }}>
+                    <Image src={img.public_url} alt={product.name} fill
+                      style={{ objectFit:"cover" }} sizes="33vw" unoptimized />
                   </div>
                 ))}
               </div>
@@ -238,104 +294,124 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </section>
         )}
 
-        {/* ── BENEFITS ── */}
-        <section style={S.section()}>
-          <div style={S.wrap}>
-            <h2 style={S.h2}>لماذا تختار هذا المنتج؟ 🏆</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "10px" }}>
-              {benefits.map((b: { icon: string; title: string; desc: string }, i: number) => (
-                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", background: "linear-gradient(135deg,#f0fdf4,#ecfdf5)", border: "1px solid #dcfce7", borderRadius: "14px", padding: "12px" }}>
-                  <span style={{ fontSize: "22px", flexShrink: 0 }}>{b.icon}</span>
-                  <div>
-                    <p style={{ fontWeight: 700, color: "#111827", fontSize: "13px", margin: "0 0 2px" }}>{b.title}</p>
-                    <p style={{ color: "#6b7280", fontSize: "11px", margin: 0, lineHeight: 1.4 }}>{b.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── TRUST ── */}
-        <section style={{ background: "linear-gradient(135deg,#1a1a2e 0%,#16213e 100%)", marginTop: "8px", padding: "28px 0" }}>
-          <div style={S.wrap}>
-            <h2 style={{ ...S.h2, color: "white" }}>لماذا نحن الأفضل؟ ✨</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        {/* ── 6. TRUST STRIP ── */}
+        <section style={{ background:"#111827", marginTop:"8px", padding:"24px 0" }}>
+          <div className="wrap">
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px" }}>
               {[
-                { icon: "💵", title: "الدفع عند الاستلام",  desc: "ما كتدفعش حتى يوصلك المنتج" },
-                { icon: "🚀", title: "توصيل سريع 2-4 أيام", desc: "نوصل لجميع مدن المغرب" },
-                { icon: "📞", title: "تأكيد عبر الهاتف",    desc: "فريقنا كيتصل بيك خلال ساعات" },
-                { icon: "🔄", title: "ضمان الاسترجاع",      desc: "راضٍ أو مستردّ ثمنك كاملاً" },
+                { icon:"💵", title:"الدفع عند الاستلام",  desc:"لا دفع مسبق" },
+                { icon:"🚀", title:"توصيل سريع",          desc:"2-4 أيام عمل" },
+                { icon:"📞", title:"تأكيد هاتفي",          desc:"فريقنا يتصل بك" },
+                { icon:"✓",  title:"ضمان المتابعة",       desc:"سنة كاملة" },
               ].map((item) => (
-                <div key={item.title} style={{ display: "flex", alignItems: "center", gap: "14px", backgroundColor: "rgba(255,255,255,0.1)", borderRadius: "14px", padding: "13px 15px" }}>
-                  <span style={{ fontSize: "26px", flexShrink: 0 }}>{item.icon}</span>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontWeight: 700, color: "white", fontSize: "13px", margin: "0 0 2px" }}>{item.title}</p>
-                    <p style={{ color: "#d1d5db", fontSize: "11px", margin: 0 }}>{item.desc}</p>
+                <div key={item.title} style={{ display:"flex", alignItems:"center",
+                  gap:"10px", background:"rgba(255,255,255,.07)",
+                  borderRadius:"12px", padding:"12px 14px" }}>
+                  <span style={{ fontSize:"22px", flexShrink:0 }}>{item.icon}</span>
+                  <div>
+                    <p style={{ fontWeight:700, color:"white", fontSize:"12px",
+                      marginBottom:"1px" }}>{item.title}</p>
+                    <p style={{ color:"#9ca3af", fontSize:"11px" }}>{item.desc}</p>
                   </div>
-                  <span style={{ color: "#4ade80", fontSize: "16px" }}>✓</span>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* ── REVIEWS ── */}
-        <section style={S.section()}>
-          <div style={S.wrap}>
-            <div style={{ textAlign: "center", marginBottom: "20px" }}>
-              <h2 style={S.h2}>آراء العملاء ⭐</h2>
-              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}>
-                <span style={{ color: "#f59e0b", fontSize: "18px" }}>★★★★★</span>
-                <span style={{ fontWeight: 900, fontSize: "16px" }}>4.9</span>
-                <span style={{ color: "#9ca3af", fontSize: "12px" }}>(+200 تقييم)</span>
+        {/* ── 7. REVIEWS ── */}
+        <section className="section">
+          <div className="wrap">
+            <div style={{ textAlign:"center", marginBottom:"20px" }}>
+              <h2 className="section-title" style={{ marginBottom:"6px" }}>آراء العملاء</h2>
+              <div style={{ display:"flex", justifyContent:"center",
+                alignItems:"center", gap:"6px" }}>
+                <span className="star" style={{ fontSize:"16px" }}>★★★★★</span>
+                <span style={{ fontWeight:800, fontSize:"15px" }}>4.9</span>
+                <span style={{ color:"var(--text-4)", fontSize:"12px" }}>(+200 تقييم)</span>
               </div>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {reviews.map((r: { name: string; city: string; text: string; stars?: number }, idx: number) => (
-                <div key={idx} style={S.card}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <div style={{ width: "36px", height: "36px", borderRadius: "50%", backgroundColor: "#16a34a", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: "14px" }}>
+            <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+              {reviews.map((r, idx) => (
+                <div key={idx} className="card" style={{ padding:"16px" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between",
+                    alignItems:"flex-start", marginBottom:"10px" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                      <div style={{ width:"36px", height:"36px", borderRadius:"50%",
+                        background:"var(--green)", color:"white",
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        fontWeight:800, fontSize:"14px", flexShrink:0 }}>
                         {r.name.charAt(0)}
                       </div>
                       <div>
-                        <p style={{ fontWeight: 700, color: "#111827", fontSize: "13px", margin: "0 0 1px" }}>{r.name}</p>
-                        <p style={{ color: "#9ca3af", fontSize: "11px", margin: 0 }}>{r.city}</p>
+                        <p style={{ fontWeight:700, color:"var(--text)", fontSize:"13px",
+                          marginBottom:"1px" }}>{r.name}</p>
+                        <p style={{ color:"var(--text-4)", fontSize:"11px" }}>{r.city}</p>
                       </div>
                     </div>
-                    <span style={{ color: "#f59e0b", fontSize: "13px" }}>{"★".repeat(r.stars ?? 5)}</span>
+                    <span className="star" style={{ fontSize:"12px", letterSpacing:"1px" }}>
+                      {"★".repeat(r.stars ?? 5)}
+                    </span>
                   </div>
-                  <p style={{ color: "#374151", fontSize: "13px", lineHeight: 1.6, margin: "0 0 6px" }}>&ldquo;{r.text}&rdquo;</p>
-                  <span style={{ color: "#16a34a", fontSize: "11px", fontWeight: 700 }}>✓ مشتري موثق</span>
+                  <p style={{ color:"var(--text-2)", fontSize:"13px", lineHeight:1.65,
+                    marginBottom:"8px" }}>
+                    {r.text}
+                  </p>
+                  <span style={{ color:"var(--green)", fontSize:"11px", fontWeight:600 }}>
+                    مشتري موثق
+                  </span>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* ── BUNDLE OFFERS ── */}
-        <section style={S.section("#f0fdf4")}>
-          <div style={S.wrap}>
-            <h2 style={S.h2}>اختر عرضك 🎁</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        {/* ── 8. BUNDLE OFFERS ── */}
+        <section style={{ background:"var(--green-light)", marginTop:"8px", padding:"28px 0" }}>
+          <div className="wrap">
+            <h2 className="section-title">اختر عرضك</h2>
+            <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
               {[
-                { qty: 1, label: "قطعة واحدة",  price: b1, badge: null },
-                { qty: 2, label: "قطعتين",      price: b2, badge: "وفّر " + (b1 * 2 - b2).toFixed(0) + " درهم" },
-                { qty: 3, label: "3 قطع",        price: b3, badge: "وفّر " + (b1 * 3 - b3).toFixed(0) + " درهم" },
+                { qty:1, label:"قطعة واحدة",  price:b1, popular:false },
+                { qty:2, label:"قطعتين",      price:b2, popular:false,
+                  saving:`وفّر ${(b1*2-b2).toFixed(0)} درهم` },
+                { qty:3, label:"3 قطع",        price:b3, popular:true,
+                  saving:`وفّر ${(b1*3-b3).toFixed(0)} درهم` },
               ].map((offer) => (
                 <a key={offer.qty} href="#order-form"
-                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: offer.qty === 3 ? "#16a34a" : "white", border: `2px solid ${offer.qty === 3 ? "#16a34a" : "#e5e7eb"}`, borderRadius: "14px", padding: "14px 16px", textDecoration: "none" }}>
+                  style={{ display:"flex", justifyContent:"space-between",
+                    alignItems:"center",
+                    background: offer.popular ? "var(--green)" : "var(--card)",
+                    border:`2px solid ${offer.popular ? "var(--green)" : "var(--border)"}`,
+                    borderRadius:"var(--radius)", padding:"14px 16px",
+                    textDecoration:"none", position:"relative" }}>
+                  {offer.popular && (
+                    <span style={{ position:"absolute", top:"-10px", right:"14px",
+                      background:"#f59e0b", color:"white", fontSize:"10px",
+                      fontWeight:700, padding:"2px 10px", borderRadius:"9999px" }}>
+                      الأوفر
+                    </span>
+                  )}
                   <div>
-                    <p style={{ fontWeight: 700, color: offer.qty === 3 ? "white" : "#111827", fontSize: "14px", margin: "0 0 2px" }}>{offer.label}</p>
-                    {offer.badge && (
-                      <span style={{ backgroundColor: offer.qty === 3 ? "rgba(255,255,255,0.2)" : "#dcfce7", color: offer.qty === 3 ? "white" : "#15803d", fontSize: "11px", fontWeight: 700, padding: "2px 8px", borderRadius: "9999px" }}>
-                        🎁 {offer.badge}
+                    <p style={{ fontWeight:700,
+                      color: offer.popular ? "white" : "var(--text)",
+                      fontSize:"14px", marginBottom:"3px" }}>
+                      {offer.qty}× — {offer.label}
+                    </p>
+                    {offer.saving && (
+                      <span style={{ background: offer.popular
+                          ? "rgba(255,255,255,.2)" : "var(--green-light)",
+                        color: offer.popular ? "white" : "var(--green)",
+                        fontSize:"11px", fontWeight:600,
+                        padding:"2px 8px", borderRadius:"9999px" }}>
+                        {offer.saving}
                       </span>
                     )}
                   </div>
-                  <span style={{ fontSize: "22px", fontWeight: 900, color: offer.qty === 3 ? "white" : "#16a34a" }}>
-                    {offer.price.toFixed(0)} <span style={{ fontSize: "13px" }}>درهم</span>
+                  <span style={{ fontSize:"22px", fontWeight:900,
+                    color: offer.popular ? "white" : "var(--green)" }}>
+                    {offer.price.toFixed(0)}{" "}
+                    <span style={{ fontSize:"12px" }}>درهم</span>
                   </span>
                 </a>
               ))}
@@ -343,53 +419,83 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </section>
 
-        {/* ── FAQ ── */}
-        <section style={S.section()}>
-          <div style={S.wrap}>
-            <h2 style={S.h2}>الأسئلة الشائعة ❓</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {faqItems.map((item: { q: string; a: string }, idx: number) => (
-                <div key={idx} style={{ borderRadius: "12px", border: "1px solid #e5e7eb", overflow: "hidden" }}>
-                  <div style={{ padding: "14px 16px", backgroundColor: "#f9fafb" }}>
-                    <p style={{ fontWeight: 700, color: "#111827", fontSize: "14px", margin: 0 }}>❓ {item.q}</p>
-                  </div>
-                  <div style={{ padding: "12px 16px" }}>
-                    <p style={{ color: "#4b5563", fontSize: "13px", margin: 0, lineHeight: 1.6 }}>✅ {item.a}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── ORDER FORM ── */}
-        <section id="order-form" style={{ backgroundColor: "white", marginTop: "8px", padding: "32px 0 40px" }}>
-          <div style={S.wrap}>
-            <div style={{ textAlign: "center", marginBottom: "24px" }}>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", backgroundColor: "#16a34a", color: "white", padding: "10px 22px", borderRadius: "9999px", fontSize: "15px", fontWeight: 700, marginBottom: "8px" }}>
-                {formHeadline}
-              </div>
-              <p style={{ color: "#6b7280", fontSize: "13px", margin: 0 }}>{formSub}</p>
-            </div>
+        {/* ── 9. ORDER FORM ── */}
+        <section id="order-form" className="section" style={{ paddingBottom:"36px" }}>
+          <div className="wrap">
+            <h2 className="section-title">{formHeadline}</h2>
+            <p style={{ textAlign:"center", color:"var(--text-3)", fontSize:"13px",
+              marginBottom:"24px" }}>
+              أملأ البيانات وسيتصل بك فريقنا للتأكيد
+            </p>
             <OrderFormPublic
-              product={product}
-              productSlug={slug}
-              ctaText={ctaText}
-              b1={b1} b2={b2} b3={b3}
+              product={product} productSlug={slug}
+              ctaText={ctaText} b1={b1} b2={b2} b3={b3}
             />
           </div>
         </section>
 
+        {/* ── 10. FAQ ── */}
+        <section className="section">
+          <div className="wrap">
+            <h2 className="section-title">الأسئلة الشائعة</h2>
+            <FaqAccordion items={faqItems} />
+          </div>
+        </section>
+
+        {/* ── 11. FINAL CTA ── */}
+        <section style={{ background:"var(--green)", marginTop:"8px", padding:"28px 0" }}>
+          <div className="wrap" style={{ textAlign:"center" }}>
+            <p style={{ color:"white", fontSize:"20px", fontWeight:800,
+              marginBottom:"6px" }}>
+              {ctaText}
+            </p>
+            <p style={{ color:"rgba(255,255,255,.8)", fontSize:"13px",
+              marginBottom:"20px" }}>
+              الدفع عند الاستلام · توصيل مجاني · ضمان سنة
+            </p>
+            <a href="#order-form"
+              style={{ display:"inline-block", background:"white",
+                color:"var(--green)", fontFamily:"'Cairo',sans-serif",
+                fontSize:"17px", fontWeight:800, padding:"14px 36px",
+                borderRadius:"var(--radius)", textDecoration:"none" }}>
+              اطلب الآن
+            </a>
+          </div>
+        </section>
+
         {/* ── FOOTER ── */}
-        <footer style={{ backgroundColor: "#111827", padding: "20px 16px", textAlign: "center", marginBottom: "80px" }}>
-          <p style={{ color: "#6b7280", fontSize: "12px", margin: "0 0 4px" }}>جميع الحقوق محفوظة © {new Date().getFullYear()}</p>
-          <p style={{ color: "#4b5563", fontSize: "11px", margin: 0 }}>🔒 معاملاتك آمنة ومحمية</p>
+        <footer style={{ background:"#111827", padding:"20px 16px",
+          textAlign:"center", marginBottom:"72px" }}>
+          <p style={{ color:"#6b7280", fontSize:"12px" }}>
+            جميع الحقوق محفوظة © {new Date().getFullYear()}
+          </p>
         </footer>
 
-        {/* ── STICKY CTA ── */}
-        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50, background: "linear-gradient(to top,white 80%,transparent)", padding: "10px 16px 14px" }}
-          className="sm:hidden">
-          <a href="#order-form" style={S.btn()}>{ctaText}</a>
+        {/* ── STICKY BOTTOM BAR (mobile only) ── */}
+        <div className="sticky-bar" style={{ position:"fixed", bottom:0, left:0, right:0,
+          zIndex:50, background:"white", borderTop:"1px solid var(--border)",
+          padding:"10px 16px 14px",
+          boxShadow:"0 -4px 16px rgba(0,0,0,.08)" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:"12px",
+            maxWidth:"520px", margin:"0 auto" }}>
+            <div style={{ flex:1, minWidth:0 }}>
+              <p style={{ fontWeight:700, fontSize:"13px", color:"var(--text)",
+                overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                {product.name}
+              </p>
+              <p style={{ fontSize:"17px", fontWeight:900, color:"var(--green)",
+                lineHeight:1 }}>
+                {price.toFixed(0)} <span style={{ fontSize:"12px" }}>درهم</span>
+              </p>
+            </div>
+            <a href="#order-form"
+              style={{ flexShrink:0, background:"var(--green)", color:"white",
+                fontFamily:"'Cairo',sans-serif", fontSize:"15px", fontWeight:800,
+                padding:"12px 22px", borderRadius:"12px",
+                textDecoration:"none" }}>
+              اطلب الآن
+            </a>
+          </div>
         </div>
       </div>
     </>

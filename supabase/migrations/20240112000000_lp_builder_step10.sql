@@ -20,3 +20,10 @@ ALTER TABLE landing_pages
 
 CREATE INDEX IF NOT EXISTS idx_lp_template ON landing_pages(template_key);
 CREATE INDEX IF NOT EXISTS idx_lp_ai       ON landing_pages(ai_generated);
+
+-- Add ai_analysis JSONB field (Step 10 upgrade)
+ALTER TABLE landing_pages
+  ADD COLUMN IF NOT EXISTS ai_analysis JSONB DEFAULT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_lp_ai_analysis ON landing_pages USING gin(ai_analysis)
+  WHERE ai_analysis IS NOT NULL;
