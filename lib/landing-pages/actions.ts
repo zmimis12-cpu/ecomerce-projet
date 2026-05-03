@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/session";
 import { generateLandingPageContent } from "@/lib/ai/generator";
+import { analyzeProduct } from "@/lib/ai/analyzer";
 import type { TemplateKey } from "@/lib/templates";
 
 const MANAGER_ROLES = ["super_admin", "admin", "manager"] as const;
@@ -78,6 +79,7 @@ export async function generateWithAI(productId: string, templateKey: TemplateKey
     sale_price_mad: number; sku: string;
   };
 
+  // templateKey is optional — generator auto-selects based on product analysis
   const generated = await generateLandingPageContent(p, templateKey);
 
   return { success: true, content: generated };
@@ -91,4 +93,35 @@ export async function deleteLandingPage(id: string) {
   if (error) return { success: false, error: error.message };
   revalidatePath("/admin/landing-pages");
   return { success: true };
+}
+
+// ─── Smart generate — auto-detects template ───────────────────────────────────
+export async function smartGenerateLandingPage(productId: string) {
+  await requireRole([...MANAGER_ROLES]);
+
+  const { data: product, error } = await supabaseAdmin
+    .from("products")
+    .select("id, name, description, sale_price_mad, sku")
+    .eq("id", productId)
+    .single();
+
+  if (error || !product) return { success: false, error: "Produit introuvable." };
+
+  const p = product as unknown as {
+    id: string; name: string; description: string | null;
+    sale_price_mad: number; sku: string;
+  };
+
+  // Step 1: analyze
+  const analysis = analyzeProduct(p);
+
+  // Step 2: generate with auto-selected template
+  const generated = await generateLandingPageContent(p, analysis.templateKey);
+
+  return {
+    success:    true,
+    content:    generated,
+    analysis,
+    templateKey: analysis.templateKey,
+  };
 }

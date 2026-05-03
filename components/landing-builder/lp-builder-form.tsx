@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { upsertLandingPage } from "@/lib/landing-pages/actions";
 import { AIGenerateButton } from "./ai-generate-button";
+import { SmartGenerateButton } from "./smart-generate-button";
 import { SectionsEditor } from "./sections-editor";
 import { TEMPLATE_LABELS, TEMPLATE_DESCRIPTIONS, buildDefaultSections } from "@/lib/templates";
 import type { TemplateKey, LPSection } from "@/lib/templates";
@@ -293,15 +294,25 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
       {/* ── Tab: Content IA ── */}
       {activeTab === "content" && (
         <div className="space-y-5">
-          <Card title="Génération IA">
+          <Card title="Génération Intelligente ✨">
             <p className="text-sm text-muted-foreground mb-3">
-              Cliquez pour générer automatiquement tout le contenu en arabe/darija selon le template sélectionné.
+              L&apos;IA analyse automatiquement votre produit, sélectionne le meilleur template et génère tout le contenu en arabe/darija.
             </p>
-            <AIGenerateButton
+            <SmartGenerateButton
               productId={productId}
-              templateKey={templateKey}
-              onGenerated={handleAIGenerated}
+              onGenerated={(content, tKey) => {
+                handleTemplateChange(tKey as TemplateKey);
+                handleAIGenerated(content);
+              }}
             />
+            <div className="border-t pt-3 mt-1">
+              <p className="text-xs text-muted-foreground mb-2">Ou choisissez un template manuellement :</p>
+              <AIGenerateButton
+                productId={productId}
+                templateKey={templateKey}
+                onGenerated={handleAIGenerated}
+              />
+            </div>
           </Card>
 
           <Card title="Textes Hero">
