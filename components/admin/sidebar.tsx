@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingCart, PhoneCall, Truck, Zap, ScanLine, RotateCcw } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingCart, PhoneCall, Truck, Zap, ScanLine, RotateCcw, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -12,6 +12,7 @@ const navItems = [
   { href: "/admin/delivery",    label: "Livraison",   icon: Truck,            exact: false },
   { href: "/admin/scanner",     label: "Scanner",     icon: ScanLine,         exact: false },
   { href: "/admin/returns",     label: "Retours",     icon: RotateCcw,        exact: false },
+  { href: "/admin/landing-pages", label: "Landing Pages", icon: Globe,         exact: false },
   { href: "/admin/automation",  label: "Automation",  icon: Zap,              exact: false },
 ];
 

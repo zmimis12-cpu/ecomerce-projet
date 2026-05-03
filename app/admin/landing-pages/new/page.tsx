@@ -1,0 +1,48 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
+import { requireRole } from "@/lib/auth/session";
+import { createClient } from "@/lib/supabase/server";
+import { LandingPageForm } from "@/components/landing/landing-page-form";
+
+export const metadata: Metadata = { title: "Nouvelle Landing Page" };
+
+export default async function NewLandingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ product_id?: string }>;
+}) {
+  await requireRole(["super_admin", "admin", "manager"]);
+  const params = await searchParams;
+  const supabase = await createClient();
+
+  const { data: products } = await supabase
+    .from("products")
+    .select("id, name, slug, description, sale_price_mad")
+    .eq("is_active", true)
+    .order("name");
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div className="flex items-center gap-2">
+        <Link href="/admin/landing-pages"
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ChevronLeft className="h-4 w-4" /> Landing Pages
+        </Link>
+        <span className="text-muted-foreground">/</span>
+        <span className="text-sm font-medium">Nouvelle page</span>
+      </div>
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight">Nouvelle Landing Page</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Remplissez le formulaire — le slug et le titre sont pré-remplis depuis le produit.
+        </p>
+      </div>
+      <LandingPageForm
+        products={(products ?? []) as unknown as { id: string; name: string; slug: string; description: string | null; sale_price_mad: number }[]}
+        preselectedProductId={params.product_id}
+        mode="create"
+      />
+    </div>
+  );
+}
