@@ -42,6 +42,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Public routes — never redirect, even if authenticated
+  // /lp/* is always public
+  if (pathname.startsWith("/lp") || pathname.startsWith("/api/public")) {
+    return supabaseResponse;
+  }
+
   return supabaseResponse;
 }
 
