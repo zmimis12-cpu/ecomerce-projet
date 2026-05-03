@@ -1,16 +1,18 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingCart, PhoneCall, Truck, Zap } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingCart, PhoneCall, Truck, Zap, ScanLine, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/admin",              label: "Dashboard",   icon: LayoutDashboard, exact: true },
-  { href: "/admin/products",     label: "Produits",    icon: Package,          exact: false },
-  { href: "/admin/orders",       label: "Commandes",   icon: ShoppingCart,     exact: false },
-  { href: "/admin/call-center",  label: "Call Center", icon: PhoneCall,        exact: false },
-  { href: "/admin/delivery",     label: "Livraison",   icon: Truck,            exact: false },
-  { href: "/admin/automation",   label: "Automation",  icon: Zap,              exact: false },
+  { href: "/admin",             label: "Dashboard",   icon: LayoutDashboard, exact: true },
+  { href: "/admin/products",    label: "Produits",    icon: Package,          exact: false },
+  { href: "/admin/orders",      label: "Commandes",   icon: ShoppingCart,     exact: false },
+  { href: "/admin/call-center", label: "Call Center", icon: PhoneCall,        exact: false },
+  { href: "/admin/delivery",    label: "Livraison",   icon: Truck,            exact: false },
+  { href: "/admin/scanner",     label: "Scanner",     icon: ScanLine,         exact: false },
+  { href: "/admin/returns",     label: "Retours",     icon: RotateCcw,        exact: false },
+  { href: "/admin/automation",  label: "Automation",  icon: Zap,              exact: false },
 ];
 
 export function AdminSidebar() {
@@ -26,7 +28,7 @@ export function AdminSidebar() {
         </div>
         <span className="font-semibold text-sm tracking-tight">GestionPro</span>
       </div>
-      <nav className="flex-1 px-2 py-3 space-y-0.5">
+      <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
         {navItems.map(({ href, label, icon: Icon, exact }) => (
           <Link key={href} href={href} className={cn(
             "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
@@ -39,7 +41,7 @@ export function AdminSidebar() {
           </Link>
         ))}
       </nav>
-      <div className="px-4 py-3 border-t">
+      <div className="px-4 py-3 border-t shrink-0">
         <p className="text-xs text-muted-foreground">v2.0</p>
       </div>
     </aside>
