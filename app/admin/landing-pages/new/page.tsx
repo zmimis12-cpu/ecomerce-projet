@@ -15,7 +15,6 @@ export default async function NewLandingPage({
   await requireRole(["super_admin", "admin", "manager"]);
   const params   = await searchParams;
   const supabase = await createClient();
-  const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
   const { data: products } = await supabase
     .from("products")
@@ -43,7 +42,6 @@ export default async function NewLandingPage({
         products={(products ?? []) as unknown as { id: string; name: string; slug: string; description: string | null; sale_price_mad: number }[]}
         preselectedProductId={params.product_id}
         mode="create"
-        appUrl={appUrl}
       />
     </div>
   );

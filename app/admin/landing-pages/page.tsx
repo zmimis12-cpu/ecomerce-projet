@@ -33,7 +33,6 @@ export default async function LandingPagesPage() {
     id: string; name: string; slug: string; sale_price_mad: number;
   }[];
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
   return (
     <div className="space-y-6">
@@ -115,7 +114,7 @@ export default async function LandingPagesPage() {
               </thead>
               <tbody className="divide-y">
                 {lps.map((lp) => {
-                  const url  = `${appUrl}/lp/${lp.slug}`;
+                  const slug = lp.slug;
                   const conv = lp.view_count === 0 ? "—"
                     : `${((lp.order_count / lp.view_count) * 100).toFixed(1)}%`;
                   return (
@@ -141,8 +140,8 @@ export default async function LandingPagesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <CopyUrlButton url={url} />
-                          <a href={url} target="_blank" rel="noopener noreferrer"
+                          <CopyUrlButton url={`/lp/${slug}`} computeFromOrigin />
+                          <a href={`/lp/${slug}`} target="_blank" rel="noopener noreferrer"
                             className="text-muted-foreground hover:text-foreground transition-colors" title="Voir la page">
                             <ExternalLink className="h-3.5 w-3.5" />
                           </a>

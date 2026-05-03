@@ -205,17 +205,25 @@ function ReadOnlyProduct({
 
 function LandingPageUrl({ slug }: { slug: string | null }) {
   if (!slug) return null;
-  const url = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/lp/${slug}`;
+  return <LandingPageUrlDisplay slug={slug} />;
+}
+
+
+// ─── Client component — builds full URL from window.location.origin ───────────
+// Declared here to avoid extra file. "use client" not needed — parent is server,
+// but this uses onClick which requires client interactivity via CopyUrlButton.
+function LandingPageUrlDisplay({ slug }: { slug: string }) {
+  const path = `/lp/${slug}`;
   return (
     <div className="flex items-center gap-3 rounded-xl border bg-blue-50 border-blue-200 px-4 py-3">
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium text-blue-700 mb-0.5">Page de vente publique</p>
-        <p className="text-xs font-mono text-blue-600 truncate">{url}</p>
+        <p className="text-xs font-mono text-blue-600 truncate">{path}</p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        <CopyUrlButton url={url} />
-        <a href={url} target="_blank" rel="noopener noreferrer"
-          className="text-xs text-blue-600 hover:text-blue-800 underline">
+        <CopyUrlButton url={path} computeFromOrigin />
+        <a href={path} target="_blank" rel="noopener noreferrer"
+          className="text-xs text-blue-600 hover:text-blue-800 underline transition-colors">
           Ouvrir →
         </a>
       </div>

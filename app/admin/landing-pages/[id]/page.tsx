@@ -13,7 +13,6 @@ export default async function EditLandingPage({ params }: { params: Promise<{ id
   const { id } = await params;
   await requireRole(["super_admin", "admin", "manager"]);
   const supabase = await createClient();
-  const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
   const { data: lp } = await supabase
     .from("landing_pages")
@@ -49,7 +48,6 @@ export default async function EditLandingPage({ params }: { params: Promise<{ id
       <LandingPageForm
         products={(products ?? []) as unknown as { id: string; name: string; slug: string; description: string | null; sale_price_mad: number }[]}
         mode="edit"
-        appUrl={appUrl}
         defaultValues={{
           id:              page.id,
           product_id:      page.product_id,

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { upsertLandingPage } from "@/lib/landing-pages/actions";
 import { cn } from "@/lib/utils";
@@ -18,12 +18,10 @@ interface LandingPageFormProps {
     subtitle?: string; description?: string; offer_text?: string;
     meta_pixel_id?: string; tiktok_pixel_id?: string; is_active?: boolean;
   };
-  /** Base URL passed from server — never computed on client to avoid window access */
-  appUrl: string;
 }
 
 export function LandingPageForm({
-  products, preselectedProductId, mode = "create", defaultValues, appUrl,
+  products, preselectedProductId, mode = "create", defaultValues,
 }: LandingPageFormProps) {
   const router                       = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -106,8 +104,12 @@ export function LandingPageForm({
     });
   }
 
-  // Preview URL — use appUrl from server prop (safe, no window access needed)
-  const previewUrl = values.slug ? `${appUrl}/lp/${values.slug}` : "";
+  // Preview URL — always use window.location.origin (safe, no server secret)
+  const previewUrl = useMemo(() => {
+    if (!values.slug) return "";
+    const base = typeof window !== "undefined" ? window.location.origin : "";
+    return `${base}/lp/${values.slug}`;
+  }, [values.slug]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
