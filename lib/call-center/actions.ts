@@ -82,6 +82,11 @@ export async function logCall(data: {
     status:        newStatus,
   };
 
+  // Save call notes to orders.notes so they appear in Google Sheets sync
+  if (data.notes && data.notes.trim()) {
+    updatePayload.notes = data.notes.trim();
+  }
+
   if (data.result === "confirmed") {
     updatePayload.confirmed_by = session.authId;
     updatePayload.confirmed_at = data.endedAt;
