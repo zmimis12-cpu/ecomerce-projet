@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingCart, PhoneCall, Truck } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingCart, PhoneCall, Truck, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { href: "/admin/orders",       label: "Commandes",   icon: ShoppingCart,     exact: false },
   { href: "/admin/call-center",  label: "Call Center", icon: PhoneCall,        exact: false },
   { href: "/admin/delivery",     label: "Livraison",   icon: Truck,            exact: false },
+  { href: "/admin/automation",   label: "Automation",  icon: Zap,              exact: false },
 ];
 
 export function AdminSidebar() {

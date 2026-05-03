@@ -5,6 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth/session";
+import { syncOrderToGoogleSheets } from "@/lib/automation/sync-engine";
 import type { DeliveryStatus } from "@/types/delivery";
 
 const MANAGER_ROLES = ["super_admin", "admin", "manager"] as const;
@@ -130,6 +131,10 @@ export async function markAsPaid(orderId: string) {
   revalidatePath("/admin/delivery");
   revalidatePath(`/admin/delivery/${orderId}`);
   revalidatePath(`/admin/orders/${orderId}`);
+
+  // Trigger sync to "Delivered Paid" sheet (non-blocking)
+  syncOrderToGoogleSheets(orderId, "delivered_paid").catch(console.error);
+
   return { success: true };
 }
 

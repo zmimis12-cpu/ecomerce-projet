@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth/session";
+import { syncOrderToGoogleSheets } from "@/lib/automation/sync-engine";
 import { checkOrderDuplicate } from "./duplicate";
 import type { OrderStatus } from "@/types/orders";
 import { AGENT_ALLOWED_STATUSES } from "@/types/orders";
@@ -186,6 +187,14 @@ export async function updateOrderStatus(
 
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath("/admin/orders");
+
+  // Trigger Google Sheets sync in background (non-blocking — don't await)
+  if (newStatus === "confirmed") {
+    syncOrderToGoogleSheets(orderId, "confirmed").catch(console.error);
+  } else if (newStatus === "returned") {
+    syncOrderToGoogleSheets(orderId, "returned").catch(console.error);
+  }
+
   return { success: true };
 }
 
