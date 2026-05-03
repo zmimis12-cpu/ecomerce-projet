@@ -4,6 +4,7 @@ import { ScanInput } from "@/components/scanner/scan-input";
 import { ScannerModeSwitcher } from "@/components/scanner/scanner-mode-switcher";
 
 export const metadata: Metadata = { title: "Scanner" };
+// No force-dynamic — page shell is static, all scanning is client-side actions
 export const dynamic = "force-dynamic";
 
 export default async function ScannerPage({
@@ -23,11 +24,7 @@ export default async function ScannerPage({
           Scan des expéditions et retours entrepôt.
         </p>
       </div>
-
-      {/* Mode switcher */}
       <ScannerModeSwitcher currentMode={mode} />
-
-      {/* Main scan input */}
       <ScanInput mode={mode} />
     </div>
   );

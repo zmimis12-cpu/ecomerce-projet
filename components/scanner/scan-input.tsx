@@ -1,22 +1,17 @@
 "use client";
-/**
- * ScanInput — the main scanner UI.
- * Works with barcode scanners (which type + Enter) and manual keyboard input.
- * Optimised for speed: auto-focus, Enter key trigger, instant feedback.
- */
 import { useState, useTransition, useRef, useEffect } from "react";
 import { scanExit, scanReturn } from "@/lib/scanner/actions";
 import { RETURN_CONDITIONS, RETURN_CONDITION_LABELS, RETURN_CONDITION_COLORS } from "@/types/scanner";
 import type { ReturnCondition, ScanResult } from "@/types/scanner";
+import { playSound } from "./scanner-sounds";
 import { cn } from "@/lib/utils";
 import { ScanLine, Barcode, RotateCcw, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 
 type Mode = "exit" | "return";
-
 interface ScanInputProps { mode: Mode; }
 
 export function ScanInput({ mode }: ScanInputProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef  = useRef<HTMLInputElement>(null);
   const [tracking, setTracking]   = useState("");
   const [condition, setCondition] = useState<ReturnCondition>("good");
   const [notes, setNotes]         = useState("");
@@ -24,8 +19,12 @@ export function ScanInput({ mode }: ScanInputProps) {
   const [result, setResult]       = useState<ScanResult | null>(null);
   const [history, setHistory]     = useState<(ScanResult & { time: string })[]>([]);
 
-  // Auto-focus input on mount and after each scan
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  // Auto-focus on mount and mode change
+  useEffect(() => {
+    inputRef.current?.focus();
+    setResult(null);
+    setTracking("");
+  }, [mode]);
 
   function handleScan() {
     if (!tracking.trim() || isPending) return;
@@ -38,13 +37,21 @@ export function ScanInput({ mode }: ScanInputProps) {
         res = await scanReturn(tracking, condition, notes);
       }
 
+      // Play sound immediately
+      if (res.isDuplicate) {
+        playSound("duplicate");
+      } else if (res.success) {
+        playSound("success");
+      } else {
+        playSound("error");
+      }
+
       setResult(res);
       setHistory((h) => [{ ...res, time: new Date().toLocaleTimeString("fr-MA") }, ...h.slice(0, 19)]);
       setTracking("");
       setNotes("");
 
-      // Re-focus after scan
-      setTimeout(() => inputRef.current?.focus(), 100);
+      setTimeout(() => inputRef.current?.focus(), 50);
     });
   }
 
@@ -54,15 +61,15 @@ export function ScanInput({ mode }: ScanInputProps) {
 
   const feedbackColor =
     !result ? "" :
-    result.isDuplicate ? "border-amber-300 bg-amber-50" :
-    result.success     ? "border-green-300 bg-green-50" :
-    "border-red-300 bg-red-50";
+    result.isDuplicate ? "border-amber-400 bg-amber-50" :
+    result.success     ? "border-green-400 bg-green-50" :
+    "border-red-400 bg-red-50";
 
   const feedbackIcon =
     !result ? null :
-    result.isDuplicate ? <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" /> :
-    result.success     ? <CheckCircle2  className="h-5 w-5 text-green-600 shrink-0" /> :
-    <XCircle className="h-5 w-5 text-red-600 shrink-0" />;
+    result.isDuplicate ? <AlertTriangle className="h-6 w-6 text-amber-600 shrink-0" /> :
+    result.success     ? <CheckCircle2  className="h-6 w-6 text-green-600 shrink-0" /> :
+    <XCircle className="h-6 w-6 text-red-600 shrink-0" />;
 
   return (
     <div className="space-y-5 max-w-xl mx-auto">
@@ -76,7 +83,7 @@ export function ScanInput({ mode }: ScanInputProps) {
           : <><RotateCcw className="h-5 w-5" /> Mode Retour — Scan réception</>}
       </div>
 
-      {/* Main scan input — large for easy scanning */}
+      {/* Scan form */}
       <div className="rounded-xl border-2 border-primary/30 bg-card p-5 space-y-4">
         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Numéro de suivi
@@ -87,7 +94,7 @@ export function ScanInput({ mode }: ScanInputProps) {
           value={tracking}
           onChange={(e) => setTracking(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Scannez ou saisissez le tracking…"
+          placeholder="Scannez ou saisissez…"
           disabled={isPending}
           autoComplete="off"
           className={cn(
@@ -98,18 +105,17 @@ export function ScanInput({ mode }: ScanInputProps) {
           )}
         />
 
-        {/* Return condition selector */}
+        {/* Return condition */}
         {mode === "return" && (
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Condition du retour *
+              Condition *
             </label>
             <div className="grid grid-cols-2 gap-2">
               {RETURN_CONDITIONS.map((c) => {
                 const color = RETURN_CONDITION_COLORS[c];
                 return (
-                  <button key={c} type="button"
-                    onClick={() => setCondition(c)}
+                  <button key={c} type="button" onClick={() => setCondition(c)}
                     className={cn(
                       "rounded-lg px-3 py-2.5 text-sm font-medium border-2 transition-all",
                       condition === c
@@ -124,41 +130,37 @@ export function ScanInput({ mode }: ScanInputProps) {
           </div>
         )}
 
-        {/* Notes */}
         {mode === "return" && (
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Notes (optionnel)
-            </label>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)}
-              placeholder="Observations…" rows={2}
-              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
-          </div>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)}
+            placeholder="Notes (optionnel)…" rows={2}
+            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
         )}
 
-        {/* Scan button */}
         <button type="button" onClick={handleScan}
           disabled={isPending || !tracking.trim()}
           className={cn(
             "w-full flex items-center justify-center gap-2 rounded-xl py-4 text-base font-bold transition-all",
             "disabled:opacity-50 disabled:cursor-not-allowed",
             mode === "exit"
-              ? "bg-indigo-600 text-white hover:bg-indigo-700"
-              : "bg-amber-600 text-white hover:bg-amber-700"
+              ? "bg-indigo-600 text-white hover:bg-indigo-700 active:scale-[0.98]"
+              : "bg-amber-600 text-white hover:bg-amber-700 active:scale-[0.98]"
           )}>
           <ScanLine className="h-5 w-5" />
           {isPending ? "Traitement…" : mode === "exit" ? "Enregistrer sortie" : "Enregistrer retour"}
         </button>
       </div>
 
-      {/* Feedback */}
+      {/* Feedback — large and clear */}
       {result && (
-        <div className={cn("flex items-start gap-3 rounded-xl border-2 px-4 py-4", feedbackColor)}>
+        <div className={cn(
+          "flex items-start gap-3 rounded-xl border-2 px-5 py-4 transition-all",
+          feedbackColor
+        )}>
           {feedbackIcon}
-          <div>
-            <p className="font-semibold text-sm">{result.message}</p>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-base">{result.message}</p>
             {result.orderId && (
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-sm text-muted-foreground mt-1">
                 {result.orderNumber} — {result.customerName}
               </p>
             )}
@@ -166,19 +168,19 @@ export function ScanInput({ mode }: ScanInputProps) {
         </div>
       )}
 
-      {/* Scan history */}
+      {/* History */}
       {history.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Historique ({history.length})
+            Historique session ({history.length})
           </p>
-          <div className="rounded-xl border bg-card divide-y max-h-60 overflow-y-auto">
+          <div className="rounded-xl border bg-card divide-y max-h-56 overflow-y-auto">
             {history.map((h, idx) => (
               <div key={idx} className="flex items-center gap-3 px-4 py-2.5">
-                <span className="text-xs text-muted-foreground font-mono shrink-0">{h.time}</span>
+                <span className="text-xs text-muted-foreground font-mono shrink-0 w-16">{h.time}</span>
                 <span className="font-mono text-xs font-medium flex-1 truncate">{h.trackingNumber}</span>
                 {h.isDuplicate
-                  ? <span className="text-xs text-amber-600 font-medium shrink-0">Doublon</span>
+                  ? <span className="text-xs text-amber-600 font-medium shrink-0">⚠ Doublon</span>
                   : h.success
                   ? <span className="text-xs text-green-600 font-medium shrink-0">✓ OK</span>
                   : <span className="text-xs text-red-600 font-medium shrink-0">✕ Erreur</span>}
