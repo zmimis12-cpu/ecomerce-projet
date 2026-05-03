@@ -8,6 +8,7 @@ import { ProductForm } from "@/components/products/product-form";
 import { ImageManager } from "@/components/products/image-manager";
 import { updateProduct } from "@/lib/products/actions";
 import { hasRole } from "@/lib/auth/roles";
+import { CopyUrlButton } from "@/components/landing/copy-url-button";
 import { formatMAD } from "@/types/products";
 import { cn } from "@/lib/utils";
 import { DeleteProductButton } from "@/components/products/delete-product-button";
@@ -89,6 +90,9 @@ export default async function ProductDetailPage({
           }
         />
       </div>
+
+      {/* Landing page URL */}
+      <LandingPageUrl slug={product.slug} />
 
       {/* Status badge */}
       <div className="flex items-center gap-2">
@@ -193,6 +197,27 @@ function ReadOnlyProduct({
             <span className="text-sm font-medium">{value}</span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+
+function LandingPageUrl({ slug }: { slug: string | null }) {
+  if (!slug) return null;
+  const url = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/lp/${slug}`;
+  return (
+    <div className="flex items-center gap-3 rounded-xl border bg-blue-50 border-blue-200 px-4 py-3">
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-blue-700 mb-0.5">Page de vente publique</p>
+        <p className="text-xs font-mono text-blue-600 truncate">{url}</p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <CopyUrlButton url={url} />
+        <a href={url} target="_blank" rel="noopener noreferrer"
+          className="text-xs text-blue-600 hover:text-blue-800 underline">
+          Ouvrir →
+        </a>
       </div>
     </div>
   );
