@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     quantity:         Number(quantity),
     notes:            String(notes),
     website:          String(website),
-  }, String(product_slug));
+  });
 
   if (!validation.ok) {
     return NextResponse.json({ success: false, errors: validation.errors }, { status: 422 });

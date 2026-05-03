@@ -35,8 +35,7 @@ export function normalizePhone(raw: string): string | null {
 
 // ─── Main validation ───────────────────────────────────────────────────────────
 export function validateOrderInput(
-  input: OrderFormInput,
-  _productSlug?: string
+  input: OrderFormInput
 ): ValidationResult {
   const errors: Record<string, string> = {};
 

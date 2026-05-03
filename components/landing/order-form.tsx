@@ -9,7 +9,7 @@ interface OrderFormProps {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function OrderForm({ product }: Omit<OrderFormProps, 'productSlug'> & { productSlug: string }) {
+export function OrderForm({ product, productSlug }: OrderFormProps) {
   const [isPending, startTransition] = useTransition();
   const [submitted, setSubmitted]    = useState(false);
   const [errors, setErrors]          = useState<Record<string, string>>({});
