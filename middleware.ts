@@ -2,6 +2,16 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Public routes — skip entirely, no session check needed
+  if (
+    pathname.startsWith("/lp") ||
+    pathname.startsWith("/api/public")
+  ) {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -23,9 +33,8 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh session — do NOT remove this call.
+  // Refresh session
   const { data: { user } } = await supabase.auth.getUser();
-  const { pathname } = request.nextUrl;
 
   // Protect /admin — unauthenticated → /login
   if (pathname.startsWith("/admin") && !user) {
@@ -42,17 +51,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Public routes — never redirect, even if authenticated
-  // /lp/* is always public
-  if (pathname.startsWith("/lp") || pathname.startsWith("/api/public")) {
-    return supabaseResponse;
-  }
-
   return supabaseResponse;
 }
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Skip /lp/*, /api/public/*, static files, images
+    "/((?!lp|api/public|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
