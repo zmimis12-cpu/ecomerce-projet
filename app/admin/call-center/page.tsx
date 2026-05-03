@@ -15,7 +15,8 @@ export default async function CallCenterPage() {
     "super_admin", "admin", "manager", "call_center_agent"
   ]);
   const isAgent   = session.role === "call_center_agent";
-  const canManage = hasRole(session.role, ["super_admin", "admin", "manager"]);
+  // canManage reserved for future use
+  void hasRole(session.role, ["super_admin", "admin", "manager"]);
 
   // Agent → redirect to their order list
   if (isAgent) {

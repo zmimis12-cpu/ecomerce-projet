@@ -4,14 +4,13 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Public routes — skip entirely, no session check needed
-  if (
-    pathname.startsWith("/lp") ||
-    pathname.startsWith("/api/public")
-  ) {
+  // ── Public routes — bypass entirely, no Supabase call ──────────────────────
+  if (pathname.startsWith("/lp/") || pathname === "/lp" ||
+      pathname.startsWith("/api/public/")) {
     return NextResponse.next();
   }
 
+  // ── Session refresh (required for SSR auth) ────────────────────────────────
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -19,24 +18,20 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
+        getAll() { return request.cookies.getAll(); },
         setAll(cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
+            supabaseResponse.cookies.set(name, value, options));
         },
       },
     }
   );
 
-  // Refresh session
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Protect /admin — unauthenticated → /login
+  // ── Protect /admin ─────────────────────────────────────────────────────────
   if (pathname.startsWith("/admin") && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -44,7 +39,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Authenticated user on /login → /admin
+  // ── /login while authenticated ─────────────────────────────────────────────
   if (pathname === "/login" && user) {
     const url = request.nextUrl.clone();
     url.pathname = "/admin";
@@ -55,8 +50,8 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // Matcher explicitly excludes: /lp/*, /api/public/*, static assets
   matcher: [
-    // Skip /lp/*, /api/public/*, static files, images
-    "/((?!lp|api/public|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!lp(?:/.*)?$|api/public(?:/.*)?$|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

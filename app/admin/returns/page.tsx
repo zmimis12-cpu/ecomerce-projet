@@ -5,7 +5,7 @@ import { getReturns, getReturnsSummary } from "@/lib/returns/queries";
 import { ReturnConditionBadge } from "@/components/returns/return-condition-badge";
 import { formatMAD } from "@/types/delivery";
 import { cn } from "@/lib/utils";
-import { RotateCcw, TrendingDown, AlertTriangle, Package } from "lucide-react";
+import { RotateCcw, TrendingDown, AlertTriangle } from "lucide-react";
 
 export const metadata: Metadata = { title: "Retours" };
 export const dynamic = "force-dynamic";
