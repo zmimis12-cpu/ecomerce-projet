@@ -5,6 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth/session";
+import { syncOrderToGoogleSheets } from "@/lib/automation/sync-engine";
 import type { CallResult } from "@/types/call-center";
 import type { OrderStatus } from "@/types/orders";
 
@@ -103,6 +104,14 @@ export async function logCall(data: {
   revalidatePath("/admin/call-center");
   revalidatePath(`/admin/call-center/orders`);
   revalidatePath(`/admin/orders/${data.orderId}`);
+
+  // Trigger Google Sheets sync (non-blocking)
+  if (data.result === "confirmed") {
+    syncOrderToGoogleSheets(data.orderId, "confirmed").catch(console.error);
+  } else if (data.result === "refused" || data.result === "no_answer") {
+    // No sync needed for these
+  }
+
   return { success: true };
 }
 
