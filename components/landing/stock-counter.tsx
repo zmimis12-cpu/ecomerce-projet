@@ -2,16 +2,13 @@
 import { useState, useEffect } from "react";
 
 export function StockCounter() {
-  // Start with a random stock between 7-15, decrease over time for urgency
   const [stock, setStock] = useState<number | null>(null);
 
   useEffect(() => {
-    // Seed based on date so it's consistent per day but feels real
     const seed = Math.floor(Date.now() / 86400000);
-    const base = 7 + (seed % 9); // 7-15
+    const base = 7 + (seed % 9); // 7-15, consistent per day
     setStock(base);
 
-    // Decrease every 45-90 seconds to simulate buying activity
     const interval = setInterval(() => {
       setStock((s) => {
         if (s === null || s <= 3) return s;
@@ -22,23 +19,46 @@ export function StockCounter() {
     return () => clearInterval(interval);
   }, []);
 
+  // Render nothing on server — avoids hydration mismatch
   if (stock === null) return null;
 
+  const isLow = stock <= 5;
+
   return (
-    <div className="text-left">
-      <p className="text-xs text-gray-500 mb-1">المخزون المتبقي</p>
-      <div className="flex items-center gap-1.5">
-        <div className="flex gap-0.5">
+    <div style={{ textAlign: "right" }}>
+      <p style={{ color: "#6b7280", fontSize: "11px", margin: "0 0 4px" }}>المخزون المتبقي</p>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", gap: "2px" }}>
           {[...Array(5)].map((_, i) => (
-            <div key={i} className={`h-2.5 w-2.5 rounded-sm ${i < Math.min(stock, 5) ? "bg-green-500" : "bg-gray-200"}`} />
+            <div
+              key={i}
+              style={{
+                width: "10px",
+                height: "10px",
+                borderRadius: "2px",
+                backgroundColor: i < Math.min(stock, 5) ? "#22c55e" : "#e5e7eb",
+              }}
+            />
           ))}
         </div>
-        <span className={`text-xs font-black ${stock <= 5 ? "text-red-600" : "text-gray-700"}`}>
+        <span style={{
+          fontSize: "12px",
+          fontWeight: 900,
+          color: isLow ? "#dc2626" : "#374151",
+        }}>
           {stock} قطعة فقط
         </span>
       </div>
-      {stock <= 5 && (
-        <p className="text-xs text-red-600 font-bold mt-0.5 animate-pulse">⚠️ يكاد ينفد!</p>
+      {isLow && (
+        <p style={{
+          color: "#dc2626",
+          fontSize: "11px",
+          fontWeight: 700,
+          margin: "3px 0 0",
+          textAlign: "right",
+        }}>
+          ⚠️ يكاد ينفد!
+        </p>
       )}
     </div>
   );

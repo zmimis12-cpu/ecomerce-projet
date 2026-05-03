@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
@@ -10,17 +10,22 @@ export const metadata: Metadata = {
     template: "%s | GestionPro",
   },
   description: "E-commerce Operations Management System",
-  robots: { index: false, follow: false }, // internal tool — no indexing
+  robots: { index: false, follow: false },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+// Viewport is defined here at root — applies to all routes
+export const viewport: Viewport = {
+  width:        "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" suppressHydrationWarning>
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className} style={{ overflowX: "hidden" }}>
+        {children}
+      </body>
     </html>
   );
 }

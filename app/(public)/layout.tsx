@@ -1,35 +1,20 @@
 /**
  * Public route group layout.
- * Fully isolated from admin — no sidebar, no auth.
- * Includes critical mobile viewport meta tag.
+ * IMPORTANT: Route group layouts nest INSIDE the root layout.
+ * Do NOT include <html> or <body> tags here — they already exist in app/layout.tsx.
+ * This layout only adds viewport + font for public pages.
  */
-import type { Metadata, Viewport } from "next";
+import type { Viewport } from "next";
+import type { ReactNode } from "react";
 
-export const metadata: Metadata = {
-  robots: { index: true, follow: false },
-};
-
-// Critical: without this, mobile browsers zoom out and show desktop layout
 export const viewport: Viewport = {
-  width: "device-width",
+  width:        "device-width",
   initialScale: 1,
   maximumScale: 5,
 };
 
-export default function PublicLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="ar" dir="rtl">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body style={{ margin: 0, padding: 0, overflowX: "hidden" }}>
-        {children}
-      </body>
-    </html>
-  );
+export default function PublicLayout({ children }: { children: ReactNode }) {
+  // No html/body — root layout provides those.
+  // Just pass children through; viewport meta is added via the export above.
+  return <>{children}</>;
 }
