@@ -1,20 +1,18 @@
 "use client";
 import { useState, useTransition } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { toggleLandingPage } from "@/lib/landing-pages/actions";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
 
 export function LandingPageToggle({ id, isActive }: { id: string; isActive: boolean }) {
   const [active, setActive]          = useState(isActive);
   const [isPending, startTransition] = useTransition();
-  const router                       = useRouter();
 
   function toggle() {
+    const next = !active;
+    setActive(next); // optimistic
     startTransition(async () => {
-      const supabase = createClient();
-      await supabase.from("landing_pages").update({ is_active: !active } as never).eq("id", id);
-      setActive(!active);
-      router.refresh();
+      const res = await toggleLandingPage(id, next);
+      if (!res.success) setActive(!next); // revert on failure
     });
   }
 

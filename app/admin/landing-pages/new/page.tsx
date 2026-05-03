@@ -13,8 +13,9 @@ export default async function NewLandingPage({
   searchParams: Promise<{ product_id?: string }>;
 }) {
   await requireRole(["super_admin", "admin", "manager"]);
-  const params = await searchParams;
+  const params   = await searchParams;
   const supabase = await createClient();
+  const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
   const { data: products } = await supabase
     .from("products")
@@ -35,13 +36,14 @@ export default async function NewLandingPage({
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Nouvelle Landing Page</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Remplissez le formulaire — le slug et le titre sont pré-remplis depuis le produit.
+          Sélectionnez un produit — le formulaire se remplit automatiquement.
         </p>
       </div>
       <LandingPageForm
         products={(products ?? []) as unknown as { id: string; name: string; slug: string; description: string | null; sale_price_mad: number }[]}
         preselectedProductId={params.product_id}
         mode="create"
+        appUrl={appUrl}
       />
     </div>
   );

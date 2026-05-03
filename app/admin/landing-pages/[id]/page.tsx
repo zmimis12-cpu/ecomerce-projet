@@ -13,10 +13,11 @@ export default async function EditLandingPage({ params }: { params: Promise<{ id
   const { id } = await params;
   await requireRole(["super_admin", "admin", "manager"]);
   const supabase = await createClient();
+  const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
   const { data: lp } = await supabase
     .from("landing_pages")
-    .select("*")
+    .select("id, product_id, slug, title, subtitle, description, offer_text, meta_pixel_id, tiktok_pixel_id, is_active")
     .eq("id", id)
     .single();
 
@@ -44,21 +45,20 @@ export default async function EditLandingPage({ params }: { params: Promise<{ id
         <span className="text-muted-foreground">/</span>
         <span className="text-sm font-medium truncate">{page.title}</span>
       </div>
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Modifier la page</h1>
-      </div>
+      <h1 className="text-xl font-semibold tracking-tight">Modifier la page</h1>
       <LandingPageForm
         products={(products ?? []) as unknown as { id: string; name: string; slug: string; description: string | null; sale_price_mad: number }[]}
         mode="edit"
+        appUrl={appUrl}
         defaultValues={{
           id:              page.id,
           product_id:      page.product_id,
           slug:            page.slug,
           title:           page.title,
-          subtitle:        page.subtitle ?? "",
-          description:     page.description ?? "",
-          offer_text:      page.offer_text ?? "",
-          meta_pixel_id:   page.meta_pixel_id ?? "",
+          subtitle:        page.subtitle        ?? "",
+          description:     page.description     ?? "",
+          offer_text:      page.offer_text      ?? "",
+          meta_pixel_id:   page.meta_pixel_id   ?? "",
           tiktok_pixel_id: page.tiktok_pixel_id ?? "",
           is_active:       page.is_active,
         }}
