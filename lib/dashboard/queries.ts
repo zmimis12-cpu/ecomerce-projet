@@ -90,7 +90,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   let q = supabase
     .from("orders")
     .select([
-      "status","is_paid","total_amount_mad","estimated_profit_mad",
+      "status","is_paid","total_amount_mad","estimated_profit",
       "real_profit_mad","cogs_total","delivery_cost_real_mad","return_cost_mad",
     ].join(","))
     .neq("status", "cancelled");
@@ -102,7 +102,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   const { data } = await q;
   const rows = (data ?? []) as {
     status: string; is_paid: boolean;
-    total_amount_mad: number; estimated_profit_mad: number;
+    total_amount_mad: number; estimated_profit: number;
     real_profit_mad: number | null; cogs_total: number;
     delivery_cost_real_mad: number; return_cost_mad: number;
   }[];
@@ -120,7 +120,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
 
   const estimated_revenue  = rows.reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
   const real_revenue       = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
-  const estimated_profit   = rows.reduce((s, r) => s + (r.estimated_profit_mad ?? 0), 0);
+  const estimated_profit   = rows.reduce((s, r) => s + (r.estimated_profit ?? 0), 0);
   const real_profit        = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.real_profit_mad ?? 0), 0);
   const total_cogs         = rows.reduce((s, r) => s + (r.cogs_total ?? 0), 0);
   const total_delivery_cost= rows.reduce((s, r) => s + (r.delivery_cost_real_mad ?? 0), 0);
@@ -173,7 +173,7 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
 
   let ordQ = supabase
     .from("orders")
-    .select("id,status,is_paid,total_amount_mad,estimated_profit_mad,real_profit_mad,cogs_total,delivery_cost_real_mad,return_cost_mad")
+    .select("id,status,is_paid,total_amount_mad,estimated_profit,real_profit_mad,cogs_total,delivery_cost_real_mad,return_cost_mad")
     .in("id", orderIds)
     .neq("status", "cancelled");
 
@@ -184,7 +184,7 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
   const { data: orders } = await ordQ;
   type OrderRow = {
     id: string; status: string; is_paid: boolean; total_amount_mad: number;
-    estimated_profit_mad: number; real_profit_mad: number | null;
+    estimated_profit: number; real_profit_mad: number | null;
     cogs_total: number; delivery_cost_real_mad: number; return_cost_mad: number;
   };
   const ordersMap = new Map<string, Omit<OrderRow, "id">>();
@@ -206,7 +206,7 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
     const oIds = productOrders.get(p.id) ?? [];
     const rows = oIds.map((id) => ordersMap.get(id)).filter(Boolean) as {
       status: string; is_paid: boolean; total_amount_mad: number;
-      estimated_profit_mad: number; real_profit_mad: number | null;
+      estimated_profit: number; real_profit_mad: number | null;
       cogs_total: number; delivery_cost_real_mad: number; return_cost_mad: number;
     }[];
 
@@ -222,7 +222,7 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
 
     const total_revenue    = rows.reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
     const real_revenue     = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
-    const estimated_profit = rows.reduce((s, r) => s + (r.estimated_profit_mad ?? 0), 0);
+    const estimated_profit = rows.reduce((s, r) => s + (r.estimated_profit ?? 0), 0);
     const real_profit      = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.real_profit_mad ?? 0), 0);
     const total_cogs       = rows.reduce((s, r) => s + (r.cogs_total ?? 0), 0);
     const total_delivery_cost = rows.reduce((s, r) => s + (r.delivery_cost_real_mad ?? 0), 0);
@@ -267,7 +267,7 @@ export async function getDailyFinance(days = 30): Promise<DailyFinance[]> {
 
   const { data } = await supabase
     .from("orders")
-    .select("created_at,status,is_paid,total_amount_mad,estimated_profit_mad,real_profit_mad")
+    .select("created_at,status,is_paid,total_amount_mad,estimated_profit,real_profit_mad")
     .gte("created_at", since)
     .neq("status", "cancelled");
 
@@ -277,7 +277,7 @@ export async function getDailyFinance(days = 30): Promise<DailyFinance[]> {
 
   for (const o of (data ?? []) as {
     created_at: string; status: string; is_paid: boolean;
-    total_amount_mad: number; estimated_profit_mad: number; real_profit_mad: number | null;
+    total_amount_mad: number; estimated_profit: number; real_profit_mad: number | null;
   }[]) {
     const day = o.created_at.slice(0, 10);
     if (!map.has(day)) map.set(day, {
@@ -291,7 +291,7 @@ export async function getDailyFinance(days = 30): Promise<DailyFinance[]> {
     if (o.status === "returned") d.returned++;
     d.estimated_revenue += o.total_amount_mad ?? 0;
     if (o.is_paid) d.real_revenue += o.total_amount_mad ?? 0;
-    d.estimated_profit += o.estimated_profit_mad ?? 0;
+    d.estimated_profit += o.estimated_profit ?? 0;
     if (o.is_paid) d.real_profit += o.real_profit_mad ?? 0;
   }
 
