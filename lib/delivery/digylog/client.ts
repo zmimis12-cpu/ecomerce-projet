@@ -41,7 +41,7 @@ export class DigylogClient {
       const res = await fetch(`${this.baseUrl}${path}`, {
         method,
         headers: {
-          "Authorization": `bearer ${this.token}`,
+          "Authorization": `Bearer ${this.token}`,
           "Referer":       this.referer,
           "Content-Type":  "application/json",
           "Accept":        returnBlob ? "application/pdf" : "application/json",
