@@ -235,10 +235,33 @@ export class DigylogClient {
 }
 
 // ─── Singleton factory ────────────────────────────────────────────────────────
-export function createDigylogClient(): DigylogClient {
-  const token   = process.env.DIGYLOG_TOKEN ?? "";
+export function createDigylogClient(tokenOverride?: string): DigylogClient {
+  const token   = tokenOverride ?? process.env.DIGYLOG_TOKEN ?? "";
   const baseUrl = process.env.DIGYLOG_BASE_URL ?? "https://api.digylog.com/api/v2/seller";
   const referer = process.env.DIGYLOG_REFERER ?? "https://apiseller.digylog.com";
+  return new DigylogClient(token, baseUrl, referer);
+}
+
+/**
+ * Creates a DigylogClient using token from DB (digylog_settings.token).
+ * Falls back to env var DIGYLOG_TOKEN if DB token is empty.
+ * Server-side only — imports supabaseAdmin.
+ */
+export async function createDigylogClientFromDB(): Promise<DigylogClient> {
+  // Lazy import to avoid circular deps
+  const { supabaseAdmin } = await import("@/lib/supabase/admin");
+  const { data } = await supabaseAdmin
+    .from("digylog_settings")
+    .select("token, referer")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const dbToken  = (data as { token?: string; referer?: string } | null)?.token ?? "";
+  const dbReferer= (data as { token?: string; referer?: string } | null)?.referer ?? "";
+  const token    = dbToken  || process.env.DIGYLOG_TOKEN  || "";
+  const baseUrl  = process.env.DIGYLOG_BASE_URL ?? "https://api.digylog.com/api/v2/seller";
+  const referer  = dbReferer || process.env.DIGYLOG_REFERER || "https://apiseller.digylog.com";
   return new DigylogClient(token, baseUrl, referer);
 }
 

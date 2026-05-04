@@ -7,7 +7,7 @@
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/session";
-import { createDigylogClient } from "./digylog/client";
+import { createDigylogClientFromDB } from "./digylog/client";
 import { mapDigylogStatus } from "./digylog/status-map";
 
 const MANAGER = ["super_admin","admin","manager"] as const;
@@ -98,7 +98,7 @@ export async function sendOrderToDigylog(orderId: string) {
     return { success: false, error: "DIGYLOG_TOKEN manquant dans les variables d'environnement Vercel." };
   }
 
-  const client = createDigylogClient();
+  const client = await createDigylogClientFromDB();
 
   // Build order payload
   const refs = orderItems.map((item) => ({
@@ -190,7 +190,7 @@ export async function sendOrderToDigylog(orderId: string) {
 // ─── Sync status for one order ────────────────────────────────────────────────
 export async function syncDigylogStatus(tracking: string) {
   await requireRole([...MANAGER]);
-  const client = createDigylogClient();
+  const client = await createDigylogClientFromDB();
 
   const infos = await client.getOrderInfos(tracking);
   if (!infos) return { success: false, error: "Tracking introuvable sur Digylog." };
@@ -300,7 +300,7 @@ export async function registerDigylogWebhook() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const webhookUrl = `${appUrl}/api/webhooks/digylog`;
 
-  const client = createDigylogClient();
+  const client = await createDigylogClientFromDB();
   const result = await client.registerWebhook(webhookUrl);
 
   if (result.ok) {
@@ -315,14 +315,14 @@ export async function registerDigylogWebhook() {
 // ─── Test connection ──────────────────────────────────────────────────────────
 export async function testDigylogConnection() {
   await requireRole([...MANAGER]);
-  const client = createDigylogClient();
+  const client = await createDigylogClientFromDB();
   return client.testConnection();
 }
 
 // ─── Sync reference data (networks, cities, stores) ──────────────────────────
 export async function syncDigylogReferenceData() {
   await requireRole([...MANAGER]);
-  const client = createDigylogClient();
+  const client = await createDigylogClientFromDB();
 
   const [networks, stores, cities, statuses] = await Promise.all([
     client.getNetworks(),
@@ -347,6 +347,7 @@ export async function syncDigylogReferenceData() {
 
 // ─── Save Digylog settings ────────────────────────────────────────────────────
 export async function saveDigylogSettings(data: {
+  token?:                  string;
   default_network_id:      number;
   default_store_name:      string;
   default_port:            1 | 2;
@@ -377,7 +378,7 @@ export async function getDigylogLabelUrl(trackings: string[]): Promise<{
   ok: boolean; error?: string; blobBase64?: string;
 }> {
   await requireRole([...MANAGER]);
-  const client = createDigylogClient();
+  const client = await createDigylogClientFromDB();
   const result = await client.downloadLabels({ orders: trackings, format: 1 });
   if (!result.ok || !result.blob) return { ok: false, error: result.error };
   const buf    = await result.blob.arrayBuffer();
@@ -390,7 +391,7 @@ export async function getDigylogBlUrl(blId: number): Promise<{
   ok: boolean; error?: string; blobBase64?: string;
 }> {
   await requireRole([...MANAGER]);
-  const client = createDigylogClient();
+  const client = await createDigylogClientFromDB();
   const result = await client.downloadBlPdf(blId);
   if (!result.ok || !result.blob) return { ok: false, error: result.error };
   const buf = await result.blob.arrayBuffer();
