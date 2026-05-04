@@ -27,6 +27,7 @@ export const TEMPLATE_DESCRIPTIONS: Record<TemplateKey, string> = {
 export type SectionType =
   | "hero"
   | "problem_solution"
+  | "lifestyle"
   | "gallery"
   | "benefits"
   | "reviews"
