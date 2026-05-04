@@ -1,11 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { DeliveryStatusBadge } from "./delivery-status-badge";
 import { DELIVERY_STATUSES, DELIVERY_STATUS_LABELS, formatMAD } from "@/types/delivery";
 import type { DeliveryOrder } from "@/types/delivery";
 import { cn } from "@/lib/utils";
-import { Truck, Search, TrendingUp, TrendingDown, CheckCircle } from "lucide-react";
+import { Truck, Search, TrendingUp, TrendingDown, CheckCircle, FileDown, Send } from "lucide-react";
+import { getDigylogLabelUrl, getDigylogBlUrl, sendOrderToDigylog } from "@/lib/delivery/shipment-actions";
 
 interface DeliveryListProps { orders: DeliveryOrder[]; }
 
@@ -15,6 +16,35 @@ export function DeliveryList({ orders }: DeliveryListProps) {
   const [paidF, setPaid]      = useState("all");
   const [dateFrom, setFrom]   = useState("");
   const [dateTo, setTo]       = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [bulkMsg, setBulkMsg]   = useState<string[]>([]);
+  const [isPending, startTransition] = useTransition();
+
+  function downloadPdf(b64: string, name: string) {
+    const bin = atob(b64);
+    const buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([buf], { type:"application/pdf" }));
+    Object.assign(document.createElement("a"), { href:url, download:name }).click();
+    URL.revokeObjectURL(url);
+  }
+
+  function toggleSel(id: string) {
+    setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
+  }
+
+  function bulkPrintLabels() {
+    const trackings = filtered
+      .filter((o) => selected.includes(o.id) && o.delivery_tracking_number)
+      .map((o) => o.delivery_tracking_number!);
+    if (!trackings.length) return;
+    setBulkMsg([]);
+    startTransition(async () => {
+      const r = await getDigylogLabelUrl(trackings);
+      if (r.ok && r.blobBase64) downloadPdf(r.blobBase64, `labels-bulk.pdf`);
+      else setBulkMsg([r.error ?? "Erreur téléchargement"]);
+    });
+  }
 
   const filtered = orders.filter((o) => {
     const q = search.toLowerCase();
@@ -77,11 +107,27 @@ export function DeliveryList({ orders }: DeliveryListProps) {
       {/* Table */}
       {filtered.length > 0 && (
         <div className="rounded-xl border bg-card overflow-hidden">
+          {/* Bulk actions bar */}
+          {selected.length > 0 && (
+            <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 mb-3">
+              <span className="text-sm font-medium">{selected.length} sélectionné(s)</span>
+              <button type="button" onClick={bulkPrintLabels} disabled={isPending}
+                className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
+                <FileDown className="h-3.5 w-3.5" />
+                {isPending ? "…" : "Imprimer étiquettes (100x100)"}
+              </button>
+              <button type="button" onClick={() => setSelected([])}
+                className="text-xs text-muted-foreground hover:text-foreground">Désélectionner</button>
+            </div>
+          )}
+          {bulkMsg.length > 0 && bulkMsg.map((m,i) => (
+            <p key={i} className="text-xs text-red-600 mb-2">{m}</p>
+          ))}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-secondary/30">
-                  {["Commande","Client","Produit","Tracking","Statut livraison","Envoyé","Livré","Paiement","Profit réel",""].map((h) => (
+                  {["","Commande","Client","Produit","Tracking","Statut Digylog","Envoyé","Livré","Paiement","Profit réel","Actions"].map((h) => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -91,6 +137,11 @@ export function DeliveryList({ orders }: DeliveryListProps) {
                   const profit = o.real_profit_mad;
                   return (
                     <tr key={o.id} className="hover:bg-secondary/20 transition-colors">
+                      <td className="px-3 py-3">
+                        <input type="checkbox" className="rounded"
+                          checked={selected.includes(o.id)}
+                          onChange={() => toggleSel(o.id)} />
+                      </td>
                       <td className="px-4 py-3">
                         <span className="font-mono text-xs font-medium">{o.order_number}</span>
                       </td>
@@ -104,11 +155,15 @@ export function DeliveryList({ orders }: DeliveryListProps) {
                       </td>
                       <td className="px-4 py-3">
                         {o.delivery_tracking_number
-                          ? <span className="font-mono text-xs bg-secondary px-1.5 py-0.5 rounded">{o.delivery_tracking_number}</span>
+                          ? <div className="space-y-0.5">
+                              <span className="font-mono text-xs bg-secondary px-1.5 py-0.5 rounded">{o.delivery_tracking_number}</span>
+                              {(o as unknown as { delivery_external_status?: string }).delivery_external_status && (
+                                <p className="text-[10px] text-muted-foreground">
+                                  {(o as unknown as { delivery_external_status: string }).delivery_external_status}
+                                </p>
+                              )}
+                            </div>
                           : <span className="text-xs text-muted-foreground">—</span>}
-                        {o.delivery_company && (
-                          <p className="text-xs text-muted-foreground mt-0.5">{o.delivery_company}</p>
-                        )}
                       </td>
                       <td className="px-4 py-3">
                         {o.delivery_status
@@ -150,10 +205,39 @@ export function DeliveryList({ orders }: DeliveryListProps) {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <Link href={`/admin/delivery/${o.id}`}
-                          className="text-xs text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
-                          Détails →
-                        </Link>
+                        <div className="flex flex-col gap-1 items-start">
+                          <Link href={`/admin/delivery/${o.id}`}
+                            className="text-xs text-muted-foreground hover:text-foreground whitespace-nowrap">
+                            Détails →
+                          </Link>
+                          {o.delivery_tracking_number && (
+                            <button type="button"
+                              onClick={() => {
+                                startTransition(async () => {
+                                  const r = await getDigylogLabelUrl([o.delivery_tracking_number!]);
+                                  if (r.ok && r.blobBase64) downloadPdf(r.blobBase64, `label-${o.delivery_tracking_number}.pdf`);
+                                });
+                              }}
+                              disabled={isPending}
+                              className="flex items-center gap-1 text-[10px] text-primary hover:underline disabled:opacity-50">
+                              <FileDown className="h-3 w-3" /> Étiquette
+                            </button>
+                          )}
+                          {(o as unknown as { bl_id?: number }).bl_id && (
+                            <button type="button"
+                              onClick={() => {
+                                const blId = (o as unknown as { bl_id: number }).bl_id;
+                                startTransition(async () => {
+                                  const r = await getDigylogBlUrl(blId);
+                                  if (r.ok && r.blobBase64) downloadPdf(r.blobBase64, `bl-${blId}.pdf`);
+                                });
+                              }}
+                              disabled={isPending}
+                              className="flex items-center gap-1 text-[10px] text-primary hover:underline disabled:opacity-50">
+                              <FileDown className="h-3 w-3" /> BL
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

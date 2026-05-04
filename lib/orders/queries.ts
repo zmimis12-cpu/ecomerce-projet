@@ -12,7 +12,10 @@ import type { Order, OrderListItem, OrderStatus } from "@/types/orders";
 const ORDER_LIST_FIELDS = `
   id, order_number, customer_name, customer_phone, customer_city,
   status, total_amount_mad, estimated_profit, assigned_to,
-  source, notes, delivery_tracking_number, is_duplicate, duplicate_of, created_at
+  source, notes, delivery_tracking_number,
+  delivery_external_status, delivery_external_status_id,
+  delivery_status, delivery_last_sync_at, bl_id,
+  is_duplicate, duplicate_of, created_at
 `;
 
 const ORDER_DETAIL_FIELDS = `
@@ -113,6 +116,11 @@ export async function getOrders(
       source: o.source,
       notes: o.notes,
       delivery_tracking_number: o.delivery_tracking_number,
+      delivery_external_status: (o as unknown as Record<string,unknown>).delivery_external_status as string | null ?? null,
+      delivery_external_status_id: (o as unknown as Record<string,unknown>).delivery_external_status_id as number | null ?? null,
+      delivery_status: (o as unknown as Record<string,unknown>).delivery_status as string | null ?? null,
+      delivery_last_sync_at: (o as unknown as Record<string,unknown>).delivery_last_sync_at as string | null ?? null,
+      bl_id: (o as unknown as Record<string,unknown>).bl_id as number | null ?? null,
       is_duplicate: o.is_duplicate ?? false,
       duplicate_of: o.duplicate_of ?? null,
       created_at: o.created_at,

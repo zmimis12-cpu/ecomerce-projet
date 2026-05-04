@@ -6,13 +6,16 @@
 import { createClient } from "@/lib/supabase/server";
 
 export interface DashboardSummary {
-  total_leads:        number;
-  confirmed_count:    number;
-  delivered_count:    number;
-  returned_count:     number;
-  refused_count:      number;
-  no_answer_count:    number;
-  cancelled_count:    number;
+  total_leads:          number;
+  confirmed_count:      number;
+  sent_to_delivery_count:number;
+  in_transit_count:     number;
+  delivered_count:      number;
+  paid_count:           number;
+  returned_count:       number;
+  refused_count:        number;
+  no_answer_count:      number;
+  cancelled_count:      number;
   estimated_revenue:  number;
   real_revenue:       number;
   estimated_profit:   number;
@@ -110,13 +113,16 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   const CONFIRMED_STATUSES = new Set(["confirmed","sent_to_delivery","in_transit","delivered","paid"]);
   const DELIVERED_STATUSES = new Set(["delivered","paid"]);
 
-  const total_leads        = rows.length;
-  const confirmed_count    = rows.filter((r) => CONFIRMED_STATUSES.has(r.status)).length;
-  const delivered_count    = rows.filter((r) => DELIVERED_STATUSES.has(r.status)).length;
-  const returned_count     = rows.filter((r) => r.status === "returned").length;
-  const refused_count      = rows.filter((r) => r.status === "refused").length;
-  const no_answer_count    = rows.filter((r) => r.status === "no_answer").length;
-  const cancelled_count    = 0; // filtered out
+  const total_leads          = rows.length;
+  const confirmed_count      = rows.filter((r) => CONFIRMED_STATUSES.has(r.status)).length;
+  const sent_to_delivery_count = rows.filter((r) => r.status === "sent_to_delivery").length;
+  const in_transit_count     = rows.filter((r) => r.status === "in_transit").length;
+  const delivered_count      = rows.filter((r) => DELIVERED_STATUSES.has(r.status)).length;
+  const paid_count           = rows.filter((r) => r.status === "paid" && r.is_paid).length;
+  const returned_count       = rows.filter((r) => r.status === "returned").length;
+  const refused_count        = rows.filter((r) => r.status === "refused").length;
+  const no_answer_count      = rows.filter((r) => r.status === "no_answer").length;
+  const cancelled_count      = 0;
 
   const estimated_revenue  = rows.reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
   const real_revenue       = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
@@ -135,7 +141,8 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     ? Math.round(delivered_count / confirmed_count * 1000) / 10 : 0;
 
   return {
-    total_leads, confirmed_count, delivered_count, returned_count,
+    total_leads, confirmed_count, sent_to_delivery_count, in_transit_count,
+    delivered_count, paid_count, returned_count,
     refused_count, no_answer_count, cancelled_count,
     estimated_revenue, real_revenue, estimated_profit, real_profit,
     total_cogs, total_delivery_cost, total_return_losses, pending_collection,

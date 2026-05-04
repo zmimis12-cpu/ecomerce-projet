@@ -76,6 +76,14 @@ export interface Order {
   // Source
   source: string | null;
 
+  // Digylog delivery
+  delivery_external_status: string | null;
+  delivery_external_status_id: number | null;
+  delivery_status: string | null;
+  delivery_last_sync_at: string | null;
+  bl_id: number | null;
+  first_product_name?: string | null;
+
   // Duplicate detection
   is_duplicate: boolean;
   duplicate_of: string | null;
@@ -117,6 +125,11 @@ export interface OrderListItem {
   source: string | null;
   notes: string | null;
   delivery_tracking_number: string | null;
+  delivery_external_status: string | null;
+  delivery_external_status_id: number | null;
+  delivery_status: string | null;
+  delivery_last_sync_at: string | null;
+  bl_id: number | null;
   is_duplicate: boolean;
   duplicate_of: string | null;
   created_at: string;
