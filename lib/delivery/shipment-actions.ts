@@ -133,13 +133,35 @@ export async function sendOrderToDigylog(orderId: string) {
     }],
   });
 
-  if (!result.ok || !result.orders.length) {
-    return { success: false, error: result.error ?? "Erreur Digylog — aucun tracking retourné." };
-  }
+  if (!result.ok) {
+  console.log("❌ DIGYLOG ERROR:", result.error);
+  return { success: false, error: result.error ?? "Erreur Digylog" };
+}
 
-  const created = result.orders[0];
-  const tracking = created.tracking;
-  const blId     = created.bl ?? null;
+console.log("📦 DIGYLOG RESPONSE FULL:", JSON.stringify(result, null, 2));
+
+const created = result.orders?.[0] ?? result.data?.[0] ?? result?.[0];
+
+if (!created) {
+  return { success: false, error: "Aucune réponse Digylog (empty)" };
+}
+
+const tracking =
+  created.tracking ||
+  created.code ||
+  created.num ||
+  created.order_id ||
+  null;
+
+const blId =
+  created.bl ||
+  created.bl_id ||
+  null;
+
+if (!tracking) {
+  console.log("⚠️ TRACKING NOT FOUND IN:", created);
+  return { success: false, error: "Tracking non retourné par Digylog" };
+}
 
   const companyId = await getDigylogCompanyId();
 
