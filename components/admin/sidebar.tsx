@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingCart, PhoneCall, Truck, Zap, ScanLine, RotateCcw, Globe, BarChart3 } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingCart, PhoneCall, Truck, Zap, ScanLine, RotateCcw, Globe, BarChart3, Settings, FileText, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -9,11 +9,14 @@ const navItems = [
   { href: "/admin/products",    label: "Produits",    icon: Package,          exact: false },
   { href: "/admin/orders",      label: "Commandes",   icon: ShoppingCart,     exact: false },
   { href: "/admin/call-center", label: "Call Center", icon: PhoneCall,        exact: false },
-  { href: "/admin/delivery",    label: "Livraison",   icon: Truck,            exact: false },
+  { href: "/admin/delivery",    label: "Livraison",   icon: Truck,            exact: true  },
+  { href: "/admin/delivery/invoices",  label: "  Factures", icon: FileText,         exact: false },
+  { href: "/admin/delivery/documents", label: "  Documents",icon: FolderOpen,       exact: false },
   { href: "/admin/scanner",     label: "Scanner",     icon: ScanLine,         exact: false },
   { href: "/admin/returns",     label: "Retours",     icon: RotateCcw,        exact: false },
   { href: "/admin/finance",       label: "Finance",       icon: BarChart3,     exact: false },
   { href: "/admin/landing-pages", label: "Landing Pages", icon: Globe,         exact: false },
+  { href: "/admin/settings/delivery", label: "Paramètres Livr.", icon: Settings, exact: false },
   { href: "/admin/automation",  label: "Automation",  icon: Zap,              exact: false },
 ];
 
