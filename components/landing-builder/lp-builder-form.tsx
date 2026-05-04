@@ -319,19 +319,19 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
           </Card>
 
           {aiAnalysis && (
-            <Card title="Analyse produit détectée">
+            <Card title="🔍 Analyse produit détectée">
               <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: "Type produit",  val: String(aiAnalysis.product_type  ?? aiAnalysis.fingerprint ?? "—") },
-                  { label: "Template",      val: String(aiAnalysis.templateKey   ?? "—") },
-                  { label: "Audience",      val: String(aiAnalysis.target_audience ?? "—") },
-                  { label: "Problème",      val: String(aiAnalysis.main_problem  ?? "—") },
-                  { label: "Bénéfice",      val: String(aiAnalysis.main_benefit  ?? "—") },
-                  { label: "Émotion",       val: String(aiAnalysis.emotional_angle ?? "—") },
-                ].map(({ label, val }) => (
-                  <div key={label} className="rounded-lg bg-secondary/30 p-2.5">
-                    <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
-                    <p className="text-xs font-medium text-foreground" dir="auto">{val}</p>
+                {([
+                  ["Type produit",  String(aiAnalysis.fingerprint ?? aiAnalysis.product_type ?? "—")],
+                  ["Template choisi", String(aiAnalysis.templateKey ?? "—")],
+                  ["Audience cible", String(aiAnalysis.target_audience ?? "—")],
+                  ["Problème détecté", String(aiAnalysis.main_problem ?? "—")],
+                  ["Bénéfice clé", String(aiAnalysis.main_benefit ?? "—")],
+                  ["Angle émotionnel", String(aiAnalysis.emotional_angle ?? "—")],
+                ] as [string, string][]).map(([label, val]) => (
+                  <div key={label} className="rounded-lg bg-violet-50 border border-violet-100 p-2.5">
+                    <p className="text-[10px] text-violet-500 uppercase tracking-wide font-semibold mb-0.5">{label}</p>
+                    <p className="text-xs font-semibold text-foreground leading-snug" dir="auto">{val}</p>
                   </div>
                 ))}
               </div>
@@ -339,9 +339,14 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
                 {previewUrl && (
                   <a href={previewUrl} target="_blank" rel="noopener noreferrer"
                     className="flex-1 text-center rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-secondary/50 transition-colors">
-                    Prévisualiser la page →
+                    Voir la page →
                   </a>
                 )}
+                <button type="button"
+                  onClick={() => setActiveTab("sections")}
+                  className="flex-1 text-center rounded-lg bg-secondary px-3 py-2 text-xs font-medium hover:bg-secondary/70 transition-colors">
+                  Éditer sections →
+                </button>
               </div>
             </Card>
           )}

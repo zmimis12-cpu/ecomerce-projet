@@ -6,58 +6,36 @@ export function StockCounter() {
 
   useEffect(() => {
     const seed = Math.floor(Date.now() / 86400000);
-    const base = 7 + (seed % 9); // 7-15, consistent per day
+    const base = 7 + (seed % 9);
     setStock(base);
-
-    const interval = setInterval(() => {
-      setStock((s) => {
-        if (s === null || s <= 3) return s;
-        return Math.random() > 0.7 ? s - 1 : s;
-      });
+    const iv = setInterval(() => {
+      setStock((s) => (s !== null && s > 3 && Math.random() > 0.7) ? s - 1 : s);
     }, 60000);
-
-    return () => clearInterval(interval);
+    return () => clearInterval(iv);
   }, []);
 
-  // Render nothing on server — avoids hydration mismatch
   if (stock === null) return null;
-
   const isLow = stock <= 5;
 
   return (
-    <div style={{ textAlign: "right" }}>
-      <p style={{ color: "#6b7280", fontSize: "11px", margin: "0 0 4px" }}>المخزون المتبقي</p>
-      <div style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "flex-end" }}>
-        <div style={{ display: "flex", gap: "2px" }}>
+    <div style={{ textAlign:"right" }}>
+      <p style={{ color:"#9ca3af", fontSize:"11px", marginBottom:"4px" }}>المخزون</p>
+      <div style={{ display:"flex", alignItems:"center", gap:"5px", justifyContent:"flex-end" }}>
+        <div style={{ display:"flex", gap:"2px" }}>
           {[...Array(5)].map((_, i) => (
-            <div
-              key={i}
-              style={{
-                width: "10px",
-                height: "10px",
-                borderRadius: "2px",
-                backgroundColor: i < Math.min(stock, 5) ? "#22c55e" : "#e5e7eb",
-              }}
-            />
+            <div key={i} style={{ width:"9px", height:"9px", borderRadius:"2px",
+              background: i < Math.min(stock, 5) ? "#16a34a" : "#e5e7eb" }} />
           ))}
         </div>
-        <span style={{
-          fontSize: "12px",
-          fontWeight: 900,
-          color: isLow ? "#dc2626" : "#374151",
-        }}>
-          {stock} قطعة فقط
+        <span style={{ fontSize:"12px", fontWeight:800,
+          color: isLow ? "#dc2626" : "#374151" }}>
+          {stock} فقط
         </span>
       </div>
       {isLow && (
-        <p style={{
-          color: "#dc2626",
-          fontSize: "11px",
-          fontWeight: 700,
-          margin: "3px 0 0",
-          textAlign: "right",
-        }}>
-          ⚠️ يكاد ينفد!
+        <p style={{ color:"#dc2626", fontSize:"10px", fontWeight:700,
+          marginTop:"2px", textAlign:"right" }}>
+          يكاد ينفد
         </p>
       )}
     </div>
