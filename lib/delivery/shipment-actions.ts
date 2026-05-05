@@ -379,7 +379,7 @@ export async function getDigylogLabelUrl(trackings: string[]): Promise<{
 }> {
   await requireRole([...MANAGER]);
   const client = await createDigylogClientFromDB();
-  const result = await client.downloadLabels({ orders: trackings, format: 1 });
+  const result = await client.downloadLabels({ orders: trackings, format: 3 });
   if (!result.ok || !result.blob) return { ok: false, error: result.error };
   const buf    = await result.blob.arrayBuffer();
   const b64    = Buffer.from(buf).toString("base64");

@@ -2,11 +2,22 @@
  * lib/delivery/digylog/client.ts
  * Digylog API v2.4 client — server-side only.
  */
+
 import type {
-  DigylogNetwork, DigylogFC, DigylogStore, DigylogCity, DigylogStatus,
-  DigylogCreateOrdersBody, DigylogCreatedOrder, DigylogSendResponse,
-  DigylogOrderInfo, DigylogOrderRef, DigylogHistorics,
-  DigylogDeliveryCost, DigylogPickupArea, DigylogWebhookPayload,
+  DigylogNetwork,
+  DigylogFC,
+  DigylogStore,
+  DigylogCity,
+  DigylogStatus,
+  DigylogCreateOrdersBody,
+  DigylogCreatedOrder,
+  DigylogSendResponse,
+  DigylogOrderInfo,
+  DigylogOrderRef,
+  DigylogHistorics,
+  DigylogDeliveryCost,
+  DigylogPickupArea,
+  DigylogWebhookPayload,
 } from "./types";
 
 export class DigylogClient {
@@ -16,8 +27,8 @@ export class DigylogClient {
 
   constructor(
     token: string,
-    baseUrl: string = "https://api.digylog.com/api/v2/seller",
-    referer: string = "https://apiseller.digylog.com"
+    baseUrl = "https://api.digylog.com/api/v2/seller",
+    referer = "https://apiseller.digylog.com"
   ) {
     this.token = (token ?? "").trim();
     this.baseUrl = baseUrl.replace(/\/$/, "").trim();
@@ -51,7 +62,7 @@ export class DigylogClient {
         const text = await res.text().catch(() => "");
         return {
           ok: false,
-          error: `HTTP ${res.status}: ${text.slice(0, 300)}`,
+          error: `HTTP ${res.status}: ${text.slice(0, 500)}`,
           status: res.status,
         };
       }
@@ -97,12 +108,20 @@ export class DigylogClient {
   }
 
   async getDeliveryCost(network: number, city: number): Promise<DigylogDeliveryCost | null> {
-    const r = await this.request<DigylogDeliveryCost>("GET", `/deliverycost?network=${network}&city=${city}`);
+    const r = await this.request<DigylogDeliveryCost>(
+      "GET",
+      `/deliverycost?network=${network}&city=${city}`
+    );
+
     return r.ok ? (r.data ?? null) : null;
   }
 
   async getPickupAreas(network: number): Promise<DigylogPickupArea[]> {
-    const r = await this.request<DigylogPickupArea[]>("GET", `/pickup/areas?network=${network}`);
+    const r = await this.request<DigylogPickupArea[]>(
+      "GET",
+      `/pickup/areas?network=${network}`
+    );
+
     return r.ok ? (r.data ?? []) : [];
   }
 
@@ -111,14 +130,48 @@ export class DigylogClient {
     orders: DigylogCreatedOrder[];
     error?: string;
   }> {
-    const r = await this.request<DigylogCreatedOrder[]>("POST", "/orders", body);
-    if (!r.ok) return { ok: false, orders: [], error: r.error };
-    return { ok: true, orders: r.data ?? [] };
+    const r = await this.request<any>("POST", "/orders", body);
+
+    console.log("🚀 DIGYLOG API RESPONSE:", JSON.stringify(r, null, 2));
+
+    if (!r.ok) {
+      return { ok: false, orders: [], error: r.error };
+    }
+
+    const data = r.data;
+
+    if (Array.isArray(data)) {
+      return { ok: true, orders: data as DigylogCreatedOrder[] };
+    }
+
+    if (Array.isArray(data?.data)) {
+      return { ok: true, orders: data.data as DigylogCreatedOrder[] };
+    }
+
+    if (Array.isArray(data?.orders)) {
+      return { ok: true, orders: data.orders as DigylogCreatedOrder[] };
+    }
+
+    if (data?.tracking || data?.traking || data?.code) {
+      return { ok: true, orders: [data as DigylogCreatedOrder] };
+    }
+
+    console.log("⚠️ UNKNOWN DIGYLOG FORMAT:", JSON.stringify(data, null, 2));
+
+    return {
+      ok: false,
+      orders: [],
+      error: `Format réponse Digylog inconnu: ${JSON.stringify(data).slice(0, 300)}`,
+    };
   }
 
   async sendOrders(trackings: string[]): Promise<{ ok: boolean; bl?: number; error?: string }> {
-    const r = await this.request<DigylogSendResponse>("PUT", "/orders/send", { orders: trackings });
+    const r = await this.request<DigylogSendResponse>("PUT", "/orders/send", {
+      orders: trackings,
+    });
+
     if (!r.ok) return { ok: false, error: r.error };
+
     return { ok: true, bl: r.data?.bl };
   }
 
@@ -144,18 +197,23 @@ export class DigylogClient {
     format?: 1 | 2 | 3 | 4 | 5;
   }): Promise<{ ok: boolean; blob?: Blob; error?: string }> {
     const body: Record<string, unknown> = {};
+
     if (params.bl) body.bl = params.bl;
     if (params.orders) body.orders = params.orders;
     if (params.format) body.format = params.format;
 
     const r = await this.request<never>("POST", "/labels", body, true);
+
     if (!r.ok) return { ok: false, error: r.error };
+
     return { ok: true, blob: r.blob };
   }
 
   async downloadBlPdf(blId: number): Promise<{ ok: boolean; blob?: Blob; error?: string }> {
     const r = await this.request<never>("GET", `/bl/${blId}/pdf`, undefined, true);
+
     if (!r.ok) return { ok: false, error: r.error };
+
     return { ok: true, blob: r.blob };
   }
 
@@ -170,8 +228,11 @@ export class DigylogClient {
     postponedTo?: string
   ): Promise<{ ok: boolean; error?: string }> {
     const body: Record<string, unknown> = { status: statusId };
+
     if (postponedTo) body.postponedTo = postponedTo;
+
     const r = await this.request<unknown>("PUT", `/order/${tracking}/status`, body);
+
     return { ok: r.ok, error: r.error };
   }
 
@@ -185,7 +246,9 @@ export class DigylogClient {
     if (!r.ok) {
       return {
         ok: false,
-        message: `Erreur Digylog: ${r.status ?? "NO_STATUS"} — ${r.error ?? "Unknown"} — token=${tokenPreview}`,
+        message: `Erreur Digylog: ${r.status ?? "NO_STATUS"} — ${
+          r.error ?? "Unknown"
+        } — token=${tokenPreview}`,
       };
     }
 
@@ -200,8 +263,11 @@ export class DigylogClient {
 
 export function createDigylogClient(tokenOverride?: string): DigylogClient {
   const token = tokenOverride ?? process.env.DIGYLOG_TOKEN ?? "";
-  const baseUrl = process.env.DIGYLOG_BASE_URL ?? "https://api.digylog.com/api/v2/seller";
-  const referer = process.env.DIGYLOG_REFERER ?? "https://apiseller.digylog.com";
+  const baseUrl =
+    process.env.DIGYLOG_BASE_URL ?? "https://api.digylog.com/api/v2/seller";
+  const referer =
+    process.env.DIGYLOG_REFERER ?? "https://apiseller.digylog.com";
+
   return new DigylogClient(token, baseUrl, referer);
 }
 
@@ -215,12 +281,17 @@ export async function createDigylogClientFromDB(): Promise<DigylogClient> {
     .limit(1)
     .maybeSingle();
 
-  const dbToken = (data as { token?: string; referer?: string } | null)?.token ?? "";
-  const dbReferer = (data as { token?: string; referer?: string } | null)?.referer ?? "";
+  const dbToken =
+    (data as { token?: string; referer?: string } | null)?.token ?? "";
+
+  const dbReferer =
+    (data as { token?: string; referer?: string } | null)?.referer ?? "";
 
   const token = dbToken || process.env.DIGYLOG_TOKEN || "";
-  const baseUrl = process.env.DIGYLOG_BASE_URL ?? "https://api.digylog.com/api/v2/seller";
-  const referer = dbReferer || process.env.DIGYLOG_REFERER || "https://apiseller.digylog.com";
+  const baseUrl =
+    process.env.DIGYLOG_BASE_URL ?? "https://api.digylog.com/api/v2/seller";
+  const referer =
+    dbReferer || process.env.DIGYLOG_REFERER || "https://apiseller.digylog.com";
 
   return new DigylogClient(token, baseUrl, referer);
 }
