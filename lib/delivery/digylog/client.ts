@@ -20,6 +20,12 @@ import type {
   DigylogWebhookPayload,
 } from "./types";
 
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export class DigylogClient {
   private readonly token: string;
   private readonly baseUrl: string;
@@ -112,7 +118,6 @@ export class DigylogClient {
       "GET",
       `/deliverycost?network=${network}&city=${city}`
     );
-
     return r.ok ? (r.data ?? null) : null;
   }
 
@@ -121,7 +126,6 @@ export class DigylogClient {
       "GET",
       `/pickup/areas?network=${network}`
     );
-
     return r.ok ? (r.data ?? []) : [];
   }
 
@@ -130,7 +134,7 @@ export class DigylogClient {
     orders: DigylogCreatedOrder[];
     error?: string;
   }> {
-    const r = await this.request<any>("POST", "/orders", body);
+    const r = await this.request<unknown>("POST", "/orders", body);
 
     console.log("🚀 DIGYLOG API RESPONSE:", JSON.stringify(r, null, 2));
 
@@ -144,15 +148,18 @@ export class DigylogClient {
       return { ok: true, orders: data as DigylogCreatedOrder[] };
     }
 
-    if (Array.isArray(data?.data)) {
+    if (isRecord(data) && Array.isArray(data.data)) {
       return { ok: true, orders: data.data as DigylogCreatedOrder[] };
     }
 
-    if (Array.isArray(data?.orders)) {
+    if (isRecord(data) && Array.isArray(data.orders)) {
       return { ok: true, orders: data.orders as DigylogCreatedOrder[] };
     }
 
-    if (data?.tracking || data?.traking || data?.code) {
+    if (
+      isRecord(data) &&
+      ("tracking" in data || "traking" in data || "code" in data)
+    ) {
       return { ok: true, orders: [data as DigylogCreatedOrder] };
     }
 
