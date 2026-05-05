@@ -196,3 +196,62 @@ export async function ensureSheetHeader(
     }
   );
 }
+
+// ─── Read all rows from sheet ──────────────────────────────────────────────────
+export async function readSheetRows(
+  spreadsheetId: string,
+  sheetName: string,
+  range = "A2:L1000"  // skip header row
+): Promise<string[][]> {
+  const token    = await getAccessToken();
+  const encoded  = encodeURIComponent(`${sheetName}!${range}`);
+  const endpoint = `${SHEETS_BASE}/${spreadsheetId}/values/${encoded}`;
+
+  const res = await fetch(endpoint, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Sheets read failed [${res.status}]: ${err.slice(0, 200)}`);
+  }
+
+  const data = await res.json() as { values?: string[][] };
+  return data.values ?? [];
+}
+
+// ─── Update specific cells in a row (by row number 1-indexed) ─────────────────
+export async function updateSheetRow(
+  spreadsheetId: string,
+  sheetName: string,
+  rowNumber: number,               // 1-indexed (row 2 = first data row)
+  values: Record<string, string>   // { J: "tracking", K: "Sent", L: "" }
+): Promise<void> {
+  const token = await getAccessToken();
+
+  // Build batch update for specific cells
+  const data = Object.entries(values).map(([col, val]) => ({
+    range:  `${sheetName}!${col}${rowNumber}`,
+    values: [[val]],
+  }));
+
+  const endpoint = `${SHEETS_BASE}/${spreadsheetId}/values:batchUpdate`;
+
+  const res = await fetch(endpoint, {
+    method:  "POST",
+    headers: {
+      Authorization:  `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      valueInputOption: "USER_ENTERED",
+      data,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Sheets update failed [${res.status}]: ${err.slice(0, 200)}`);
+  }
+}
