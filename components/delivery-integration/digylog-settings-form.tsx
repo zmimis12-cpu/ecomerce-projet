@@ -8,13 +8,15 @@ import {
 } from "@/lib/delivery/shipment-actions";
 
 interface Props {
-  settings:    Record<string, unknown>;
-  appUrl:      string;
-  hasToken:    boolean;
-  tokenSource: "env" | "db" | "none";
+  settings:       Record<string, unknown>;
+  appUrl:         string;
+  hasToken:       boolean;
+  tokenSource:    "env" | "db" | "none";
+  cachedNetworks: { id: number; name: string }[];
+  cachedStores:   { id: number; name: string }[];
 }
 
-export function DigylogSettingsForm({ settings, appUrl, hasToken, tokenSource }: Props) {
+export function DigylogSettingsForm({ settings, appUrl, hasToken, tokenSource, cachedNetworks, cachedStores }: Props) {
   const [isPending, startTransition] = useTransition();
   const [msg, setMsg]      = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [showToken, setShowToken] = useState(false);
@@ -135,18 +137,50 @@ export function DigylogSettingsForm({ settings, appUrl, hasToken, tokenSource }:
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={LBL}>ID Réseau Digylog</label>
-            <input type="number" value={form.default_network_id}
-              onChange={(e) => set("default_network_id", Number(e.target.value))}
-              className={INP} placeholder="1" />
-            <p className="text-xs text-muted-foreground mt-1">Obtenu via GET /networks</p>
+            <label className={LBL}>Réseau Digylog</label>
+            {cachedNetworks.length > 0 ? (
+              <select value={form.default_network_id}
+                onChange={(e) => set("default_network_id", Number(e.target.value))}
+                className={INP}>
+                {cachedNetworks.map((n) => (
+                  <option key={n.id} value={n.id}>{n.id} — {n.name}</option>
+                ))}
+              </select>
+            ) : (
+              <>
+                <input type="number" value={form.default_network_id}
+                  onChange={(e) => set("default_network_id", Number(e.target.value))}
+                  className={INP} placeholder="1" />
+                <p className="text-xs text-amber-600 mt-1">
+                  Cliquez &ldquo;Sync réseaux&rdquo; pour charger la liste Digylog.
+                </p>
+              </>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">
+              ID actuel: <strong>{form.default_network_id}</strong>
+            </p>
           </div>
           <div>
-            <label className={LBL}>Nom boutique (store)</label>
-            <input type="text" value={form.default_store_name}
-              onChange={(e) => set("default_store_name", e.target.value)}
-              className={INP} placeholder="Hichoux Store" />
-            <p className="text-xs text-muted-foreground mt-1">Exactement comme dans GET /stores</p>
+            <label className={LBL}>Boutique (store)</label>
+            {cachedStores.length > 0 ? (
+              <select value={form.default_store_name}
+                onChange={(e) => set("default_store_name", e.target.value)}
+                className={INP}>
+                <option value="">-- Choisir --</option>
+                {cachedStores.map((s) => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
+              </select>
+            ) : (
+              <>
+                <input type="text" value={form.default_store_name}
+                  onChange={(e) => set("default_store_name", e.target.value)}
+                  className={INP} placeholder="Hichoux Store" />
+                <p className="text-xs text-amber-600 mt-1">
+                  Cliquez &ldquo;Sync réseaux&rdquo; pour charger la liste.
+                </p>
+              </>
+            )}
           </div>
         </div>
 

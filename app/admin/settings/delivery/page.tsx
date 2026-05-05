@@ -22,6 +22,12 @@ export default async function DeliverySettingsPage() {
   const activeToken  = envToken || dbToken; // env takes priority
   const tokenSource  = envToken ? "env" : dbToken ? "db" : "none";
 
+  const config = (settings as Record<string, unknown> | null)?.config as {
+    networks?: { id: number; name: string }[];
+    stores?:   { id: number; name: string }[];
+    cities?:   string[];
+  } | null ?? null;
+
   return (
     <div className="max-w-2xl space-y-6">
       <div>
@@ -54,6 +60,8 @@ export default async function DeliverySettingsPage() {
         appUrl={appUrl}
         hasToken={!!activeToken}
         tokenSource={tokenSource}
+        cachedNetworks={config?.networks ?? []}
+        cachedStores={config?.stores ?? []}
       />
     </div>
   );
