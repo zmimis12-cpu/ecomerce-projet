@@ -1,25 +1,26 @@
 "use server";
-
+/**
+ * lib/delivery/shipment-actions.ts
+ * Server actions for Digylog delivery operations.
+ * Token NEVER reaches the browser.
+ */
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/session";
 import { createDigylogClientFromDB } from "./digylog/client";
 import { mapDigylogStatus } from "./digylog/status-map";
 
-const MANAGER = ["super_admin", "admin", "manager"] as const;
+const MANAGER = ["super_admin","admin","manager"] as const;
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+/** Normalize Moroccan phone to exactly 10 digits starting with 0 */
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
-
-  if (digits.startsWith("212") && digits.length === 12) {
-    return "0" + digits.slice(3);
-  }
-
-  if (digits.startsWith("0") && digits.length === 10) {
-    return digits;
-  }
-
-  return digits.slice(-10).padStart(10, "0");
+  if (digits.startsWith("212") && digits.length === 12) return "0" + digits.slice(3);
+  if (digits.startsWith("0")   && digits.length === 10) return digits;
+  // pad/truncate to 10
+  return ("0" + digits).slice(-10).padStart(10, "0");
 }
 
 async function getDigylogSettings() {
@@ -29,12 +30,11 @@ async function getDigylogSettings() {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-
   return data as {
-    default_network_id: number;
-    default_store_name: string;
-    default_port: 1 | 2;
-    default_mode: 1 | 2;
+    default_network_id:       number;
+    default_store_name:       string;
+    default_port:             1 | 2;
+    default_mode:             1 | 2;
     default_status_on_create: 0 | 1;
   } | null;
 }
@@ -45,282 +45,285 @@ async function getDigylogCompanyId(): Promise<string | null> {
     .select("id")
     .eq("slug", "digylog")
     .maybeSingle();
-
   return (data as { id: string } | null)?.id ?? null;
 }
 
-export async function sendOrderToDigylog(orderId: string) {
+// ── Send order to Digylog ──────────────────────────────────────────────────────
+export async function sendOrderToDigylog(orderId: string): Promise<{
+  success: boolean;
+  tracking?: string;
+  blId?: number | null;
+  error?: string;
+}> {
   await requireRole([...MANAGER]);
 
-  const { data: order, error: orderError } = await supabaseAdmin
+  // 1. Load order
+  const { data: order, error: orderErr } = await supabaseAdmin
     .from("orders")
     .select(`
-      id,
-      order_number,
-      customer_name,
-      customer_phone,
-      customer_city,
-      customer_address,
-      total_amount_mad,
-      notes,
-      status,
+      id, order_number, customer_name, customer_phone,
+      customer_city, customer_address, total_amount_mad, notes, status,
       delivery_tracking_number
     `)
     .eq("id", orderId)
     .single();
 
-  if (orderError || !order) {
-    return { success: false, error: "Commande introuvable." };
-  }
+  if (orderErr || !order) return { success: false, error: "Commande introuvable." };
 
   const o = order as {
-    id: string;
-    order_number: string;
-    customer_name: string;
-    customer_phone: string;
-    customer_city: string;
-    customer_address: string;
-    total_amount_mad: number;
-    notes: string | null;
-    status: string;
+    id: string; order_number: string; customer_name: string;
+    customer_phone: string; customer_city: string; customer_address: string;
+    total_amount_mad: number; notes: string | null; status: string;
     delivery_tracking_number: string | null;
   };
 
   if (o.status !== "confirmed") {
-    return {
-      success: false,
-      error: `Commande non confirmée. Status actuel: ${o.status}`,
-    };
+    return { success: false, error: `Statut invalide: "${o.status}". Seules les commandes "confirmed" peuvent être envoyées.` };
   }
-
   if (o.delivery_tracking_number) {
-    return {
-      success: false,
-      error: `Déjà envoyé — tracking: ${o.delivery_tracking_number}`,
-    };
+    return { success: false, error: `Déjà envoyé — tracking: ${o.delivery_tracking_number}` };
   }
 
+  // 2. Validate phone
+  const phone = normalizePhone(o.customer_phone);
+  if (phone.length !== 10 || !phone.startsWith("0")) {
+    return { success: false, error: `Téléphone invalide: "${o.customer_phone}" → "${phone}". Doit être 10 chiffres commençant par 0.` };
+  }
+
+  // 3. Load items
   const { data: items } = await supabaseAdmin
     .from("order_items")
     .select("quantity, products(name, sku)")
     .eq("order_id", orderId);
 
-  type Item = {
-    quantity: number;
-    products: { name: string; sku: string } | null;
-  };
-
+  type Item = { quantity: number; products: { name: string; sku: string } | null };
   const orderItems = (items ?? []) as Item[];
-
-  const settings = await getDigylogSettings();
-
-  if (!settings) {
-    return {
-      success: false,
-      error: "Paramètres Digylog manquants. Configurez dans Paramètres → Transporteur.",
-    };
-  }
-
-  const token = process.env.DIGYLOG_TOKEN ?? "";
-
-  if (!token.trim()) {
-    return {
-      success: false,
-      error: "DIGYLOG_TOKEN manquant dans Vercel Environment Variables.",
-    };
-  }
-
   const refs = orderItems.map((item) => ({
     designation: item.products?.name ?? "Produit",
-    quantity: item.quantity || 1,
+    quantity:    item.quantity,
   }));
+  if (!refs.length) refs.push({ designation: "Produit", quantity: 1 });
 
-  if (!refs.length) {
-    refs.push({ designation: "Produit", quantity: 1 });
+  // 4. Load Digylog settings
+  const settings = await getDigylogSettings();
+  if (!settings) {
+    return { success: false, error: "Paramètres Digylog manquants. Allez dans Paramètres → Transporteur." };
+  }
+  if (!settings.default_store_name) {
+    return { success: false, error: "Nom de boutique Digylog manquant. Configurez-le dans Paramètres → Transporteur." };
+  }
+  if (!settings.default_network_id) {
+    return { success: false, error: "ID réseau Digylog manquant. Configurez-le dans Paramètres → Transporteur." };
   }
 
-  const phone = normalizePhone(o.customer_phone);
+  // 5. Build client — token from DB or env
+  const client = await createDigylogClientFromDB();
+  if (!client.hasToken()) {
+    return { success: false, error: "Token Digylog manquant. Entrez-le dans Paramètres → Transporteur." };
+  }
 
+  // 6. Build payload
   const payload = {
-    network: Number(settings.default_network_id),
-    store: settings.default_store_name,
-    mode: Number(settings.default_mode ?? 1),
-    status: Number(settings.default_status_on_create ?? 1),
-    checkDuplicate: 1,
-    orders: [
-      {
-        num: o.order_number,
-        type: 1,
-        mode: Number(settings.default_mode ?? 1),
-        network: String(settings.default_network_id),
-        fc: null,
-        store: settings.default_store_name,
-        name: o.customer_name,
-        phone,
-        address: o.customer_address,
-        city: o.customer_city,
-        price: Number(o.total_amount_mad),
-        refs,
-        openproduct: 1,
-        port: Number(settings.default_port ?? 1),
-        note: o.notes ?? "",
-      },
-    ],
+    network:        settings.default_network_id,
+    store:          settings.default_store_name,
+    mode:           (settings.default_mode ?? 1) as 1 | 2,
+    status:         (settings.default_status_on_create ?? 1) as 0 | 1,
+    checkDuplicate: 1 as const,
+    orders: [{
+      num:         o.order_number,
+      type:        1 as const,
+      mode:        (settings.default_mode ?? 1) as 1 | 2,
+      network:     String(settings.default_network_id),
+      fc:          null,
+      store:       settings.default_store_name,
+      name:        o.customer_name,
+      phone,
+      address:     o.customer_address || "N/A",
+      city:        o.customer_city,
+      price:       o.total_amount_mad,
+      refs,
+      openproduct: 1 as const,
+      port:        (settings.default_port ?? 1) as 1 | 2,
+      note:        o.notes ?? "",
+    }],
   };
 
-  console.log("📤 DIGYLOG PAYLOAD:", JSON.stringify(payload, null, 2));
-
-  const client = await createDigylogClientFromDB();
+  // 7. Send to Digylog
   const result = await client.createOrders(payload);
 
-  console.log("📥 DIGYLOG RESULT:", JSON.stringify(result, null, 2));
-
-  if (!result.ok) {
+  if (!result.ok || !result.orders.length) {
     return {
       success: false,
-      error: `Digylog error: ${result.error ?? "unknown error"}`,
+      error: result.error ?? "Digylog n'a pas retourné de tracking.",
     };
   }
 
-  if (!result.orders || result.orders.length === 0) {
-    return {
-      success: false,
-      error:
-        "Digylog ma rja3 hata commande. Vérifie city / network / store / phone. Chouf Vercel logs: DIGYLOG RESULT.",
-    };
-  }
-
-  const created = result.orders[0] as {
-    tracking?: string;
-    traking?: string;
-    code?: string;
-    num?: string;
-    order_id?: string;
-    bl?: number | string | null;
-    bl_id?: number | string | null;
-    [key: string]: unknown;
-  };
-
-  const tracking =
-    created.tracking ??
-    created.traking ??
-    created.code ??
-    null;
+  const created  = result.orders[0];
+  const tracking = created.tracking;
+  const blId     = created.bl != null ? Number(created.bl) : null;
 
   if (!tracking) {
-    console.log("❌ DIGYLOG CREATED WITHOUT TRACKING:", JSON.stringify(created, null, 2));
-
     return {
       success: false,
-      error:
-        "Digylog rja3 réponse mais tracking ma kaynach. Chouf Vercel logs: DIGYLOG CREATED WITHOUT TRACKING.",
+      error: `Digylog a accepté la commande mais n'a pas retourné de tracking. Réponse: ${JSON.stringify(created).slice(0, 200)}`,
     };
   }
 
-  const blIdRaw = created.bl ?? created.bl_id ?? null;
-  const blId =
-    typeof blIdRaw === "string" ? Number(blIdRaw) || null : blIdRaw;
-
+  // 8. Persist to DB
   const companyId = await getDigylogCompanyId();
-  const now = new Date().toISOString();
 
-  await supabaseAdmin.from("delivery_shipments").upsert(
-    {
-      order_id: orderId,
+  const [shipmentRes, orderRes] = await Promise.all([
+    supabaseAdmin.from("delivery_shipments").upsert({
+      order_id:            orderId,
       delivery_company_id: companyId,
-      tracking_number: tracking,
-      external_order_id: o.order_number,
-      external_status: "Non envoyé",
-      external_status_id: 0,
-      internal_status: "not_sent",
-      bl_id: blId,
-      raw_payload: created as never,
-      last_synced_at: now,
-    } as never,
-    { onConflict: "order_id" }
-  );
+      tracking_number:     tracking,
+      external_order_id:   o.order_number,
+      external_status:     "Non envoyé",
+      external_status_id:  0,
+      internal_status:     "not_sent",
+      bl_id:               blId,
+      raw_payload:         created as never,
+      last_synced_at:      new Date().toISOString(),
+    } as never, { onConflict: "order_id" }),
 
-  await supabaseAdmin
-    .from("orders")
-    .update({
-      delivery_tracking_number: tracking,
-      delivery_company_id: companyId,
-      external_delivery_id: o.order_number,
-      delivery_external_status: "Non envoyé",
+    supabaseAdmin.from("orders").update({
+      delivery_tracking_number:    tracking,
+      delivery_company_id:         companyId,
+      external_delivery_id:        o.order_number,
+      delivery_external_status:    "Non envoyé",
       delivery_external_status_id: 0,
-      delivery_status: "not_sent",
-      delivery_last_sync_at: now,
-      status: "sent_to_delivery",
-      sent_to_delivery_at: now,
-      bl_id: blId,
-    } as never)
-    .eq("id", orderId);
+      delivery_status:             "not_sent",
+      delivery_last_sync_at:       new Date().toISOString(),
+      status:                      "sent_to_delivery",
+      bl_id:                       blId,
+    } as never).eq("id", orderId),
+  ]);
 
+  if (shipmentRes.error) console.error("❌ shipment upsert error:", shipmentRes.error.message);
+  if (orderRes.error)    console.error("❌ order update error:",   orderRes.error.message);
+
+  // 9. Log event
   await supabaseAdmin.from("delivery_status_events").insert({
-    order_id: orderId,
-    tracking_number: tracking,
-    external_status: "Non envoyé",
+    order_id:           orderId,
+    tracking_number:    tracking,
+    external_status:    "Non envoyé",
     external_status_id: 0,
-    internal_status: "not_sent",
-    event_time: now,
-    raw_payload: created as never,
-  } as never);
+    internal_status:    "not_sent",
+    event_time:         new Date().toISOString(),
+    raw_payload:        created as never,
+  } as never).then(() => {}, () => {});
 
   revalidatePath("/admin/delivery");
-  revalidatePath(`/admin/delivery/${orderId}`);
+  revalidatePath("/admin/delivery/digylog");
   revalidatePath("/admin/orders");
 
   return { success: true, tracking, blId };
 }
 
-export async function syncDigylogStatus(tracking: string) {
+// ── Test order (for settings page) ────────────────────────────────────────────
+export async function sendTestOrderToDigylog(settings: {
+  network_id:  number;
+  store_name:  string;
+  port:        1 | 2;
+}): Promise<{
+  ok:          boolean;
+  message:     string;
+  tracking?:   string;
+  payload?:    unknown;
+  response?:   unknown;
+}> {
   await requireRole([...MANAGER]);
-
   const client = await createDigylogClientFromDB();
-  const infos = await client.getOrderInfos(tracking);
-
-  if (!infos) {
-    return { success: false, error: "Tracking introuvable sur Digylog." };
+  if (!client.hasToken()) {
+    return { ok: false, message: "Token Digylog manquant. Entrez-le et sauvegardez." };
   }
 
-  const idStatus = infos.idStatus ?? null;
+  const testPayload = {
+    network:        settings.network_id,
+    store:          settings.store_name,
+    mode:           1 as const,
+    status:         0 as const,          // 0 = add only, don't send
+    checkDuplicate: 0 as const,
+    orders: [{
+      num:         `TEST-${Date.now()}`,
+      type:        1 as const,
+      mode:        1 as const,
+      network:     String(settings.network_id),
+      fc:          null,
+      store:       settings.store_name,
+      name:        "Test GestionPro",
+      phone:       "0612345678",
+      address:     "Adresse Test",
+      city:        "Casablanca",
+      price:       100,
+      refs:        [{ designation: "Produit Test", quantity: 1 }],
+      openproduct: 1 as const,
+      port:        settings.port,
+      note:        "TEST — à supprimer",
+    }],
+  };
+
+  console.log("📤 DIGYLOG TEST PAYLOAD:", JSON.stringify(testPayload, null, 2));
+  const result = await client.createOrders(testPayload);
+  console.log("📥 DIGYLOG TEST RESULT:", JSON.stringify(result, null, 2));
+
+  if (!result.ok) {
+    return {
+      ok:      false,
+      message: result.error ?? "Erreur inconnue",
+      payload: testPayload,
+      response:result.rawResponse,
+    };
+  }
+
+  const tracking = result.orders[0]?.tracking ?? null;
+  return {
+    ok:      true,
+    message: tracking
+      ? `✓ Commande test créée — Tracking: ${tracking}`
+      : `⚠ Digylog a répondu OK mais sans tracking`,
+    tracking:  tracking ?? undefined,
+    payload:   testPayload,
+    response:  result.rawResponse,
+  };
+}
+
+// ── Sync status ────────────────────────────────────────────────────────────────
+export async function syncDigylogStatus(tracking: string) {
+  await requireRole([...MANAGER]);
+  const client = await createDigylogClientFromDB();
+  const infos  = await client.getOrderInfos(tracking);
+  if (!infos) return { success: false, error: "Tracking introuvable sur Digylog." };
+
+  const idStatus    = infos.idStatus ?? null;
   const statusLabel = String(infos.status ?? "");
-  const mapped = mapDigylogStatus(idStatus, statusLabel);
 
   await applyDigylogStatusUpdate({
     tracking,
     externalStatus: statusLabel,
-    idStatus: idStatus ?? 0,
-    motif: "",
-    postponedTo: null,
-    eventTime: new Date().toISOString(),
-    rawPayload: infos as Record<string, unknown>,
+    idStatus:       idStatus ?? 0,
+    motif:          "",
+    postponedTo:    null,
+    eventTime:      new Date().toISOString(),
+    rawPayload:     infos as Record<string, unknown>,
   });
 
   revalidatePath("/admin/delivery");
-
-  return { success: true, internal: mapped.internal };
+  revalidatePath("/admin/delivery/digylog");
+  return { success: true, internal: mapDigylogStatus(idStatus, statusLabel).internal };
 }
 
+// ── Apply status update (webhook + sync) ──────────────────────────────────────
 export async function applyDigylogStatusUpdate(params: {
-  tracking: string;
+  tracking:       string;
   externalStatus: string;
-  idStatus: number;
-  motif: string;
-  postponedTo: string | null;
-  eventTime: string;
-  rawPayload: Record<string, unknown>;
+  idStatus:       number;
+  motif:          string;
+  postponedTo:    string | null;
+  eventTime:      string;
+  rawPayload:     Record<string, unknown>;
 }) {
-  const {
-    tracking,
-    externalStatus,
-    idStatus,
-    motif,
-    postponedTo,
-    eventTime,
-    rawPayload,
-  } = params;
-
+  const { tracking, externalStatus, idStatus, motif, postponedTo, eventTime, rawPayload } = params;
   const mapped = mapDigylogStatus(idStatus, externalStatus);
 
   const { data: shipment } = await supabaseAdmin
@@ -330,7 +333,7 @@ export async function applyDigylogStatusUpdate(params: {
     .maybeSingle();
 
   const shipmentId = (shipment as { id: string; order_id: string } | null)?.id;
-  let orderId = (shipment as { id: string; order_id: string } | null)?.order_id;
+  let orderId      = (shipment as { id: string; order_id: string } | null)?.order_id;
 
   if (!orderId) {
     const { data: ord } = await supabaseAdmin
@@ -338,7 +341,6 @@ export async function applyDigylogStatusUpdate(params: {
       .select("id")
       .eq("delivery_tracking_number", tracking)
       .maybeSingle();
-
     orderId = (ord as { id: string } | null)?.id;
   }
 
@@ -347,88 +349,67 @@ export async function applyDigylogStatusUpdate(params: {
   const now = new Date().toISOString();
 
   await supabaseAdmin.from("delivery_status_events").insert({
-    shipment_id: shipmentId,
-    order_id: orderId,
-    tracking_number: tracking,
-    external_status: externalStatus,
+    shipment_id:        shipmentId,
+    order_id:           orderId,
+    tracking_number:    tracking,
+    external_status:    externalStatus,
     external_status_id: idStatus,
-    internal_status: mapped.internal,
-    motif: motif || null,
-    postponed_to: postponedTo,
-    event_time: eventTime,
-    raw_payload: rawPayload,
-  } as never);
+    internal_status:    mapped.internal,
+    motif:              motif || null,
+    postponed_to:       postponedTo,
+    event_time:         eventTime,
+    raw_payload:        rawPayload,
+  } as never).then(() => {}, () => {});
 
   if (shipmentId) {
-    await supabaseAdmin
-      .from("delivery_shipments")
-      .update({
-        external_status: externalStatus,
-        external_status_id: idStatus,
-        internal_status: mapped.internal,
-        last_synced_at: now,
-      } as never)
-      .eq("id", shipmentId);
+    await supabaseAdmin.from("delivery_shipments").update({
+      external_status:    externalStatus,
+      external_status_id: idStatus,
+      internal_status:    mapped.internal,
+      last_synced_at:     now,
+    } as never).eq("id", shipmentId);
   }
 
   const orderUpdate: Record<string, unknown> = {
-    delivery_external_status: externalStatus,
+    delivery_external_status:    externalStatus,
     delivery_external_status_id: idStatus,
-    delivery_status: mapped.internal,
-    delivery_last_sync_at: now,
-    status: mapped.orderStatus,
+    delivery_status:             mapped.internal,
+    delivery_last_sync_at:       now,
+    status:                      mapped.orderStatus,
   };
+  if (mapped.isPaid)      { orderUpdate.is_paid = true; orderUpdate.paid_at = eventTime; }
+  if (mapped.isDelivered && !mapped.isPaid) orderUpdate.delivered_at = eventTime;
+  if (mapped.isReturned)  orderUpdate.returned_at = eventTime;
 
-  if (mapped.isPaid) {
-    orderUpdate.is_paid = true;
-    orderUpdate.paid_at = eventTime;
-  }
-
-  if (mapped.isDelivered && !mapped.isPaid) {
-    orderUpdate.delivered_at = eventTime;
-  }
-
-  if (mapped.isReturned) {
-    orderUpdate.returned_at = eventTime;
-  }
-
-  await supabaseAdmin
-    .from("orders")
-    .update(orderUpdate as never)
-    .eq("id", orderId);
+  await supabaseAdmin.from("orders").update(orderUpdate as never).eq("id", orderId);
 }
 
+// ── Register webhook ──────────────────────────────────────────────────────────
 export async function registerDigylogWebhook() {
-  await requireRole(["super_admin", "admin"]);
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  await requireRole(["super_admin","admin"]);
+  const appUrl     = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const webhookUrl = `${appUrl}/api/webhooks/digylog`;
-
-  const client = await createDigylogClientFromDB();
-  const result = await client.registerWebhook(webhookUrl);
+  const client     = await createDigylogClientFromDB();
+  const result     = await client.registerWebhook(webhookUrl);
 
   if (result.ok) {
-    await supabaseAdmin
-      .from("digylog_settings")
-      .update({
-        webhook_url: webhookUrl,
-      } as never)
+    await supabaseAdmin.from("digylog_settings")
+      .update({ webhook_url: webhookUrl } as never)
       .not("id", "is", null);
   }
-
   return result;
 }
 
+// ── Test connection ────────────────────────────────────────────────────────────
 export async function testDigylogConnection() {
   await requireRole([...MANAGER]);
-
   const client = await createDigylogClientFromDB();
   return client.testConnection();
 }
 
+// ── Sync reference data ───────────────────────────────────────────────────────
 export async function syncDigylogReferenceData() {
   await requireRole([...MANAGER]);
-
   const client = await createDigylogClientFromDB();
 
   const [networks, stores, cities, statuses] = await Promise.all([
@@ -438,145 +419,82 @@ export async function syncDigylogReferenceData() {
     client.getStatuses(),
   ]);
 
-  await supabaseAdmin
-    .from("digylog_settings")
-    .update({
-      config: {
-        networks,
-        stores,
-        cities: cities.map((c) => c.name),
-        statuses,
-      } as never,
-    } as never)
-    .not("id", "is", null);
+  await supabaseAdmin.from("digylog_settings").update({
+    config: { networks, stores, cities: cities.map((c) => c.name), statuses } as never,
+  } as never).not("id", "is", null);
 
-  return {
-    success: true,
-    networks: networks.length,
-    stores: stores.length,
-    cities: cities.length,
-    statuses: statuses.length,
-  };
+  return { success: true, networks: networks.length, stores: stores.length, cities: cities.length, statuses: statuses.length };
 }
 
+// ── Save settings ─────────────────────────────────────────────────────────────
 export async function saveDigylogSettings(data: {
-  token?: string;
-  default_network_id: number;
-  default_store_name: string;
-  default_port: 1 | 2;
-  default_mode: 1 | 2;
-  default_status_on_create: 0 | 1;
-  webhook_secret?: string;
+  token?:                  string;
+  default_network_id:      number;
+  default_store_name:      string;
+  default_port:            1 | 2;
+  default_mode:            1 | 2;
+  default_status_on_create:0 | 1;
+  webhook_secret?:         string;
 }) {
-  await requireRole(["super_admin", "admin"]);
-
+  await requireRole(["super_admin","admin"]);
   const existing = await getDigylogSettings();
 
   if (existing) {
-    await supabaseAdmin
-      .from("digylog_settings")
-      .update(data as never)
-      .not("id", "is", null);
+    await supabaseAdmin.from("digylog_settings").update(data as never).not("id", "is", null);
   } else {
     await supabaseAdmin.from("digylog_settings").insert({
       ...data,
-      token: "",
       referer: process.env.DIGYLOG_REFERER ?? "https://apiseller.digylog.com",
     } as never);
   }
 
   revalidatePath("/admin/settings/delivery");
-
   return { success: true };
 }
 
+// ── Download label (base64 PDF for client) ────────────────────────────────────
 export async function getDigylogLabelUrl(trackings: string[]): Promise<{
-  ok: boolean;
-  error?: string;
-  blobBase64?: string;
+  ok: boolean; error?: string; blobBase64?: string;
 }> {
   await requireRole([...MANAGER]);
-
   const client = await createDigylogClientFromDB();
-
-  const result = await client.downloadLabels({ orders: trackings, format: 3 });
-
-  if (!result.ok || !result.blob) {
-    return { ok: false, error: result.error };
-  }
-
+  const result = await client.downloadLabels({ orders: trackings, format: 3 }); // 3 = thermal 100×100
+  if (!result.ok || !result.blob) return { ok: false, error: result.error };
   const buf = await result.blob.arrayBuffer();
-  const b64 = Buffer.from(buf).toString("base64");
-
-  return { ok: true, blobBase64: b64 };
+  return { ok: true, blobBase64: Buffer.from(buf).toString("base64") };
 }
 
+// ── Download BL ───────────────────────────────────────────────────────────────
 export async function getDigylogBlUrl(blId: number): Promise<{
-  ok: boolean;
-  error?: string;
-  blobBase64?: string;
+  ok: boolean; error?: string; blobBase64?: string;
 }> {
   await requireRole([...MANAGER]);
-
   const client = await createDigylogClientFromDB();
   const result = await client.downloadBlPdf(blId);
-
-  if (!result.ok || !result.blob) {
-    return { ok: false, error: result.error };
-  }
-
+  if (!result.ok || !result.blob) return { ok: false, error: result.error };
   const buf = await result.blob.arrayBuffer();
-  const b64 = Buffer.from(buf).toString("base64");
-
-  return { ok: true, blobBase64: b64 };
+  return { ok: true, blobBase64: Buffer.from(buf).toString("base64") };
 }
 
+// ── Stubs (legacy) ────────────────────────────────────────────────────────────
 export async function importInvoices(_from: string, _to: string) {
-  return {
-    success: false,
-    error: "Import via API Digylog non configuré.",
-    imported: 0,
-  };
+  return { success: false, error: "Non configuré.", imported: 0 };
 }
-
 export async function reconcileInvoice(_invoiceId: string) {
-  return {
-    success: false as const,
-    error: "Réconciliation non configurée.",
-    matched: 0,
-    missing: 0,
-    diff: 0,
-  };
+  return { success: false as const, error: "Non configuré.", matched:0, missing:0, diff:0 };
 }
-
-export async function fetchDeliveryDocument(
-  _type: "delivery" | "pickup" | "return",
-  _date: string
-) {
-  return {
-    success: false as const,
-    error: "Non configuré.",
-    fileUrl: undefined as string | undefined,
-  };
+export async function fetchDeliveryDocument(_type: "delivery"|"pickup"|"return", _date: string) {
+  return { success: false as const, error: "Non configuré.", fileUrl: undefined as string|undefined };
 }
-
 export async function saveDeliverySettings(_data: Record<string, unknown>) {
   return { success: true };
 }
-
 export async function applyStatusUpdate(
-  tracking: string,
-  externalStatus: string,
-  rawPayload: Record<string, unknown>,
-  eventTime?: string
+  tracking: string, externalStatus: string,
+  rawPayload: Record<string, unknown>, eventTime?: string
 ) {
   await applyDigylogStatusUpdate({
-    tracking,
-    externalStatus,
-    idStatus: 0,
-    motif: "",
-    postponedTo: null,
-    eventTime: eventTime ?? new Date().toISOString(),
-    rawPayload,
+    tracking, externalStatus, idStatus: 0, motif: "",
+    postponedTo: null, eventTime: eventTime ?? new Date().toISOString(), rawPayload,
   });
 }

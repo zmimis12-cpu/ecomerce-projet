@@ -10,6 +10,7 @@ const navItems = [
   { href: "/admin/orders",      label: "Commandes",   icon: ShoppingCart,     exact: false },
   { href: "/admin/call-center", label: "Call Center", icon: PhoneCall,        exact: false },
   { href: "/admin/delivery",    label: "Livraison",   icon: Truck,            exact: true  },
+  { href: "/admin/delivery/digylog",   label: "  Digylog",  icon: Truck,            exact: false },
   { href: "/admin/delivery/invoices",  label: "  Factures", icon: FileText,         exact: false },
   { href: "/admin/delivery/documents", label: "  Documents",icon: FolderOpen,       exact: false },
   { href: "/admin/scanner",     label: "Scanner",     icon: ScanLine,         exact: false },

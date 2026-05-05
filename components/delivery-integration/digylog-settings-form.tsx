@@ -4,6 +4,7 @@ import { Copy, RefreshCw, Wifi, Download, Eye, EyeOff } from "lucide-react";
 import {
   saveDigylogSettings, testDigylogConnection,
   registerDigylogWebhook, syncDigylogReferenceData,
+  sendTestOrderToDigylog,
 } from "@/lib/delivery/shipment-actions";
 
 interface Props {
@@ -17,6 +18,7 @@ export function DigylogSettingsForm({ settings, appUrl, hasToken, tokenSource }:
   const [isPending, startTransition] = useTransition();
   const [msg, setMsg]      = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [showToken, setShowToken] = useState(false);
+  const [testResult, setTestResult] = useState<Record<string, unknown> | null>(null);
 
   const webhookUrl = `${appUrl}/api/webhooks/digylog`;
 
@@ -193,8 +195,50 @@ export function DigylogSettingsForm({ settings, appUrl, hasToken, tokenSource }:
             <Download className="h-3.5 w-3.5" />
             Enregistrer webhook chez Digylog
           </button>
+          <button type="button" disabled={isPending || (!form.token && !hasToken)}
+            onClick={() => {
+              setTestResult(null);
+              setMsg(null);
+              startTransition(async () => {
+                const r = await sendTestOrderToDigylog({
+                  network_id: form.default_network_id,
+                  store_name: form.default_store_name,
+                  port:       form.default_port,
+                });
+                setTestResult(r as unknown as Record<string, unknown>);
+                setMsg({ type: r.ok ? "ok" : "err", text: r.message });
+              });
+            }}
+            className={BTN + " border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100"}>
+            <Wifi className="h-3.5 w-3.5" />
+            Envoyer commande test Digylog
+          </button>
         </div>
       </div>
+
+      {/* ── TEST RESULT ── */}
+      {testResult && (
+        <div className="rounded-xl border bg-card p-5 space-y-3">
+          <h3 className="text-sm font-semibold">Résultat commande test</h3>
+          {(testResult.tracking as string | undefined) && (
+            <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800 font-mono font-semibold">
+              ✓ Tracking: {testResult.tracking as string}
+            </div>
+          )}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase">Payload envoyé</p>
+            <pre className="text-[10px] bg-secondary/40 rounded-lg p-3 overflow-x-auto max-h-48">
+              {JSON.stringify(testResult.payload, null, 2)}
+            </pre>
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase">Réponse Digylog</p>
+            <pre className="text-[10px] bg-secondary/40 rounded-lg p-3 overflow-x-auto max-h-48">
+              {JSON.stringify(testResult.response, null, 2)}
+            </pre>
+          </div>
+        </div>
+      )}
 
       {/* ── WEBHOOK URL ── */}
       <div className="rounded-xl border bg-card p-5 space-y-3">
