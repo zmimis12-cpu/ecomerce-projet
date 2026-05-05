@@ -7,9 +7,10 @@ interface Props {
   productSlug: string;
   ctaText?: string;
   b1: number; b2: number; b3: number;
+  cities?: string[];
 }
 
-export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3 }: Props) {
+export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, cities = FALLBACK_CITIES }: Props) {
   const [isPending, startTransition] = useTransition();
   const [submitted, setSubmitted]    = useState(false);
   const [errors, setErrors]          = useState<Record<string, string>>({});
@@ -180,7 +181,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           onChange={(e) => set("customer_city", e.target.value)}
           style={INP(!!errors.customer_city)} required>
           <option value="">اختر مدينتك</option>
-          {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          {cities.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
         {ERR(errors.customer_city)}
       </div>
@@ -229,7 +230,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   );
 }
 
-const CITIES = [
+export const FALLBACK_CITIES = [
   "الدار البيضاء","الرباط","مراكش","فاس","طنجة","أكادير","مكناس","وجدة",
   "القنيطرة","تطوان","سلا","الجديدة","خريبكة","بني ملال","تازة","الناظور",
   "سطات","آسفي","العرائش","الحسيمة","الرشيدية","ورزازات","إفران","زاكورة",

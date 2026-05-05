@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { FALLBACK_CITIES } from "@/components/landing/order-form-public";
 import { getLandingPage } from "@/lib/public/queries";
 import { OrderFormPublic } from "@/components/landing/order-form-public";
 import { StockCounter } from "@/components/landing/stock-counter";
@@ -39,6 +40,21 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   if (!page) notFound();
 
   supabaseAdmin.rpc("increment_lp_views" as never, { p_slug: slug } as never).then(() => {}, () => {});
+
+  // Load Digylog cities from cached settings (updated via sync in admin)
+  let digylogCities: string[] = [];
+  try {
+    const { data: dgSettings } = await supabaseAdmin
+      .from("digylog_settings")
+      .select("config")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const config = (dgSettings as { config?: Record<string, unknown> } | null)?.config;
+    if (Array.isArray(config?.cities) && (config.cities as string[]).length > 0) {
+      digylogCities = config.cities as string[];
+    }
+  } catch { /* fallback to hardcoded */ }
 
   const lp      = (lpData ?? {}) as Record<string, unknown>;
   const product = page.product;
@@ -352,7 +368,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             <h2 className="lp-h2">{formTitle}</h2>
             <p className="lp-form-note green">{formNote}</p>
             <OrderFormPublic product={product} productSlug={slug}
-              ctaText={ctaText} b1={b1} b2={b2} b3={b3} />
+              ctaText={ctaText} b1={b1} b2={b2} b3={b3}
+              cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
           </div>
         </section>
 

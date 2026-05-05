@@ -150,7 +150,7 @@ export class DigylogClient {
 
     const raw = r.data;
 
-    // ── Normalise tracking field (Digylog spells it "traking" sometimes) ────
+    // ── Normalise an order item from any field name variant ─────────────────
     function fixTracking(item: Record<string, unknown>): DigylogCreatedOrder {
       return {
         ...item,
@@ -159,17 +159,43 @@ export class DigylogClient {
       } as DigylogCreatedOrder;
     }
 
-    // ── Try every known format ───────────────────────────────────────────────
+    // ── Try every known format ────────────────────────────────────────────────
     let orders: DigylogCreatedOrder[] = [];
 
     if (Array.isArray(raw)) {
-      // [ {num, tracking/traking, bl?}, ... ]
-      orders = (raw as Record<string, unknown>[]).map(fixTracking);
+      // Check if the array items have isSuccess:false (Digylog validation errors)
+      const errItems = (raw as Record<string, unknown>[]).filter(
+        (item) => item.isSuccess === false || item.isSuccess === 0
+      );
+      if (errItems.length === raw.length) {
+        // ALL items failed
+        const msgs = errItems.map((item) => {
+          const errs = Array.isArray(item.errors)
+            ? (item.errors as string[]).join(" | ")
+            : String(item.errors ?? item.message ?? "Erreur inconnue");
+          return `[${String(item.num ?? "")}] ${errs}`;
+        }).join(" | ");
+        console.error("❌ DIGYLOG VALIDATION ERRORS:", msgs);
+        return { ok: false, orders: [], error: msgs, rawResponse: raw };
+      }
+      // Some may have succeeded — take successful ones
+      const successItems = (raw as Record<string, unknown>[]).filter(
+        (item) => item.isSuccess !== false && item.isSuccess !== 0
+      );
+      orders = (successItems.length ? successItems : raw as Record<string, unknown>[]).map(fixTracking);
     } else if (raw && typeof raw === "object") {
       const obj = raw as Record<string, unknown>;
 
-      // Digylog validation error (still HTTP 200 sometimes)
-      if (obj.message || obj.errors) {
+      // Single validation error object
+      if (obj.isSuccess === false || obj.isSuccess === 0) {
+        const errs = Array.isArray(obj.errors)
+          ? (obj.errors as string[]).join(" | ")
+          : String(obj.errors ?? obj.message ?? "Erreur Digylog");
+        console.error("❌ DIGYLOG VALIDATION ERROR:", errs);
+        return { ok: false, orders: [], error: errs, rawResponse: raw };
+      }
+
+      if (obj.message || (obj.errors && !obj.tracking && !obj.traking)) {
         const errMsg = String(obj.message ?? JSON.stringify(obj.errors ?? obj));
         console.error("❌ DIGYLOG VALIDATION ERROR:", errMsg);
         return { ok: false, orders: [], error: `Digylog: ${errMsg}`, rawResponse: raw };
@@ -180,10 +206,8 @@ export class DigylogClient {
       } else if (Array.isArray(obj.orders)) {
         orders = (obj.orders as Record<string, unknown>[]).map(fixTracking);
       } else if (obj.tracking ?? obj.traking) {
-        // Single order as object
         orders = [fixTracking(obj)];
       } else {
-        // Unknown — log full response
         console.error("❌ DIGYLOG CREATED WITHOUT TRACKING — unknown format:", JSON.stringify(raw));
         return {
           ok: false, orders: [],
@@ -196,7 +220,7 @@ export class DigylogClient {
     // Filter out items with no tracking
     const withTracking = orders.filter((o) => o.tracking && o.tracking.length > 0);
     if (!withTracking.length) {
-      console.error("❌ DIGYLOG CREATED WITHOUT TRACKING — orders array:", JSON.stringify(orders));
+      console.error("❌ DIGYLOG CREATED WITHOUT TRACKING — orders:", JSON.stringify(orders));
       return {
         ok: false, orders,
         error: `Digylog a créé ${orders.length} colis sans tracking. Réponse: ${JSON.stringify(orders).slice(0, 300)}`,
