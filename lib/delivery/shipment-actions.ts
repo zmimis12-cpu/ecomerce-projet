@@ -123,8 +123,14 @@ export async function sendOrderToDigylog(orderId: string): Promise<{
   }
 
   // 6. Build payload
+  // Force integer — DB may store string if saved incorrectly
+  const networkId = parseInt(String(settings.default_network_id), 10);
+  if (!networkId || isNaN(networkId)) {
+    return { success: false, error: `ID réseau invalide: "${settings.default_network_id}". Doit être un nombre entier (ex: 1). Allez dans Paramètres → Transporteur → Sync → choisissez le réseau.` };
+  }
+
   const payload = {
-    network:        settings.default_network_id,
+    network:        networkId,
     store:          settings.default_store_name,
     mode:           (settings.default_mode ?? 1) as 1 | 2,
     status:         (settings.default_status_on_create ?? 1) as 0 | 1,
@@ -133,7 +139,7 @@ export async function sendOrderToDigylog(orderId: string): Promise<{
       num:         o.order_number,
       type:        1 as const,
       mode:        (settings.default_mode ?? 1) as 1 | 2,
-      network:     String(settings.default_network_id),
+      network:     String(networkId),
       fc:          null,
       store:       settings.default_store_name,
       name:        o.customer_name,
@@ -238,8 +244,13 @@ export async function sendTestOrderToDigylog(settings: {
     return { ok: false, message: "Token Digylog manquant. Entrez-le et sauvegardez." };
   }
 
+  const networkIdTest = parseInt(String(settings.network_id), 10);
+  if (!networkIdTest || isNaN(networkIdTest)) {
+    return { ok: false, message: `ID réseau invalide: "${settings.network_id}". Doit être un nombre.`, payload: null, response: null };
+  }
+
   const testPayload = {
-    network:        settings.network_id,
+    network:        networkIdTest,
     store:          settings.store_name,
     mode:           1 as const,
     status:         0 as const,          // 0 = add only, don't send
@@ -248,7 +259,7 @@ export async function sendTestOrderToDigylog(settings: {
       num:         `TEST-${Date.now()}`,
       type:        1 as const,
       mode:        1 as const,
-      network:     String(settings.network_id),
+      network:     String(networkIdTest),
       fc:          null,
       store:       settings.store_name,
       name:        "Test GestionPro",
