@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, ShoppingCart, PhoneCall, Truck, Zap, ScanLine, RotateCcw, Globe, BarChart3, Settings, FileText, FolderOpen } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingCart, PhoneCall, Truck, Zap, ScanLine, RotateCcw, Globe, BarChart3, Settings, FileText, FolderOpen, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -11,6 +11,8 @@ const navItems = [
   { href: "/admin/call-center", label: "Call Center", icon: PhoneCall,        exact: false },
   { href: "/admin/delivery",    label: "Livraison",   icon: Truck,            exact: true  },
   { href: "/admin/delivery/digylog",   label: "  Digylog",  icon: Truck,            exact: false },
+  { href: "/admin/delivery/batches",   label: "  Groupes",  icon: Layers,           exact: false },
+  { href: "/admin/delivery/sheet-sync",label: "  Sheet Sync",icon: FileText,          exact: false },
   { href: "/admin/delivery/invoices",  label: "  Factures", icon: FileText,         exact: false },
   { href: "/admin/delivery/documents", label: "  Documents",icon: FolderOpen,       exact: false },
   { href: "/admin/scanner",     label: "Scanner",     icon: ScanLine,         exact: false },
