@@ -324,9 +324,34 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
         shipping_company: "Digylog",
       } as never).eq("id", bRes.batchId);
 
-      await supabaseAdmin.from("delivery_batch_orders")
-        .update({ status: "sent" } as never)
+      // Copy tracking_number from orders into delivery_batch_orders
+      const { data: batchOrdRows } = await supabaseAdmin
+        .from("delivery_batch_orders")
+        .select("id, order_id")
         .eq("batch_id", bRes.batchId);
+
+      if (batchOrdRows?.length) {
+        const orderIds = (batchOrdRows as { id: string; order_id: string }[]).map((r) => r.order_id);
+        const { data: ordTrackings } = await supabaseAdmin
+          .from("orders")
+          .select("id, delivery_tracking_number")
+          .in("id", orderIds)
+          .not("delivery_tracking_number", "is", null);
+
+        const trackMap = new Map<string, string>();
+        for (const ot of (ordTrackings ?? []) as { id: string; delivery_tracking_number: string }[]) {
+          trackMap.set(ot.id, ot.delivery_tracking_number);
+        }
+
+        for (const bo of batchOrdRows as { id: string; order_id: string }[]) {
+          const tracking = trackMap.get(bo.order_id);
+          if (tracking) {
+            await supabaseAdmin.from("delivery_batch_orders")
+              .update({ status: "sent", tracking_number: tracking } as never)
+              .eq("id", bo.id);
+          }
+        }
+      }
     }
   }
 
