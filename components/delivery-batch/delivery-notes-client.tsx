@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Search, Download, Loader2, CheckCircle2, Clock, Truck, FileDown, XCircle, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { downloadBatchLabels, downloadBatchBl, sendBatchGetBl } from "@/lib/delivery/batch/actions";
+import { getBlPdfByBlId } from "@/lib/delivery/document-actions";
 
 type Batch = {
   id: string;
