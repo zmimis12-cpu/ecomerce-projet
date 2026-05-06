@@ -135,9 +135,10 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
       {/* Actions + Orders table (client component for interactivity) */}
       <BatchDetailClient
         batchId={id}
-        batchStatus={b.status}
-        blId={b.bl_id}
-        orders={(batchOrders ?? []) as unknown as BatchOrderRow[]}
+        status={String(b.status)}
+        blId={b.bl_id as number | null}
+        paymentStatus={String((b as Record<string,unknown>).payment_status ?? "unpaid")}
+        trackings={(batchOrders ?? []).map((bo: unknown) => (bo as Record<string,unknown>).tracking_number as string).filter(Boolean) as string[]}
       />
     </div>
   );

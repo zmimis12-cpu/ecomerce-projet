@@ -76,3 +76,15 @@ CREATE POLICY "batchproducts_auth" ON delivery_batch_product_summary FOR ALL USI
 -- ── 4. Add delivery_batch_id to orders ───────────────────────────────────────
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_batch_id UUID REFERENCES delivery_batches(id);
 CREATE INDEX IF NOT EXISTS idx_orders_batch ON orders(delivery_batch_id) WHERE delivery_batch_id IS NOT NULL;
+
+-- ── Step 16 additions ─────────────────────────────────────────────────────────
+ALTER TABLE delivery_batches
+  ADD COLUMN IF NOT EXISTS payment_status  TEXT NOT NULL DEFAULT 'unpaid',
+    -- unpaid | partial | paid
+  ADD COLUMN IF NOT EXISTS shipping_company TEXT,
+  ADD COLUMN IF NOT EXISTS store_name      TEXT,
+  ADD COLUMN IF NOT EXISTS completed_at    TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS paid_at         TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS paid_by         UUID REFERENCES auth.users(id);
+
+CREATE INDEX IF NOT EXISTS idx_db_payment ON delivery_batches(payment_status);

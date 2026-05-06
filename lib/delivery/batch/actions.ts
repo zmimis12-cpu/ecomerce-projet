@@ -100,10 +100,11 @@ export async function createBatch(orderIds: string[], notes?: string) {
   const { data: batch, error: batchErr } = await supabaseAdmin
     .from("delivery_batches")
     .insert({
-      batch_number:   "",  // trigger will set
-      status:         "draft",
-      total_orders:   rows.length,
-      notes:          notes ?? null,
+      batch_number:    "",  // trigger will set
+      status:          "draft",
+      total_orders:    rows.length,
+      notes:           notes ?? null,
+      shipping_company:"Digylog",
     } as never)
     .select("id, batch_number")
     .single();
