@@ -1,9 +1,9 @@
 "use client";
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Search, Download, Loader2, CheckCircle2, Clock, Truck, FileDown, XCircle } from "lucide-react";
+import { Search, Download, Loader2, CheckCircle2, Clock, Truck, FileDown, XCircle, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { downloadBatchLabels, downloadBatchBl } from "@/lib/delivery/batch/actions";
+import { downloadBatchLabels, downloadBatchBl, sendBatchGetBl } from "@/lib/delivery/batch/actions";
 
 type Batch = {
   id: string;
@@ -51,50 +51,72 @@ function downloadBlob(b64: string, name: string) {
   URL.revokeObjectURL(url);
 }
 
-function DownloadBtn({ batch }: { batch: Batch }) {
+function ActionBtn({ batch }: { batch: Batch }) {
   const [isPending, startTransition] = useTransition();
-  const [err, setErr] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const isDraft = batch.status === "draft" && !batch.bl_id;
+
+  function handleSend(e: React.MouseEvent) {
+    e.preventDefault(); e.stopPropagation();
+    setMsg(null);
+    startTransition(async () => {
+      const r = await sendBatchGetBl(batch.id) as { ok?: boolean; bl?: number; error?: string };
+      if (r.ok && r.bl) {
+        setMsg({ ok: true, text: `BL #${r.bl}` });
+        setTimeout(() => window.location.reload(), 1000);
+      } else {
+        setMsg({ ok: false, text: r.error ?? "Erreur" });
+      }
+    });
+  }
 
   function handleDownload(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    setErr(null);
+    e.preventDefault(); e.stopPropagation();
+    setMsg(null);
     startTransition(async () => {
-      // Try BL first, fall back to labels
       if (batch.bl_id) {
         const r = await downloadBatchBl(batch.id);
-        if (r.ok && r.blobBase64) {
-          downloadBlob(r.blobBase64, `BL-${batch.bl_id}.pdf`);
-          return;
-        }
+        if (r.ok && r.blobBase64) { downloadBlob(r.blobBase64, `BL-${batch.bl_id}.pdf`); return; }
       }
       const r = await downloadBatchLabels(batch.id);
       if (r.ok && r.blobBase64) {
         downloadBlob(r.blobBase64, `labels-${batch.batch_number}.pdf`);
       } else {
-        setErr(r.error ?? "Erreur");
+        setMsg({ ok: false, text: r.error ?? "Erreur" });
       }
     });
   }
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <button
-        type="button"
-        onClick={handleDownload}
-        disabled={isPending}
-        title={batch.bl_id ? `Télécharger BL #${batch.bl_id}` : "Télécharger étiquettes"}
+    <div className="flex items-center gap-1.5">
+      {/* Send button for drafts without BL */}
+      {isDraft && (
+        <button type="button" onClick={handleSend} disabled={isPending}
+          title="Envoyer à Digylog pour obtenir le BL"
+          className={cn(
+            "flex items-center gap-1 rounded-lg border border-primary/40 bg-primary/10 text-primary",
+            "px-2 py-1.5 text-[10px] font-bold hover:bg-primary/20 transition-colors",
+            isPending && "opacity-50 cursor-not-allowed"
+          )}>
+          {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+          Envoyer
+        </button>
+      )}
+      {/* Download button */}
+      <button type="button" onClick={handleDownload} disabled={isPending}
+        title={batch.bl_id ? `BL #${batch.bl_id}` : "Étiquettes"}
         className={cn(
           "w-9 h-9 rounded-lg border flex items-center justify-center transition-colors",
           "border-border bg-background hover:bg-secondary text-muted-foreground hover:text-foreground",
           isPending && "opacity-50 cursor-not-allowed"
-        )}
-      >
-        {isPending
-          ? <Loader2 className="h-4 w-4 animate-spin" />
-          : <Download className="h-4 w-4" />}
+        )}>
+        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
       </button>
-      {err && <span className="text-[10px] text-red-500 max-w-[80px] text-center">{err}</span>}
+      {msg && (
+        <span className={`text-[10px] font-medium ${msg.ok ? "text-green-600" : "text-red-500"}`}>
+          {msg.text}
+        </span>
+      )}
     </div>
   );
 }
@@ -255,7 +277,7 @@ export function DeliveryNotesClient({ rows, stores, companies }: Props) {
 
                     {/* Download action */}
                     <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
-                      <DownloadBtn batch={b} />
+                      <ActionBtn batch={b} />
                     </td>
                   </tr>
                 );
