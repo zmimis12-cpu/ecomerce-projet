@@ -3,7 +3,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Search, Loader2, CheckCircle2, Clock, Truck, FileDown, XCircle, Send, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { downloadBatchLabels, sendBatchGetBl } from "@/lib/delivery/batch/actions";
+import { downloadBatchLabels, sendBatchGetBl, closeDailyBatch } from "@/lib/delivery/batch/actions";
 import { getBlPdfByBlId } from "@/lib/delivery/document-actions";
 
 type Batch = {
@@ -20,6 +20,7 @@ type Batch = {
   created_at: string;
   notes: string | null;
   labels_downloaded_at: string | null;
+  batch_date: string | null;
 };
 
 interface Props {
@@ -50,6 +51,55 @@ function downloadBlob(b64: string, name: string) {
   const url = URL.createObjectURL(new Blob([buf], { type: "application/pdf" }));
   Object.assign(document.createElement("a"), { href: url, download: name }).click();
   URL.revokeObjectURL(url);
+}
+
+// ── Close day button ─────────────────────────────────────────────────────────
+function CloseDayButton({ batch }: { batch: Batch }) {
+  const [isPending, startTransition] = useTransition();
+  const [confirmed, setConfirmed]   = useState(false);
+  const [msg, setMsg]               = useState<{ ok: boolean; text: string } | null>(null);
+
+  const isOpen = !batch.bl_id && (batch.status === "draft" || batch.status === "sent");
+  if (!isOpen) return null;
+
+  function handleClose(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirmed) { setConfirmed(true); return; }
+    setMsg(null);
+    startTransition(async () => {
+      const r = await closeDailyBatch(batch.id);
+      if (r.ok) {
+        setMsg({ ok: true, text: `✓ BL #${r.bl} — ${r.totalTrackings} trackings` });
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        setMsg({ ok: false, text: r.error ?? "Erreur" });
+        setConfirmed(false);
+      }
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+      <button type="button" onClick={handleClose} disabled={isPending}
+        className={cn(
+          "flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors disabled:opacity-50",
+          confirmed
+            ? "bg-red-600 text-white hover:bg-red-700"
+            : "bg-emerald-600 text-white hover:bg-emerald-700"
+        )}>
+        {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+        {confirmed ? `✓ Confirmer (${batch.total_orders} commandes)` : "🔒 Générer BL du jour"}
+      </button>
+      {confirmed && !isPending && (
+        <p className="text-[10px] text-red-600">Cliquez encore pour confirmer</p>
+      )}
+      {msg && (
+        <p className={cn("text-[10px] font-medium", msg.ok ? "text-green-700" : "text-red-600")}>
+          {msg.text}
+        </p>
+      )}
+    </div>
+  );
 }
 
 // ── Row actions ───────────────────────────────────────────────────────────────
@@ -234,7 +284,7 @@ export function DeliveryNotesClient({ rows, stores, companies }: Props) {
           <table className="w-full">
             <thead>
               <tr className="border-b bg-secondary/30">
-                {["BL ID","SHIPPING","STORE","ORDERS","STATUS","PAYMENT","TICKETS & BL"].map((h) => (
+                {["BL ID","SHIPPING","STORE","ORDERS","STATUS","PAYMENT","FERMER JOUR","TICKETS & BL"].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-[10px] font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -278,6 +328,9 @@ export function DeliveryNotesClient({ rows, stores, companies }: Props) {
                       <span className={cn("inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-semibold", pCfg.cls)}>
                         {pCfg.label}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <CloseDayButton batch={b} />
                     </td>
                     <td className="px-4 py-3">
                       <RowActions batch={b} />

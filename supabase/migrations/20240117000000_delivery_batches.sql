@@ -93,3 +93,31 @@ CREATE INDEX IF NOT EXISTS idx_db_payment ON delivery_batches(payment_status);
 ALTER TABLE delivery_batches
   ADD COLUMN IF NOT EXISTS labels_downloaded_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS labels_downloaded_by UUID REFERENCES auth.users(id);
+
+-- ── Daily batch mode additions ────────────────────────────────────────────────
+ALTER TABLE delivery_batches
+  ADD COLUMN IF NOT EXISTS batch_date DATE NOT NULL DEFAULT CURRENT_DATE;
+
+-- Index for fast daily batch lookup
+CREATE INDEX IF NOT EXISTS idx_db_date_store
+  ON delivery_batches(batch_date, store_name, shipping_company, status);
+
+-- New batch number trigger: BATCH-YYYYMMDD-NNN
+CREATE OR REPLACE FUNCTION generate_batch_number()
+RETURNS TRIGGER AS $$
+DECLARE
+  date_str TEXT;
+  day_seq  INTEGER;
+BEGIN
+  IF NEW.batch_number IS NULL OR NEW.batch_number = '' THEN
+    date_str := TO_CHAR(COALESCE(NEW.batch_date, CURRENT_DATE), 'YYYYMMDD');
+    SELECT COUNT(*) + 1 INTO day_seq
+      FROM delivery_batches
+     WHERE batch_date = COALESCE(NEW.batch_date, CURRENT_DATE)
+       AND store_name = NEW.store_name
+       AND shipping_company = NEW.shipping_company;
+    NEW.batch_number := 'BATCH-' || date_str || '-' || LPAD(day_seq::TEXT, 3, '0');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;

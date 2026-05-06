@@ -10,6 +10,186 @@ import { createDigylogClientFromDB } from "@/lib/delivery/digylog/client";
 
 const MANAGER = ["super_admin","admin","manager"] as const;
 
+// ── Find or create the open daily batch for today ─────────────────────────────
+export async function findOrCreateDailyBatch(
+  storeName: string,
+  shippingCompany = "Digylog"
+): Promise<{ batchId: string; batchNumber: string; isNew: boolean }> {
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+  // Look for existing open batch today (draft = collecting orders, no BL yet)
+  const { data: existing } = await supabaseAdmin
+    .from("delivery_batches")
+    .select("id, batch_number")
+    .eq("batch_date", today)
+    .eq("store_name", storeName)
+    .eq("shipping_company", shippingCompany)
+    .in("status", ["draft", "sent"])          // open = draft or sent (tickets downloaded but no BL)
+    .is("bl_id", null)                        // no BL yet = still open
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) {
+    return {
+      batchId:     (existing as { id: string; batch_number: string }).id,
+      batchNumber: (existing as { id: string; batch_number: string }).batch_number,
+      isNew: false,
+    };
+  }
+
+  // Create new daily batch
+  const { data: created, error } = await supabaseAdmin
+    .from("delivery_batches")
+    .insert({
+      batch_number:     "",    // trigger sets BATCH-YYYYMMDD-NNN
+      batch_date:       today,
+      status:           "draft",
+      shipping_company: shippingCompany,
+      store_name:       storeName,
+      total_orders:     0,
+      total_products:   0,
+    } as never)
+    .select("id, batch_number")
+    .single();
+
+  if (error || !created) {
+    throw new Error(`Cannot create daily batch: ${error?.message}`);
+  }
+
+  return {
+    batchId:     (created as { id: string; batch_number: string }).id,
+    batchNumber: (created as { id: string; batch_number: string }).batch_number,
+    isNew: true,
+  };
+}
+
+// ── Add orders to existing daily batch (no BL, just accumulate) ───────────────
+export async function addOrdersToDailyBatch(
+  batchId: string,
+  orderIds: string[],
+  trackingMap: Map<string, string>   // orderId → tracking
+) {
+  if (!orderIds.length) return;
+
+  // Upsert batch_orders (ignore duplicates)
+  const rows = orderIds.map((oid) => ({
+    batch_id:        batchId,
+    order_id:        oid,
+    tracking_number: trackingMap.get(oid) ?? null,
+    status:          "pending",
+  }));
+
+  await supabaseAdmin.from("delivery_batch_orders")
+    .upsert(rows as never, { onConflict: "batch_id,order_id", ignoreDuplicates: true });
+
+  // Update orders with batch id
+  await supabaseAdmin.from("orders")
+    .update({ delivery_batch_id: batchId } as never)
+    .in("id", orderIds);
+
+  // Update totals
+  const { count } = await supabaseAdmin
+    .from("delivery_batch_orders")
+    .select("id", { count: "exact", head: true })
+    .eq("batch_id", batchId);
+
+  await supabaseAdmin.from("delivery_batches")
+    .update({ total_orders: count ?? 0 } as never)
+    .eq("id", batchId);
+}
+
+// ── Close daily batch: call PUT /orders/send with ALL trackings → get 1 BL ───
+export async function closeDailyBatch(batchId: string): Promise<{
+  ok: boolean; bl?: number; totalTrackings?: number; error?: string;
+}> {
+  await requireRole([...MANAGER]);
+
+  // Collect all trackings for this batch
+  const { data: boRows } = await supabaseAdmin
+    .from("delivery_batch_orders")
+    .select("tracking_number, order_id")
+    .eq("batch_id", batchId)
+    .not("order_id", "is", null);
+
+  const items = (boRows ?? []) as { tracking_number: string | null; order_id: string }[];
+
+  // Fill missing trackings from orders table
+  const missingOrderIds = items.filter((r) => !r.tracking_number).map((r) => r.order_id);
+  const trackMap = new Map<string, string>();
+
+  if (missingOrderIds.length) {
+    const { data: ordRows } = await supabaseAdmin
+      .from("orders")
+      .select("id, delivery_tracking_number")
+      .in("id", missingOrderIds)
+      .not("delivery_tracking_number", "is", null);
+
+    for (const o of (ordRows ?? []) as { id: string; delivery_tracking_number: string }[]) {
+      trackMap.set(o.id, o.delivery_tracking_number);
+    }
+  }
+
+  const allTrackings = [
+    ...items.filter((r) => r.tracking_number).map((r) => r.tracking_number!),
+    ...[...trackMap.values()],
+  ].filter((v, i, a) => a.indexOf(v) === i); // deduplicate
+
+  if (!allTrackings.length) {
+    return { ok: false, error: "Aucun tracking dans ce batch." };
+  }
+
+  console.log(`[closeDailyBatch] Calling PUT /orders/send with ${allTrackings.length} trackings:`, allTrackings);
+
+  // ONE single PUT /orders/send call
+  const client = await createDigylogClientFromDB();
+  const sendRes = await client.sendOrders(allTrackings);
+
+  if (!sendRes.ok || !sendRes.bl) {
+    return { ok: false, error: sendRes.error ?? "Digylog n'a pas retourné de BL." };
+  }
+
+  const blId = sendRes.bl;
+  console.log(`[closeDailyBatch] Got BL: ${blId} for ${allTrackings.length} trackings`);
+
+  // Save bl_id everywhere
+  await supabaseAdmin.from("delivery_batches")
+    .update({
+      bl_id:      blId,
+      status:     "completed",
+      completed_at: new Date().toISOString(),
+    } as never)
+    .eq("id", batchId);
+
+  // Update all orders
+  const allOrderIds = items.map((r) => r.order_id).filter(Boolean);
+  if (allOrderIds.length) {
+    await supabaseAdmin.from("orders")
+      .update({ bl_id: blId } as never)
+      .in("id", allOrderIds);
+    await supabaseAdmin.from("delivery_shipments")
+      .update({ bl_id: blId } as never)
+      .in("order_id", allOrderIds);
+  }
+
+  // Update tracking_numbers in batch_orders for any that were missing
+  for (const [ordId, tracking] of trackMap.entries()) {
+    await supabaseAdmin.from("delivery_batch_orders")
+      .update({ tracking_number: tracking, status: "sent" } as never)
+      .eq("batch_id", batchId)
+      .eq("order_id", ordId);
+  }
+  // Mark all as sent
+  await supabaseAdmin.from("delivery_batch_orders")
+    .update({ status: "sent" } as never)
+    .eq("batch_id", batchId);
+
+  revalidatePath("/admin/delivery/notes");
+  revalidatePath("/admin/delivery/documents");
+
+  return { ok: true, bl: blId, totalTrackings: allTrackings.length };
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 export interface BatchOrder {
   id: string; order_number: string; customer_name: string;
