@@ -473,3 +473,54 @@ export async function syncBatchStatuses(batchId: string) {
   revalidatePath(`/admin/delivery/batches/${batchId}`);
   return { success: true, synced };
 }
+
+// ── Send batch to Digylog PUT /orders/send → get real BL ID ───────────────────
+export async function sendBatchGetBl(batchId: string): Promise<{
+  ok: boolean; bl?: number; error?: string;
+}> {
+  await requireRole([...MANAGER]);
+
+  // Get all trackings for this batch
+  const { data: batchOrders } = await supabaseAdmin
+    .from("delivery_batch_orders")
+    .select("orders(delivery_tracking_number)")
+    .eq("batch_id", batchId);
+
+  type BO = { orders: { delivery_tracking_number: string | null } | null };
+  const trackings = ((batchOrders ?? []) as BO[])
+    .map((bo) => bo.orders?.delivery_tracking_number)
+    .filter(Boolean) as string[];
+
+  if (!trackings.length) return { ok: false, error: "Aucun tracking trouvé dans ce batch." };
+
+  const client = await createDigylogClientFromDB();
+  const result = await client.sendOrders(trackings);
+
+  if (!result.ok || !result.bl) {
+    return { ok: false, error: result.error ?? "Digylog n'a pas retourné de BL." };
+  }
+
+  const blId = result.bl;
+
+  // Update batch
+  await supabaseAdmin.from("delivery_batches").update({
+    bl_id:   blId,
+    status:  "sent",
+    sent_at: new Date().toISOString(),
+  } as never).eq("id", batchId);
+
+  // Update orders and shipments by tracking
+  for (const tracking of trackings) {
+    await supabaseAdmin.from("orders")
+      .update({ bl_id: blId, status: "sent_to_delivery" } as never)
+      .eq("delivery_tracking_number", tracking);
+    await supabaseAdmin.from("delivery_shipments")
+      .update({ bl_id: blId, internal_status: "not_sent" } as never)
+      .eq("tracking_number", tracking);
+  }
+
+  revalidatePath("/admin/delivery/notes");
+  revalidatePath(`/admin/delivery/notes/${batchId}`);
+  revalidatePath("/admin/delivery/batches");
+  return { ok: true, bl: blId };
+}
