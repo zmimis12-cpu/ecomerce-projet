@@ -152,11 +152,11 @@ export async function closeDailyBatch(batchId: string): Promise<{
   const blId = sendRes.bl;
   console.log(`[closeDailyBatch] Got BL: ${blId} for ${allTrackings.length} trackings`);
 
-  // Save bl_id everywhere
+  // Save bl_id — mark as bl_generated (closed, no more orders can be added)
   await supabaseAdmin.from("delivery_batches")
     .update({
-      bl_id:      blId,
-      status:     "completed",
+      bl_id:        blId,
+      status:       "bl_generated",
       completed_at: new Date().toISOString(),
     } as never)
     .eq("id", batchId);
@@ -603,13 +603,22 @@ export async function downloadBatchLabels(batchId: string): Promise<{
   const result = await client.downloadLabels({ orders: trackings, format: 3 });
   if (!result.ok || !result.blob) return { ok: false, error: result.error };
 
-  // Mark labels downloaded with timestamp
+  // Mark tickets printed — batch stays OPEN, BL not generated yet
+  // Do NOT set status=labels_downloaded (that was wrong — it blocked daily batch)
   await supabaseAdmin.from("delivery_batches")
     .update({
-      status: "labels_downloaded",
       labels_downloaded_at: new Date().toISOString(),
+      // Keep status as-is (draft/tickets_printed) — batch stays open for more orders
+      // Only update if currently draft → tickets_printed
     } as never)
-    .eq("id", batchId);
+    .eq("id", batchId)
+    .eq("status", "draft");  // only update if still draft, not if already bl_generated
+
+  // Set to tickets_printed (but NOT bl_generated/completed)
+  await supabaseAdmin.from("delivery_batches")
+    .update({ status: "tickets_printed" } as never)
+    .eq("id", batchId)
+    .in("status", ["draft", "tickets_printed"]);  // can reprint
 
   revalidatePath(`/admin/delivery/notes`);
   revalidatePath(`/admin/delivery/notes/${batchId}`);

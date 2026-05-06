@@ -29,13 +29,18 @@ interface Props {
   companies: string[];
 }
 
-const STATUS_CFG: Record<string, { label: string; icon: React.ElementType; cls: string }> = {
-  draft:              { label:"DRAFT",       icon:Clock,         cls:"bg-slate-100 text-slate-600 border-slate-200" },
-  sent:               { label:"ENVOYÉ",      icon:Truck,         cls:"bg-blue-100 text-blue-700 border-blue-200" },
-  labels_downloaded:  { label:"TICKETS OK",  icon:Printer,       cls:"bg-violet-100 text-violet-700 border-violet-200" },
-  bl_downloaded:      { label:"BL OK",       icon:FileDown,      cls:"bg-amber-100 text-amber-700 border-amber-200" },
-  completed:          { label:"TERMINÉ",     icon:CheckCircle2,  cls:"bg-emerald-50 text-emerald-700 border-emerald-200" },
-  cancelled:          { label:"ANNULÉ",      icon:XCircle,       cls:"bg-red-100 text-red-600 border-red-200" },
+const STATUS_CFG: Record<string, { label: string; icon: React.ElementType; cls: string; isOpen?: boolean }> = {
+  // OPEN states — batch still accepts orders, no BL yet
+  draft:            { label:"OUVERT",        icon:Clock,         cls:"bg-blue-100 text-blue-700 border-blue-200",   isOpen:true  },
+  tickets_printed:  { label:"TICKETS ✓",    icon:Printer,       cls:"bg-violet-100 text-violet-700 border-violet-200", isOpen:true },
+  sent:             { label:"OUVERT",        icon:Clock,         cls:"bg-blue-100 text-blue-700 border-blue-200",   isOpen:true  },
+  // CLOSED states — BL generated
+  bl_generated:     { label:"BL GÉNÉRÉ",    icon:CheckCircle2,  cls:"bg-emerald-100 text-emerald-700 border-emerald-200", isOpen:false },
+  completed:        { label:"TERMINÉ",       icon:CheckCircle2,  cls:"bg-emerald-50 text-emerald-700 border-emerald-200",  isOpen:false },
+  // Legacy
+  labels_downloaded:{ label:"TICKETS ✓",   icon:Printer,       cls:"bg-violet-100 text-violet-700 border-violet-200", isOpen:true },
+  bl_downloaded:    { label:"BL OK",        icon:FileDown,      cls:"bg-amber-100 text-amber-700 border-amber-200",  isOpen:false },
+  cancelled:        { label:"ANNULÉ",        icon:XCircle,       cls:"bg-red-100 text-red-600 border-red-200",        isOpen:false },
 };
 
 const PAY_CFG: Record<string, { label: string; cls: string }> = {
@@ -59,7 +64,8 @@ function CloseDayButton({ batch }: { batch: Batch }) {
   const [confirmed, setConfirmed]   = useState(false);
   const [msg, setMsg]               = useState<{ ok: boolean; text: string } | null>(null);
 
-  const isOpen = !batch.bl_id && (batch.status === "draft" || batch.status === "sent");
+  const cfg    = STATUS_CFG[batch.status] ?? STATUS_CFG.draft;
+  const isOpen = !batch.bl_id && (cfg.isOpen ?? false);
   if (!isOpen) return null;
 
   function handleClose(e: React.MouseEvent) {

@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS delivery_batches (
   batch_number TEXT UNIQUE NOT NULL,
   provider     TEXT NOT NULL DEFAULT 'digylog',
   status       TEXT NOT NULL DEFAULT 'draft',
-    -- draft | sent | labels_downloaded | bl_downloaded | completed
+    -- draft | tickets_printed | bl_generated | completed (legacy: sent | labels_downloaded | bl_downloaded)
   total_orders   INTEGER NOT NULL DEFAULT 0,
   total_products INTEGER NOT NULL DEFAULT 0,
   bl_id          INTEGER,
