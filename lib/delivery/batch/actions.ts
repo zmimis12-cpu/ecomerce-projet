@@ -85,8 +85,7 @@ export async function createBatch(orderIds: string[], notes?: string) {
       customer_address, total_amount_mad, notes,
       order_items ( quantity, products ( id, name, sku ) )
     `)
-    .in("id", orderIds)
-    .eq("status", "confirmed");
+    .in("id", orderIds);
 
   if (!orders?.length) return { success: false, error: "Commandes introuvables." };
 
