@@ -553,46 +553,72 @@ export async function downloadBatchLabels(batchId: string): Promise<{
 }> {
   await requireRole([...MANAGER]);
 
-  // Try trackings from delivery_batch_orders first
+  // ── Get product priority order for this batch ────────────────────────────
+  const { data: prodSummary } = await supabaseAdmin
+    .from("delivery_batch_product_summary")
+    .select("product_id, total_quantity")
+    .eq("batch_id", batchId)
+    .order("total_quantity", { ascending: false });
+
+  type ProdPrio = { product_id: string|null; total_quantity: number };
+  const prodPriority = new Map<string, number>();
+  ((prodSummary ?? []) as ProdPrio[]).forEach((p, i) => {
+    if (p.product_id) prodPriority.set(p.product_id, i);
+  });
+
+  // ── Get orders with their products and trackings ──────────────────────────
   const { data: boRows } = await supabaseAdmin
     .from("delivery_batch_orders")
-    .select("tracking_number, order_id")
+    .select(`
+      order_id, tracking_number,
+      orders ( delivery_tracking_number, order_items ( products ( id ) ) )
+    `)
     .eq("batch_id", batchId)
     .not("order_id", "is", null);
 
-  let trackings = ((boRows ?? []) as { tracking_number: string | null; order_id: string }[])
-    .map((r) => r.tracking_number)
+  type BORow = {
+    order_id: string;
+    tracking_number: string|null;
+    orders: {
+      delivery_tracking_number: string|null;
+      order_items: { products: { id: string }|null }[];
+    }|null;
+  };
+
+  const rows = (boRows ?? []) as BORow[];
+
+  // Build tracking list sorted by product priority
+  const sortedRows = rows
+    .filter((r) => r.tracking_number ?? r.orders?.delivery_tracking_number)
+    .sort((a, b) => {
+      const getRank = (row: BORow) => {
+        const items = row.orders?.order_items ?? [];
+        let best = 9999;
+        for (const it of items) {
+          const pid = it.products?.id;
+          if (pid) {
+            const rank = prodPriority.get(pid) ?? 9999;
+            if (rank < best) best = rank;
+          }
+        }
+        return best;
+      };
+      return getRank(a) - getRank(b);
+    });
+
+  let trackings = sortedRows
+    .map((r) => r.tracking_number ?? r.orders?.delivery_tracking_number)
     .filter(Boolean) as string[];
 
-  // Fallback: get trackings from orders directly via batch
-  if (!trackings.length) {
-    const orderIds = ((boRows ?? []) as { tracking_number: string | null; order_id: string }[])
-      .map((r) => r.order_id).filter(Boolean);
-
-    if (orderIds.length) {
-      const { data: ordRows } = await supabaseAdmin
-        .from("orders")
-        .select("delivery_tracking_number")
-        .in("id", orderIds)
-        .not("delivery_tracking_number", "is", null);
-
-      trackings = ((ordRows ?? []) as { delivery_tracking_number: string }[])
-        .map((r) => r.delivery_tracking_number)
-        .filter(Boolean);
-    }
-  }
-
-  // Last fallback: get from orders where delivery_batch_id = batchId
+  // Fallback: get from orders.delivery_batch_id
   if (!trackings.length) {
     const { data: ordRows } = await supabaseAdmin
       .from("orders")
       .select("delivery_tracking_number")
       .eq("delivery_batch_id", batchId)
       .not("delivery_tracking_number", "is", null);
-
     trackings = ((ordRows ?? []) as { delivery_tracking_number: string }[])
-      .map((r) => r.delivery_tracking_number)
-      .filter(Boolean);
+      .map((r) => r.delivery_tracking_number);
   }
 
   if (!trackings.length) {

@@ -13,8 +13,17 @@ type Batch = {
   shipping_company: string | null;
   store_name: string | null;
   total_orders: number;
+  total_products: number;
   created_at: string;
   labels_downloaded_at: string | null;
+};
+
+type ProductSummary = {
+  batch_id: string;
+  product_name: string;
+  sku: string | null;
+  total_quantity: number;
+  order_count: number;
 };
 
 export default async function DeliveryNotesPage() {
@@ -22,19 +31,41 @@ export default async function DeliveryNotesPage() {
 
   const { data: batches } = await supabaseAdmin
     .from("delivery_batches")
-    .select("id,batch_number,status,shipping_company,store_name,total_orders,created_at,labels_downloaded_at")
+    .select("id,batch_number,status,shipping_company,store_name,total_orders,total_products,created_at,labels_downloaded_at")
     .not("status", "eq", "cancelled")
     .order("created_at", { ascending: false })
-    .limit(500);
+    .limit(200);
 
   const rows = (batches ?? []) as Batch[];
+
+  // Fetch top-3 products per batch for inline summary
+  const productsByBatch: Map<string, ProductSummary[]> = new Map();
+
+  if (rows.length > 0) {
+    const batchIds = rows.map((r) => r.id);
+    const { data: prods } = await supabaseAdmin
+      .from("delivery_batch_product_summary")
+      .select("batch_id,product_name,sku,total_quantity,order_count")
+      .in("batch_id", batchIds)
+      .order("total_quantity", { ascending: false });
+
+    const allProds = (prods ?? []) as ProductSummary[];
+    for (const p of allProds) {
+      if (!productsByBatch.has(p.batch_id)) productsByBatch.set(p.batch_id, []);
+      const arr = productsByBatch.get(p.batch_id)!;
+      if (arr.length < 3) arr.push(p); // keep top-3 only
+    }
+  }
 
   const stores    = [...new Set(rows.map((r) => r.store_name).filter(Boolean))] as string[];
   const companies = [...new Set(rows.map((r) => r.shipping_company ?? "Digylog"))] as string[];
 
   return (
-    <div className="space-y-5">
-      <DeliveryNotesClient rows={rows} stores={stores} companies={companies} />
-    </div>
+    <DeliveryNotesClient
+      rows={rows}
+      stores={stores}
+      companies={companies}
+      productsByBatch={Object.fromEntries(productsByBatch)}
+    />
   );
 }
