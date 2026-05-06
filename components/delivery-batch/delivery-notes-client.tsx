@@ -3,7 +3,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Search, Loader2, Printer, CheckCircle2, Clock, XCircle, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { downloadBatchLabels } from "@/lib/delivery/batch/actions";
+import { generateRecapAndLabels } from "@/lib/delivery/batch/actions";
 
 type Batch = {
   id: string;
@@ -61,10 +61,10 @@ function PrintButton({ batch }: { batch: Batch }) {
     e.stopPropagation();
     setMsg(null);
     startTransition(async () => {
-      const r = await downloadBatchLabels(batch.id);
+      const r = await generateRecapAndLabels(batch.id);
       if (r.ok && r.blobBase64) {
-        downloadBlob(r.blobBase64, `tickets-${batch.batch_number}.pdf`);
-        setMsg({ ok: true, text: "✓ Téléchargé" });
+        downloadBlob(r.blobBase64, `recap-tickets-${batch.batch_number}.pdf`);
+        setMsg({ ok: true, text: `✓ ${r.totalTrackings} tickets` });
         setTimeout(() => window.location.reload(), 800);
       } else {
         setMsg({ ok: false, text: r.error ?? "Erreur" });

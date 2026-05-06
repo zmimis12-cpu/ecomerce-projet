@@ -283,7 +283,7 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
       .eq("batch_date", today)
       .eq("store_name", storeName)
       .eq("shipping_company", "Digylog")
-      .in("status", ["draft", "tickets_printed", "sent"])
+      .eq("status", "draft")  // ONLY draft — printed batches are closed to new orders
       .is("bl_id", null)
       .order("created_at", { ascending: false })
       .limit(1)

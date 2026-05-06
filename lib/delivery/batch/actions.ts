@@ -548,12 +548,9 @@ export async function sendBatchToDigylog(batchId: string) {
 }
 
 // ── Download tickets for batch ─────────────────────────────────────────────────
-export async function downloadBatchLabels(batchId: string): Promise<{
-  ok: boolean; blobBase64?: string; error?: string;
-}> {
-  await requireRole([...MANAGER]);
-
-  // ── Get product priority order for this batch ────────────────────────────
+// ── Helper: get trackings sorted by product priority ─────────────────────────
+async function getSortedTrackingsForBatch(batchId: string): Promise<string[]> {
+  // Get product priority
   const { data: prodSummary } = await supabaseAdmin
     .from("delivery_batch_product_summary")
     .select("product_id, total_quantity")
@@ -566,61 +563,51 @@ export async function downloadBatchLabels(batchId: string): Promise<{
     if (p.product_id) prodPriority.set(p.product_id, i);
   });
 
-  // ── Get orders with their products and trackings ──────────────────────────
   const { data: boRows } = await supabaseAdmin
     .from("delivery_batch_orders")
-    .select(`
-      order_id, tracking_number,
-      orders ( delivery_tracking_number, order_items ( products ( id ) ) )
-    `)
+    .select("order_id, tracking_number, orders ( delivery_tracking_number, order_items ( products ( id ) ) )")
     .eq("batch_id", batchId)
     .not("order_id", "is", null);
 
   type BORow = {
-    order_id: string;
-    tracking_number: string|null;
-    orders: {
-      delivery_tracking_number: string|null;
-      order_items: { products: { id: string }|null }[];
-    }|null;
+    order_id: string; tracking_number: string|null;
+    orders: { delivery_tracking_number: string|null; order_items: { products: { id: string }|null }[] } | null;
   };
-
   const rows = (boRows ?? []) as BORow[];
 
-  // Build tracking list sorted by product priority
-  const sortedRows = rows
+  const sorted = rows
     .filter((r) => r.tracking_number ?? r.orders?.delivery_tracking_number)
     .sort((a, b) => {
-      const getRank = (row: BORow) => {
-        const items = row.orders?.order_items ?? [];
+      const rank = (row: BORow) => {
         let best = 9999;
-        for (const it of items) {
-          const pid = it.products?.id;
-          if (pid) {
-            const rank = prodPriority.get(pid) ?? 9999;
-            if (rank < best) best = rank;
-          }
+        for (const it of row.orders?.order_items ?? []) {
+          const r = prodPriority.get(it.products?.id ?? "") ?? 9999;
+          if (r < best) best = r;
         }
         return best;
       };
-      return getRank(a) - getRank(b);
+      return rank(a) - rank(b);
     });
 
-  let trackings = sortedRows
+  let trackings = sorted
     .map((r) => r.tracking_number ?? r.orders?.delivery_tracking_number)
     .filter(Boolean) as string[];
 
-  // Fallback: get from orders.delivery_batch_id
   if (!trackings.length) {
     const { data: ordRows } = await supabaseAdmin
-      .from("orders")
-      .select("delivery_tracking_number")
+      .from("orders").select("delivery_tracking_number")
       .eq("delivery_batch_id", batchId)
       .not("delivery_tracking_number", "is", null);
-    trackings = ((ordRows ?? []) as { delivery_tracking_number: string }[])
-      .map((r) => r.delivery_tracking_number);
+    trackings = ((ordRows ?? []) as { delivery_tracking_number: string }[]).map((r) => r.delivery_tracking_number);
   }
+  return trackings;
+}
 
+export async function downloadBatchLabels(batchId: string): Promise<{
+  ok: boolean; blobBase64?: string; error?: string;
+}> {
+  await requireRole([...MANAGER]);
+  const trackings = await getSortedTrackingsForBatch(batchId);
   if (!trackings.length) {
     return { ok: false, error: "Aucun tracking trouvé pour ce batch." };
   }
@@ -629,22 +616,15 @@ export async function downloadBatchLabels(batchId: string): Promise<{
   const result = await client.downloadLabels({ orders: trackings, format: 3 });
   if (!result.ok || !result.blob) return { ok: false, error: result.error };
 
-  // Mark tickets printed — batch stays OPEN, BL not generated yet
-  // Do NOT set status=labels_downloaded (that was wrong — it blocked daily batch)
+  // Mark as tickets_printed — batch is now CLOSED to new orders
+  // New synced orders will go into a new draft batch
   await supabaseAdmin.from("delivery_batches")
     .update({
+      status: "tickets_printed",
       labels_downloaded_at: new Date().toISOString(),
-      // Keep status as-is (draft/tickets_printed) — batch stays open for more orders
-      // Only update if currently draft → tickets_printed
     } as never)
     .eq("id", batchId)
-    .eq("status", "draft");  // only update if still draft, not if already bl_generated
-
-  // Set to tickets_printed (but NOT bl_generated/completed)
-  await supabaseAdmin.from("delivery_batches")
-    .update({ status: "tickets_printed" } as never)
-    .eq("id", batchId)
-    .in("status", ["draft", "tickets_printed"]);  // can reprint
+    .in("status", ["draft", "tickets_printed"]);  // idempotent
 
   revalidatePath(`/admin/delivery/notes`);
   revalidatePath(`/admin/delivery/notes/${batchId}`);
@@ -862,4 +842,167 @@ export async function regenerateBatchBl(batchId: string): Promise<{
   revalidatePath("/admin/delivery/documents");
 
   return { ok: true, bl: newBlId, trackingsUsed: trackings.length };
+}
+
+// ── Generate recap pages + Digylog labels merged into one PDF ─────────────────
+export async function generateRecapAndLabels(batchId: string): Promise<{
+  ok: boolean; blobBase64?: string; totalTrackings?: number; error?: string;
+}> {
+  await requireRole([...MANAGER]);
+
+  // 1. Get product summary (sorted DESC)
+  const { data: prodRows } = await supabaseAdmin
+    .from("delivery_batch_product_summary")
+    .select("product_name, sku, total_quantity, order_count")
+    .eq("batch_id", batchId)
+    .order("total_quantity", { ascending: false });
+
+  const { data: batchData } = await supabaseAdmin
+    .from("delivery_batches")
+    .select("batch_number, total_orders")
+    .eq("id", batchId)
+    .maybeSingle();
+
+  type PRow = { product_name: string; sku: string|null; total_quantity: number; order_count: number };
+  const products = (prodRows ?? []) as PRow[];
+  const batchNum = (batchData as { batch_number: string; total_orders: number } | null)?.batch_number ?? "";
+  const totalOrders = (batchData as { batch_number: string; total_orders: number } | null)?.total_orders ?? 0;
+
+  // 2. Get sorted trackings
+  const trackings = await getSortedTrackingsForBatch(batchId);
+  if (!trackings.length) {
+    return { ok: false, error: "Aucun tracking trouvé pour ce batch." };
+  }
+
+  // 3. Build recap PDF pages using pdf-lib
+  const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
+
+  const recapDoc = await PDFDocument.create();
+  const fontBold   = await recapDoc.embedFont(StandardFonts.HelveticaBold);
+  const fontNormal = await recapDoc.embedFont(StandardFonts.Helvetica);
+
+  // Page size A4
+  const W = 595, H = 842;
+  const ROWS_PER_PAGE = 30;
+
+  // Build product rows with separator chunks
+  const chunks: PRow[][] = [];
+  for (let i = 0; i < products.length; i += ROWS_PER_PAGE) {
+    chunks.push(products.slice(i, i + ROWS_PER_PAGE));
+  }
+  if (!chunks.length) chunks.push([]); // at least one page
+
+  chunks.forEach((chunk, pageIdx) => {
+    const page = recapDoc.addPage([W, H]);
+
+    // Header background
+    page.drawRectangle({ x: 0, y: H - 60, width: W, height: 60, color: rgb(0.08, 0.08, 0.08) });
+
+    // Title
+    page.drawText(`${batchNum} (${totalOrders} Orders)`, {
+      x: 20, y: H - 38, font: fontBold, size: 18, color: rgb(1, 1, 1),
+    });
+
+    // Page indicator
+    if (chunks.length > 1) {
+      page.drawText(`Page ${pageIdx + 1}/${chunks.length}`, {
+        x: W - 80, y: H - 38, font: fontNormal, size: 10, color: rgb(0.7, 0.7, 0.7),
+      });
+    }
+
+    // Column headers
+    const headerY = H - 80;
+    page.drawRectangle({ x: 0, y: headerY - 4, width: W, height: 22, color: rgb(0.93, 0.93, 0.93) });
+    page.drawText("SKU", { x: 20, y: headerY, font: fontBold, size: 9, color: rgb(0.4, 0.4, 0.4) });
+    page.drawText("PRODUIT", { x: 100, y: headerY, font: fontBold, size: 9, color: rgb(0.4, 0.4, 0.4) });
+    page.drawText("QTE", { x: W - 80, y: headerY, font: fontBold, size: 9, color: rgb(0.4, 0.4, 0.4) });
+    page.drawText("CMDS", { x: W - 40, y: headerY, font: fontBold, size: 9, color: rgb(0.4, 0.4, 0.4) });
+
+    // Product rows
+    let y = headerY - 20;
+    chunk.forEach((p, i) => {
+      const globalRank = pageIdx * ROWS_PER_PAGE + i;
+      if (i % 2 === 0) {
+        page.drawRectangle({ x: 0, y: y - 4, width: W, height: 18, color: rgb(0.97, 0.97, 0.97) });
+      }
+
+      // Rank circle color
+      const rankColor = globalRank === 0 ? rgb(0.85, 0.65, 0.13)
+        : globalRank === 1 ? rgb(0.63, 0.63, 0.63)
+        : globalRank === 2 ? rgb(0.80, 0.50, 0.20)
+        : rgb(0.88, 0.88, 0.88);
+      page.drawCircle({ x: 11, y: y + 5, size: 9, color: rankColor });
+      page.drawText(String(globalRank + 1), {
+        x: globalRank < 9 ? 8 : 5, y: y + 1, font: fontBold, size: 8,
+        color: globalRank < 3 ? rgb(1, 1, 1) : rgb(0.4, 0.4, 0.4),
+      });
+
+      // SKU
+      const sku = (p.sku ?? "").slice(0, 12);
+      page.drawText(sku, { x: 25, y: y + 1, font: fontNormal, size: 8, color: rgb(0.5, 0.5, 0.5) });
+
+      // Product name (truncate)
+      const name = p.product_name.length > 55 ? p.product_name.slice(0, 55) + "…" : p.product_name;
+      page.drawText(name, { x: 100, y: y + 1, font: globalRank < 3 ? fontBold : fontNormal, size: 9, color: rgb(0.1, 0.1, 0.1) });
+
+      // Quantity (large)
+      page.drawText(`×${p.total_quantity}`, {
+        x: W - 80, y: y + 1, font: fontBold, size: 11,
+        color: globalRank < 3 ? rgb(0.08, 0.08, 0.08) : rgb(0.3, 0.3, 0.3),
+      });
+
+      // Orders count
+      page.drawText(String(p.order_count), { x: W - 35, y: y + 1, font: fontNormal, size: 9, color: rgb(0.5, 0.5, 0.5) });
+
+      y -= 18;
+    });
+
+    // Footer
+    const totalUnits = products.reduce((s, p) => s + p.total_quantity, 0);
+    page.drawLine({ start: { x: 20, y: 50 }, end: { x: W - 20, y: 50 }, thickness: 0.5, color: rgb(0.8, 0.8, 0.8) });
+    page.drawText(`Total: ${totalUnits} unités — ${trackings.length} trackings`, {
+      x: 20, y: 35, font: fontNormal, size: 9, color: rgb(0.5, 0.5, 0.5),
+    });
+  });
+
+  const recapBytes = await recapDoc.save();
+
+  // 4. Download Digylog labels (sorted trackings)
+  const client = await createDigylogClientFromDB();
+  const labelsRes = await client.downloadLabels({ orders: trackings, format: 3 });
+  if (!labelsRes.ok || !labelsRes.blob) {
+    return { ok: false, error: labelsRes.error ?? "Erreur téléchargement étiquettes Digylog." };
+  }
+  const labelsBytes = new Uint8Array(await labelsRes.blob.arrayBuffer());
+
+  // 5. Merge: recap pages + labels pages
+  const mergedDoc  = await PDFDocument.create();
+  const recapSrc   = await PDFDocument.load(recapBytes);
+  const labelsSrc  = await PDFDocument.load(labelsBytes);
+
+  const recapPages  = await mergedDoc.copyPages(recapSrc,  recapSrc.getPageIndices());
+  const labelsPages = await mergedDoc.copyPages(labelsSrc, labelsSrc.getPageIndices());
+
+  recapPages.forEach((p)  => mergedDoc.addPage(p));
+  labelsPages.forEach((p) => mergedDoc.addPage(p));
+
+  const mergedBytes = await mergedDoc.save();
+
+  // 6. Mark as printed
+  await supabaseAdmin.from("delivery_batches")
+    .update({
+      status: "tickets_printed",
+      labels_downloaded_at: new Date().toISOString(),
+    } as never)
+    .eq("id", batchId)
+    .in("status", ["draft", "tickets_printed"]);
+
+  revalidatePath("/admin/delivery/notes");
+  revalidatePath(`/admin/delivery/notes/${batchId}`);
+
+  return {
+    ok: true,
+    blobBase64: Buffer.from(mergedBytes).toString("base64"),
+    totalTrackings: trackings.length,
+  };
 }
