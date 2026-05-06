@@ -32,7 +32,7 @@ export function BatchDetailClient({ batchId, status, trackings }: Props) {
       const r = await generateRecapAndLabels(batchId);
       if (r.ok && r.blobBase64) {
         downloadBlob(r.blobBase64, `recap-tickets-${batchId}.pdf`);
-        setMsg({ ok: true, text: `✓ PDF téléchargé — ${r.totalTrackings} tickets` });
+        setMsg({ ok: true, text: `✓ PDF — ${r.totalTrackings} tickets, ${r.productsFound ?? 0} produits` });
         setTimeout(() => window.location.reload(), 800);
       } else {
         setMsg({ ok: false, text: r.error ?? "Erreur" });

@@ -844,165 +844,285 @@ export async function regenerateBatchBl(batchId: string): Promise<{
   return { ok: true, bl: newBlId, trackingsUsed: trackings.length };
 }
 
-// ── Generate recap pages + Digylog labels merged into one PDF ─────────────────
+// ── Generate recap page(s) + sorted Digylog labels — merged PDF ─────────────
 export async function generateRecapAndLabels(batchId: string): Promise<{
-  ok: boolean; blobBase64?: string; totalTrackings?: number; error?: string;
+  ok: boolean; blobBase64?: string; totalTrackings?: number;
+  productsFound?: number; error?: string;
 }> {
   await requireRole([...MANAGER]);
 
-  // 1. Get product summary (sorted DESC)
-  const { data: prodRows } = await supabaseAdmin
-    .from("delivery_batch_product_summary")
-    .select("product_name, sku, total_quantity, order_count")
-    .eq("batch_id", batchId)
-    .order("total_quantity", { ascending: false });
-
+  // ── 1. Fetch batch meta ────────────────────────────────────────────────────
   const { data: batchData } = await supabaseAdmin
     .from("delivery_batches")
     .select("batch_number, total_orders")
     .eq("id", batchId)
     .maybeSingle();
 
-  type PRow = { product_name: string; sku: string|null; total_quantity: number; order_count: number };
-  const products = (prodRows ?? []) as PRow[];
-  const batchNum = (batchData as { batch_number: string; total_orders: number } | null)?.batch_number ?? "";
-  const totalOrders = (batchData as { batch_number: string; total_orders: number } | null)?.total_orders ?? 0;
+  type BD = { batch_number: string; total_orders: number };
+  const batchNum    = (batchData as BD | null)?.batch_number ?? "";
+  const totalOrders = (batchData as BD | null)?.total_orders ?? 0;
 
-  // 2. Get sorted trackings
-  const trackings = await getSortedTrackingsForBatch(batchId);
-  if (!trackings.length) {
-    return { ok: false, error: "Aucun tracking trouvé pour ce batch." };
+  // ── 2. Build product totals LIVE from order_items (source of truth) ────────
+  const { data: boRows } = await supabaseAdmin
+    .from("delivery_batch_orders")
+    .select(`
+      order_id, tracking_number,
+      orders (
+        id, order_number, delivery_tracking_number,
+        order_items (
+          quantity,
+          products ( id, name, sku )
+        )
+      )
+    `)
+    .eq("batch_id", batchId);
+
+  type OItem = { quantity: number; products: { id: string; name: string; sku: string } | null };
+  type ORow  = { id: string; order_number: string; delivery_tracking_number: string | null; order_items: OItem[] };
+  type BORow = { order_id: string; tracking_number: string | null; orders: ORow | null };
+
+  const batchOrders = (boRows ?? []) as BORow[];
+
+  // Build product totals map: productId → { name, sku, qty, orderCount }
+  type ProdEntry = { id: string; name: string; sku: string; totalQty: number; orderCount: number };
+  const prodMap = new Map<string, ProdEntry>();
+
+  for (const bo of batchOrders) {
+    if (!bo.orders) continue;
+    for (const item of bo.orders.order_items) {
+      const pid  = item.products?.id   ?? "__unknown__";
+      const name = item.products?.name ?? "Produit inconnu";
+      const sku  = item.products?.sku  ?? "";
+      if (!prodMap.has(pid)) {
+        prodMap.set(pid, { id: pid, name, sku, totalQty: 0, orderCount: 0 });
+      }
+      const e = prodMap.get(pid)!;
+      e.totalQty    += item.quantity;
+      e.orderCount  += 1;
+    }
   }
 
-  // 3. Build recap PDF pages using pdf-lib
+  // Sort products by totalQty DESC, then name ASC
+  const products = [...prodMap.values()].sort((a, b) =>
+    b.totalQty !== a.totalQty ? b.totalQty - a.totalQty : a.name.localeCompare(b.name)
+  );
+
+  // ── 3. Build priority-sorted tracking numbers ──────────────────────────────
+  // Each order → primary product = highest totalQty product in this batch
+  const sortedOrders = batchOrders
+    .filter((bo) => bo.orders && (bo.tracking_number ?? bo.orders.delivery_tracking_number))
+    .sort((a, b) => {
+      const getPrimary = (bo: BORow) => {
+        const items = bo.orders?.order_items ?? [];
+        let bestRank = 9999, bestQty = 0;
+        for (const it of items) {
+          const pid   = it.products?.id ?? "";
+          const entry = prodMap.get(pid);
+          if (!entry) continue;
+          // find index in sorted products array
+          const rank = products.findIndex((p) => p.id === pid);
+          if (rank < bestRank || (rank === bestRank && it.quantity > bestQty)) {
+            bestRank = rank;
+            bestQty  = it.quantity;
+          }
+        }
+        return { rank: bestRank, qty: bestQty };
+      };
+      const pa = getPrimary(a), pb = getPrimary(b);
+      if (pa.rank !== pb.rank) return pa.rank - pb.rank;
+      if (pa.qty  !== pb.qty)  return pb.qty - pa.qty;
+      return (a.orders?.order_number ?? "").localeCompare(b.orders?.order_number ?? "");
+    });
+
+  const trackings = sortedOrders
+    .map((bo) => bo.tracking_number ?? bo.orders?.delivery_tracking_number)
+    .filter(Boolean) as string[];
+
+  // Fallback: any tracking from orders table
+  if (!trackings.length) {
+    const { data: fallback } = await supabaseAdmin
+      .from("orders")
+      .select("delivery_tracking_number")
+      .eq("delivery_batch_id", batchId)
+      .not("delivery_tracking_number", "is", null);
+    trackings.push(...((fallback ?? []) as { delivery_tracking_number: string }[]).map((r) => r.delivery_tracking_number));
+  }
+
+  if (!trackings.length) return { ok: false, error: "Aucun tracking trouvé pour ce batch.", productsFound: products.length };
+
+  // ── 4. Build recap PDF — 10×10 format (100mm = 283.46pt) ──────────────────
   const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
 
-  const recapDoc = await PDFDocument.create();
+  const SZ = 283.46;            // 100mm in PDF points
+  const MARGIN = 10;
+  const LINE_H = 14;
+  const HEADER_H = 52;
+  const FOOTER_H = 16;
+  const usableH = SZ - HEADER_H - FOOTER_H - MARGIN;
+  const ROWS_PER_PAGE = Math.floor(usableH / LINE_H);  // ~13 rows
+
+  const recapDoc   = await PDFDocument.create();
   const fontBold   = await recapDoc.embedFont(StandardFonts.HelveticaBold);
   const fontNormal = await recapDoc.embedFont(StandardFonts.Helvetica);
 
-  // Page size A4
-  const W = 595, H = 842;
-  const ROWS_PER_PAGE = 30;
-
-  // Build product rows with separator chunks
-  const chunks: PRow[][] = [];
-  for (let i = 0; i < products.length; i += ROWS_PER_PAGE) {
-    chunks.push(products.slice(i, i + ROWS_PER_PAGE));
+  // Chunk products into pages
+  const chunks: ProdEntry[][] = [];
+  if (products.length === 0) {
+    chunks.push([]); // one empty page with warning
+  } else {
+    for (let i = 0; i < products.length; i += ROWS_PER_PAGE) {
+      chunks.push(products.slice(i, i + ROWS_PER_PAGE));
+    }
   }
-  if (!chunks.length) chunks.push([]); // at least one page
+
+  const totalUnits = products.reduce((s, p) => s + p.totalQty, 0);
 
   chunks.forEach((chunk, pageIdx) => {
-    const page = recapDoc.addPage([W, H]);
+    const page = recapDoc.addPage([SZ, SZ]);
+    let y = SZ - MARGIN;
 
-    // Header background
-    page.drawRectangle({ x: 0, y: H - 60, width: W, height: 60, color: rgb(0.08, 0.08, 0.08) });
+    // ── Header block ──────────────────────────────────────────────────────
+    page.drawRectangle({ x: 0, y: SZ - HEADER_H, width: SZ, height: HEADER_H, color: rgb(0.07, 0.07, 0.07) });
 
-    // Title
-    page.drawText(`${batchNum} (${totalOrders} Orders)`, {
-      x: 20, y: H - 38, font: fontBold, size: 18, color: rgb(1, 1, 1),
+    // Batch number
+    const titleFontSize = batchNum.length > 18 ? 9 : 11;
+    page.drawText(batchNum, {
+      x: MARGIN, y: SZ - MARGIN - titleFontSize,
+      font: fontBold, size: titleFontSize, color: rgb(1, 1, 1),
     });
 
-    // Page indicator
-    if (chunks.length > 1) {
-      page.drawText(`Page ${pageIdx + 1}/${chunks.length}`, {
-        x: W - 80, y: H - 38, font: fontNormal, size: 10, color: rgb(0.7, 0.7, 0.7),
+    // Orders count + page indicator
+    const subLine = `${totalOrders} commandes  •  ${totalUnits} unités${chunks.length > 1 ? `  •  p.${pageIdx + 1}/${chunks.length}` : ""}`;
+    page.drawText(subLine, {
+      x: MARGIN, y: SZ - MARGIN - titleFontSize - 13,
+      font: fontNormal, size: 7.5, color: rgb(0.75, 0.75, 0.75),
+    });
+
+    y = SZ - HEADER_H - 6;
+
+    // ── Column headers ────────────────────────────────────────────────────
+    page.drawRectangle({ x: 0, y: y - 10, width: SZ, height: 13, color: rgb(0.92, 0.92, 0.92) });
+    page.drawText("PRODUIT / SKU", { x: MARGIN + 14, y: y - 7, font: fontBold, size: 7, color: rgb(0.4, 0.4, 0.4) });
+    page.drawText("QTÉ", { x: SZ - 30, y: y - 7, font: fontBold, size: 7, color: rgb(0.4, 0.4, 0.4) });
+    y -= 13;
+
+    if (chunk.length === 0) {
+      page.drawText("Aucun produit trouvé.", {
+        x: MARGIN, y: y - 20, font: fontNormal, size: 8, color: rgb(0.7, 0, 0),
       });
     }
 
-    // Column headers
-    const headerY = H - 80;
-    page.drawRectangle({ x: 0, y: headerY - 4, width: W, height: 22, color: rgb(0.93, 0.93, 0.93) });
-    page.drawText("SKU", { x: 20, y: headerY, font: fontBold, size: 9, color: rgb(0.4, 0.4, 0.4) });
-    page.drawText("PRODUIT", { x: 100, y: headerY, font: fontBold, size: 9, color: rgb(0.4, 0.4, 0.4) });
-    page.drawText("QTE", { x: W - 80, y: headerY, font: fontBold, size: 9, color: rgb(0.4, 0.4, 0.4) });
-    page.drawText("CMDS", { x: W - 40, y: headerY, font: fontBold, size: 9, color: rgb(0.4, 0.4, 0.4) });
-
-    // Product rows
-    let y = headerY - 20;
+    // ── Product rows ──────────────────────────────────────────────────────
     chunk.forEach((p, i) => {
       const globalRank = pageIdx * ROWS_PER_PAGE + i;
+      const rowY = y - (i + 1) * LINE_H;
+
+      // Alternating background
       if (i % 2 === 0) {
-        page.drawRectangle({ x: 0, y: y - 4, width: W, height: 18, color: rgb(0.97, 0.97, 0.97) });
+        page.drawRectangle({ x: 0, y: rowY - 2, width: SZ, height: LINE_H, color: rgb(0.97, 0.97, 0.97) });
       }
 
-      // Rank circle color
-      const rankColor = globalRank === 0 ? rgb(0.85, 0.65, 0.13)
-        : globalRank === 1 ? rgb(0.63, 0.63, 0.63)
-        : globalRank === 2 ? rgb(0.80, 0.50, 0.20)
-        : rgb(0.88, 0.88, 0.88);
-      page.drawCircle({ x: 11, y: y + 5, size: 9, color: rankColor });
-      page.drawText(String(globalRank + 1), {
-        x: globalRank < 9 ? 8 : 5, y: y + 1, font: fontBold, size: 8,
-        color: globalRank < 3 ? rgb(1, 1, 1) : rgb(0.4, 0.4, 0.4),
+      // Rank badge
+      const badgeColor = globalRank === 0 ? rgb(0.85, 0.65, 0.05)
+        : globalRank === 1 ? rgb(0.62, 0.62, 0.62)
+        : globalRank === 2 ? rgb(0.75, 0.45, 0.15)
+        : rgb(0.85, 0.85, 0.85);
+      page.drawCircle({ x: MARGIN + 5, y: rowY + 5, size: 5.5, color: badgeColor });
+      const rankStr = String(globalRank + 1);
+      page.drawText(rankStr, {
+        x: MARGIN + (rankStr.length === 1 ? 3 : 1.5), y: rowY + 2,
+        font: fontBold, size: 6, color: globalRank < 3 ? rgb(1,1,1) : rgb(0.4,0.4,0.4),
       });
 
-      // SKU
-      const sku = (p.sku ?? "").slice(0, 12);
-      page.drawText(sku, { x: 25, y: y + 1, font: fontNormal, size: 8, color: rgb(0.5, 0.5, 0.5) });
-
-      // Product name (truncate)
-      const name = p.product_name.length > 55 ? p.product_name.slice(0, 55) + "…" : p.product_name;
-      page.drawText(name, { x: 100, y: y + 1, font: globalRank < 3 ? fontBold : fontNormal, size: 9, color: rgb(0.1, 0.1, 0.1) });
-
-      // Quantity (large)
-      page.drawText(`×${p.total_quantity}`, {
-        x: W - 80, y: y + 1, font: fontBold, size: 11,
-        color: globalRank < 3 ? rgb(0.08, 0.08, 0.08) : rgb(0.3, 0.3, 0.3),
+      // Product name (max 28 chars)
+      const nameText = p.name.length > 28 ? p.name.slice(0, 28) + "…" : p.name;
+      page.drawText(nameText, {
+        x: MARGIN + 14, y: rowY + 5,
+        font: globalRank < 3 ? fontBold : fontNormal,
+        size: 8, color: rgb(0.1, 0.1, 0.1),
       });
 
-      // Orders count
-      page.drawText(String(p.order_count), { x: W - 35, y: y + 1, font: fontNormal, size: 9, color: rgb(0.5, 0.5, 0.5) });
+      // SKU below name
+      if (p.sku) {
+        page.drawText(p.sku.slice(0, 18), {
+          x: MARGIN + 14, y: rowY - 1,
+          font: fontNormal, size: 6, color: rgb(0.6, 0.6, 0.6),
+        });
+      }
 
-      y -= 18;
+      // Quantity (bold, right-aligned)
+      const qtyText = `×${p.totalQty}`;
+      const qtyW = qtyText.length * 5.5;
+      page.drawText(qtyText, {
+        x: SZ - MARGIN - qtyW, y: rowY + 3,
+        font: fontBold, size: 10,
+        color: globalRank < 3 ? rgb(0.08, 0.08, 0.08) : rgb(0.35, 0.35, 0.35),
+      });
     });
 
-    // Footer
-    const totalUnits = products.reduce((s, p) => s + p.total_quantity, 0);
-    page.drawLine({ start: { x: 20, y: 50 }, end: { x: W - 20, y: 50 }, thickness: 0.5, color: rgb(0.8, 0.8, 0.8) });
-    page.drawText(`Total: ${totalUnits} unités — ${trackings.length} trackings`, {
-      x: 20, y: 35, font: fontNormal, size: 9, color: rgb(0.5, 0.5, 0.5),
+    // ── Footer ────────────────────────────────────────────────────────────
+    page.drawLine({ start: { x: MARGIN, y: FOOTER_H - 2 }, end: { x: SZ - MARGIN, y: FOOTER_H - 2 }, thickness: 0.5, color: rgb(0.8,0.8,0.8) });
+    page.drawText(`${trackings.length} trackings à imprimer`, {
+      x: MARGIN, y: FOOTER_H - 12, font: fontNormal, size: 6.5, color: rgb(0.55, 0.55, 0.55),
     });
   });
 
   const recapBytes = await recapDoc.save();
 
-  // 4. Download Digylog labels (sorted trackings)
+  // ── 5. Download Digylog labels (sorted trackings) ─────────────────────────
   const client = await createDigylogClientFromDB();
   const labelsRes = await client.downloadLabels({ orders: trackings, format: 3 });
   if (!labelsRes.ok || !labelsRes.blob) {
-    return { ok: false, error: labelsRes.error ?? "Erreur téléchargement étiquettes Digylog." };
+    return { ok: false, error: labelsRes.error ?? "Erreur téléchargement étiquettes.", productsFound: products.length };
   }
   const labelsBytes = new Uint8Array(await labelsRes.blob.arrayBuffer());
 
-  // 5. Merge: recap pages + labels pages
+  // ── 6. Merge: recap pages first, then Digylog label pages ─────────────────
   const mergedDoc  = await PDFDocument.create();
   const recapSrc   = await PDFDocument.load(recapBytes);
   const labelsSrc  = await PDFDocument.load(labelsBytes);
 
   const recapPages  = await mergedDoc.copyPages(recapSrc,  recapSrc.getPageIndices());
   const labelsPages = await mergedDoc.copyPages(labelsSrc, labelsSrc.getPageIndices());
-
   recapPages.forEach((p)  => mergedDoc.addPage(p));
   labelsPages.forEach((p) => mergedDoc.addPage(p));
 
   const mergedBytes = await mergedDoc.save();
 
-  // 6. Mark as printed
+  // ── 7. Mark batch as printed ───────────────────────────────────────────────
   await supabaseAdmin.from("delivery_batches")
     .update({
-      status: "tickets_printed",
+      status:               "tickets_printed",
       labels_downloaded_at: new Date().toISOString(),
     } as never)
     .eq("id", batchId)
     .in("status", ["draft", "tickets_printed"]);
+
+  // Also update product summary table if it was empty
+  if (products.length > 0) {
+    const existing = await supabaseAdmin.from("delivery_batch_product_summary")
+      .select("id", { count: "exact", head: true }).eq("batch_id", batchId);
+    if ((existing.count ?? 0) === 0) {
+      await supabaseAdmin.from("delivery_batch_product_summary").insert(
+        products.map((p) => ({
+          batch_id:       batchId,
+          product_id:     p.id === "__unknown__" ? null : p.id,
+          product_name:   p.name,
+          sku:            p.sku || null,
+          total_quantity: p.totalQty,
+          order_count:    p.orderCount,
+        })) as never
+      );
+    }
+  }
 
   revalidatePath("/admin/delivery/notes");
   revalidatePath(`/admin/delivery/notes/${batchId}`);
 
   return {
     ok: true,
-    blobBase64: Buffer.from(mergedBytes).toString("base64"),
-    totalTrackings: trackings.length,
+    blobBase64:      Buffer.from(mergedBytes).toString("base64"),
+    totalTrackings:  trackings.length,
+    productsFound:   products.length,
   };
 }

@@ -158,6 +158,19 @@ export default async function DeliveryNoteDetailPage({
             </div>
           ))}
         </div>
+
+        {/* Product debug info */}
+        {prodRows.length === 0 && (
+          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-700">
+            ⚠ Aucun produit trouvé pour ce batch — vérifiez que les order_items sont liés aux orders.
+            Le PDF recap sera vide.
+          </div>
+        )}
+        {prodRows.length > 0 && (
+          <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-xs text-green-800">
+            ✓ {prodRows.length} produit(s) — {totalQty} unités — recap PDF prêt
+          </div>
+        )}
       </div>
 
       {/* Actions */}
