@@ -207,10 +207,13 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
     }
 
     // Send to Digylog
+    // IMPORTANT: Always use status=0 (add only, do NOT send per order).
+    // We will call PUT /orders/send ONCE after all orders are created.
+    // If status=1 is used, Digylog creates one BL per order — wrong behavior.
     const digylogResult = await client.createOrders({
       network: networkId, store: dg.default_store_name,
       mode: (dg.default_mode ?? 1) as 1|2,
-      status: (dg.default_status_on_create ?? 1) as 0|1,
+      status: 0,  // ALWAYS 0 — never send per order
       checkDuplicate: 1,
       orders: [{
         num: orderNumber, type: 1, mode: (dg.default_mode ?? 1) as 1|2,
@@ -231,14 +234,14 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
 
     const created  = digylogResult.orders[0];
     const tracking = created.tracking;
-    const blId     = created.bl != null ? Number(created.bl) : null;
+    // bl_id is NOT saved here — it will be set after PUT /orders/send groups all orders
 
-    // Save shipment + update order
+    // Save shipment (no bl_id yet — will be set after grouped send)
     await supabaseAdmin.from("delivery_shipments").upsert({
       order_id: orderId, delivery_company_id: companyId,
       tracking_number: tracking, external_order_id: orderNumber,
       external_status: "Non envoyée", external_status_id: 0,
-      internal_status: "not_sent", bl_id: blId,
+      internal_status: "not_sent", bl_id: null,
       raw_payload: created as never, last_synced_at: new Date().toISOString(),
     } as never, { onConflict: "order_id" });
 
@@ -246,7 +249,7 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
       delivery_tracking_number: tracking, delivery_company_id: companyId,
       delivery_external_status: "Non envoyée", delivery_external_status_id: 0,
       delivery_status: "not_sent", delivery_last_sync_at: new Date().toISOString(),
-      status: "sent_to_delivery", bl_id: blId,
+      status: "sent_to_delivery", bl_id: null,
       external_delivery_id: orderNumber, import_source: "sheet_sync",
     } as never).eq("id", orderId);
 
