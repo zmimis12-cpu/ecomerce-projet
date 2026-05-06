@@ -1,10 +1,11 @@
 "use client";
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Search, Loader2, CheckCircle2, Clock, Truck, FileDown, XCircle, Send, Printer } from "lucide-react";
+import { Search, Loader2, CheckCircle2, Clock, Truck, FileDown, XCircle, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { downloadBatchLabels, sendBatchGetBl, closeDailyBatch } from "@/lib/delivery/batch/actions";
+import { downloadBatchLabels, closeDailyBatch } from "@/lib/delivery/batch/actions";
 import { getBlPdfByBlId } from "@/lib/delivery/document-actions";
+import { regroupDailyOrders } from "@/lib/delivery/repair-actions";
 
 type Batch = {
   id: string;
@@ -115,7 +116,6 @@ function RowActions({ batch }: { batch: Batch }) {
 
   const alreadyPrinted = !!batch.labels_downloaded_at;
   const hasBlId        = !!batch.bl_id;
-  const noBlId         = !batch.bl_id;
 
   function handleTickets(e: React.MouseEvent) {
     e.stopPropagation();
@@ -133,58 +133,49 @@ function RowActions({ batch }: { batch: Batch }) {
     });
   }
 
-  function handleSendGetBl(e: React.MouseEvent) {
-    e.stopPropagation();
-    setMsg(null);
-    startTransition(async () => {
-      const r = await sendBatchGetBl(batch.id);
-      if (r.ok) {
-        setMsg({ ok: true, text: `✓ BL #${r.bl}` });
-        setTimeout(() => window.location.reload(), 1200);
-      } else {
-        setMsg({ ok: false, text: r.error ?? "Erreur" });
-      }
-    });
-  }
-
   return (
     <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-      {/* TICKETS button — primary action */}
+      {/* TICKETS only — never generates BL */}
       {alreadyPrinted ? (
-        // Already printed — show muted reprint option
         <button type="button" onClick={handleTickets} disabled={isPending}
-          title="Réimprimer les tickets"
-          className="flex items-center gap-1 rounded-md border border-dashed border-border px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground hover:border-border disabled:opacity-40 transition-colors">
+          title="Réimprimer les tickets 10×10"
+          className="flex items-center gap-1 rounded-md border border-dashed px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground disabled:opacity-40">
           {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Printer className="h-3 w-3" />}
           Réimprimer
         </button>
       ) : (
-        // Not yet printed — prominent tickets button
         <button type="button" onClick={handleTickets} disabled={isPending}
           title="Télécharger les tickets 10×10"
-          className="flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-[10px] font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-colors">
+          className="flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-[10px] font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
           {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Printer className="h-3 w-3" />}
           Tickets
         </button>
       )}
 
-      {/* BL button — secondary */}
-      {noBlId ? (
-        <button type="button" onClick={handleSendGetBl} disabled={isPending}
-          title="Envoyer à Digylog pour obtenir le BL"
-          className="flex items-center gap-1 rounded-md border border-blue-300 bg-blue-50 px-2.5 py-1.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition-colors">
-          {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-          Get BL
-        </button>
-      ) : (
-        <span className="text-[10px] font-mono text-violet-700 font-bold">
+      {/* Download BL — only if already generated */}
+      {hasBlId && (
+        <button type="button" onClick={(e) => {
+          e.stopPropagation();
+          startTransition(async () => {
+            const r = await getBlPdfByBlId(batch.bl_id!);
+            if (r.ok && r.blobBase64) {
+              const bin = atob(r.blobBase64);
+              const buf = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+              const url = URL.createObjectURL(new Blob([buf], { type:"application/pdf" }));
+              Object.assign(document.createElement("a"), { href:url, download:`BL-${batch.bl_id}.pdf` }).click();
+              URL.revokeObjectURL(url);
+            }
+          });
+        }} disabled={isPending}
+          className="flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-[10px] font-semibold text-violet-700 border-violet-300 hover:bg-violet-50 disabled:opacity-50">
+          <FileDown className="h-3 w-3" />
           BL #{batch.bl_id}
-        </span>
+        </button>
       )}
 
       {msg && (
-        <span className={cn("text-[10px] font-medium max-w-[100px]",
-          msg.ok ? "text-green-700" : "text-red-600")}>
+        <span className={cn("text-[10px] font-medium", msg.ok ? "text-green-700" : "text-red-600")}>
           {msg.text}
         </span>
       )}
@@ -310,11 +301,16 @@ export function DeliveryNotesClient({ rows, stores, companies }: Props) {
                       printed && "opacity-60"
                     )}>
                     <td className="px-4 py-3">
-                      <p className="font-mono font-bold text-sm">{b.bl_id ?? b.batch_number}</p>
+                      {b.bl_id ? (
+                        <p className="font-mono font-bold text-sm text-violet-700">#{b.bl_id}</p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">Non généré</p>
+                      )}
+                      <p className="font-mono text-[10px] text-muted-foreground mt-0.5">{b.batch_number}</p>
                       {printed && (
-                        <p className="text-[10px] text-green-600 flex items-center gap-0.5">
+                        <p className="text-[10px] text-green-600 flex items-center gap-0.5 mt-0.5">
                           <CheckCircle2 className="h-2.5 w-2.5" />
-                          Imprimé {new Date(b.labels_downloaded_at!).toLocaleDateString("fr-MA")}
+                          Tickets {new Date(b.labels_downloaded_at!).toLocaleDateString("fr-MA")}
                         </p>
                       )}
                     </td>
