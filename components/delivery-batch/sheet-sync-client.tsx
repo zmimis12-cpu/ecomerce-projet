@@ -91,14 +91,20 @@ export function SheetSyncClient({ sheetConfigured }: { sheetConfigured: boolean 
                     Groupe créé: {result.batchNumber}
                   </p>
                   <p className="text-xs text-green-700">
-                    {result.sent} commande(s) — Tickets et BL disponibles dans le groupe.
+                    {result.sent} commande(s) — Tickets et BL disponibles dans Delivery Notes.
                   </p>
                 </div>
               </div>
-              <Link href={`/admin/delivery/batches/${result.batchId}`}
-                className="flex-shrink-0 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">
-                Voir le groupe →
-              </Link>
+              <div className="flex gap-2 flex-shrink-0">
+                <Link href={`/admin/delivery/notes/${result.batchId}`}
+                  className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">
+                  Delivery Notes →
+                </Link>
+                <Link href="/admin/delivery/notes"
+                  className="rounded-lg bg-green-100 text-green-800 px-3 py-1.5 text-xs font-semibold hover:bg-green-200">
+                  Tous les BLs
+                </Link>
+              </div>
             </div>
           )}
 

@@ -272,9 +272,58 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
     if (bRes.success && bRes.batchId) {
       batchId     = bRes.batchId;
       batchNumber = bRes.batchNumber;
+
+      // Find the real Digylog BL ID from the sent orders
+      // When status=1 (add+send), Digylog returns bl in each order response
+      // When status=0, we need to call PUT /orders/send to get the bl
+      let realBlId: number | null = null;
+
+      // Try to get bl_id from already-saved orders
+      const { data: sentOrders } = await supabaseAdmin
+        .from("orders")
+        .select("bl_id, delivery_tracking_number")
+        .in("id", sentOrderIds)
+        .not("bl_id", "is", null)
+        .limit(1);
+
+      const existingBlId = (sentOrders?.[0] as { bl_id?: number } | undefined)?.bl_id ?? null;
+
+      if (existingBlId) {
+        realBlId = existingBlId;
+      } else {
+        // status=0 case: call PUT /orders/send to get bl_id
+        const trackingsToSend = results
+          .filter((r) => r.status === "sent" && r.tracking)
+          .map((r) => r.tracking!);
+
+        if (trackingsToSend.length > 0) {
+          try {
+            const sendRes = await client.sendOrders(trackingsToSend);
+            if (sendRes.ok && sendRes.bl) {
+              realBlId = sendRes.bl;
+              // Update all sent orders with the real bl_id
+              await supabaseAdmin.from("orders")
+                .update({ bl_id: realBlId, status: "sent_to_delivery" } as never)
+                .in("id", sentOrderIds);
+              await supabaseAdmin.from("delivery_shipments")
+                .update({ bl_id: realBlId, internal_status: "not_sent" } as never)
+                .in("order_id", sentOrderIds);
+            }
+          } catch (e) {
+            console.error("[sheet-sync] sendOrders failed:", e);
+          }
+        }
+      }
+
+      // Update batch with real bl_id, status, store_name
       await supabaseAdmin.from("delivery_batches").update({
-        status: "sent", sent_at: new Date().toISOString(),
+        status:      "sent",
+        sent_at:     new Date().toISOString(),
+        bl_id:       realBlId,
+        store_name:  dg?.default_store_name ?? null,
+        shipping_company: "Digylog",
       } as never).eq("id", bRes.batchId);
+
       await supabaseAdmin.from("delivery_batch_orders")
         .update({ status: "sent" } as never)
         .eq("batch_id", bRes.batchId);
