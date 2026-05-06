@@ -558,3 +558,93 @@ export async function sendBatchGetBl(batchId: string): Promise<{
   revalidatePath("/admin/delivery/batches");
   return { ok: true, bl: blId };
 }
+
+// ── Repair: Regenerate BL for batch (call PUT /orders/send with ALL trackings) ─
+export async function regenerateBatchBl(batchId: string): Promise<{
+  ok: boolean; bl?: number; trackingsUsed?: number; error?: string;
+}> {
+  await requireRole([...MANAGER]);
+
+  // Get ALL trackings for this batch from multiple sources
+  const { data: boRows } = await supabaseAdmin
+    .from("delivery_batch_orders")
+    .select("tracking_number, order_id")
+    .eq("batch_id", batchId);
+
+  const boItems = (boRows ?? []) as { tracking_number: string | null; order_id: string }[];
+
+  // Collect trackings from batch_orders and fallback to orders table
+  let trackings = boItems.map((r) => r.tracking_number).filter(Boolean) as string[];
+
+  if (trackings.length < boItems.length) {
+    // Some trackings missing — get from orders table
+    const orderIds = boItems.map((r) => r.order_id).filter(Boolean);
+    const { data: ordRows } = await supabaseAdmin
+      .from("orders")
+      .select("id, delivery_tracking_number")
+      .in("id", orderIds)
+      .not("delivery_tracking_number", "is", null);
+
+    const trackMap = new Map<string, string>();
+    for (const o of (ordRows ?? []) as { id: string; delivery_tracking_number: string }[]) {
+      trackMap.set(o.id, o.delivery_tracking_number);
+    }
+
+    // Update delivery_batch_orders with missing trackings
+    for (const bo of boItems) {
+      if (!bo.tracking_number) {
+        const t = trackMap.get(bo.order_id);
+        if (t) {
+          await supabaseAdmin.from("delivery_batch_orders")
+            .update({ tracking_number: t, status: "sent" } as never)
+            .eq("batch_id", batchId)
+            .eq("order_id", bo.order_id);
+        }
+      }
+    }
+
+    // Re-collect all trackings
+    trackings = [
+      ...new Set([
+        ...trackings,
+        ...[...trackMap.values()],
+      ])
+    ];
+  }
+
+  if (!trackings.length) {
+    return { ok: false, error: "Aucun tracking trouvé pour ce batch." };
+  }
+
+  // Call PUT /orders/send with ALL trackings → get ONE grouped BL
+  const client = await createDigylogClientFromDB();
+  const sendRes = await client.sendOrders(trackings);
+
+  if (!sendRes.ok || !sendRes.bl) {
+    return { ok: false, error: sendRes.error ?? "Digylog n'a pas retourné de BL groupé." };
+  }
+
+  const newBlId = sendRes.bl;
+
+  // Update batch bl_id
+  await supabaseAdmin.from("delivery_batches")
+    .update({ bl_id: newBlId, status: "sent" } as never)
+    .eq("id", batchId);
+
+  // Update all orders in this batch
+  const orderIds = boItems.map((r) => r.order_id).filter(Boolean);
+  if (orderIds.length) {
+    await supabaseAdmin.from("orders")
+      .update({ bl_id: newBlId } as never)
+      .in("id", orderIds);
+    await supabaseAdmin.from("delivery_shipments")
+      .update({ bl_id: newBlId } as never)
+      .in("order_id", orderIds);
+  }
+
+  revalidatePath("/admin/delivery/notes");
+  revalidatePath(`/admin/delivery/notes/${batchId}`);
+  revalidatePath("/admin/delivery/documents");
+
+  return { ok: true, bl: newBlId, trackingsUsed: trackings.length };
+}

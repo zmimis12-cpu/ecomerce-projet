@@ -12,6 +12,7 @@ interface Props {
   status:        string;
   paymentStatus: string;
   trackings:     string[];
+  totalOrders:   number;
 }
 
 function downloadBlob(b64: string, name: string) {
