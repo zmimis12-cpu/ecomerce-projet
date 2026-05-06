@@ -88,3 +88,8 @@ ALTER TABLE delivery_batches
   ADD COLUMN IF NOT EXISTS paid_by         UUID REFERENCES auth.users(id);
 
 CREATE INDEX IF NOT EXISTS idx_db_payment ON delivery_batches(payment_status);
+
+-- ── Step 17 additions ─────────────────────────────────────────────────────────
+ALTER TABLE delivery_batches
+  ADD COLUMN IF NOT EXISTS labels_downloaded_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS labels_downloaded_by UUID REFERENCES auth.users(id);

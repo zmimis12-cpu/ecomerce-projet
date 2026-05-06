@@ -392,12 +392,16 @@ export async function downloadBatchLabels(batchId: string): Promise<{
   const result = await client.downloadLabels({ orders: trackings, format: 3 });
   if (!result.ok || !result.blob) return { ok: false, error: result.error };
 
-  // Mark status
+  // Mark labels downloaded with timestamp
   await supabaseAdmin.from("delivery_batches")
-    .update({ status: "labels_downloaded" } as never)
+    .update({
+      status: "labels_downloaded",
+      labels_downloaded_at: new Date().toISOString(),
+    } as never)
     .eq("id", batchId);
 
-  revalidatePath(`/admin/delivery/batches/${batchId}`);
+  revalidatePath(`/admin/delivery/notes`);
+  revalidatePath(`/admin/delivery/notes/${batchId}`);
 
   const buf = await result.blob.arrayBuffer();
   return { ok: true, blobBase64: Buffer.from(buf).toString("base64") };

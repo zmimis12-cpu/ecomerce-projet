@@ -19,6 +19,7 @@ type Batch = {
   sent_at: string | null;
   created_at: string;
   notes: string | null;
+  labels_downloaded_at: string | null;
 };
 
 export default async function DeliveryNotesPage() {
@@ -27,7 +28,7 @@ export default async function DeliveryNotesPage() {
   const { data: batches } = await supabaseAdmin
     .from("delivery_batches")
     .select(
-      "id,batch_number,bl_id,status,payment_status,shipping_company,store_name,total_orders,total_products,sent_at,created_at,notes"
+      "id,batch_number,bl_id,status,payment_status,shipping_company,store_name,total_orders,total_products,sent_at,created_at,notes,labels_downloaded_at"
     )
     .order("created_at", { ascending: false })
     .limit(500);

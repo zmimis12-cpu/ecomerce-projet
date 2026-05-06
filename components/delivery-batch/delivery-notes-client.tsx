@@ -1,9 +1,9 @@
 "use client";
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Search, Download, Loader2, CheckCircle2, Clock, Truck, FileDown, XCircle, Send } from "lucide-react";
+import { Search, Loader2, CheckCircle2, Clock, Truck, FileDown, XCircle, Send, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { downloadBatchLabels, downloadBatchBl, sendBatchGetBl } from "@/lib/delivery/batch/actions";
+import { downloadBatchLabels, sendBatchGetBl } from "@/lib/delivery/batch/actions";
 import { getBlPdfByBlId } from "@/lib/delivery/document-actions";
 
 type Batch = {
@@ -19,6 +19,7 @@ type Batch = {
   sent_at: string | null;
   created_at: string;
   notes: string | null;
+  labels_downloaded_at: string | null;
 };
 
 interface Props {
@@ -27,20 +28,19 @@ interface Props {
   companies: string[];
 }
 
-// ── Status config ──────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<string, { label: string; icon: React.ElementType; cls: string }> = {
-  draft:             { label:"DRAFT",      icon:Clock,          cls:"bg-slate-100 text-slate-600 border-slate-200" },
-  sent:              { label:"SENT",       icon:Truck,          cls:"bg-blue-100 text-blue-700 border-blue-200" },
-  labels_downloaded: { label:"LABELS OK",  icon:FileDown,       cls:"bg-violet-100 text-violet-700 border-violet-200" },
-  bl_downloaded:     { label:"BL OK",      icon:FileDown,       cls:"bg-amber-100 text-amber-700 border-amber-200" },
-  completed:         { label:"COMPLETED",  icon:CheckCircle2,   cls:"bg-emerald-50 text-emerald-700 border-emerald-200" },
-  cancelled:         { label:"CANCELLED",  icon:XCircle,        cls:"bg-red-100 text-red-600 border-red-200" },
+  draft:              { label:"DRAFT",       icon:Clock,         cls:"bg-slate-100 text-slate-600 border-slate-200" },
+  sent:               { label:"ENVOYÉ",      icon:Truck,         cls:"bg-blue-100 text-blue-700 border-blue-200" },
+  labels_downloaded:  { label:"TICKETS OK",  icon:Printer,       cls:"bg-violet-100 text-violet-700 border-violet-200" },
+  bl_downloaded:      { label:"BL OK",       icon:FileDown,      cls:"bg-amber-100 text-amber-700 border-amber-200" },
+  completed:          { label:"TERMINÉ",     icon:CheckCircle2,  cls:"bg-emerald-50 text-emerald-700 border-emerald-200" },
+  cancelled:          { label:"ANNULÉ",      icon:XCircle,       cls:"bg-red-100 text-red-600 border-red-200" },
 };
 
 const PAY_CFG: Record<string, { label: string; cls: string }> = {
-  unpaid:  { label:"Unpaid",  cls:"bg-red-50 text-red-500 border-red-200" },
-  partial: { label:"Partial", cls:"bg-amber-50 text-amber-600 border-amber-200" },
-  paid:    { label:"Paid",    cls:"bg-green-50 text-green-600 border-green-200" },
+  unpaid:  { label:"Non payé", cls:"bg-red-50 text-red-500 border-red-200" },
+  partial: { label:"Partiel",  cls:"bg-amber-50 text-amber-600 border-amber-200" },
+  paid:    { label:"Payé",     cls:"bg-green-50 text-green-600 border-green-200" },
 };
 
 function downloadBlob(b64: string, name: string) {
@@ -52,36 +52,39 @@ function downloadBlob(b64: string, name: string) {
   URL.revokeObjectURL(url);
 }
 
-function ActionBtn({ batch }: { batch: Batch }) {
+// ── Row actions ───────────────────────────────────────────────────────────────
+function RowActions({ batch }: { batch: Batch }) {
   const [isPending, startTransition] = useTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const isDraft = batch.status === "draft" && !batch.bl_id;
 
-  function handleSend(e: React.MouseEvent) {
-    e.preventDefault(); e.stopPropagation();
+  const alreadyPrinted = !!batch.labels_downloaded_at;
+  const hasBlId        = !!batch.bl_id;
+  const noBlId         = !batch.bl_id;
+
+  function handleTickets(e: React.MouseEvent) {
+    e.stopPropagation();
     setMsg(null);
     startTransition(async () => {
-      const r = await sendBatchGetBl(batch.id) as { ok?: boolean; bl?: number; error?: string };
-      if (r.ok && r.bl) {
-        setMsg({ ok: true, text: `BL #${r.bl}` });
+      const r = await downloadBatchLabels(batch.id);
+      if (r.ok && r.blobBase64) {
+        downloadBlob(r.blobBase64, `tickets-${batch.batch_number}.pdf`);
+        setMsg({ ok: true, text: "✓ Tickets téléchargés" });
+        // Reload to show updated status
         setTimeout(() => window.location.reload(), 1000);
       } else {
-        setMsg({ ok: false, text: r.error ?? "Erreur" });
+        setMsg({ ok: false, text: r.error ?? "Erreur tickets" });
       }
     });
   }
 
-  function handleDownload(e: React.MouseEvent) {
-    e.preventDefault(); e.stopPropagation();
+  function handleSendGetBl(e: React.MouseEvent) {
+    e.stopPropagation();
     setMsg(null);
     startTransition(async () => {
-      if (batch.bl_id) {
-        const r = await downloadBatchBl(batch.id);
-        if (r.ok && r.blobBase64) { downloadBlob(r.blobBase64, `BL-${batch.bl_id}.pdf`); return; }
-      }
-      const r = await downloadBatchLabels(batch.id);
-      if (r.ok && r.blobBase64) {
-        downloadBlob(r.blobBase64, `labels-${batch.batch_number}.pdf`);
+      const r = await sendBatchGetBl(batch.id);
+      if (r.ok) {
+        setMsg({ ok: true, text: `✓ BL #${r.bl}` });
+        setTimeout(() => window.location.reload(), 1200);
       } else {
         setMsg({ ok: false, text: r.error ?? "Erreur" });
       }
@@ -89,32 +92,43 @@ function ActionBtn({ batch }: { batch: Batch }) {
   }
 
   return (
-    <div className="flex items-center gap-1.5">
-      {/* Send button for drafts without BL */}
-      {isDraft && (
-        <button type="button" onClick={handleSend} disabled={isPending}
-          title="Envoyer à Digylog pour obtenir le BL"
-          className={cn(
-            "flex items-center gap-1 rounded-lg border border-primary/40 bg-primary/10 text-primary",
-            "px-2 py-1.5 text-[10px] font-bold hover:bg-primary/20 transition-colors",
-            isPending && "opacity-50 cursor-not-allowed"
-          )}>
-          {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-          Envoyer
+    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+      {/* TICKETS button — primary action */}
+      {alreadyPrinted ? (
+        // Already printed — show muted reprint option
+        <button type="button" onClick={handleTickets} disabled={isPending}
+          title="Réimprimer les tickets"
+          className="flex items-center gap-1 rounded-md border border-dashed border-border px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground hover:border-border disabled:opacity-40 transition-colors">
+          {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Printer className="h-3 w-3" />}
+          Réimprimer
+        </button>
+      ) : (
+        // Not yet printed — prominent tickets button
+        <button type="button" onClick={handleTickets} disabled={isPending}
+          title="Télécharger les tickets 10×10"
+          className="flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-[10px] font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-colors">
+          {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Printer className="h-3 w-3" />}
+          Tickets
         </button>
       )}
-      {/* Download button */}
-      <button type="button" onClick={handleDownload} disabled={isPending}
-        title={batch.bl_id ? `BL #${batch.bl_id}` : "Étiquettes"}
-        className={cn(
-          "w-9 h-9 rounded-lg border flex items-center justify-center transition-colors",
-          "border-border bg-background hover:bg-secondary text-muted-foreground hover:text-foreground",
-          isPending && "opacity-50 cursor-not-allowed"
-        )}>
-        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-      </button>
+
+      {/* BL button — secondary */}
+      {noBlId ? (
+        <button type="button" onClick={handleSendGetBl} disabled={isPending}
+          title="Envoyer à Digylog pour obtenir le BL"
+          className="flex items-center gap-1 rounded-md border border-blue-300 bg-blue-50 px-2.5 py-1.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition-colors">
+          {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+          Get BL
+        </button>
+      ) : (
+        <span className="text-[10px] font-mono text-violet-700 font-bold">
+          BL #{batch.bl_id}
+        </span>
+      )}
+
       {msg && (
-        <span className={`text-[10px] font-medium ${msg.ok ? "text-green-600" : "text-red-500"}`}>
+        <span className={cn("text-[10px] font-medium max-w-[100px]",
+          msg.ok ? "text-green-700" : "text-red-600")}>
           {msg.text}
         </span>
       )}
@@ -122,23 +136,21 @@ function ActionBtn({ batch }: { batch: Batch }) {
   );
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 export function DeliveryNotesClient({ rows, stores, companies }: Props) {
   const [search,  setSearch]  = useState("");
   const [store,   setStore]   = useState("all");
   const [company, setCompany] = useState("all");
   const [payment, setPayment] = useState("all");
+  const [showPrinted, setShowPrinted] = useState(true);
 
   const q = search.toLowerCase().trim();
-
   const filtered = rows.filter((r) => {
+    if (!showPrinted && r.labels_downloaded_at) return false;
     if (q) {
       const blStr = r.bl_id ? String(r.bl_id) : "";
-      if (
-        !blStr.includes(q) &&
-        !r.batch_number.toLowerCase().includes(q) &&
-        !(r.store_name ?? "").toLowerCase().includes(q)
-      ) return false;
+      if (!blStr.includes(q) && !r.batch_number.toLowerCase().includes(q) &&
+          !(r.store_name ?? "").toLowerCase().includes(q)) return false;
     }
     if (store   !== "all" && r.store_name !== store) return false;
     if (company !== "all" && (r.shipping_company ?? "Digylog") !== company) return false;
@@ -146,77 +158,84 @@ export function DeliveryNotesClient({ rows, stores, companies }: Props) {
     return true;
   });
 
+  const pendingTickets = rows.filter((r) => !r.labels_downloaded_at).length;
+
   const SEL = "h-10 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight">Delivery Notes</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {rows.length} groupe(s) au total
+            {rows.length} groupe(s) — {pendingTickets > 0 && (
+              <span className="text-amber-600 font-semibold">{pendingTickets} ticket(s) à imprimer</span>
+            )}
           </p>
         </div>
-        <Link href="/admin/delivery/sheet-sync"
-          className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90">
-          <Truck className="h-4 w-4" />
-          Sync Sheet → Digylog
-        </Link>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Toggle: show/hide already printed */}
+          <button type="button"
+            onClick={() => setShowPrinted((v) => !v)}
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors",
+              showPrinted
+                ? "border-border bg-background text-muted-foreground hover:bg-secondary"
+                : "border-primary bg-primary/10 text-primary"
+            )}>
+            <Printer className="h-3.5 w-3.5" />
+            {showPrinted ? "Masquer imprimés" : "Afficher tous"}
+          </button>
+          <Link href="/admin/delivery/sheet-sync"
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90">
+            <Truck className="h-4 w-4" />
+            Sync Sheet → Digylog
+          </Link>
+        </div>
       </div>
 
-      {/* Filters bar */}
+      {/* Filters */}
       <div className="rounded-xl border bg-card p-4">
         <div className="flex flex-wrap gap-3">
-          {/* Search */}
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search BL ID..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            />
+            <input type="text" placeholder="Search BL ID, batch, store…"
+              value={search} onChange={(e) => setSearch(e.target.value)}
+              className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
-
-          {/* Store filter */}
           <select value={store} onChange={(e) => setStore(e.target.value)} className={SEL}>
             <option value="all">All Stores</option>
             {stores.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-
-          {/* Company filter */}
           <select value={company} onChange={(e) => setCompany(e.target.value)} className={SEL}>
             <option value="all">All Shipping Companies</option>
             {companies.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
-
-          {/* Payment filter */}
           <select value={payment} onChange={(e) => setPayment(e.target.value)} className={SEL}>
             <option value="all">All Payment Status</option>
-            <option value="unpaid">Unpaid</option>
-            <option value="partial">Partial</option>
-            <option value="paid">Paid</option>
+            <option value="unpaid">Non payé</option>
+            <option value="partial">Partiel</option>
+            <option value="paid">Payé</option>
           </select>
         </div>
       </div>
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="rounded-xl border-2 border-dashed bg-card flex flex-col items-center justify-center py-20 gap-4">
-          <p className="text-sm font-medium text-muted-foreground">Aucun résultat</p>
+        <div className="rounded-xl border-2 border-dashed bg-card flex flex-col items-center justify-center py-16 gap-3">
+          <Printer className="h-10 w-10 text-muted-foreground/20" />
+          <p className="text-sm text-muted-foreground font-medium">
+            {showPrinted ? "Aucun résultat" : "Tous les tickets ont été imprimés ✓"}
+          </p>
         </div>
       ) : (
         <div className="rounded-xl border bg-card overflow-hidden">
           <table className="w-full">
             <thead>
               <tr className="border-b bg-secondary/30">
-                {["BL ID","SHIPPING","STORE","ORDERS","STATUS","PAYMENT","ACTIONS"].map((h) => (
-                  <th key={h}
-                    className="px-5 py-3.5 text-left text-[11px] font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
-                    {h}
-                  </th>
+                {["BL ID","SHIPPING","STORE","ORDERS","STATUS","PAYMENT","TICKETS & BL"].map((h) => (
+                  <th key={h} className="px-4 py-3 text-left text-[10px] font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -225,75 +244,52 @@ export function DeliveryNotesClient({ rows, stores, companies }: Props) {
                 const sCfg = STATUS_CFG[b.status] ?? STATUS_CFG.draft;
                 const pCfg = PAY_CFG[b.payment_status ?? "unpaid"] ?? PAY_CFG.unpaid;
                 const SIcon = sCfg.icon;
+                const printed = !!b.labels_downloaded_at;
 
                 return (
                   <tr key={b.id}
-                    className="hover:bg-secondary/20 transition-colors cursor-pointer group"
-                    onClick={() => { window.location.href = `/admin/delivery/notes/${b.id}`; }}>
-
-                    {/* BL ID */}
-                    <td className="px-5 py-4">
-                      <span className="font-mono font-bold text-sm text-foreground">
-                        {b.bl_id ?? b.batch_number}
-                      </span>
+                    onClick={() => { window.location.href = `/admin/delivery/notes/${b.id}`; }}
+                    className={cn(
+                      "hover:bg-secondary/20 transition-colors cursor-pointer",
+                      printed && "opacity-60"
+                    )}>
+                    <td className="px-4 py-3">
+                      <p className="font-mono font-bold text-sm">{b.bl_id ?? b.batch_number}</p>
+                      {printed && (
+                        <p className="text-[10px] text-green-600 flex items-center gap-0.5">
+                          <CheckCircle2 className="h-2.5 w-2.5" />
+                          Imprimé {new Date(b.labels_downloaded_at!).toLocaleDateString("fr-MA")}
+                        </p>
+                      )}
                     </td>
-
-                    {/* Shipping company */}
-                    <td className="px-5 py-4">
-                      <span className="inline-flex items-center rounded-full bg-violet-100 text-violet-700 border border-violet-200 px-2.5 py-0.5 text-[11px] font-semibold">
+                    <td className="px-4 py-3">
+                      <span className="inline-flex rounded-full bg-violet-100 text-violet-700 border border-violet-200 px-2.5 py-0.5 text-[10px] font-semibold">
                         {b.shipping_company ?? "Digylog"}
                       </span>
                     </td>
-
-                    {/* Store */}
-                    <td className="px-5 py-4 text-sm text-foreground font-medium">
-                      {b.store_name ?? "—"}
-                    </td>
-
-                    {/* Orders count */}
-                    <td className="px-5 py-4 text-sm font-bold text-foreground text-center">
-                      {b.total_orders}
-                    </td>
-
-                    {/* Status badge */}
-                    <td className="px-5 py-4">
-                      <span className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide",
-                        sCfg.cls
-                      )}>
-                        <SIcon className="h-3 w-3" />
-                        {sCfg.label}
+                    <td className="px-4 py-3 text-sm font-medium">{b.store_name ?? "—"}</td>
+                    <td className="px-4 py-3 text-sm font-bold text-center">{b.total_orders}</td>
+                    <td className="px-4 py-3">
+                      <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase", sCfg.cls)}>
+                        <SIcon className="h-2.5 w-2.5" />{sCfg.label}
                       </span>
                     </td>
-
-                    {/* Payment badge */}
-                    <td className="px-5 py-4">
-                      <span className={cn(
-                        "inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
-                        pCfg.cls
-                      )}>
+                    <td className="px-4 py-3">
+                      <span className={cn("inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-semibold", pCfg.cls)}>
                         {pCfg.label}
                       </span>
                     </td>
-
-                    {/* Download action */}
-                    <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
-                      <ActionBtn batch={b} />
+                    <td className="px-4 py-3">
+                      <RowActions batch={b} />
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-
-          {/* Footer */}
-          <div className="border-t bg-secondary/10 px-5 py-3 flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              {filtered.length} résultat(s) sur {rows.length}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Total: {filtered.reduce((s, r) => s + r.total_orders, 0)} commandes
-            </p>
+          <div className="border-t bg-secondary/10 px-4 py-3 flex items-center justify-between text-xs text-muted-foreground">
+            <span>{filtered.length} résultat(s) sur {rows.length}</span>
+            <span>Total: {filtered.reduce((s, r) => s + r.total_orders, 0)} commandes</span>
           </div>
         </div>
       )}
