@@ -121,3 +121,22 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+-- ── delivery_daily_bls — one row per day/provider/store ───────────────────────
+CREATE TABLE IF NOT EXISTS delivery_daily_bls (
+  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  provider       TEXT NOT NULL DEFAULT 'digylog',
+  store_name     TEXT NOT NULL,
+  business_date  DATE NOT NULL,
+  bl_id          INTEGER,
+  total_orders   INTEGER NOT NULL DEFAULT 0,
+  total_trackings INTEGER NOT NULL DEFAULT 0,
+  total_cod      NUMERIC(14,2) NOT NULL DEFAULT 0,
+  payment_status TEXT NOT NULL DEFAULT 'unpaid',
+  generated_at   TIMESTAMPTZ,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(provider, store_name, business_date)
+);
+ALTER TABLE delivery_daily_bls ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "dbl_auth" ON delivery_daily_bls FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_dbl_date ON delivery_daily_bls(business_date DESC);
