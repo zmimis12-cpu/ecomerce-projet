@@ -186,10 +186,8 @@ export default async function DeliveryNoteDetailPage({
       {/* Client actions — download labels, BL, sync, mark paid */}
       <BatchDetailClient
         batchId={blId}
-        blId={b.bl_id as number | null}
         status={String(b.status)}
         paymentStatus={String(b.payment_status ?? "unpaid")}
-        totalOrders={Number(b.total_orders ?? orderRows.length)}
         trackings={orderRows.map((o) => (o as {tracking_number?: string}).tracking_number).filter(Boolean) as string[]}
       />
 

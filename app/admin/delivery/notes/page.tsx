@@ -9,18 +9,12 @@ export const dynamic = "force-dynamic";
 type Batch = {
   id: string;
   batch_number: string;
-  bl_id: number | null;
   status: string;
-  payment_status: string | null;
   shipping_company: string | null;
   store_name: string | null;
   total_orders: number;
-  total_products: number;
-  sent_at: string | null;
   created_at: string;
-  notes: string | null;
   labels_downloaded_at: string | null;
-  batch_date: string | null;
 };
 
 export default async function DeliveryNotesPage() {
@@ -28,20 +22,18 @@ export default async function DeliveryNotesPage() {
 
   const { data: batches } = await supabaseAdmin
     .from("delivery_batches")
-    .select(
-      "id,batch_number,bl_id,status,payment_status,shipping_company,store_name,total_orders,total_products,sent_at,created_at,notes,labels_downloaded_at,batch_date"
-    )
+    .select("id,batch_number,status,shipping_company,store_name,total_orders,created_at,labels_downloaded_at")
+    .not("status", "eq", "cancelled")
     .order("created_at", { ascending: false })
     .limit(500);
 
   const rows = (batches ?? []) as Batch[];
 
-  // Extract unique filter values
   const stores    = [...new Set(rows.map((r) => r.store_name).filter(Boolean))] as string[];
-  const companies = [...new Set(rows.map((r) => r.shipping_company ?? "Digylog").filter(Boolean))] as string[];
+  const companies = [...new Set(rows.map((r) => r.shipping_company ?? "Digylog"))] as string[];
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="space-y-5">
       <DeliveryNotesClient rows={rows} stores={stores} companies={companies} />
     </div>
   );
