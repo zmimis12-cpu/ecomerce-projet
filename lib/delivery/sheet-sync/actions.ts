@@ -265,96 +265,105 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
     sent++;
   }
 
-  // Create delivery batch for sent orders
+  // ── DAILY BATCH MODE ────────────────────────────────────────────────────────
+  // DO NOT call PUT /orders/send here.
+  // Orders accumulate in the open daily batch.
+  // Admin clicks "Générer BL du jour" to close and get 1 grouped BL.
   let batchId: string | undefined;
   let batchNumber: string | undefined;
 
   if (sentOrderIds.length > 0) {
-    const { createBatch } = await import("@/lib/delivery/batch/actions");
-    const bRes = await createBatch(sentOrderIds, `Sheet Sync — ${new Date().toLocaleDateString("fr-MA")}`);
-    if (bRes.success && bRes.batchId) {
-      batchId     = bRes.batchId;
-      batchNumber = bRes.batchNumber;
+    const storeName = dg.default_store_name;
+    const today     = new Date().toISOString().slice(0, 10);
 
-      // Find the real Digylog BL ID from the sent orders
-      // When status=1 (add+send), Digylog returns bl in each order response
-      // When status=0, we need to call PUT /orders/send to get the bl
-      let realBlId: number | null = null;
+    // Find existing open daily batch (same store, same day, no BL yet)
+    const { data: existingBatch } = await supabaseAdmin
+      .from("delivery_batches")
+      .select("id, batch_number, total_orders")
+      .eq("batch_date", today)
+      .eq("store_name", storeName)
+      .eq("shipping_company", "Digylog")
+      .in("status", ["draft", "sent"])
+      .is("bl_id", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-      // Try to get bl_id from already-saved orders
-      const { data: sentOrders } = await supabaseAdmin
-        .from("orders")
-        .select("bl_id, delivery_tracking_number")
-        .in("id", sentOrderIds)
-        .not("bl_id", "is", null)
-        .limit(1);
+    if (existingBatch) {
+      // Add to existing open batch
+      batchId     = (existingBatch as { id:string; batch_number:string; total_orders:number }).id;
+      batchNumber = (existingBatch as { id:string; batch_number:string; total_orders:number }).batch_number;
+      console.log(`[sheet-sync] Adding ${sentOrderIds.length} orders to existing daily batch ${batchNumber}`);
+    } else {
+      // Create new daily batch for today
+      const { data: newBatch, error: batchErr } = await supabaseAdmin
+        .from("delivery_batches")
+        .insert({
+          batch_number:     "",
+          batch_date:       today,
+          status:           "draft",
+          shipping_company: "Digylog",
+          store_name:       storeName,
+          total_orders:     0,
+          total_products:   0,
+        } as never)
+        .select("id, batch_number")
+        .single();
 
-      const existingBlId = (sentOrders?.[0] as { bl_id?: number } | undefined)?.bl_id ?? null;
-
-      if (existingBlId) {
-        realBlId = existingBlId;
+      if (batchErr || !newBatch) {
+        console.error("[sheet-sync] Failed to create daily batch:", batchErr?.message);
       } else {
-        // status=0 case: call PUT /orders/send to get bl_id
-        const trackingsToSend = results
-          .filter((r) => r.status === "sent" && r.tracking)
-          .map((r) => r.tracking!);
+        batchId     = (newBatch as { id:string; batch_number:string }).id;
+        batchNumber = (newBatch as { id:string; batch_number:string }).batch_number;
+        console.log(`[sheet-sync] Created new daily batch ${batchNumber}`);
+      }
+    }
 
-        if (trackingsToSend.length > 0) {
-          try {
-            const sendRes = await client.sendOrders(trackingsToSend);
-            if (sendRes.ok && sendRes.bl) {
-              realBlId = sendRes.bl;
-              // Update all sent orders with the real bl_id
-              await supabaseAdmin.from("orders")
-                .update({ bl_id: realBlId, status: "sent_to_delivery" } as never)
-                .in("id", sentOrderIds);
-              await supabaseAdmin.from("delivery_shipments")
-                .update({ bl_id: realBlId, internal_status: "not_sent" } as never)
-                .in("order_id", sentOrderIds);
-            }
-          } catch (e) {
-            console.error("[sheet-sync] sendOrders failed:", e);
-          }
-        }
+    if (batchId) {
+      // Link orders to batch
+      const batchOrderRows = sentOrderIds.map((oid) => ({
+        batch_id:  batchId,
+        order_id:  oid,
+        status:    "pending",
+        tracking_number: null as string | null,
+      }));
+
+      // Get trackings for these orders
+      const { data: ordRows } = await supabaseAdmin
+        .from("orders")
+        .select("id, delivery_tracking_number")
+        .in("id", sentOrderIds)
+        .not("delivery_tracking_number", "is", null);
+
+      const trackMap = new Map<string, string>();
+      for (const o of (ordRows ?? []) as { id:string; delivery_tracking_number:string }[]) {
+        trackMap.set(o.id, o.delivery_tracking_number);
       }
 
-      // Update batch with real bl_id, status, store_name
-      await supabaseAdmin.from("delivery_batches").update({
-        status:      "sent",
-        sent_at:     new Date().toISOString(),
-        bl_id:       realBlId,
-        store_name:  dg?.default_store_name ?? null,
-        shipping_company: "Digylog",
-      } as never).eq("id", bRes.batchId);
+      for (const row of batchOrderRows) {
+        row.tracking_number = trackMap.get(row.order_id) ?? null;
+      }
 
-      // Copy tracking_number from orders into delivery_batch_orders
-      const { data: batchOrdRows } = await supabaseAdmin
+      // Upsert — ignore duplicates if order already in batch
+      await supabaseAdmin.from("delivery_batch_orders")
+        .upsert(batchOrderRows as never, { onConflict: "batch_id,order_id", ignoreDuplicates: true });
+
+      // Update order → batch link
+      await supabaseAdmin.from("orders")
+        .update({ delivery_batch_id: batchId } as never)
+        .in("id", sentOrderIds);
+
+      // Update batch total_orders count
+      const { count } = await supabaseAdmin
         .from("delivery_batch_orders")
-        .select("id, order_id")
-        .eq("batch_id", bRes.batchId);
+        .select("id", { count: "exact", head: true })
+        .eq("batch_id", batchId);
 
-      if (batchOrdRows?.length) {
-        const orderIds = (batchOrdRows as { id: string; order_id: string }[]).map((r) => r.order_id);
-        const { data: ordTrackings } = await supabaseAdmin
-          .from("orders")
-          .select("id, delivery_tracking_number")
-          .in("id", orderIds)
-          .not("delivery_tracking_number", "is", null);
+      await supabaseAdmin.from("delivery_batches")
+        .update({ total_orders: count ?? 0, status: "draft" } as never)
+        .eq("id", batchId);
 
-        const trackMap = new Map<string, string>();
-        for (const ot of (ordTrackings ?? []) as { id: string; delivery_tracking_number: string }[]) {
-          trackMap.set(ot.id, ot.delivery_tracking_number);
-        }
-
-        for (const bo of batchOrdRows as { id: string; order_id: string }[]) {
-          const tracking = trackMap.get(bo.order_id);
-          if (tracking) {
-            await supabaseAdmin.from("delivery_batch_orders")
-              .update({ status: "sent", tracking_number: tracking } as never)
-              .eq("id", bo.id);
-          }
-        }
-      }
+      console.log(`[sheet-sync] ✓ Daily batch ${batchNumber} now has ${count} orders. No BL yet — click "Générer BL du jour" when ready.`);
     }
   }
 
