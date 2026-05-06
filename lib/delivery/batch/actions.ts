@@ -373,19 +373,50 @@ export async function downloadBatchLabels(batchId: string): Promise<{
 }> {
   await requireRole([...MANAGER]);
 
-  const { data: rows } = await supabaseAdmin
+  // Try trackings from delivery_batch_orders first
+  const { data: boRows } = await supabaseAdmin
     .from("delivery_batch_orders")
-    .select("tracking_number")
+    .select("tracking_number, order_id")
     .eq("batch_id", batchId)
-    .eq("status", "sent")
-    .not("tracking_number", "is", null);
+    .not("order_id", "is", null);
 
-  const trackings = ((rows ?? []) as { tracking_number: string }[])
+  let trackings = ((boRows ?? []) as { tracking_number: string | null; order_id: string }[])
     .map((r) => r.tracking_number)
-    .filter(Boolean);
+    .filter(Boolean) as string[];
+
+  // Fallback: get trackings from orders directly via batch
+  if (!trackings.length) {
+    const orderIds = ((boRows ?? []) as { tracking_number: string | null; order_id: string }[])
+      .map((r) => r.order_id).filter(Boolean);
+
+    if (orderIds.length) {
+      const { data: ordRows } = await supabaseAdmin
+        .from("orders")
+        .select("delivery_tracking_number")
+        .in("id", orderIds)
+        .not("delivery_tracking_number", "is", null);
+
+      trackings = ((ordRows ?? []) as { delivery_tracking_number: string }[])
+        .map((r) => r.delivery_tracking_number)
+        .filter(Boolean);
+    }
+  }
+
+  // Last fallback: get from orders where delivery_batch_id = batchId
+  if (!trackings.length) {
+    const { data: ordRows } = await supabaseAdmin
+      .from("orders")
+      .select("delivery_tracking_number")
+      .eq("delivery_batch_id", batchId)
+      .not("delivery_tracking_number", "is", null);
+
+    trackings = ((ordRows ?? []) as { delivery_tracking_number: string }[])
+      .map((r) => r.delivery_tracking_number)
+      .filter(Boolean);
+  }
 
   if (!trackings.length) {
-    return { ok: false, error: "Aucun tracking disponible. Envoyez le batch à Digylog d'abord." };
+    return { ok: false, error: "Aucun tracking trouvé pour ce batch." };
   }
 
   const client = await createDigylogClientFromDB();
