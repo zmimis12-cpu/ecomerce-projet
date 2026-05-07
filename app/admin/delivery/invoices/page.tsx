@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { ImportInvoicesButton } from "@/components/delivery-integration/import-invoices-button";
+import { ImportInvoiceForm } from "@/components/delivery-integration/import-invoice-form";
 import { FileText, CheckCircle, AlertTriangle, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,18 +15,13 @@ export default async function InvoicesPage() {
 
   const { data: invoices } = await supabase
     .from("delivery_invoices")
-    .select("id,invoice_number,invoice_date,total_amount_mad,paid_amount_mad,status,imported_at")
+    .select("id,invoice_number,invoice_date,total_amount_mad,paid_amount_mad,status,imported_at,raw_payload")
     .order("invoice_date", { ascending: false });
-
-  const { data: companies } = await supabase
-    .from("delivery_companies")
-    .select("id,name,slug")
-    .eq("is_active", true);
 
   type Invoice = {
     id: string; invoice_number: string; invoice_date: string;
     total_amount_mad: number; paid_amount_mad: number;
-    status: string; imported_at: string;
+    status: string; imported_at: string; raw_payload: Record<string, unknown>;
   };
 
   const rows = (invoices ?? []) as Invoice[];
@@ -43,25 +38,15 @@ export default async function InvoicesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Factures Transporteur</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Importez et réconciliez les factures de votre transporteur.
-          </p>
-        </div>
-        <ImportInvoicesButton />
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight">Factures Transporteur</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Importez et réconciliez les factures Digylog (BL, BR, BLFC, BRFC, Factures de paiement).
+        </p>
       </div>
 
-      {/* Company info */}
-      {(companies ?? []).length === 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Aucun transporteur configuré.{" "}
-          <Link href="/admin/settings/delivery" className="underline font-medium">
-            Configurer →
-          </Link>
-        </div>
-      )}
+      {/* Import form */}
+      <ImportInvoiceForm />
 
       {/* Invoices table */}
       {rows.length === 0 ? (
@@ -69,7 +54,7 @@ export default async function InvoicesPage() {
           <FileText className="h-10 w-10 text-muted-foreground/30" />
           <p className="font-medium text-sm">Aucune facture importée</p>
           <p className="text-xs text-muted-foreground">
-            Cliquez sur &laquo; Importer les factures &raquo; pour commencer.
+            Utilisez le formulaire ci-dessus pour importer votre première facture.
           </p>
         </div>
       ) : (
@@ -78,7 +63,7 @@ export default async function InvoicesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-secondary/30">
-                  {["N° Facture","Date","Montant Total","Montant Payé","Statut","Importée le",""].map((h) => (
+                  {["Type","N° Facture","Date","Total","Payé","Statut","Importée le",""].map((h) => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
@@ -87,8 +72,14 @@ export default async function InvoicesPage() {
                 {rows.map((inv) => {
                   const cfg = statusConfig[inv.status as keyof typeof statusConfig] ?? statusConfig.imported;
                   const Icon = cfg.icon;
+                  const docType = (inv.raw_payload?.documentType as string) ?? "FACTURE";
                   return (
                     <tr key={inv.id} className="hover:bg-secondary/20 transition-colors">
+                      <td className="px-4 py-3">
+                        <span className="inline-flex rounded-full bg-violet-100 text-violet-700 px-2.5 py-0.5 text-[10px] font-bold">
+                          {docType}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 font-mono font-medium">{inv.invoice_number}</td>
                       <td className="px-4 py-3">{inv.invoice_date}</td>
                       <td className="px-4 py-3 font-mono">{mad(inv.total_amount_mad)}</td>

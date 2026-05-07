@@ -1,6 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
-import { reconcileInvoice } from "@/lib/delivery/shipment-actions";
+import { reconcileInvoice } from "@/lib/delivery/reconciliation-actions";
 import { RefreshCw } from "lucide-react";
 
 export function ReconcileButton({ invoiceId }: { invoiceId: string }) {
@@ -12,7 +12,13 @@ export function ReconcileButton({ invoiceId }: { invoiceId: string }) {
     startTransition(async () => {
       const res = await reconcileInvoice(invoiceId);
       if (res.success) {
-        setResult(`✓ ${res.matched} OK · ${res.missing} manquants · écart: ${res.diff?.toFixed(2)} MAD`);
+        const parts = [`✓ ${res.matched} OK`];
+        if ((res.missing ?? 0) > 0)       parts.push(`${res.missing} manquants`);
+        if ((res.feeOvercharge ?? 0) > 0)  parts.push(`surcharge frais ${res.feeOvercharge?.toFixed(2)} MAD`);
+        if ((res.codMismatch ?? 0) > 0)    parts.push(`${res.codMismatch} COD ≠`);
+        parts.push(`écart: ${res.diff?.toFixed(2)} MAD`);
+        setResult(parts.join(" · "));
+        setTimeout(() => window.location.reload(), 1500);
       } else {
         setResult(`✕ ${res.error}`);
       }

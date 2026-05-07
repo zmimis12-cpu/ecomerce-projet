@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, CheckCircle, AlertTriangle, HelpCircle } from "lucide-react";
+import { ChevronLeft, CheckCircle, AlertTriangle, HelpCircle, TrendingDown } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { ReconcileButton } from "@/components/delivery-integration/reconcile-button";
+import { normalizeCity, getExpectedDeliveryCost } from "@/lib/delivery/reconciliation-utils";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Détail Facture" };
@@ -24,7 +25,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
 
   const { data: items } = await supabase
     .from("delivery_invoice_items")
-    .select("*, orders(order_number,customer_name,status)")
+    .select("*, orders(order_number,customer_name,customer_city,total_amount_mad,status)")
     .eq("invoice_id", id)
     .order("matched_status");
 
@@ -38,9 +39,10 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
 
   type InvItem = {
     id: string; tracking_number: string; cod_amount_mad: number;
-    delivery_fee_mad: number; amount_paid_mad: number; invoice_status: string;
-    matched_status: string; mismatch_reason: string | null;
-    orders: { order_number: string; customer_name: string; status: string } | null;
+    delivery_fee_mad: number; return_fee_mad: number; amount_paid_mad: number;
+    invoice_status: string; matched_status: string; mismatch_reason: string | null;
+    raw_payload: Record<string, unknown>;
+    orders: { order_number: string; customer_name: string; customer_city: string; total_amount_mad: number; status: string } | null;
   };
 
   const inv  = invoice as Record<string, unknown>;
@@ -51,11 +53,37 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     return (Number(n) || 0).toLocaleString("fr-MA", { minimumFractionDigits: 2 }) + " MAD";
   }
 
-  const matchBadge = {
-    matched:    { label:"OK",             icon:CheckCircle,  cls:"bg-green-100 text-green-800" },
-    mismatched: { label:"Écart",          icon:AlertTriangle,cls:"bg-red-100 text-red-800" },
-    pending:    { label:"En attente",     icon:HelpCircle,   cls:"bg-gray-100 text-gray-600" },
+  const statusBadge = {
+    OK:            { label:"OK",           cls:"bg-green-100 text-green-800",  icon:CheckCircle },
+    MISMATCH:      { label:"Écart",        cls:"bg-red-100 text-red-800",      icon:AlertTriangle },
+    FEE_OVERCHARGE:{ label:"Surcharge",    cls:"bg-orange-100 text-orange-800",icon:TrendingDown },
+    COD_MISMATCH:  { label:"COD ≠",        cls:"bg-red-100 text-red-800",      icon:AlertTriangle },
+    MISSING:       { label:"Manquant",     cls:"bg-gray-100 text-gray-600",    icon:HelpCircle },
+    EXTRA:         { label:"Hors système", cls:"bg-purple-100 text-purple-700",icon:HelpCircle },
+    DUPLICATE:     { label:"Doublon",      cls:"bg-yellow-100 text-yellow-700",icon:AlertTriangle },
+    UNPAID:        { label:"Non payé",     cls:"bg-red-100 text-red-800",      icon:AlertTriangle },
+    matched:       { label:"OK",           cls:"bg-green-100 text-green-800",  icon:CheckCircle },
+    mismatched:    { label:"Écart",        cls:"bg-red-100 text-red-800",      icon:AlertTriangle },
+    pending:       { label:"En attente",   cls:"bg-gray-100 text-gray-600",    icon:HelpCircle },
   } as const;
+
+  // Compute per-row reconciliation for display
+  const enrichedRows = rows.map((item) => {
+    const city = item.orders?.customer_city ?? (item.raw_payload?.city as string | undefined) ?? "";
+    const normalizedCity = normalizeCity(city);
+    const expectedFee = getExpectedDeliveryCost(city);
+    const digylogFee  = item.delivery_fee_mad ?? 0;
+    const feeDiff     = digylogFee - expectedFee;
+    const codSystem   = item.orders?.total_amount_mad ?? null;
+    const codDigylog  = item.cod_amount_mad;
+    const expPayout   = codSystem !== null ? codSystem - expectedFee : null;
+    const actPayout   = item.amount_paid_mad;
+    const payoutDiff  = expPayout !== null ? actPayout - expPayout : null;
+    return { ...item, city, normalizedCity, expectedFee, digylogFee, feeDiff, codSystem, codDigylog, expPayout, actPayout, payoutDiff };
+  });
+
+  const totalFeeOvercharge = enrichedRows.reduce((s, r) => s + (r.feeDiff > 0.5 ? r.feeDiff : 0), 0);
+  const docType = (inv.raw_payload as Record<string, unknown> | null)?.documentType as string ?? "FACTURE";
 
   return (
     <div className="space-y-6">
@@ -68,36 +96,49 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         <span className="text-sm font-medium">{String(inv.invoice_number)}</span>
       </div>
 
-      {/* Summary */}
+      {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Facture {String(inv.invoice_number)}</h1>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex rounded-full bg-violet-100 text-violet-700 px-2.5 py-0.5 text-xs font-bold">{docType}</span>
+            <h1 className="text-xl font-semibold">{String(inv.invoice_number)}</h1>
+          </div>
           <p className="text-sm text-muted-foreground mt-1">
-            Date: {String(inv.invoice_date ?? "—")} ·
-            Montant: {mad(Number(inv.total_amount_mad))}
+            Date: {String(inv.invoice_date ?? "—")} · {rows.length} colis · Total: {mad(Number(inv.total_amount_mad))}
           </p>
         </div>
         <ReconcileButton invoiceId={id} />
       </div>
 
-      {/* Reconciliation summary */}
+      {/* Reconciliation summary cards */}
       {reco && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label:"Commandes",   val: String(reco.total_orders) },
-            { label:"Réconciliées",val: String(reco.matched_orders), green:true },
-            { label:"Manquantes",  val: String(reco.missing_orders), red:true },
-            { label:"Différence",  val: mad(Number(reco.difference_mad)),
-              red: Number(reco.difference_mad) !== 0 },
+            { label:"Colis",          val: String(reco.total_orders) },
+            { label:"OK",             val: String(reco.matched_orders), green:true },
+            { label:"Problèmes",      val: String(Number(reco.total_orders) - Number(reco.matched_orders)), red:true },
+            { label:"Différence",     val: mad(Number(reco.difference_mad)), red: Number(reco.difference_mad) !== 0 },
           ].map((k) => (
             <div key={k.label} className="rounded-xl border bg-card p-4">
               <p className="text-xs text-muted-foreground mb-1">{k.label}</p>
-              <p className={cn("text-xl font-bold",
-                k.green && "text-green-700",
-                k.red && Number((k.val ?? "").replace(/[^0-9.-]/g,"")) < 0 && "text-red-700"
-              )}>{k.val}</p>
+              <p className={cn("text-xl font-bold", k.green && "text-green-700", k.red && "text-red-700")}>{k.val}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Fee overcharge alert */}
+      {totalFeeOvercharge > 0.5 && (
+        <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 flex items-start gap-3">
+          <TrendingDown className="h-5 w-5 text-orange-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-orange-800">
+              Surcharge frais Digylog détectée : {mad(totalFeeOvercharge)}
+            </p>
+            <p className="text-xs text-orange-700 mt-0.5">
+              Des commandes Casablanca ont été facturées 35 MAD au lieu de 25 MAD. Montant à réclamer à Digylog.
+            </p>
+          </div>
         </div>
       )}
 
@@ -110,37 +151,60 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b bg-secondary/30">
-                {["Tracking","Commande","Client","Statut Facture","COD","Frais","Payé","Résultat","Raison"].map((h) => (
+                {["Tracking","Commande","Ville","COD Sys.","COD Digy.","Frais attendu","Frais Digy.","Écart frais","Payout attendu","Payout réel","Diff","Statut","Raison"].map((h) => (
                   <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y">
-              {rows.map((item) => {
-                const badge = matchBadge[item.matched_status as keyof typeof matchBadge] ?? matchBadge.pending;
-                const Icon  = badge.icon;
+              {enrichedRows.map((item) => {
+                const badgeKey = item.mismatch_reason?.includes("double") ? "DUPLICATE"
+                  : item.matched_status === "matched" ? "matched"
+                  : item.matched_status === "mismatched" ? "mismatched"
+                  : "pending";
+                const badge = statusBadge[badgeKey as keyof typeof statusBadge] ?? statusBadge.pending;
+                const Icon = badge.icon;
                 return (
                   <tr key={item.id} className={cn(
                     "hover:bg-secondary/20",
-                    item.matched_status === "mismatched" && "bg-red-50/30"
+                    item.matched_status === "mismatched" && "bg-red-50/30",
+                    item.feeDiff > 0.5 && "bg-orange-50/20",
                   )}>
-                    <td className="px-3 py-2.5 font-mono">{item.tracking_number}</td>
-                    <td className="px-3 py-2.5 font-mono">
-                      {item.orders?.order_number ?? "—"}
+                    <td className="px-3 py-2.5 font-mono font-medium">{item.tracking_number}</td>
+                    <td className="px-3 py-2.5 font-mono">{item.orders?.order_number ?? "—"}</td>
+                    <td className="px-3 py-2.5">
+                      <span className="block">{item.normalizedCity || "—"}</span>
+                      {item.normalizedCity === "Casablanca" && (
+                        <span className="text-[9px] text-emerald-600 font-semibold">Casa 25 MAD</span>
+                      )}
                     </td>
-                    <td className="px-3 py-2.5">{item.orders?.customer_name ?? "—"}</td>
-                    <td className="px-3 py-2.5 capitalize">{item.invoice_status}</td>
-                    <td className="px-3 py-2.5 font-mono">{mad(item.cod_amount_mad)}</td>
-                    <td className="px-3 py-2.5 font-mono">{mad(item.delivery_fee_mad)}</td>
-                    <td className="px-3 py-2.5 font-mono font-semibold">
-                      {mad(item.amount_paid_mad)}
+                    <td className="px-3 py-2.5 font-mono">{item.codSystem !== null ? mad(item.codSystem) : "—"}</td>
+                    <td className={cn("px-3 py-2.5 font-mono", item.codSystem !== null && Math.abs(item.codDigylog - item.codSystem) > 0.5 && "text-red-600 font-bold")}>
+                      {mad(item.codDigylog)}
+                    </td>
+                    <td className="px-3 py-2.5 font-mono text-muted-foreground">{mad(item.expectedFee)}</td>
+                    <td className={cn("px-3 py-2.5 font-mono", item.feeDiff > 0.5 && "text-orange-600 font-bold")}>
+                      {mad(item.digylogFee)}
+                    </td>
+                    <td className={cn("px-3 py-2.5 font-mono font-semibold",
+                      item.feeDiff > 0.5 ? "text-red-600" : item.feeDiff < -0.5 ? "text-green-600" : "text-muted-foreground")}>
+                      {item.feeDiff > 0.5 ? `+${item.feeDiff.toFixed(2)}` : item.feeDiff < -0.5 ? item.feeDiff.toFixed(2) : "0"}
+                    </td>
+                    <td className="px-3 py-2.5 font-mono text-muted-foreground">
+                      {item.expPayout !== null ? mad(item.expPayout) : "—"}
+                    </td>
+                    <td className="px-3 py-2.5 font-mono font-semibold">{mad(item.actPayout)}</td>
+                    <td className={cn("px-3 py-2.5 font-mono font-bold",
+                      item.payoutDiff !== null && item.payoutDiff < -0.5 ? "text-red-600" :
+                      item.payoutDiff !== null && item.payoutDiff > 0.5 ? "text-green-600" : "text-muted-foreground")}>
+                      {item.payoutDiff !== null ? (item.payoutDiff > 0.5 ? `+${item.payoutDiff.toFixed(2)}` : item.payoutDiff.toFixed(2)) : "—"}
                     </td>
                     <td className="px-3 py-2.5">
                       <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold", badge.cls)}>
                         <Icon className="h-3 w-3" />{badge.label}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">
+                    <td className="px-3 py-2.5 text-muted-foreground max-w-[180px] truncate">
                       {item.mismatch_reason ?? "—"}
                     </td>
                   </tr>
