@@ -44,15 +44,27 @@ export function isLoss(condition: ReturnCondition): boolean {
   return ["damaged", "lost", "missing_items"].includes(condition);
 }
 
+export interface ScanOrderItem {
+  product_id:    string;
+  product_name:  string;
+  product_sku:   string;
+  quantity:      number;
+  unit_cost_mad: number;
+  image_url?:    string | null;
+}
+
 export interface ScanResult {
-  success: boolean;
-  isDuplicate: boolean;
-  orderId: string | null;
-  orderNumber: string | null;
-  customerName: string | null;
+  success:        boolean;
+  isDuplicate:    boolean;
+  orderId:        string | null;
+  orderNumber:    string | null;
+  customerName:   string | null;
   trackingNumber: string;
-  message: string;
-  error?: string;
+  message:        string;
+  error?:         string;
+  // Return mode: show products so operator can select partial qty
+  orderItems?:    ScanOrderItem[];
+  returnId?:      string;
 }
 
 export interface ReturnItem {
