@@ -18,24 +18,14 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/session";
 import { revalidatePath } from "next/cache";
-import { normalizeCity, getExpectedDeliveryCost } from "@/lib/delivery/reconciliation-utils";
+import { normalizeCity, getExpectedDeliveryCost, DigylogInvoiceRow } from "@/lib/delivery/reconciliation-utils";
 
 const MANAGER = ["super_admin", "admin", "manager", "finance"] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
-export interface DigylogInvoiceRow {
-  tracking_number:  string;
-  invoice_status:   string;   // "livré" | "retour" | "perdu" | etc.
-  cod_amount:       number;   // COD collected from customer
-  delivery_fee:     number;   // fee Digylog charged us
-  return_fee:       number;   // return fee if applicable
-  amount_paid:      number;   // net payout to us
-  bl_number?:       string;
-  order_number?:    string;
-  city?:            string;
-}
+// DigylogInvoiceRow imported from reconciliation-utils
 
 export interface ImportInvoiceParams {
   invoiceNumber:  string;

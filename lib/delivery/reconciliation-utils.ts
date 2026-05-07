@@ -20,6 +20,18 @@ export function getExpectedDeliveryCost(city: string): number {
   return normalizeCity(city) === "Casablanca" ? 25 : 35;
 }
 
+export interface DigylogInvoiceRow {
+  tracking_number:  string;
+  invoice_status:   string;
+  cod_amount:       number;
+  delivery_fee:     number;
+  return_fee:       number;
+  amount_paid:      number;
+  bl_number?:       string;
+  order_number?:    string;
+  city?:            string;
+}
+
 export function parseDigylogCsv(csvText: string): DigylogInvoiceRow[] {
   const lines = csvText.split("\n").map((l) => l.trim()).filter(Boolean);
   if (lines.length < 2) return [];
