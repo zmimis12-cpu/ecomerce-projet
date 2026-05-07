@@ -337,6 +337,29 @@ export async function applyDigylogStatusUpdate(params: {
   const { tracking, externalStatus, idStatus, motif, postponedTo, eventTime, rawPayload } = params;
   const mapped = mapDigylogStatus(idStatus, externalStatus);
 
+  console.log("DIGYLOG WEBHOOK RECEIVED", {
+    tracking, externalStatus, idStatus, motif, eventTime,
+  });
+
+  // ── Deduplication via event_hash ──────────────────────────────────────────
+  // hash = tracking + idStatus + eventTime (deterministic)
+  const { createHash } = await import("crypto");
+  const eventHash = createHash("sha256")
+    .update(`${tracking}:${idStatus}:${externalStatus}:${eventTime}`)
+    .digest("hex");
+
+  const { data: existing } = await supabaseAdmin
+    .from("delivery_status_events")
+    .select("id")
+    .eq("event_hash", eventHash)
+    .maybeSingle();
+
+  if (existing) {
+    console.log("DIGYLOG DUPLICATE EVENT IGNORED", { tracking, eventHash });
+    return;
+  }
+
+  // ── Find order ─────────────────────────────────────────────────────────────
   const { data: shipment } = await supabaseAdmin
     .from("delivery_shipments")
     .select("id, order_id")
@@ -349,16 +372,44 @@ export async function applyDigylogStatusUpdate(params: {
   if (!orderId) {
     const { data: ord } = await supabaseAdmin
       .from("orders")
-      .select("id")
+      .select("id, status")
       .eq("delivery_tracking_number", tracking)
       .maybeSingle();
-    orderId = (ord as { id: string } | null)?.id;
+    orderId = (ord as { id: string; status: string } | null)?.id;
   }
 
-  if (!orderId) return;
+  // ── Orphan webhook — tracking not found in our system ─────────────────────
+  if (!orderId) {
+    console.warn("DIGYLOG WEBHOOK ORPHAN", { tracking, externalStatus, idStatus });
+    await supabaseAdmin.from("orphan_webhooks").insert({
+      tracking_number: tracking,
+      raw_payload:     rawPayload,
+    } as never).then(() => {}, () => {});
+    return;
+  }
+
+  // ── Get old status for logs ────────────────────────────────────────────────
+  const { data: currentOrder } = await supabaseAdmin
+    .from("orders")
+    .select("delivery_status, status")
+    .eq("id", orderId)
+    .maybeSingle();
+  const oldStatus = (currentOrder as { delivery_status?: string; status?: string } | null)?.delivery_status ?? "unknown";
+
+  console.log("DIGYLOG STATUS UPDATE", {
+    tracking,
+    oldStatus,
+    newStatus:        externalStatus,
+    normalizedStatus: mapped.internal,
+    orderStatus:      mapped.orderStatus,
+    isPaid:           mapped.isPaid,
+    isDelivered:      mapped.isDelivered,
+    isReturned:       mapped.isReturned,
+  });
 
   const now = new Date().toISOString();
 
+  // ── Insert event with dedup hash ───────────────────────────────────────────
   await supabaseAdmin.from("delivery_status_events").insert({
     shipment_id:        shipmentId,
     order_id:           orderId,
@@ -366,12 +417,15 @@ export async function applyDigylogStatusUpdate(params: {
     external_status:    externalStatus,
     external_status_id: idStatus,
     internal_status:    mapped.internal,
+    normalized_status:  mapped.internal,
+    event_hash:         eventHash,
     motif:              motif || null,
     postponed_to:       postponedTo,
     event_time:         eventTime,
     raw_payload:        rawPayload,
   } as never).then(() => {}, () => {});
 
+  // ── Update shipment ────────────────────────────────────────────────────────
   if (shipmentId) {
     await supabaseAdmin.from("delivery_shipments").update({
       external_status:    externalStatus,
@@ -381,16 +435,30 @@ export async function applyDigylogStatusUpdate(params: {
     } as never).eq("id", shipmentId);
   }
 
+  // ── Update order ───────────────────────────────────────────────────────────
   const orderUpdate: Record<string, unknown> = {
     delivery_external_status:    externalStatus,
     delivery_external_status_id: idStatus,
     delivery_status:             mapped.internal,
     delivery_last_sync_at:       now,
+    shipment_status:             mapped.internal,
+    shipment_status_updated_at:  now,
     status:                      mapped.orderStatus,
+    last_webhook_payload:        rawPayload,
   };
-  if (mapped.isPaid)      { orderUpdate.is_paid = true; orderUpdate.paid_at = eventTime; }
-  if (mapped.isDelivered && !mapped.isPaid) orderUpdate.delivered_at = eventTime;
-  if (mapped.isReturned)  orderUpdate.returned_at = eventTime;
+  if (mapped.isPaid) {
+    orderUpdate.is_paid     = true;
+    orderUpdate.paid_at     = eventTime;
+  }
+  if (mapped.isDelivered && !mapped.isPaid) {
+    orderUpdate.delivered_at = eventTime;
+  }
+  if (mapped.isReturned) {
+    orderUpdate.returned_at  = eventTime;
+  }
+  if (mapped.internal === "refused_delivery") {
+    orderUpdate.refused_at = eventTime;
+  }
 
   await supabaseAdmin.from("orders").update(orderUpdate as never).eq("id", orderId);
 }

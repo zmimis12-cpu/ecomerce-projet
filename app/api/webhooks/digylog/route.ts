@@ -25,7 +25,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  // Optional secret verification
+  console.log("DIGYLOG WEBHOOK RECEIVED", {
+    tracking:  payload?.tracking,
+    status:    payload?.status,
+    idStatus:  payload?.idStatus,
+    updatedAt: payload?.updatedAt,
+    ip:        request.headers.get("x-forwarded-for") ?? "unknown",
+  });
+
+  // ── Optional secret verification ─────────────────────────────────────────
   const secret = process.env.DIGYLOG_WEBHOOK_SECRET;
   if (secret) {
     const provided = request.headers.get("x-webhook-secret")
@@ -37,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Validate required fields
+  // ── Validate required fields ──────────────────────────────────────────────
   if (!payload.tracking || payload.idStatus === undefined) {
     await log("invalid_payload", payload, { reason: "Missing tracking or idStatus" });
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
