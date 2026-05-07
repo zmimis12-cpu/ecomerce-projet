@@ -1016,39 +1016,116 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
     b.totalQty !== a.totalQty ? b.totalQty - a.totalQty : a.name.localeCompare(b.name)
   );
 
-  // ── 3. Build priority-sorted tracking numbers ──────────────────────────────
-  // Each order → primary product = highest totalQty product in this batch
-  const sortedOrders = batchOrders
-    .filter((bo) => bo.orders && (bo.tracking_number ?? bo.orders.delivery_tracking_number))
-    .sort((a, b) => {
-      const getPrimary = (bo: BORow) => {
-        const items = bo.orders?.order_items ?? [];
-        let bestRank = 9999, bestQty = 0;
-        for (const it of items) {
-          const pid   = it.products?.id ?? "";
-          const entry = prodMap.get(pid);
-          if (!entry) continue;
-          // find index in sorted products array
-          const rank = products.findIndex((p) => p.id === pid);
-          if (rank < bestRank || (rank === bestRank && it.quantity > bestQty)) {
-            bestRank = rank;
-            bestQty  = it.quantity;
-          }
-        }
-        return { rank: bestRank, qty: bestQty };
-      };
-      const pa = getPrimary(a), pb = getPrimary(b);
-      if (pa.rank !== pb.rank) return pa.rank - pb.rank;
-      if (pa.qty  !== pb.qty)  return pb.qty - pa.qty;
-      return (a.orders?.order_number ?? "").localeCompare(b.orders?.order_number ?? "");
-    });
+  // ── 3. Build recapProductOrder index — source of truth for ticket order ──────
+  // recapRank[productId] = position in recap (0 = first = most ordered)
+  // This MUST match the sorted `products` array built in step 2.
+  const recapRank = new Map<string, number>();
+  products.forEach((p, i) => recapRank.set(p.id, i));
 
-  const trackings = sortedOrders
-    .map((bo) => bo.tracking_number ?? bo.orders?.delivery_tracking_number)
-    .filter(Boolean) as string[];
+  // ── 4. For each order: determine primaryProduct using recapRank ────────────
+  type SortableBO = {
+    bo:          BORow;
+    tracking:    string;
+    orderNumber: string;
+    recapIdx:    number;   // recap position of primary product (lower = first in recap)
+    primaryQty:  number;   // qty of primary product in this specific order
+    primaryName: string;   // for debug
+  };
 
-  // Fallback: any tracking from orders table
+  const sortable: SortableBO[] = [];
+
+  for (const bo of batchOrders) {
+    const tracking = bo.tracking_number ?? bo.orders?.delivery_tracking_number;
+    if (!bo.orders || !tracking) continue;
+
+    const orderNumber = bo.orders.order_number;
+    const items       = bo.orders.order_items;
+
+    let recapIdx    = Number.MAX_SAFE_INTEGER;
+    let primaryQty  = 0;
+    let primaryName = "";
+
+    for (const it of items) {
+      const pid  = it.products?.id ?? "";
+      const name = it.products?.name ?? "";
+      const qty  = it.quantity ?? 1;
+      // rank in recap: lower index = higher priority
+      const rank = recapRank.has(pid) ? recapRank.get(pid)! : Number.MAX_SAFE_INTEGER;
+
+      const better =
+        rank < recapIdx ||                                          // earlier in recap
+        (rank === recapIdx && qty > primaryQty) ||                  // same product, more qty
+        (rank === recapIdx && qty === primaryQty && name < primaryName); // alpha tie-break
+
+      if (better) {
+        recapIdx    = rank;
+        primaryQty  = qty;
+        primaryName = name;
+      }
+    }
+
+    sortable.push({ bo, tracking, orderNumber, recapIdx, primaryQty, primaryName });
+  }
+
+  // ── 5. Sort: recapIdx ASC → primaryQty DESC → orderNumber ASC ─────────────
+  sortable.sort((a, b) => {
+    if (a.recapIdx !== b.recapIdx)       return a.recapIdx - b.recapIdx;
+    if (b.primaryQty !== a.primaryQty)   return b.primaryQty - a.primaryQty;
+    return a.orderNumber.localeCompare(b.orderNumber);
+  });
+
+  console.log("RECAP PRODUCT ORDER", products.map((p, i) => ({
+    index: i, name: p.name, totalQty: p.totalQty,
+  })));
+  console.log("DIGYLOG LABEL INPUT ORDER", sortable.map((o) => ({
+    orderNumber:    o.orderNumber,
+    tracking:       o.tracking,
+    product:        o.primaryName,
+    qty:            o.primaryQty,
+    recapIndex:     o.recapIdx,
+  })));
+
+  const trackings = sortable.map((o) => o.tracking).filter(Boolean) as string[];
+
+  // If some batch_orders had null tracking_number, backfill from orders table
+  // so old batches work without re-importing data
+  const missingTrackOrders = batchOrders.filter(
+    (bo) => bo.orders && !bo.tracking_number && !bo.orders.delivery_tracking_number
+  );
+  if (missingTrackOrders.length) {
+    const ids = missingTrackOrders.map((bo) => bo.order_id).filter(Boolean);
+    const { data: backfill } = await supabaseAdmin
+      .from("orders")
+      .select("id, delivery_tracking_number")
+      .in("id", ids)
+      .not("delivery_tracking_number", "is", null);
+    type BF = { id: string; delivery_tracking_number: string };
+    const bfMap = new Map((backfill ?? [] as BF[]).map((r) => [r.id, (r as BF).delivery_tracking_number]));
+    // Patch tracking into batchOrders rows so sort uses them
+    for (const bo of batchOrders) {
+      if (!bo.tracking_number && bo.orders) {
+        const t = bfMap.get(bo.order_id);
+        if (t) (bo as { tracking_number: string | null }).tracking_number = t;
+      }
+    }
+    // Rebuild sortable with backfilled trackings
+    for (const s of sortable) {
+      if (!s.tracking) {
+        const t = bfMap.get(s.bo.order_id);
+        if (t) (s as { tracking: string }).tracking = t;
+      }
+    }
+  }
+
+  // Final tracking list — already sorted in step 5
   if (!trackings.length) {
+    // Regenerate from sortable after backfill
+    const rebulit = sortable.map((o) => o.tracking).filter(Boolean) as string[];
+    trackings.push(...rebulit);
+  }
+
+  if (!trackings.length) {
+    // Last resort: get from orders in any order
     const { data: fallback } = await supabaseAdmin
       .from("orders")
       .select("delivery_tracking_number")
