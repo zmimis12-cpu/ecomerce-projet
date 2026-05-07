@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, Calendar, Hash, Globe } from "lucide-react";
+import { ChevronLeft, Calendar, Hash, Globe, Pencil } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
 import { getOrder, getAgents } from "@/lib/orders/queries";
 import { StatusBadge } from "@/components/orders/status-badge";

@@ -278,6 +278,103 @@ export async function updateOrderNotes(orderId: string, notes: string) {
   return { success: true };
 }
 
+
+// ─── Update order ──────────────────────────────────────────────────────────────
+export async function updateOrder(orderId: string, formData: FormData) {
+  const session = await requireRole([...MANAGER_ROLES]);
+  const supabase = await createClient();
+
+  const customerName  = String(formData.get("customer_name")  ?? "").trim();
+  const customerPhone = String(formData.get("customer_phone") ?? "").trim();
+  const customerCity  = String(formData.get("customer_city")  ?? "").trim();
+  const customerAddr  = String(formData.get("customer_address") ?? "").trim();
+  const notes         = String(formData.get("notes") ?? "").trim() || null;
+  const productId     = String(formData.get("product_id") ?? "").trim();
+  const qty           = parseInt(String(formData.get("quantity") ?? "1"));
+  const shippingCharge = parseFloat(String(formData.get("shipping_charge") ?? "0")) || 0;
+  const source        = String(formData.get("source") ?? "").trim() || null;
+
+  const errors: Record<string, string> = {};
+  if (!customerName)  errors.customer_name  = "Nom requis.";
+  if (!customerPhone) errors.customer_phone = "Téléphone requis.";
+  if (!customerCity)  errors.customer_city  = "Ville requise.";
+  if (isNaN(qty) || qty < 1) errors.quantity = "Quantité invalide.";
+  if (Object.keys(errors).length > 0) return { success: false, errors };
+
+  // Load current order (check status)
+  const { data: current } = await supabase
+    .from("orders").select("status, order_number").eq("id", orderId).single();
+  const currentStatus = (current as { status: string; order_number: string } | null)?.status;
+
+  if (!currentStatus) return { success: false, errors: { _form: "Commande introuvable." } };
+  if (["sent_to_delivery","in_transit","delivered","paid","returned"].includes(currentStatus)) {
+    return { success: false, errors: { _form: `Impossible de modifier une commande en statut "${currentStatus}".` } };
+  }
+
+  // Fetch product if provided
+  let unitPrice = 0, unitCost = 0, productName = "", productSku = "";
+  if (productId) {
+    const { data: prod } = await supabase
+      .from("products").select("id,name,sku,sale_price_mad,total_cost_mad").eq("id", productId).single();
+    if (!prod) return { success: false, errors: { product_id: "Produit introuvable." } };
+    const p = prod as { id:string; name:string; sku:string; sale_price_mad:number; total_cost_mad:number };
+    unitPrice   = p.sale_price_mad ?? 0;
+    unitCost    = p.total_cost_mad ?? 0;
+    productName = p.name;
+    productSku  = p.sku;
+  }
+
+  const subtotal    = unitPrice * qty;
+  const cogs        = unitCost * qty;
+  const estProfit   = subtotal + shippingCharge - cogs;
+
+  const updatePayload: Record<string, unknown> = {
+    customer_name:    customerName,
+    customer_phone:   customerPhone,
+    customer_city:    customerCity,
+    customer_address: customerAddr || customerCity,
+    notes,
+    shipping_charge:  shippingCharge,
+    updated_at:       new Date().toISOString(),
+  };
+  if (source) updatePayload.source = source;
+  if (productId) {
+    updatePayload.subtotal         = subtotal;
+    updatePayload.cogs_total       = cogs;
+    updatePayload.estimated_profit = estProfit;
+  }
+
+  const { error } = await supabase.from("orders").update(updatePayload as never).eq("id", orderId);
+  if (error) return { success: false, errors: { _form: error.message } };
+
+  // Update order_items if product changed
+  if (productId) {
+    await supabase.from("order_items").delete().eq("order_id", orderId);
+    await supabase.from("order_items").insert({
+      order_id:     orderId,
+      product_id:   productId,
+      product_name: productName,
+      product_sku:  productSku,
+      unit_price:   unitPrice,
+      unit_cost_mad: unitCost,
+      quantity:     qty,
+      discount_pct: 0,
+    } as never);
+  }
+
+  await supabase.from("order_status_history").insert({
+    order_id:    orderId,
+    from_status: currentStatus,
+    to_status:   currentStatus,
+    changed_by:  session.authId,
+    notes:       "Commande modifiée.",
+  } as never);
+
+  revalidatePath(`/admin/orders/${orderId}`);
+  revalidatePath("/admin/orders");
+  return { success: true };
+}
+
 // ─── Delete order ──────────────────────────────────────────────────────────────
 export async function deleteOrder(orderId: string) {
   await requireRole([...MANAGER_ROLES]);
