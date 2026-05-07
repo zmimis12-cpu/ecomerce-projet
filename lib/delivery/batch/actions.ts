@@ -980,28 +980,39 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
         id, order_number, delivery_tracking_number,
         order_items (
           quantity,
+          product_name,
+          product_sku,
+          product_id,
           products ( id, name, sku )
         )
       )
     `)
     .eq("batch_id", batchId);
 
-  type OItem = { quantity: number; products: { id: string; name: string; sku: string } | null };
+  type OItem = {
+    quantity: number;
+    product_name: string | null;
+    product_sku: string | null;
+    product_id: string | null;
+    products: { id: string; name: string; sku: string } | null;
+  };
   type ORow  = { id: string; order_number: string; delivery_tracking_number: string | null; order_items: OItem[] };
   type BORow = { order_id: string; tracking_number: string | null; orders: ORow | null };
 
   const batchOrders = (boRows ?? []) as BORow[];
 
-  // Build product totals map: productId → { name, sku, qty, orderCount }
+  // Build product totals map: productId/sku → { name, sku, qty, orderCount }
+  // Use snapshot fields (product_name, product_sku) as primary source — always populated
   type ProdEntry = { id: string; name: string; sku: string; totalQty: number; orderCount: number };
   const prodMap = new Map<string, ProdEntry>();
 
   for (const bo of batchOrders) {
     if (!bo.orders) continue;
     for (const item of bo.orders.order_items) {
-      const pid  = item.products?.id   ?? "__unknown__";
-      const name = item.products?.name ?? "Produit inconnu";
-      const sku  = item.products?.sku  ?? "";
+      // Key: prefer product_id for dedup, fallback to sku snapshot, then name
+      const pid  = item.product_id ?? item.products?.id ?? item.product_sku ?? item.product_name ?? "__unknown__";
+      const name = item.products?.name ?? item.product_name ?? item.product_sku ?? "Produit inconnu";
+      const sku  = item.products?.sku  ?? item.product_sku ?? "";
       if (!prodMap.has(pid)) {
         prodMap.set(pid, { id: pid, name, sku, totalQty: 0, orderCount: 0 });
       }
@@ -1046,8 +1057,8 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
     let primaryName = "";
 
     for (const it of items) {
-      const pid  = it.products?.id ?? "";
-      const name = it.products?.name ?? "";
+      const pid  = it.product_id ?? it.products?.id ?? it.product_sku ?? it.product_name ?? "";
+      const name = it.products?.name ?? it.product_name ?? it.product_sku ?? "";
       const qty  = it.quantity ?? 1;
       // rank in recap: lower index = higher priority
       const rank = recapRank.has(pid) ? recapRank.get(pid)! : Number.MAX_SAFE_INTEGER;
