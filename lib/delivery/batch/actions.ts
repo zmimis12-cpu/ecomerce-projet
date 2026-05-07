@@ -550,56 +550,162 @@ export async function sendBatchToDigylog(batchId: string) {
 // ── Download tickets for batch ─────────────────────────────────────────────────
 // ── Helper: get trackings sorted by product priority ─────────────────────────
 async function getSortedTrackingsForBatch(batchId: string): Promise<string[]> {
-  // Get product priority
-  const { data: prodSummary } = await supabaseAdmin
-    .from("delivery_batch_product_summary")
-    .select("product_id, total_quantity")
-    .eq("batch_id", batchId)
-    .order("total_quantity", { ascending: false });
-
-  type ProdPrio = { product_id: string|null; total_quantity: number };
-  const prodPriority = new Map<string, number>();
-  ((prodSummary ?? []) as ProdPrio[]).forEach((p, i) => {
-    if (p.product_id) prodPriority.set(p.product_id, i);
-  });
-
+  // Step 1: Get all batch orders with full order_items + product info
   const { data: boRows } = await supabaseAdmin
     .from("delivery_batch_orders")
-    .select("order_id, tracking_number, orders ( delivery_tracking_number, order_items ( products ( id ) ) )")
+    .select(`
+      order_id,
+      tracking_number,
+      orders (
+        id,
+        order_number,
+        delivery_tracking_number,
+        order_items (
+          quantity,
+          product_name,
+          sku,
+          products ( id, name )
+        )
+      )
+    `)
     .eq("batch_id", batchId)
     .not("order_id", "is", null);
 
-  type BORow = {
-    order_id: string; tracking_number: string|null;
-    orders: { delivery_tracking_number: string|null; order_items: { products: { id: string }|null }[] } | null;
+  type OItem = {
+    quantity: number;
+    product_name: string | null;
+    sku: string | null;
+    products: { id: string; name: string } | null;
   };
+  type ORow = {
+    id: string;
+    order_number: string;
+    delivery_tracking_number: string | null;
+  };
+  type BORow = {
+    order_id: string;
+    tracking_number: string | null;
+    orders: (ORow & { order_items: OItem[] }) | null;
+  };
+
   const rows = (boRows ?? []) as BORow[];
 
-  const sorted = rows
-    .filter((r) => r.tracking_number ?? r.orders?.delivery_tracking_number)
-    .sort((a, b) => {
-      const rank = (row: BORow) => {
-        let best = 9999;
-        for (const it of row.orders?.order_items ?? []) {
-          const r = prodPriority.get(it.products?.id ?? "") ?? 9999;
-          if (r < best) best = r;
-        }
-        return best;
-      };
-      return rank(a) - rank(b);
+  // Step 2: Build productTotals — sum quantities across entire batch
+  // Key = SKU or product name (fallback)
+  const productTotals = new Map<string, { total: number; name: string }>();
+
+  for (const bo of rows) {
+    for (const item of bo.orders?.order_items ?? []) {
+      const key  = item.products?.id ?? item.sku ?? item.product_name ?? "unknown";
+      const name = item.products?.name ?? item.product_name ?? item.sku ?? "unknown";
+      const qty  = item.quantity ?? 1;
+      const existing = productTotals.get(key);
+      if (existing) {
+        existing.total += qty;
+      } else {
+        productTotals.set(key, { total: qty, name });
+      }
+    }
+  }
+
+  // Step 3: For each order, determine primaryProduct
+  type SortableOrder = {
+    tracking: string;
+    orderNumber: string;
+    primaryProductKey: string;
+    primaryProductName: string;
+    primaryProductTotal: number;
+    primaryProductQty: number;
+  };
+
+  const sortable: SortableOrder[] = [];
+
+  for (const bo of rows) {
+    const tracking = bo.tracking_number ?? bo.orders?.delivery_tracking_number;
+    if (!tracking) continue;
+
+    const orderNumber = bo.orders?.order_number ?? bo.order_id;
+    const items = bo.orders?.order_items ?? [];
+
+    // Find primary product: highest productTotal, then name ASC on tie
+    let primaryKey   = "";
+    let primaryName  = "";
+    let primaryTotal = -1;
+    let primaryQty   = 0;
+
+    for (const item of items) {
+      const key   = item.products?.id ?? item.sku ?? item.product_name ?? "unknown";
+      const name  = item.products?.name ?? item.product_name ?? item.sku ?? "unknown";
+      const total = productTotals.get(key)?.total ?? 0;
+      const qty   = item.quantity ?? 1;
+
+      if (
+        total > primaryTotal ||
+        (total === primaryTotal && name < primaryName) ||
+        (total === primaryTotal && name === primaryName && qty > primaryQty)
+      ) {
+        primaryKey   = key;
+        primaryName  = name;
+        primaryTotal = total;
+        primaryQty   = qty;
+      }
+    }
+
+    if (!primaryKey && items.length === 0) {
+      // No order_items — just add with defaults
+      primaryKey   = "unknown";
+      primaryName  = "unknown";
+      primaryTotal = 0;
+      primaryQty   = 0;
+    }
+
+    sortable.push({
+      tracking,
+      orderNumber,
+      primaryProductKey:   primaryKey,
+      primaryProductName:  primaryName,
+      primaryProductTotal: primaryTotal,
+      primaryProductQty:   primaryQty,
     });
+  }
 
-  let trackings = sorted
-    .map((r) => r.tracking_number ?? r.orders?.delivery_tracking_number)
-    .filter(Boolean) as string[];
+  // Step 4: Sort
+  // 1. primaryProductTotal DESC (most ordered product first)
+  // 2. primaryProductName ASC (alphabetical on tie)
+  // 3. primaryProductQty DESC (largest qty in this order first)
+  // 4. orderNumber ASC
+  sortable.sort((a, b) => {
+    if (b.primaryProductTotal !== a.primaryProductTotal)
+      return b.primaryProductTotal - a.primaryProductTotal;
+    if (a.primaryProductName !== b.primaryProductName)
+      return a.primaryProductName.localeCompare(b.primaryProductName);
+    if (b.primaryProductQty !== a.primaryProductQty)
+      return b.primaryProductQty - a.primaryProductQty;
+    return a.orderNumber.localeCompare(b.orderNumber);
+  });
 
+  // Debug log
+  console.log("TICKET SORT DEBUG", sortable.map((o) => ({
+    order:        o.orderNumber,
+    tracking:     o.tracking,
+    primaryProduct: o.primaryProductName,
+    qty:          o.primaryProductQty,
+    productTotal: o.primaryProductTotal,
+  })));
+
+  let trackings = sortable.map((o) => o.tracking);
+
+  // Fallback: if no trackings from batch_orders, get from orders table
   if (!trackings.length) {
     const { data: ordRows } = await supabaseAdmin
-      .from("orders").select("delivery_tracking_number")
+      .from("orders")
+      .select("delivery_tracking_number")
       .eq("delivery_batch_id", batchId)
       .not("delivery_tracking_number", "is", null);
-    trackings = ((ordRows ?? []) as { delivery_tracking_number: string }[]).map((r) => r.delivery_tracking_number);
+    trackings = ((ordRows ?? []) as { delivery_tracking_number: string }[])
+      .map((r) => r.delivery_tracking_number);
   }
+
   return trackings;
 }
 
