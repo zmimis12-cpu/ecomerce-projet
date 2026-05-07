@@ -487,16 +487,14 @@ export async function getDigylogBlUrl(blId: number): Promise<{
   return { ok: true, blobBase64: Buffer.from(buf).toString("base64") };
 }
 
-// ── Stubs (legacy) ────────────────────────────────────────────────────────────
+// ── Legacy stubs ──────────────────────────────────────────────────────────────
 export async function importInvoices(_from: string, _to: string) {
-  return { success: false, error: "Non configuré.", imported: 0 };
-}
-export async function reconcileInvoice(_invoiceId: string) {
-  return { success: false as const, error: "Non configuré.", matched:0, missing:0, diff:0 };
+  return { success: false, error: "Utilisez l'import manuel via le formulaire.", imported: 0 };
 }
 export async function fetchDeliveryDocument(_type: "delivery"|"pickup"|"return", _date: string) {
   return { success: false as const, error: "Non configuré.", fileUrl: undefined as string|undefined };
 }
+// reconcileInvoice is now in @/lib/delivery/reconciliation-actions
 export async function saveDeliverySettings(_data: Record<string, unknown>) {
   return { success: true };
 }
