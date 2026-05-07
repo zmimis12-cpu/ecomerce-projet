@@ -278,7 +278,7 @@ export async function reconcileInvoice(invoiceId: string): Promise<{
         matched++;
       } else if (status !== "FEE_OVERCHARGE") {
         status = reasons.some((r) => r.includes("COD")) ? "COD_MISMATCH" : "MISMATCH";
-        if (status !== "OK") missing++;
+        missing++;
       }
 
       mismatchReason = reasons.join(" | ") || null;
