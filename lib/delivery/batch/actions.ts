@@ -1149,23 +1149,28 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
 
   const recapBytes = await recapDoc.save();
 
-  // ── 5. Download Digylog labels (sorted trackings) ─────────────────────────
+  // ── 5. Download Digylog labels ONE BY ONE in sorted order then merge ────────
+  // Digylog POST /labels ignores the order of trackings array — it returns
+  // labels in its own internal order. The only way to guarantee sorted output
+  // is to download each label individually and merge them ourselves.
   const client = await createDigylogClientFromDB();
-  const labelsRes = await client.downloadLabels({ orders: trackings, format: 3 });
-  if (!labelsRes.ok || !labelsRes.blob) {
-    return { ok: false, error: labelsRes.error ?? "Erreur téléchargement étiquettes.", productsFound: products.length };
+  const mergedDoc = await PDFDocument.create();
+  const recapSrc  = await PDFDocument.load(recapBytes);
+  const recapPages = await mergedDoc.copyPages(recapSrc, recapSrc.getPageIndices());
+  recapPages.forEach((p) => mergedDoc.addPage(p));
+
+  // Download each label individually and append in sorted order
+  for (const tracking of trackings) {
+    const labelRes = await client.downloadLabels({ orders: [tracking], format: 3 });
+    if (!labelRes.ok || !labelRes.blob) {
+      console.warn(`[generateRecapAndLabels] Failed to download label for ${tracking}: ${labelRes.error}`);
+      continue;
+    }
+    const labelBytes = new Uint8Array(await labelRes.blob.arrayBuffer());
+    const labelSrc   = await PDFDocument.load(labelBytes);
+    const labelPages = await mergedDoc.copyPages(labelSrc, labelSrc.getPageIndices());
+    labelPages.forEach((p) => mergedDoc.addPage(p));
   }
-  const labelsBytes = new Uint8Array(await labelsRes.blob.arrayBuffer());
-
-  // ── 6. Merge: recap pages first, then Digylog label pages ─────────────────
-  const mergedDoc  = await PDFDocument.create();
-  const recapSrc   = await PDFDocument.load(recapBytes);
-  const labelsSrc  = await PDFDocument.load(labelsBytes);
-
-  const recapPages  = await mergedDoc.copyPages(recapSrc,  recapSrc.getPageIndices());
-  const labelsPages = await mergedDoc.copyPages(labelsSrc, labelsSrc.getPageIndices());
-  recapPages.forEach((p)  => mergedDoc.addPage(p));
-  labelsPages.forEach((p) => mergedDoc.addPage(p));
 
   const mergedBytes = await mergedDoc.save();
 
