@@ -113,3 +113,13 @@ CREATE INDEX IF NOT EXISTS idx_orders_tracking          ON orders(delivery_track
 CREATE INDEX IF NOT EXISTS idx_orders_customer_phone    ON orders(customer_phone);
 CREATE INDEX IF NOT EXISTS idx_orders_customer_name     ON orders(customer_name);
 CREATE INDEX IF NOT EXISTS idx_orders_created_desc      ON orders(created_at DESC);
+
+-- ── Sheet sync tracking fields ────────────────────────────────────────────────
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS sheet_sync_status TEXT    DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS sheet_synced_at   TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS sheet_sync_error  TEXT,
+  ADD COLUMN IF NOT EXISTS sent_to_delivery_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_orders_sheet_sync
+  ON orders(sheet_sync_status) WHERE sheet_sync_status != 'synced';

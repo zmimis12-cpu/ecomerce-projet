@@ -192,11 +192,38 @@ export async function updateOrderStatus(
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath("/admin/orders");
 
-  // Trigger Google Sheets sync in background (non-blocking — don't await)
-  if (newStatus === "confirmed") {
-    syncOrderToGoogleSheets(orderId, "confirmed").catch(console.error);
-  } else if (newStatus === "returned") {
-    syncOrderToGoogleSheets(orderId, "returned").catch(console.error);
+  // Trigger Google Sheets sync — mark pending first, then sync in background
+  if (newStatus === "confirmed" || newStatus === "returned") {
+    // Mark as pending immediately so we can detect failures
+    const supabaseAdmin = (await import("@/lib/supabase/admin")).supabaseAdmin;
+    await supabaseAdmin.from("orders")
+      .update({ sheet_sync_status: "pending" } as never)
+      .eq("id", orderId);
+
+    // Run sync — log result regardless of outcome
+    const sheetType = newStatus === "confirmed" ? "confirmed" : "returned";
+    syncOrderToGoogleSheets(orderId, sheetType)
+      .then(async (res) => {
+        const status = res?.success === false ? "failed" : "synced";
+        const errMsg = res?.success === false ? (res as { error?: string }).error ?? "Unknown" : null;
+        console.log("SHEET SYNC DEBUG", {
+          orderId, orderNumber: orderId, status: newStatus,
+          sheetSyncStatus: status, error: errMsg,
+        });
+        await supabaseAdmin.from("orders").update({
+          sheet_sync_status: status,
+          sheet_synced_at:   status === "synced" ? new Date().toISOString() : null,
+          sheet_sync_error:  errMsg,
+        } as never).eq("id", orderId);
+      })
+      .catch(async (err) => {
+        const errMsg = err?.message ?? String(err);
+        console.error("SHEET SYNC DEBUG", { orderId, error: errMsg, sheetSyncStatus: "failed" });
+        await supabaseAdmin.from("orders").update({
+          sheet_sync_status: "failed",
+          sheet_sync_error:  errMsg,
+        } as never).eq("id", orderId);
+      });
   }
 
   return { success: true };
