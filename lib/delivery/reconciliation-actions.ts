@@ -302,7 +302,7 @@ export async function reconcileInvoice(invoiceId: string): Promise<{
     // Update item
     await supabaseAdmin.from("delivery_invoice_items").update({
       order_id:       order?.id ?? null,
-      matched_status: status === "OK" ? "matched" : status === "EXTRA" || status === "MISSING" ? "pending" : "mismatched",
+      matched_status: status === "OK" ? "matched" : status === "EXTRA" ? "pending" : "mismatched",
       mismatch_reason: mismatchReason,
     } as never).eq("id", item.id);
   }
