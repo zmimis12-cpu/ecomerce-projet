@@ -548,9 +548,9 @@ export async function sendBatchToDigylog(batchId: string) {
 }
 
 // ── Download tickets for batch ─────────────────────────────────────────────────
-// ── Helper: get trackings sorted by product priority ─────────────────────────
+// ── Helper: get trackings sorted by recap product priority ────────────────────
 async function getSortedTrackingsForBatch(batchId: string): Promise<string[]> {
-  // Step 1: Get all batch orders with full order_items + product info
+  // ── Step 1: Load all batch orders with items + products ───────────────────
   const { data: boRows } = await supabaseAdmin
     .from("delivery_batch_orders")
     .select(`
@@ -577,21 +577,21 @@ async function getSortedTrackingsForBatch(batchId: string): Promise<string[]> {
     sku: string | null;
     products: { id: string; name: string } | null;
   };
-  type ORow = {
-    id: string;
-    order_number: string;
-    delivery_tracking_number: string | null;
-  };
   type BORow = {
     order_id: string;
     tracking_number: string | null;
-    orders: (ORow & { order_items: OItem[] }) | null;
+    orders: {
+      id: string;
+      order_number: string;
+      delivery_tracking_number: string | null;
+      order_items: OItem[];
+    } | null;
   };
 
   const rows = (boRows ?? []) as BORow[];
 
-  // Step 2: Build productTotals — sum quantities across entire batch
-  // Key = SKU or product name (fallback)
+  // ── Step 2: Build productTotals (same logic as recap) ─────────────────────
+  // Key = product id → name + total qty across batch
   const productTotals = new Map<string, { total: number; name: string }>();
 
   for (const bo of rows) {
@@ -599,23 +599,43 @@ async function getSortedTrackingsForBatch(batchId: string): Promise<string[]> {
       const key  = item.products?.id ?? item.sku ?? item.product_name ?? "unknown";
       const name = item.products?.name ?? item.product_name ?? item.sku ?? "unknown";
       const qty  = item.quantity ?? 1;
-      const existing = productTotals.get(key);
-      if (existing) {
-        existing.total += qty;
+      const prev = productTotals.get(key);
+      if (prev) {
+        prev.total += qty;
       } else {
         productTotals.set(key, { total: qty, name });
       }
     }
   }
 
-  // Step 3: For each order, determine primaryProduct
+  // ── Step 3: Build recapProductOrder — IDENTICAL to recap page sort ─────────
+  // Sort: totalQty DESC → name ASC (ties broken alphabetically)
+  // This is the source of truth — tickets must follow this exact order.
+  const recapProductOrder: string[] = [...productTotals.entries()]
+    .sort(([, a], [, b]) => {
+      if (b.total !== a.total) return b.total - a.total;   // highest qty first
+      return a.name.localeCompare(b.name);                  // alpha on tie
+    })
+    .map(([key]) => key);
+
+  // Build index map: productKey → position in recap (0 = first = highest priority)
+  const recapIndex = new Map<string, number>();
+  recapProductOrder.forEach((key, i) => recapIndex.set(key, i));
+
+  console.log("RECAP PRODUCT ORDER", recapProductOrder.map((k) => ({
+    key:   k,
+    name:  productTotals.get(k)?.name,
+    total: productTotals.get(k)?.total,
+  })));
+
+  // ── Step 4: For each order determine primaryProduct using recapIndex ────────
   type SortableOrder = {
-    tracking: string;
-    orderNumber: string;
-    primaryProductKey: string;
+    tracking:           string;
+    orderNumber:        string;
+    primaryProductKey:  string;
     primaryProductName: string;
-    primaryProductTotal: number;
-    primaryProductQty: number;
+    primaryProductQty:  number;
+    recapIdx:           number;   // position in recap — lower = higher priority
   };
 
   const sortable: SortableOrder[] = [];
@@ -625,77 +645,60 @@ async function getSortedTrackingsForBatch(batchId: string): Promise<string[]> {
     if (!tracking) continue;
 
     const orderNumber = bo.orders?.order_number ?? bo.order_id;
-    const items = bo.orders?.order_items ?? [];
+    const items       = bo.orders?.order_items ?? [];
 
-    // Find primary product: highest productTotal, then name ASC on tie
-    let primaryKey   = "";
-    let primaryName  = "";
-    let primaryTotal = -1;
-    let primaryQty   = 0;
+    // Primary product = product with lowest recapIndex (= first in recap)
+    // Tie-break: highest qty in this order → product name ASC
+    let primaryKey  = "unknown";
+    let primaryName = "unknown";
+    let primaryIdx  = Number.MAX_SAFE_INTEGER;
+    let primaryQty  = 0;
 
     for (const item of items) {
-      const key   = item.products?.id ?? item.sku ?? item.product_name ?? "unknown";
-      const name  = item.products?.name ?? item.product_name ?? item.sku ?? "unknown";
-      const total = productTotals.get(key)?.total ?? 0;
-      const qty   = item.quantity ?? 1;
+      const key  = item.products?.id ?? item.sku ?? item.product_name ?? "unknown";
+      const name = item.products?.name ?? item.product_name ?? item.sku ?? "unknown";
+      const idx  = recapIndex.get(key) ?? Number.MAX_SAFE_INTEGER;
+      const qty  = item.quantity ?? 1;
 
-      if (
-        total > primaryTotal ||
-        (total === primaryTotal && name < primaryName) ||
-        (total === primaryTotal && name === primaryName && qty > primaryQty)
-      ) {
-        primaryKey   = key;
-        primaryName  = name;
-        primaryTotal = total;
-        primaryQty   = qty;
+      const better =
+        idx < primaryIdx ||                                        // earlier in recap
+        (idx === primaryIdx && qty > primaryQty) ||               // same product, more qty
+        (idx === primaryIdx && qty === primaryQty && name < primaryName); // alpha tie-break
+
+      if (better) {
+        primaryKey  = key;
+        primaryName = name;
+        primaryIdx  = idx;
+        primaryQty  = qty;
       }
     }
 
-    if (!primaryKey && items.length === 0) {
-      // No order_items — just add with defaults
-      primaryKey   = "unknown";
-      primaryName  = "unknown";
-      primaryTotal = 0;
-      primaryQty   = 0;
-    }
-
-    sortable.push({
-      tracking,
-      orderNumber,
-      primaryProductKey:   primaryKey,
-      primaryProductName:  primaryName,
-      primaryProductTotal: primaryTotal,
-      primaryProductQty:   primaryQty,
-    });
+    sortable.push({ tracking, orderNumber, primaryProductKey: primaryKey,
+      primaryProductName: primaryName, primaryProductQty: primaryQty, recapIdx: primaryIdx });
   }
 
-  // Step 4: Sort
-  // 1. primaryProductTotal DESC (most ordered product first)
-  // 2. primaryProductName ASC (alphabetical on tie)
-  // 3. primaryProductQty DESC (largest qty in this order first)
-  // 4. orderNumber ASC
+  // ── Step 5: Sort by recap order ────────────────────────────────────────────
+  // 1. recapIdx ASC    → follow recap product order exactly
+  // 2. primaryQty DESC → within same product: larger orders first
+  // 3. orderNumber ASC → final stable tie-break
   sortable.sort((a, b) => {
-    if (b.primaryProductTotal !== a.primaryProductTotal)
-      return b.primaryProductTotal - a.primaryProductTotal;
-    if (a.primaryProductName !== b.primaryProductName)
-      return a.primaryProductName.localeCompare(b.primaryProductName);
+    if (a.recapIdx !== b.recapIdx)          return a.recapIdx - b.recapIdx;
     if (b.primaryProductQty !== a.primaryProductQty)
-      return b.primaryProductQty - a.primaryProductQty;
+                                            return b.primaryProductQty - a.primaryProductQty;
     return a.orderNumber.localeCompare(b.orderNumber);
   });
 
-  // Debug log
   console.log("TICKET SORT DEBUG", sortable.map((o) => ({
-    order:        o.orderNumber,
-    tracking:     o.tracking,
+    order:          o.orderNumber,
+    tracking:       o.tracking,
     primaryProduct: o.primaryProductName,
-    qty:          o.primaryProductQty,
-    productTotal: o.primaryProductTotal,
+    qty:            o.primaryProductQty,
+    recapIndex:     o.recapIdx,
   })));
 
   let trackings = sortable.map((o) => o.tracking);
 
-  // Fallback: if no trackings from batch_orders, get from orders table
+  // Fallback: no batch_orders → get from orders.delivery_batch_id
   if (!trackings.length) {
     const { data: ordRows } = await supabaseAdmin
       .from("orders")
