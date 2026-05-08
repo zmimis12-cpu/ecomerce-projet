@@ -72,7 +72,12 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Digylog might also use GET for webhook verification
+// Digylog uses PUT for webhook (as shown in their API config)
+export async function PUT(request: NextRequest) {
+  return POST(request);
+}
+
+// GET for webhook verification
 export async function GET() {
   return NextResponse.json({ status: "ok", provider: "digylog" });
 }
