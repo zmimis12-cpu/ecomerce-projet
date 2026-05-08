@@ -13,8 +13,8 @@ import {
   processReturnCondition,
   importDigylogBR,
   getActiveBRs,
-} from "@/lib/scanner/fast-actions";
-import type { FastScanResult, ReturnScanResult, PendingReturn } from "@/lib/scanner/fast-actions";
+} from "@/lib/scanner/actions";
+import type { FastScanResult, ReturnScanResult, PendingReturn } from "@/lib/scanner/actions";
 import { RETURN_CONDITIONS, RETURN_CONDITION_LABELS, RETURN_CONDITION_COLORS } from "@/types/scanner";
 import type { ReturnCondition } from "@/types/scanner";
 import { playSound } from "./scanner-sounds";
