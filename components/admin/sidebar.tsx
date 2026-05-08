@@ -29,6 +29,7 @@ const NAV_GROUPS = [
       { href: "/admin/delivery/sheet-sync",     label: "Sheet Sync",     icon: FileSpreadsheet, exact: false },
       { href: "/admin/delivery/invoices",       label: "Factures",       icon: FileText,        exact: false },
       { href: "/admin/delivery/documents",      label: "Documents",      icon: FolderOpen,      exact: false },
+      { href: "/admin/digylog/documents",       label: "Digylog Docs",   icon: FileText,        exact: false },
     ],
   },
   {
