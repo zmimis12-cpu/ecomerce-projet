@@ -335,7 +335,7 @@ export async function syncDigylogStatuses(): Promise<{
       }
 
       // Get latest status
-      const latest = history[history.length - 1] as Record<string, unknown>;
+      const latest = history[history.length - 1] as unknown as Record<string, unknown>;
       const idStatus = Number(latest.idStatus ?? latest.id_status ?? 0);
       const extStatus = String(latest.status ?? latest.libelle ?? "");
 
