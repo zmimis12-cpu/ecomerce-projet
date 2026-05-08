@@ -4,12 +4,11 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Package, ShoppingCart, PhoneCall,
   Truck, Layers, FileSpreadsheet, FileText, FolderOpen,
-  BookOpen, ScanLine, RotateCcw, BarChart3, Globe,
-  Settings, Zap,
+  ScanLine, RotateCcw, BarChart3, Globe, Settings,
+  ClipboardList, RefreshCw, Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// ── Nav structure with groups ──────────────────────────────────────────────────
 const NAV_GROUPS = [
   {
     label: null,
@@ -23,35 +22,32 @@ const NAV_GROUPS = [
   {
     label: "Livraison",
     items: [
-      { href: "/admin/delivery",                label: "Livraison",      icon: Truck,           exact: true  },
-      { href: "/admin/delivery/notes",          label: "Delivery Notes", icon: BookOpen,        exact: false },
-      { href: "/admin/delivery/batches",        label: "Groupes",        icon: Layers,          exact: false },
-      { href: "/admin/delivery/sheet-sync",     label: "Sheet Sync",     icon: FileSpreadsheet, exact: false },
-      { href: "/admin/delivery/invoices",       label: "Factures",       icon: FileText,        exact: false },
-      { href: "/admin/delivery/documents",      label: "Documents",      icon: FolderOpen,      exact: false },
-      { href: "/admin/digylog/documents",       label: "Digylog Docs",   icon: FileText,        exact: false },
-      { href: "/admin/audit-logs",              label: "Audit Logs",     icon: FileText,        exact: false },
+      { href: "/admin/delivery",             label: "Livraison",    icon: Truck,          exact: true  },
+      { href: "/admin/delivery/batches",     label: "Groupes BL",   icon: Layers,         exact: false },
+      { href: "/admin/delivery/sheet-sync",  label: "Sheet Sync",   icon: FileSpreadsheet,exact: false },
+      { href: "/admin/delivery/invoices",    label: "Factures",     icon: FileText,       exact: false },
+      { href: "/admin/digylog/documents",    label: "Documents Digylog", icon: FolderOpen, exact: false },
     ],
   },
   {
     label: "Opérations",
     items: [
-      { href: "/admin/scanner",     label: "Scanner",     icon: ScanLine,  exact: false },
-      { href: "/admin/returns",     label: "Retours",     icon: RotateCcw, exact: false },
+      { href: "/admin/scanner",  label: "Scanner",  icon: ScanLine,  exact: false },
+      { href: "/admin/returns",  label: "Retours",  icon: RotateCcw, exact: false },
     ],
   },
   {
     label: "Business",
     items: [
-      { href: "/admin/finance",           label: "Finance",         icon: BarChart3, exact: false },
-      { href: "/admin/landing-pages",     label: "Landing Pages",   icon: Globe,     exact: false },
-      { href: "/admin/automation",        label: "Automation",      icon: Zap,       exact: false },
+      { href: "/admin/finance",       label: "Finance",       icon: BarChart3,     exact: false },
+      { href: "/admin/landing-pages", label: "Landing Pages", icon: Globe,         exact: false },
     ],
   },
   {
-    label: "Paramètres",
+    label: "Admin",
     items: [
-      { href: "/admin/settings/delivery", label: "Config Digylog",  icon: Settings,  exact: false },
+      { href: "/admin/audit-logs", label: "Audit Logs",   icon: Shield,        exact: false },
+      { href: "/admin/settings",   label: "Paramètres",   icon: Settings,      exact: false },
     ],
   },
 ];
@@ -61,7 +57,6 @@ export function AdminSidebar() {
 
   function isActive(href: string, exact: boolean) {
     if (exact) return pathname === href;
-    // Special case: /admin/delivery exact check so sub-items don't also activate "Livraison"
     if (href === "/admin/delivery") return pathname === "/admin/delivery";
     return pathname.startsWith(href);
   }
@@ -102,7 +97,7 @@ export function AdminSidebar() {
       </nav>
 
       <div className="px-4 py-3 border-t shrink-0">
-        <p className="text-xs text-muted-foreground">v2.0</p>
+        <p className="text-xs text-muted-foreground">GestionPro v2.0</p>
       </div>
     </aside>
   );
