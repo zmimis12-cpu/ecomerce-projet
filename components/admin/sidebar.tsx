@@ -30,6 +30,7 @@ const NAV_GROUPS = [
       { href: "/admin/delivery/invoices",       label: "Factures",       icon: FileText,        exact: false },
       { href: "/admin/delivery/documents",      label: "Documents",      icon: FolderOpen,      exact: false },
       { href: "/admin/digylog/documents",       label: "Digylog Docs",   icon: FileText,        exact: false },
+      { href: "/admin/audit-logs",              label: "Audit Logs",     icon: FileText,        exact: false },
     ],
   },
   {

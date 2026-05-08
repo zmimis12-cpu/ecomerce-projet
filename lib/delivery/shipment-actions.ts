@@ -9,6 +9,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/session";
 import { createDigylogClientFromDB } from "./digylog/client";
 import { mapDigylogStatus } from "./digylog/status-map";
+import { createAuditLog, auditStatusChange } from "@/lib/audit/audit-logger";
 
 const MANAGER = ["super_admin","admin","manager"] as const;
 
@@ -461,6 +462,17 @@ export async function applyDigylogStatusUpdate(params: {
   }
 
   await supabaseAdmin.from("orders").update(orderUpdate as never).eq("id", orderId);
+
+  // Audit log — fire and forget
+  auditStatusChange({
+    userId:       null,
+    entityType:   "order",
+    entityId:     orderId,
+    entityLabel:  `Tracking: ${tracking}`,
+    oldStatus:    oldStatus,
+    newStatus:    mapped.internal,
+    sourceModule: "digylog_webhook",
+  });
 }
 
 // ── Register webhook ──────────────────────────────────────────────────────────

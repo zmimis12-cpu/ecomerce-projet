@@ -18,6 +18,7 @@ import { requireRole } from "@/lib/auth/session";
 import { createDigylogClientFromDB } from "@/lib/delivery/digylog/client";
 import { mapDigylogStatus } from "@/lib/delivery/digylog/status-map";
 import { normalizeCity, getExpectedDeliveryCost } from "@/lib/delivery/reconciliation-utils";
+import { createAuditLog, auditImport } from "@/lib/audit/audit-logger";
 import { parseDocumentCsv, type RawDocumentLine } from "@/lib/delivery/digylog/document-utils";
 
 
@@ -197,6 +198,17 @@ export async function importDigylogDocument(params: ImportDocumentParams): Promi
   }
 
   revalidatePath("/admin/digylog/documents");
+
+  // Audit
+  auditImport({
+    userId:       session.authId,
+    entityType:   "digylog_document",
+    entityId:     documentId,
+    entityLabel:  `${documentType} ${documentNumber}`,
+    sourceModule: "digylog_documents",
+    count:        lines.length,
+  });
+
   return { success: true, documentId, imported: lines.length, matched: matchedCount };
 }
 
