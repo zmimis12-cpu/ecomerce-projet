@@ -1,86 +1,87 @@
 /**
- * POST /api/webhooks/digylog
+ * POST/PUT /api/webhooks/digylog
  * Receives real-time status updates from Digylog.
- *
- * Digylog payload:
- * {
- *   tracking: string, num: string, status: string,
- *   idStatus: number, motif: string, postponedTo: string|null, updatedAt: string
- * }
+ * Always returns 200 — Digylog stops retrying on any non-200.
  */
 import { type NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { applyDigylogStatusUpdate } from "@/lib/delivery/shipment-actions";
-import type { DigylogWebhookPayload } from "@/lib/delivery/digylog/client";
 
-export async function POST(request: NextRequest) {
-  let body: string;
-  let payload: DigylogWebhookPayload;
+const OK = NextResponse.json({ success: true }, { status: 200 });
+
+async function handle(request: NextRequest) {
+  let raw = "";
+  let payload: Record<string, unknown> = {};
 
   try {
-    body    = await request.text();
-    payload = JSON.parse(body) as DigylogWebhookPayload;
+    raw     = await request.text();
+    payload = raw ? JSON.parse(raw) : {};
   } catch {
-    await log("parse_error", null, { error: "Invalid JSON" });
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    // Can't parse — log and return 200 anyway so Digylog doesn't retry
+    await log("parse_error", raw, {});
+    return OK;
   }
 
   console.log("DIGYLOG WEBHOOK RECEIVED", {
-    tracking:  payload?.tracking,
-    status:    payload?.status,
-    idStatus:  payload?.idStatus,
-    updatedAt: payload?.updatedAt,
-    ip:        request.headers.get("x-forwarded-for") ?? "unknown",
+    raw:      raw.slice(0, 300),
+    tracking: payload?.tracking ?? payload?.num ?? null,
+    status:   payload?.status   ?? null,
+    idStatus: payload?.idStatus ?? null,
+    ip:       request.headers.get("x-forwarded-for") ?? "unknown",
   });
 
-  // ── Optional secret verification ─────────────────────────────────────────
-  const secret = process.env.DIGYLOG_WEBHOOK_SECRET;
-  if (secret) {
-    const provided = request.headers.get("x-webhook-secret")
-      ?? request.headers.get("x-digylog-secret")
-      ?? "";
-    if (provided !== secret) {
-      await log("auth_error", payload, { reason: "Bad secret" });
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  // Log raw payload always
+  await log("received", payload, {});
+
+  // Extract tracking — Digylog may use different field names
+  const tracking =
+    String(payload.tracking ?? payload.num ?? payload.trackingNumber ?? payload.code ?? "").trim();
+
+  const idStatus  = Number(payload.idStatus ?? payload.id_status ?? payload.statusId ?? 0);
+  const extStatus = String(payload.status   ?? payload.libelle   ?? payload.statusLabel ?? "");
+
+  // If no tracking — it's a test ping from Digylog, just return 200
+  if (!tracking) {
+    await log("ping_ok", payload, { reason: "No tracking — test ping" });
+    return OK;
   }
 
-  // ── Validate required fields ──────────────────────────────────────────────
-  if (!payload.tracking || payload.idStatus === undefined) {
-    await log("invalid_payload", payload, { reason: "Missing tracking or idStatus" });
-    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
-  }
+  // Process async — return 200 immediately so Digylog doesn't timeout
+  processWebhook({ tracking, idStatus, extStatus, payload }).catch((err) => {
+    console.error("[digylog webhook] Async error:", err?.message);
+  });
 
+  return OK;
+}
+
+async function processWebhook(params: {
+  tracking:   string;
+  idStatus:   number;
+  extStatus:  string;
+  payload:    Record<string, unknown>;
+}) {
+  const { tracking, idStatus, extStatus, payload } = params;
   try {
     await applyDigylogStatusUpdate({
-      tracking:       payload.tracking,
-      externalStatus: payload.status ?? "",
-      idStatus:       payload.idStatus,
-      motif:          payload.motif ?? "",
-      postponedTo:    payload.postponedTo ?? null,
-      eventTime:      payload.updatedAt ?? new Date().toISOString(),
-      rawPayload:     payload as unknown as Record<string, unknown>,
+      tracking,
+      externalStatus: extStatus,
+      idStatus,
+      motif:       String(payload.motif       ?? ""),
+      postponedTo: payload.postponedTo as string | null ?? null,
+      eventTime:   String(payload.updatedAt   ?? payload.date ?? new Date().toISOString()),
+      rawPayload:  payload,
     });
-
-    await log("processed", payload, { tracking: payload.tracking, idStatus: payload.idStatus });
-    return NextResponse.json({ success: true });
+    await log("processed", payload, { tracking, idStatus });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    await log("error", payload, { error: msg });
-    console.error("[digylog webhook] Error:", msg);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    const msg = err instanceof Error ? err.message : "Unknown";
+    await log("error", payload, { tracking, error: msg });
+    console.error("[digylog webhook] Process error:", msg);
   }
 }
 
-// Digylog uses PUT for webhook (as shown in their API config)
-export async function PUT(request: NextRequest) {
-  return POST(request);
-}
-
-// GET for webhook verification
-export async function GET() {
-  return NextResponse.json({ status: "ok", provider: "digylog" });
-}
+export async function POST(request: NextRequest) { return handle(request); }
+export async function PUT(request: NextRequest)  { return handle(request); }
+export async function GET()                       { return NextResponse.json({ status: "ok", provider: "digylog" }); }
 
 async function log(status: string, payload: unknown, meta: Record<string, unknown>) {
   await supabaseAdmin.from("webhook_logs").insert({
