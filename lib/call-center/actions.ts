@@ -20,6 +20,8 @@ const RESULT_TO_STATUS: Record<CallResult, OrderStatus> = {
   unreachable:        "no_answer",
   wrong_number:       "no_answer",
   callback_requested: "no_answer",
+  fake_order:         "cancelled",
+  duplicate:          "cancelled",
 };
 
 // ─── Log a call ────────────────────────────────────────────────────────────────
@@ -209,4 +211,54 @@ async function upsertAgentStats(agentId: string, result: CallResult, durationSec
   await supabase.from("agent_daily_stats").upsert(payload as never, {
     onConflict: "agent_id,stat_date",
   });
+}
+
+// ─── Schedule callback ────────────────────────────────────────────────────────
+export async function scheduleCallback(data: {
+  orderId:    string;
+  callbackAt: string;  // ISO datetime
+  reason?:    string;
+}) {
+  await requireRole([...CC_ROLES]);
+  const supabase = await createClient();
+
+  await supabase.from("orders").update({
+    callback_scheduled_at: data.callbackAt,
+    callback_reason:       data.reason ?? null,
+    status:                "no_answer",
+  } as never).eq("id", data.orderId);
+
+  revalidatePath("/admin/call-center/orders");
+  return { success: true };
+}
+
+// ─── Get agent commissions ────────────────────────────────────────────────────
+export async function getAgentCommissions(agentId?: string) {
+  await requireRole([...CC_ROLES]);
+  const supabase = await createClient();
+
+  // Get agents with their confirmed + delivered_paid orders
+  let q = supabase
+    .from("call_logs")
+    .select("agent_id, result, orders!inner(status, total_amount_mad)")
+    .eq("result", "confirmed");
+
+  if (agentId) q = q.eq("agent_id", agentId);
+
+  const { data } = await q;
+  type Row = { agent_id: string; result: string; orders: { status: string; total_amount_mad: number } };
+  const rows = (data ?? []) as Row[];
+
+  const map = new Map<string, { confirmed: number; delivered: number; commission: number }>();
+  for (const row of rows) {
+    const e = map.get(row.agent_id) ?? { confirmed: 0, delivered: 0, commission: 0 };
+    e.confirmed++;
+    if (["delivered", "paid"].includes(row.orders?.status ?? "")) {
+      e.delivered++;
+      e.commission += 3; // 3 MAD per delivered — configurable later
+    }
+    map.set(row.agent_id, e);
+  }
+
+  return [...map.entries()].map(([id, stats]) => ({ agentId: id, ...stats }));
 }

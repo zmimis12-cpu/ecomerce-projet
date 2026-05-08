@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import type { AgentStats } from "@/types/call-center";
-import { TrendingUp, Phone } from "lucide-react";
+import { TrendingUp, Phone, AlertTriangle, Award } from "lucide-react";
 
 export function AgentsTable({ agents }: { agents: AgentStats[] }) {
   if (agents.length === 0) {
@@ -20,7 +20,10 @@ export function AgentsTable({ agents }: { agents: AgentStats[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-secondary/30">
-              {["Agent","Assignées","Appels","Confirmés","Refusés","Sans rép.","Taux","Durée moy.",""].map((h) => (
+              {[
+                "Agent", "Assignées", "Appels", "Confirmés",
+                "Livrés payés", "Commission", "Fausses", "Taux conf.", "Durée moy.", ""
+              ].map((h) => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -35,13 +38,25 @@ export function AgentsTable({ agents }: { agents: AgentStats[] }) {
                 <td className="px-4 py-3 text-center font-mono text-sm">{a.total_assigned}</td>
                 <td className="px-4 py-3 text-center font-mono text-sm">{a.calls_made}</td>
                 <td className="px-4 py-3 text-center">
-                  <span className="font-mono text-sm text-green-600 font-medium">{a.confirmed}</span>
+                  <span className="font-mono text-sm text-green-600 font-bold">{a.confirmed}</span>
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <span className="font-mono text-sm text-red-600">{a.refused}</span>
+                  <span className="font-mono text-sm text-emerald-600 font-bold">{a.delivered_paid ?? 0}</span>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1">
+                    <Award className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                    <span className="font-mono text-sm font-bold text-amber-700">
+                      {(a.commission_mad ?? 0).toFixed(0)} MAD
+                    </span>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <span className="font-mono text-sm text-orange-600">{a.no_answer}</span>
+                  {(a.fake_orders ?? 0) > 0
+                    ? <span className="inline-flex items-center gap-1 text-xs font-bold text-red-600">
+                        <AlertTriangle className="h-3 w-3" />{a.fake_orders}
+                      </span>
+                    : <span className="text-xs text-muted-foreground">—</span>}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1.5">

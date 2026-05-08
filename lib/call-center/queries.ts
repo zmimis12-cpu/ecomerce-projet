@@ -40,29 +40,41 @@ export async function getAgentStats(): Promise<AgentStats[]> {
     const agentOrders = orderRows.filter((o) => o.assigned_to === agent.id);
     const agentLogs   = logs.filter((l) => l.agent_id === agent.id);
 
-    const confirmed  = agentLogs.filter((l) => l.disposition === "confirmed").length;
-    const refused    = agentLogs.filter((l) => l.disposition === "refused").length;
-    const no_answer  = agentLogs.filter((l) => l.disposition === "no_answer").length;
-    const durations  = agentLogs.map((l) => l.duration_seconds).filter((d): d is number => d !== null);
-    const avgDur     = durations.length > 0
+    const confirmed   = agentLogs.filter((l) => l.disposition === "confirmed").length;
+    const refused     = agentLogs.filter((l) => l.disposition === "refused").length;
+    const no_answer   = agentLogs.filter((l) => l.disposition === "no_answer").length;
+    const fake_orders = agentLogs.filter((l) => l.disposition === "fake_order").length;
+    const duplicates  = agentLogs.filter((l) => l.disposition === "duplicate").length;
+    const durations   = agentLogs.map((l) => l.duration_seconds).filter((d): d is number => d !== null);
+    const avgDur      = durations.length > 0
       ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length)
       : null;
 
-    const callsMade  = agentLogs.length;
-    const rate       = callsMade === 0 ? 0 : Math.round((confirmed / callsMade) * 100);
+    const callsMade     = agentLogs.length;
+    const rate          = callsMade === 0 ? 0 : Math.round((confirmed / callsMade) * 100);
+    const fakeRate      = callsMade === 0 ? 0 : Math.round((fake_orders / callsMade) * 100);
+
+    // Commission: 3 MAD per delivered_paid order confirmed by this agent
+    const deliveredPaid = agentOrders.filter((o) => ["paid", "delivered"].includes(o.status)).length;
+    const commission    = deliveredPaid * 3;  // 3 MAD per delivered — configurable
 
     return {
-      agent_id:         agent.id,
-      full_name:        agent.full_name,
-      email:            agent.email,
-      role:             agent.role,
-      total_assigned:   agentOrders.length,
-      calls_made:       callsMade,
+      agent_id:          agent.id,
+      full_name:         agent.full_name,
+      email:             agent.email,
+      role:              agent.role,
+      total_assigned:    agentOrders.length,
+      calls_made:        callsMade,
       confirmed,
       refused,
       no_answer,
+      fake_orders,
+      duplicates,
+      delivered_paid:    deliveredPaid,
+      commission_mad:    commission,
       confirmation_rate: rate,
-      avg_duration_sec: avgDur,
+      fake_rate:         fakeRate,
+      avg_duration_sec:  avgDur,
     };
   });
 }

@@ -8,20 +8,25 @@ export type CallResult =
   | "no_answer"
   | "unreachable"
   | "wrong_number"
-  | "callback_requested";
+  | "callback_requested"
+  | "fake_order"
+  | "duplicate";
 
 export const CALL_RESULTS: CallResult[] = [
   "confirmed", "refused", "no_answer",
   "unreachable", "wrong_number", "callback_requested",
+  "fake_order", "duplicate",
 ];
 
 export const CALL_RESULT_LABELS: Record<CallResult, string> = {
-  confirmed:          "Confirmé",
+  confirmed:          "Confirmé ✓",
   refused:            "Refusé",
   no_answer:          "Sans réponse",
   unreachable:        "Injoignable",
   wrong_number:       "Mauvais numéro",
   callback_requested: "Rappel demandé",
+  fake_order:         "🚫 Fausse commande",
+  duplicate:          "⚠ Doublon",
 };
 
 export const CALL_RESULT_COLORS: Record<CallResult, { bg: string; text: string }> = {
@@ -31,6 +36,8 @@ export const CALL_RESULT_COLORS: Record<CallResult, { bg: string; text: string }
   unreachable:        { bg: "bg-slate-100",  text: "text-slate-600" },
   wrong_number:       { bg: "bg-purple-100", text: "text-purple-700" },
   callback_requested: { bg: "bg-blue-100",   text: "text-blue-700" },
+  fake_order:         { bg: "bg-red-200",    text: "text-red-800" },
+  duplicate:          { bg: "bg-yellow-100", text: "text-yellow-700" },
 };
 
 // Minimum call duration (seconds) before "Confirmed" is allowed
@@ -53,17 +60,22 @@ export interface CallLog {
 }
 
 export interface AgentStats {
-  agent_id: string;
-  full_name: string;
-  email: string;
-  role: string;
-  total_assigned: number;
-  calls_made: number;
-  confirmed: number;
-  refused: number;
-  no_answer: number;
+  agent_id:          string;
+  full_name:         string;
+  email:             string;
+  role:              string;
+  total_assigned:    number;
+  calls_made:        number;
+  confirmed:         number;
+  refused:           number;
+  no_answer:         number;
+  fake_orders:       number;
+  duplicates:        number;
+  delivered_paid:    number;
+  commission_mad:    number;
   confirmation_rate: number;
-  avg_duration_sec: number | null;
+  fake_rate:         number;
+  avg_duration_sec:  number | null;
 }
 
 export interface CallCenterOrder {

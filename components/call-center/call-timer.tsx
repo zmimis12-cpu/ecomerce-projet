@@ -1,48 +1,55 @@
 "use client";
 /**
  * CallTimer — core agent interaction component.
- * Shows a live timer, enforces 20s before "Confirmed",
- * saves call log via server action on submit.
+ * - Live timer
+ * - 20s anti-fake lock on "Confirmed"
+ * - fake_order + duplicate + callback_requested
+ * - Callback date/time scheduling
  */
 import { useState, useEffect, useRef, useTransition } from "react";
-import { logCall } from "@/lib/call-center/actions";
-import { MIN_CONFIRM_SECONDS, CALL_RESULT_LABELS } from "@/types/call-center";
+import { logCall, scheduleCallback } from "@/lib/call-center/actions";
+import { MIN_CONFIRM_SECONDS, CALL_RESULT_LABELS, CALL_RESULT_COLORS } from "@/types/call-center";
 import type { CallResult } from "@/types/call-center";
 import { cn } from "@/lib/utils";
-import { Phone, PhoneOff, Clock } from "lucide-react";
+import { Phone, PhoneOff, Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 interface CallTimerProps {
-  orderId: string;
+  orderId:       string;
   customerPhone: string;
 }
 
 type Phase = "idle" | "calling" | "done";
 
 export function CallTimer({ orderId, customerPhone }: CallTimerProps) {
-  const [phase, setPhase]       = useState<Phase>("idle");
-  const [elapsed, setElapsed]   = useState(0);
-  const [notes, setNotes]       = useState("");
+  const [phase, setPhase]   = useState<Phase>("idle");
+  const [elapsed, setElapsed] = useState(0);
+  const [notes, setNotes]   = useState("");
+  const [callbackAt, setCallbackAt] = useState("");
   const [isPending, startTransition] = useTransition();
-  const [toast, setToast]       = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [toast, setToast]   = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const startRef    = useRef<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Start timer
   function startCall() {
     startRef.current = new Date().toISOString();
     setElapsed(0);
     setPhase("calling");
-    intervalRef.current = setInterval(() => {
-      setElapsed((s) => s + 1);
-    }, 1000);
+    intervalRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
   }
 
-  // Stop timer and log
   function endCall(result: CallResult) {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    const endedAt = new Date().toISOString();
-    const dur     = elapsed;
+    const dur = elapsed;
     setPhase("done");
+
+    // Callback scheduling
+    if (result === "callback_requested" && callbackAt) {
+      startTransition(async () => {
+        await scheduleCallback({ orderId, callbackAt, reason: notes });
+        setToast({ type: "success", msg: "Rappel planifié." });
+      });
+      return;
+    }
 
     startTransition(async () => {
       const res = await logCall({
@@ -50,147 +57,133 @@ export function CallTimer({ orderId, customerPhone }: CallTimerProps) {
         phoneDialed:     customerPhone,
         result,
         durationSeconds: dur,
-        notes,
-        startedAt:  startRef.current ?? endedAt,
-        endedAt,
+        notes:           notes.trim() || "",
+        startedAt:       startRef.current!,
+        endedAt:         new Date().toISOString(),
       });
-
       if (res.success) {
-        setToast({ type: "success", msg: `Appel enregistré : ${CALL_RESULT_LABELS[result]}` });
-        setTimeout(() => setToast(null), 3000);
+        setToast({ type: "success", msg: `${CALL_RESULT_LABELS[result]} — enregistré.` });
       } else {
         setToast({ type: "error", msg: res.error ?? "Erreur." });
-        setTimeout(() => setToast(null), 5000);
-        setPhase("calling"); // allow retry
+        setPhase("idle");
       }
     });
   }
 
   // Cleanup on unmount
-  useEffect(() => {
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, []);
+  useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
 
-  const canConfirm = elapsed >= MIN_CONFIRM_SECONDS;
-  const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
-  const ss = String(elapsed % 60).padStart(2, "0");
+  const canConfirm   = elapsed >= MIN_CONFIRM_SECONDS;
+  const secRemaining = Math.max(0, MIN_CONFIRM_SECONDS - elapsed);
+  const fmt          = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
+  // ── IDLE ──────────────────────────────────────────────────────────────────
+  if (phase === "idle") return (
+    <div className="space-y-4">
+      <button type="button" onClick={startCall}
+        className="w-full flex items-center justify-center gap-2 rounded-xl bg-green-600 text-white py-5 text-lg font-bold hover:bg-green-700 transition-colors active:scale-[0.98]">
+        <Phone className="h-6 w-6" />
+        Démarrer l&apos;appel
+      </button>
+      <p className="text-center text-xs text-muted-foreground">
+        Le bouton &quot;Confirmé&quot; sera débloqué après {MIN_CONFIRM_SECONDS}s d&apos;appel.
+      </p>
+    </div>
+  );
+
+  // ── DONE ──────────────────────────────────────────────────────────────────
+  if (phase === "done") return (
+    <div className={cn(
+      "rounded-xl border-2 p-5 text-center space-y-2",
+      toast?.type === "success" ? "border-green-400 bg-green-50" : "border-red-400 bg-red-50"
+    )}>
+      {toast?.type === "success"
+        ? <CheckCircle2 className="h-8 w-8 text-green-600 mx-auto" />
+        : <AlertTriangle className="h-8 w-8 text-red-600 mx-auto" />}
+      <p className="font-semibold">{toast?.msg}</p>
+      <p className="text-xs text-muted-foreground">Durée: {fmt(elapsed)}</p>
+      <button type="button" onClick={() => { setPhase("idle"); setElapsed(0); setNotes(""); setToast(null); }}
+        className="text-xs text-primary hover:underline">
+        Nouvel appel
+      </button>
+    </div>
+  );
+
+  // ── CALLING ───────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      {toast && (
-        <div className={cn(
-          "rounded-lg px-4 py-3 text-sm font-medium",
-          toast.type === "success" ? "bg-green-600 text-white" : "bg-red-50 border border-red-200 text-red-700"
-        )}>
-          {toast.type === "success" ? "✓ " : "✕ "}{toast.msg}
+      {/* Timer display */}
+      <div className={cn(
+        "rounded-xl p-5 text-center border-2 transition-colors",
+        canConfirm ? "border-green-400 bg-green-50" : "border-orange-300 bg-orange-50"
+      )}>
+        <div className="flex items-center justify-center gap-2 mb-1">
+          <Clock className={cn("h-5 w-5", canConfirm ? "text-green-600" : "text-orange-500")} />
+          <span className={cn("text-4xl font-mono font-bold tabular-nums", canConfirm ? "text-green-700" : "text-orange-600")}>
+            {fmt(elapsed)}
+          </span>
         </div>
-      )}
-
-      {/* Phone number — large */}
-      <div className="rounded-xl border bg-secondary/20 px-5 py-4 text-center">
-        <p className="text-xs text-muted-foreground mb-1">Numéro à appeler</p>
-        <p className="text-3xl font-mono font-bold tracking-widest text-foreground">
-          {customerPhone}
-        </p>
+        {!canConfirm && (
+          <p className="text-xs text-orange-600 font-medium">
+            ⏳ Confirmation disponible dans {secRemaining}s
+          </p>
+        )}
+        {canConfirm && (
+          <p className="text-xs text-green-600 font-semibold">✓ Confirmation débloquée</p>
+        )}
       </div>
 
-      {/* Timer display */}
-      {phase !== "idle" && (
-        <div className="flex items-center justify-center gap-2 py-2">
-          <Clock className={cn("h-4 w-4", phase === "calling" ? "text-green-500 animate-pulse" : "text-muted-foreground")} />
-          <span className={cn(
-            "text-2xl font-mono font-bold tabular-nums",
-            phase === "calling" ? "text-green-600" : "text-muted-foreground"
-          )}>
-            {mm}:{ss}
-          </span>
-          {phase === "calling" && !canConfirm && (
-            <span className="text-xs text-muted-foreground">
-              ({MIN_CONFIRM_SECONDS - elapsed}s avant confirmation)
-            </span>
-          )}
-        </div>
-      )}
-
       {/* Notes */}
-      {phase === "calling" && (
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Notes de l&apos;appel
-          </label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Observations, raison du refus…"
-            rows={2}
-            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-          />
-        </div>
-      )}
+      <textarea value={notes} onChange={(e) => setNotes(e.target.value)}
+        placeholder="Notes sur l'appel…" rows={2}
+        className="flex w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
 
-      {/* Action buttons */}
-      {phase === "idle" && (
-        <button
-          type="button"
-          onClick={startCall}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-green-600 text-white py-3 text-sm font-semibold hover:bg-green-700 transition-colors"
-        >
-          <Phone className="h-5 w-5" /> Démarrer l&apos;appel
+      {/* Callback date (shown always for flexibility) */}
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-muted-foreground whitespace-nowrap">Rappel le :</label>
+        <input type="datetime-local" value={callbackAt} onChange={(e) => setCallbackAt(e.target.value)}
+          className="flex-1 h-8 rounded-lg border bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-ring" />
+      </div>
+
+      {/* Result buttons */}
+      <div className="grid grid-cols-2 gap-2">
+        {/* CONFIRMED — locked until 20s */}
+        <button type="button"
+          onClick={() => canConfirm && endCall("confirmed")}
+          disabled={!canConfirm || isPending}
+          className={cn(
+            "col-span-2 flex items-center justify-center gap-2 rounded-xl py-4 text-base font-bold transition-all",
+            canConfirm
+              ? "bg-green-600 text-white hover:bg-green-700 active:scale-[0.98]"
+              : "bg-gray-100 text-gray-400 cursor-not-allowed"
+          )}>
+          <CheckCircle2 className="h-5 w-5" />
+          {canConfirm ? "✓ Confirmer la commande" : `Confirmer (attendre ${secRemaining}s)`}
         </button>
-      )}
 
-      {phase === "calling" && (
-        <div className="grid grid-cols-2 gap-2">
-          {/* Confirm — disabled before 20s */}
-          <button
-            type="button"
-            onClick={() => endCall("confirmed")}
-            disabled={!canConfirm || isPending}
-            className={cn(
-              "col-span-2 flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all",
-              canConfirm
-                ? "bg-green-600 text-white hover:bg-green-700"
-                : "bg-green-100 text-green-400 cursor-not-allowed"
-            )}
-          >
-            ✓ {canConfirm ? "Confirmer la commande" : `Confirmer (${MIN_CONFIRM_SECONDS - elapsed}s)`}
-          </button>
-
-          {[
-            { result: "refused"            as CallResult, label: "Refusé",         cls: "bg-red-100 text-red-700 hover:bg-red-200" },
-            { result: "no_answer"          as CallResult, label: "Sans réponse",   cls: "bg-orange-100 text-orange-700 hover:bg-orange-200" },
-            { result: "unreachable"        as CallResult, label: "Injoignable",    cls: "bg-slate-100 text-slate-700 hover:bg-slate-200" },
-            { result: "callback_requested" as CallResult, label: "Rappel demandé", cls: "bg-blue-100 text-blue-700 hover:bg-blue-200" },
-            { result: "wrong_number"       as CallResult, label: "Mauvais n°",     cls: "bg-purple-100 text-purple-700 hover:bg-purple-200" },
-          ].map(({ result, label, cls }) => (
-            <button
-              key={result}
-              type="button"
-              onClick={() => endCall(result)}
-              disabled={isPending}
-              className={cn("rounded-lg py-2.5 text-sm font-medium transition-colors disabled:opacity-50", cls)}
-            >
-              {label}
-            </button>
-          ))}
-
-          {/* End call without result */}
-          <button
-            type="button"
-            onClick={() => { if (intervalRef.current) clearInterval(intervalRef.current); setPhase("idle"); setElapsed(0); }}
+        {/* Other results */}
+        {([
+          ["refused",            "Refusé",           "bg-red-100 text-red-700 hover:bg-red-200"],
+          ["no_answer",          "Sans réponse",      "bg-orange-100 text-orange-700 hover:bg-orange-200"],
+          ["callback_requested", "Rappel demandé",    "bg-blue-100 text-blue-700 hover:bg-blue-200"],
+          ["wrong_number",       "Mauvais numéro",    "bg-purple-100 text-purple-700 hover:bg-purple-200"],
+          ["fake_order",         "🚫 Fausse commande","bg-red-200 text-red-900 hover:bg-red-300"],
+          ["duplicate",          "⚠ Doublon",         "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"],
+        ] as [CallResult, string, string][]).map(([result, label, cls]) => (
+          <button key={result} type="button"
+            onClick={() => endCall(result)}
             disabled={isPending}
-            className="flex items-center justify-center gap-1.5 rounded-lg border py-2.5 text-xs text-muted-foreground hover:bg-secondary transition-colors"
-          >
-            <PhoneOff className="h-3.5 w-3.5" /> Annuler
+            className={cn("rounded-xl py-3 text-sm font-semibold transition-colors disabled:opacity-50", cls)}>
+            {label}
           </button>
-        </div>
-      )}
+        ))}
 
-      {phase === "done" && (
-        <div className="rounded-xl bg-secondary/30 py-4 text-center text-sm text-muted-foreground">
-          Appel enregistré — {isPending ? "Sauvegarde…" : "✓ Sauvegardé"}
-        </div>
-      )}
+        {/* End call without result */}
+        <button type="button" onClick={() => endCall("no_answer")} disabled={isPending}
+          className="col-span-2 flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors">
+          <PhoneOff className="h-4 w-4" /> Terminer l&apos;appel
+        </button>
+      </div>
     </div>
   );
 }
