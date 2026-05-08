@@ -315,60 +315,50 @@ export async function syncDigylogStatuses(): Promise<{
   const syncId = (syncLog as { id: string } | null)?.id;
 
   const client = await createDigylogClientFromDB();
-  const trackings = rows.map((r) => r.delivery_tracking_number);
 
-  // Fetch historics in batches of 50
+  // Use getOrderInfos per tracking — getHistorics returns change history not current status
   let updated = 0, unchanged = 0, failed = 0;
   const details: Record<string, unknown>[] = [];
 
-  for (let i = 0; i < trackings.length; i += 50) {
-    const batch    = trackings.slice(i, i + 50);
-    const historics = await client.getHistorics(batch);
+  for (const order of rows) {
+    const t = order.delivery_tracking_number;
+    try {
+      const info = await client.getOrderInfos(t);
+      if (!info) { failed++; continue; }
 
-    for (const order of rows.filter((r) => batch.includes(r.delivery_tracking_number))) {
-      const t       = order.delivery_tracking_number;
-      const history = historics[t];
+      // getOrderInfos returns current status
+      const idStatus  = Number(info.idStatus ?? info.id_status ?? 0);
+      const extStatus = String(info.status ?? info.libelle ?? "");
 
-      if (!history || !Array.isArray(history) || !history.length) {
-        failed++;
-        continue;
-      }
+      if (!idStatus && !extStatus) { failed++; continue; }
 
-      // Get latest status
-      const latest = history[history.length - 1] as unknown as Record<string, unknown>;
-      const idStatus = Number(latest.idStatus ?? latest.id_status ?? 0);
-      const extStatus = String(latest.status ?? latest.libelle ?? "");
-
-      if (!idStatus) { failed++; continue; }
-
-      const mapped = mapDigylogStatus(idStatus, extStatus);
+      const mapped    = mapDigylogStatus(idStatus, extStatus);
       const oldStatus = order.delivery_status ?? order.status;
 
       console.log("DIGYLOG STATUS SYNC CHECK", {
-        tracking:          t,
+        tracking:         t,
         oldStatus,
-        newStatus:         extStatus,
-        normalizedStatus:  mapped.internal,
-        source:            "manual_sync",
+        newStatus:        extStatus,
+        normalizedStatus: mapped.internal,
+        source:           "manual_sync",
       });
 
       if (mapped.internal === oldStatus) { unchanged++; continue; }
 
-      // Update order
+      const now = new Date().toISOString();
       const orderUpdate: Record<string, unknown> = {
         delivery_status:            mapped.internal,
         shipment_status:            mapped.internal,
-        shipment_status_updated_at: new Date().toISOString(),
+        shipment_status_updated_at: now,
         status:                     mapped.orderStatus,
-        last_webhook_payload:       latest,
+        last_webhook_payload:       info as unknown as Record<string, unknown>,
       };
-      if (mapped.isPaid)      { orderUpdate.is_paid = true; orderUpdate.paid_at = latest.updatedAt ?? new Date().toISOString(); }
-      if (mapped.isDelivered && !mapped.isPaid) orderUpdate.delivered_at = latest.updatedAt ?? new Date().toISOString();
-      if (mapped.isReturned)  orderUpdate.returned_at = latest.updatedAt ?? new Date().toISOString();
+      if (mapped.isPaid)                     { orderUpdate.is_paid = true; orderUpdate.paid_at = now; }
+      if (mapped.isDelivered && !mapped.isPaid) orderUpdate.delivered_at = now;
+      if (mapped.isReturned)                   orderUpdate.returned_at = now;
 
       await supabaseAdmin.from("orders").update(orderUpdate as never).eq("id", order.id);
 
-      // Insert shipment event
       await supabaseAdmin.from("delivery_status_events").insert({
         order_id:           order.id,
         tracking_number:    t,
@@ -376,13 +366,15 @@ export async function syncDigylogStatuses(): Promise<{
         external_status_id: idStatus,
         internal_status:    mapped.internal,
         normalized_status:  mapped.internal,
-        event_time:         String(latest.updatedAt ?? new Date().toISOString()),
-        raw_payload:        latest,
+        event_time:         now,
+        raw_payload:        info as unknown as Record<string, unknown>,
         event_hash:         `manual_sync_${t}_${idStatus}_${Date.now()}`,
       } as never).then(() => {}, () => {});
 
       updated++;
       details.push({ tracking: t, oldStatus, newStatus: mapped.internal });
+    } catch {
+      failed++;
     }
   }
 
