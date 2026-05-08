@@ -1,31 +1,51 @@
 /**
  * lib/dashboard/queries.ts
- * Server-side dashboard data queries.
+ * Server-side dashboard data queries — Real Finance System.
  * All finance data requires manager+ role — enforced by callers.
  */
 import { createClient } from "@/lib/supabase/server";
+import { normalizeCity, getExpectedDeliveryCost } from "@/lib/delivery/reconciliation-utils";
 
 export interface DashboardSummary {
-  total_leads:          number;
-  confirmed_count:      number;
-  sent_to_delivery_count:number;
-  in_transit_count:     number;
-  delivered_count:      number;
-  paid_count:           number;
-  returned_count:       number;
-  refused_count:        number;
-  no_answer_count:      number;
-  cancelled_count:      number;
-  estimated_revenue:  number;
-  real_revenue:       number;
-  estimated_profit:   number;
-  real_profit:        number;
-  total_cogs:         number;
-  total_delivery_cost:number;
-  total_return_losses:number;
-  pending_collection: number;
-  confirmation_rate:  number;
-  delivery_rate:      number;
+  total_leads:            number;
+  confirmed_count:        number;
+  sent_to_delivery_count: number;
+  in_transit_count:       number;
+  delivered_count:        number;
+  paid_count:             number;
+  returned_count:         number;
+  refused_count:          number;
+  no_answer_count:        number;
+  cancelled_count:        number;
+  estimated_revenue:      number;
+  real_revenue:           number;
+  estimated_profit:       number;
+  real_profit:            number;
+  total_cogs:             number;
+  total_delivery_cost:    number;
+  total_return_losses:    number;
+  pending_collection:     number;
+  confirmation_rate:      number;
+  delivery_rate:          number;
+  // New real finance fields
+  total_delivery_margin:  number;  // +10 MAD per Casa order
+  total_delivery_overcharge: number; // Digylog overcharged us
+  casa_orders_count:      number;
+  net_margin_pct:         number;
+  roi:                    number;
+}
+
+export interface FinanceAnomaly {
+  id:              string;
+  order_id:        string;
+  tracking_number: string | null;
+  anomaly_type:    string;
+  expected_value:  number;
+  actual_value:    number;
+  difference:      number;
+  description:     string | null;
+  resolved:        boolean;
+  created_at:      string;
 }
 
 export interface ProductPerformance {
@@ -40,8 +60,10 @@ export interface ProductPerformance {
   confirmed_count:     number;
   delivered_count:     number;
   returned_count:      number;
+  refused_count:       number;
   confirmation_rate:   number;
   delivery_rate:       number;
+  refusal_rate:        number;
   total_revenue:       number;
   real_revenue:        number;
   estimated_profit:    number;
@@ -82,7 +104,7 @@ export interface DeliveryClaim {
 }
 
 export interface DateFilter {
-  from: string; // ISO date
+  from: string;
   to:   string;
 }
 
@@ -95,6 +117,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     .select([
       "status","is_paid","total_amount_mad","estimated_profit",
       "real_profit_mad","cogs_total","delivery_cost_real_mad","return_cost_mad",
+      "customer_city","expected_delivery_cost","delivery_margin","actual_delivery_cost",
     ].join(","))
     .neq("status", "cancelled");
 
@@ -108,53 +131,177 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     total_amount_mad: number; estimated_profit: number;
     real_profit_mad: number | null; cogs_total: number;
     delivery_cost_real_mad: number; return_cost_mad: number;
+    customer_city: string | null;
+    expected_delivery_cost: number | null;
+    delivery_margin: number | null;
+    actual_delivery_cost: number | null;
   }[];
 
   const CONFIRMED_STATUSES = new Set(["confirmed","sent_to_delivery","in_transit","delivered","paid"]);
   const DELIVERED_STATUSES = new Set(["delivered","paid"]);
 
-  const total_leads          = rows.length;
-  const confirmed_count      = rows.filter((r) => CONFIRMED_STATUSES.has(r.status)).length;
+  const total_leads            = rows.length;
+  const confirmed_count        = rows.filter((r) => CONFIRMED_STATUSES.has(r.status)).length;
   const sent_to_delivery_count = rows.filter((r) => r.status === "sent_to_delivery").length;
-  const in_transit_count     = rows.filter((r) => r.status === "in_transit").length;
-  const delivered_count      = rows.filter((r) => DELIVERED_STATUSES.has(r.status)).length;
-  const paid_count           = rows.filter((r) => r.status === "paid" && r.is_paid).length;
-  const returned_count       = rows.filter((r) => r.status === "returned").length;
-  const refused_count        = rows.filter((r) => r.status === "refused").length;
-  const no_answer_count      = rows.filter((r) => r.status === "no_answer").length;
-  const cancelled_count      = 0;
+  const in_transit_count       = rows.filter((r) => r.status === "in_transit").length;
+  const delivered_count        = rows.filter((r) => DELIVERED_STATUSES.has(r.status)).length;
+  const paid_count             = rows.filter((r) => r.status === "paid" && r.is_paid).length;
+  const returned_count         = rows.filter((r) => r.status === "returned").length;
+  const refused_count          = rows.filter((r) => r.status === "refused_delivery").length;
+  const no_answer_count        = rows.filter((r) => r.status === "no_answer").length;
+  const cancelled_count        = 0;
 
-  const estimated_revenue  = rows.reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
-  const real_revenue       = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
-  const estimated_profit   = rows.reduce((s, r) => s + (r.estimated_profit ?? 0), 0);
-  const real_profit        = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.real_profit_mad ?? 0), 0);
-  const total_cogs         = rows.reduce((s, r) => s + (r.cogs_total ?? 0), 0);
-  const total_delivery_cost= rows.reduce((s, r) => s + (r.delivery_cost_real_mad ?? 0), 0);
-  const total_return_losses= rows.reduce((s, r) => s + (r.return_cost_mad ?? 0), 0);
-  const pending_collection = rows
+  const estimated_revenue   = rows.reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
+  const real_revenue        = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
+  const estimated_profit    = rows.reduce((s, r) => s + (r.estimated_profit ?? 0), 0);
+  const real_profit         = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.real_profit_mad ?? 0), 0);
+  const total_cogs          = rows.reduce((s, r) => s + (r.cogs_total ?? 0), 0);
+  const total_delivery_cost = rows.reduce((s, r) => s + (r.delivery_cost_real_mad ?? 0), 0);
+  const total_return_losses = rows.reduce((s, r) => s + (r.return_cost_mad ?? 0), 0);
+  const pending_collection  = rows
     .filter((r) => DELIVERED_STATUSES.has(r.status) && !r.is_paid)
     .reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
+
+  // Delivery margin: +10 MAD for each Casa order
+  let total_delivery_margin = 0;
+  let total_delivery_overcharge = 0;
+  let casa_orders_count = 0;
+
+  for (const r of rows) {
+    const city = r.customer_city ?? "";
+    const norm = normalizeCity(city);
+    const expectedCost = getExpectedDeliveryCost(city);
+    const actualCost   = r.actual_delivery_cost ?? r.delivery_cost_real_mad ?? expectedCost;
+    const margin       = r.delivery_margin ?? (35 - expectedCost);
+
+    if (norm === "Casablanca") casa_orders_count++;
+    total_delivery_margin += margin;
+
+    // Overcharge = Digylog charged more than expected
+    const overcharge = actualCost - expectedCost;
+    if (overcharge > 0.5) total_delivery_overcharge += overcharge;
+  }
 
   const confirmation_rate = total_leads > 0
     ? Math.round(confirmed_count / total_leads * 1000) / 10 : 0;
   const delivery_rate = confirmed_count > 0
     ? Math.round(delivered_count / confirmed_count * 1000) / 10 : 0;
+  const net_margin_pct = real_revenue > 0
+    ? Math.round(real_profit / real_revenue * 1000) / 10 : 0;
+  const roi = total_cogs > 0
+    ? Math.round(real_profit / total_cogs * 1000) / 10 : 0;
 
   return {
     total_leads, confirmed_count, sent_to_delivery_count, in_transit_count,
-    delivered_count, paid_count, returned_count,
-    refused_count, no_answer_count, cancelled_count,
+    delivered_count, paid_count, returned_count, refused_count,
+    no_answer_count, cancelled_count,
     estimated_revenue, real_revenue, estimated_profit, real_profit,
     total_cogs, total_delivery_cost, total_return_losses, pending_collection,
     confirmation_rate, delivery_rate,
+    total_delivery_margin, total_delivery_overcharge, casa_orders_count,
+    net_margin_pct, roi,
   };
+}
+
+// ── Finance anomalies ──────────────────────────────────────────────────────────
+export async function getFinanceAnomalies(limit = 50): Promise<FinanceAnomaly[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("finance_anomalies")
+    .select("*")
+    .eq("resolved", false)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return (data ?? []) as FinanceAnomaly[];
+}
+
+// ── Detect and save anomalies from current orders ─────────────────────────────
+export async function detectFinanceAnomalies(filter?: DateFilter): Promise<number> {
+  const supabase = await createClient();
+
+  let q = supabase
+    .from("orders")
+    .select("id,order_number,delivery_tracking_number,customer_city,total_amount_mad,delivery_cost_real_mad,actual_delivery_cost,is_paid,status,real_profit_mad")
+    .neq("status", "cancelled");
+
+  if (filter) {
+    q = q.gte("created_at", filter.from).lte("created_at", filter.to + "T23:59:59");
+  }
+
+  const { data } = await q;
+  type ORow = {
+    id: string; order_number: string; delivery_tracking_number: string | null;
+    customer_city: string | null; total_amount_mad: number;
+    delivery_cost_real_mad: number; actual_delivery_cost: number | null;
+    is_paid: boolean; status: string; real_profit_mad: number | null;
+  };
+
+  const orders = (data ?? []) as ORow[];
+  const anomalies: Record<string, unknown>[] = [];
+
+  for (const o of orders) {
+    const city = o.customer_city ?? "";
+    const expectedCost = getExpectedDeliveryCost(city);
+    const actualCost   = o.actual_delivery_cost ?? o.delivery_cost_real_mad ?? expectedCost;
+    const feeDiff      = actualCost - expectedCost;
+
+    // Delivery overcharge
+    if (feeDiff > 0.5) {
+      anomalies.push({
+        order_id:        o.id,
+        tracking_number: o.delivery_tracking_number,
+        anomaly_type:    "delivery_overcharge",
+        expected_value:  expectedCost,
+        actual_value:    actualCost,
+        difference:      feeDiff,
+        description:     `${normalizeCity(city)}: attendu ${expectedCost} MAD, facturé ${actualCost} MAD`,
+      });
+    }
+
+    // Delivered but unpaid for too long
+    if (["delivered","paid"].includes(o.status) && !o.is_paid) {
+      anomalies.push({
+        order_id:        o.id,
+        tracking_number: o.delivery_tracking_number,
+        anomaly_type:    "unpaid_delivered",
+        expected_value:  o.total_amount_mad,
+        actual_value:    0,
+        difference:      o.total_amount_mad,
+        description:     `Commande livrée non payée: ${o.total_amount_mad} MAD`,
+      });
+    }
+
+    // Negative profit
+    if (o.is_paid && o.real_profit_mad !== null && o.real_profit_mad < -10) {
+      anomalies.push({
+        order_id:        o.id,
+        tracking_number: o.delivery_tracking_number,
+        anomaly_type:    "negative_profit",
+        expected_value:  0,
+        actual_value:    o.real_profit_mad,
+        difference:      o.real_profit_mad,
+        description:     `Profit négatif: ${o.real_profit_mad.toFixed(2)} MAD`,
+      });
+    }
+  }
+
+  if (anomalies.length > 0) {
+    // Upsert anomalies (skip if already exists for same order + type)
+    for (const a of anomalies) {
+      await supabase.from("finance_anomalies").upsert(
+        a as never,
+        { onConflict: "order_id,anomaly_type", ignoreDuplicates: true }
+      );
+    }
+  }
+
+  return anomalies.length;
 }
 
 // ── Product performance ────────────────────────────────────────────────────────
 export async function getProductPerformance(filter?: DateFilter): Promise<ProductPerformance[]> {
   const supabase = await createClient();
 
-  // Two-query pattern to avoid FK join issues
   const { data: products } = await supabase
     .from("products")
     .select("id,name,sku,sale_price_mad,total_cost_mad,estimated_profit_mad,ads_cost_mad,packaging_cost_mad,confirmation_cost_mad,shipping_cost_mad")
@@ -169,7 +316,6 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
     confirmation_cost_mad: number; shipping_cost_mad: number;
   }[];
 
-  // Fetch order items with their orders
   const { data: items } = await supabase
     .from("order_items")
     .select("product_id,order_id")
@@ -199,7 +345,6 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
     ordersMap.set(o.id, o);
   }
 
-  // Group items by product
   const productOrders = new Map<string, string[]>();
   for (const item of (items as { product_id: string; order_id: string }[])) {
     if (!productOrders.has(item.product_id)) productOrders.set(item.product_id, []);
@@ -221,11 +366,14 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
     const confirmed_count = rows.filter((r) => CONF.has(r.status)).length;
     const delivered_count = rows.filter((r) => DELV.has(r.status)).length;
     const returned_count  = rows.filter((r) => r.status === "returned").length;
+    const refused_count   = rows.filter((r) => r.status === "refused_delivery").length;
 
     const confirmation_rate = lead_count > 0
       ? Math.round(confirmed_count / lead_count * 1000) / 10 : 0;
     const delivery_rate = confirmed_count > 0
       ? Math.round(delivered_count / confirmed_count * 1000) / 10 : 0;
+    const refusal_rate = confirmed_count > 0
+      ? Math.round(refused_count / confirmed_count * 1000) / 10 : 0;
 
     const total_revenue    = rows.reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
     const real_revenue     = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
@@ -246,10 +394,10 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
       product_id: p.id, product_name: p.name, sku: p.sku,
       sale_price_mad: p.sale_price_mad, total_cost_mad: p.total_cost_mad,
       unit_profit: p.estimated_profit_mad, ads_cost_mad: p.ads_cost_mad,
-      lead_count, confirmed_count, delivered_count, returned_count,
-      confirmation_rate, delivery_rate, total_revenue, real_revenue,
-      estimated_profit, real_profit, total_cogs, total_delivery_cost,
-      return_losses, real_margin_pct,
+      lead_count, confirmed_count, delivered_count, returned_count, refused_count,
+      confirmation_rate, delivery_rate, refusal_rate,
+      total_revenue, real_revenue, estimated_profit, real_profit,
+      total_cogs, total_delivery_cost, return_losses, real_margin_pct,
       performance_status: performance_status as ProductPerformance["performance_status"],
     };
   });
@@ -260,10 +408,11 @@ function makeEmptyPerf(p: { id: string; name: string; sku: string; sale_price_ma
     product_id: p.id, product_name: p.name, sku: p.sku,
     sale_price_mad: p.sale_price_mad, total_cost_mad: p.total_cost_mad,
     unit_profit: p.estimated_profit_mad, ads_cost_mad: p.ads_cost_mad,
-    lead_count: 0, confirmed_count: 0, delivered_count: 0, returned_count: 0,
-    confirmation_rate: 0, delivery_rate: 0, total_revenue: 0, real_revenue: 0,
-    estimated_profit: 0, real_profit: 0, total_cogs: 0, total_delivery_cost: 0,
-    return_losses: 0, real_margin_pct: 0, performance_status: "no_data",
+    lead_count: 0, confirmed_count: 0, delivered_count: 0, returned_count: 0, refused_count: 0,
+    confirmation_rate: 0, delivery_rate: 0, refusal_rate: 0,
+    total_revenue: 0, real_revenue: 0, estimated_profit: 0, real_profit: 0,
+    total_cogs: 0, total_delivery_cost: 0, return_losses: 0, real_margin_pct: 0,
+    performance_status: "no_data",
   };
 }
 
@@ -329,8 +478,7 @@ export async function getDeliveryClaims(): Promise<{ claims: DeliveryClaim[]; to
     .map((o) => ({
       ...o,
       claim_amount: ["delivered","paid"].includes(o.status) && !o.is_paid
-        ? o.total_amount_mad
-        : o.return_cost_mad,
+        ? o.total_amount_mad : o.return_cost_mad,
       claim_type: (["delivered","paid"].includes(o.status) && !o.is_paid
         ? "pending_collection"
         : o.status === "returned" ? "return_claim" : "other") as DeliveryClaim["claim_type"],

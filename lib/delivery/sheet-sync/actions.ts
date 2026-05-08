@@ -176,7 +176,7 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
       const { data: prodData } = await supabaseAdmin
         .from("products")
         .select("id,name,sku,sale_price_mad,total_cost_mad")
-        .ilike("sku", sku)
+        .eq("sku", sku)
         .maybeSingle();
       type ProdRow = { id:string; name:string; sku:string; sale_price_mad:number; total_cost_mad:number };
       const prod = prodData as ProdRow | null;
