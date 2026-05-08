@@ -94,7 +94,7 @@ export function mapDigylogStatus(
   }
 
   const ORDER_STATUS: Record<DigylogInternalStatus, string> = {
-    not_sent:         "sent_to_delivery",
+    not_sent:         "not_sent",          // Still in Digylog "Non envoyées" — not picked up yet
     in_transit:       "in_transit",
     delivered:        "delivered",
     paid:             "paid",

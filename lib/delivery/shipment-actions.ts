@@ -201,7 +201,7 @@ export async function sendOrderToDigylog(orderId: string): Promise<{
       delivery_external_status_id: 0,
       delivery_status:             "not_sent",
       delivery_last_sync_at:       new Date().toISOString(),
-      status:                      "sent_to_delivery",
+      status:                      "not_sent",    // Will update to sent_to_delivery after PUT /orders/send
       bl_id:                       blId,
     } as never).eq("id", orderId),
   ]);
@@ -209,7 +209,16 @@ export async function sendOrderToDigylog(orderId: string): Promise<{
   if (shipmentRes.error) console.error("❌ shipment upsert error:", shipmentRes.error.message);
   if (orderRes.error)    console.error("❌ order update error:",   orderRes.error.message);
 
-  // 9. Log event
+  // 9. Log lifecycle
+  console.log("DIGYLOG ORDER LIFECYCLE", {
+    orderNumber: o.order_number,
+    trackingNumber: tracking,
+    created: true,
+    sentToDelivery: false,
+    digylogStatus: "Non envoyé (idStatus=0) — order in Non envoyées, not picked up yet",
+  });
+
+  // 10. Log event
   await supabaseAdmin.from("delivery_status_events").insert({
     order_id:           orderId,
     tracking_number:    tracking,

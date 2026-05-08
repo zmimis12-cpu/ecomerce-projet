@@ -17,7 +17,8 @@ export type OrderStatus =
   | "shipped"
   | "partially_returned"
   | "in_transit"
-  | "refused_delivery";
+  | "refused_delivery"
+  | "not_sent";               // Created in Digylog but not sent yet (Non envoyée)
 
 export interface OrderItem {
   id: string;
@@ -150,6 +151,7 @@ export const STATUS_LABELS: Record<OrderStatus, string> = {
   no_answer:        "Sans réponse",
   processing:       "En traitement",
   sent_to_delivery: "Envoyé en livraison",
+  not_sent:         "Créé — Non envoyée",
   in_transit:       "En transit",
   refused_delivery: "Refusé à la livraison",
   delivered:        "Livré",
@@ -168,6 +170,7 @@ export const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string; dot:
   no_answer:        { bg: "bg-orange-50", text: "text-orange-700",dot: "bg-orange-400" },
   processing:       { bg: "bg-purple-50", text: "text-purple-700",dot: "bg-purple-500" },
   sent_to_delivery: { bg: "bg-indigo-50", text: "text-indigo-700",dot: "bg-indigo-500" },
+  not_sent:         { bg: "bg-yellow-50", text: "text-yellow-700", dot: "bg-yellow-500" },
   delivered:        { bg: "bg-teal-50",   text: "text-teal-700",  dot: "bg-teal-500" },
   paid:             { bg: "bg-emerald-50",text: "text-emerald-700",dot: "bg-emerald-500" },
   returned:         { bg: "bg-amber-50",  text: "text-amber-700", dot: "bg-amber-500" },
