@@ -204,6 +204,7 @@ export const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   partially_returned:["returned"],
   in_transit:       ["delivered", "refused_delivery", "returned"],
   refused_delivery: ["returned"],
+  not_sent:         ["sent_to_delivery", "cancelled"],
 };
 
 export function formatOrderDate(dateStr: string): string {
