@@ -4,8 +4,10 @@ import { setSettings } from "@/lib/settings/settings-service";
 import { cn } from "@/lib/utils";
 import {
   Settings, Truck, BarChart3, ScanLine,
-  Phone, Megaphone, FileSpreadsheet, Shield, CheckCircle2, X
+  Phone, FileSpreadsheet, Users, CheckCircle2, X
 } from "lucide-react";
+import { UsersTab } from "@/components/settings/users-tab";
+import type { UserRow } from "@/lib/settings/users-actions";
 
 interface SettingRow {
   key: string; value: unknown; category: string;
@@ -19,6 +21,7 @@ const TABS = [
   { id: "scanner",       label: "Scanner",         icon: ScanLine },
   { id: "call_center",   label: "Call Center",     icon: Phone },
   { id: "google_sheets", label: "Google Sheets",   icon: FileSpreadsheet },
+  { id: "users",         label: "Utilisateurs",    icon: Users },
 ] as const;
 
 type TabId = typeof TABS[number]["id"];
@@ -53,7 +56,7 @@ const SETTING_META: Record<string, { label: string; description?: string; type: 
   gsheet_sync_interval:    { label: "Intervalle sync (minutes)",   type: "number" },
 };
 
-export function SettingsClient({ settings }: { settings: SettingRow[] }) {
+export function SettingsClient({ settings, users = [] }: { settings: SettingRow[]; users?: UserRow[] }) {
   const [activeTab, setActiveTab] = useState<TabId>("general");
   const [values, setValues]       = useState<Record<string, unknown>>(() => {
     const map: Record<string, unknown> = {};
@@ -127,12 +130,16 @@ export function SettingsClient({ settings }: { settings: SettingRow[] }) {
             </div>
           </div>
 
-          {tabSettings.length === 0 && (
+          {/* Users tab renders separately */}
+          {activeTab === "users" && <UsersTab initialUsers={users} />}
+
+          {activeTab !== "users" && tabSettings.length === 0 && (
             <p className="text-sm text-muted-foreground py-8 text-center">
               Aucun paramètre pour cette section.
             </p>
           )}
 
+          {activeTab !== "users" && (
           <div className="space-y-4">
             {tabSettings.map((setting) => {
               const meta = SETTING_META[setting.key];
@@ -178,6 +185,7 @@ export function SettingsClient({ settings }: { settings: SettingRow[] }) {
               );
             })}
           </div>
+          )}
         </div>
       </div>
     </div>
