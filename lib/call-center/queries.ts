@@ -12,7 +12,7 @@ export async function getAgentStats(): Promise<AgentStats[]> {
   const { data: agents } = await supabase
     .from("users")
     .select("id, full_name, email, role")
-    .in("role", ["call_center_agent", "admin", "manager", "super_admin"])
+    .eq("role", "call_center_agent")  // Only real CC agents — no admins
     .eq("is_active", true)
     .order("full_name");
 

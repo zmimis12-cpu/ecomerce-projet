@@ -171,11 +171,15 @@ export async function getOrder(id: string): Promise<Order | null> {
 
 export async function getAgents() {
   const supabase = await createClient();
+  // Only real call center agents — not admin/super_admin
   const { data } = await supabase
     .from("users")
-    .select("id, full_name, email, role")
-    .in("role", ["super_admin", "admin", "manager", "call_center_agent"])
+    .select("id, full_name, email, role, availability_status")
+    .eq("role", "call_center_agent")
     .eq("is_active", true)
     .order("full_name");
-  return (data ?? []) as unknown as { id: string; full_name: string; email: string; role: string }[];
+  return (data ?? []) as unknown as {
+    id: string; full_name: string; email: string;
+    role: string; availability_status: string | null;
+  }[];
 }

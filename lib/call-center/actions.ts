@@ -127,13 +127,24 @@ export async function assignOrderToAgent(orderId: string, agentId: string | null
   await requireRole([...MANAGER_ROLES]);
   const supabase = await createClient();
 
+  // Server-side validation: agentId must be a call_center_agent
+  if (agentId) {
+    const { data: agent } = await supabase.from("users").select("role, is_active")
+      .eq("id", agentId).maybeSingle();
+    const a = agent as { role: string; is_active: boolean } | null;
+    if (!a || a.role !== "call_center_agent" || !a.is_active) {
+      return { success: false, error: "Utilisateur invalide — doit être agent call center actif." };
+    }
+  }
+
   const { error } = await supabase
     .from("orders")
-    .update({ assigned_to: agentId } as never)
+    .update({ assigned_to: agentId, assigned_at: agentId ? new Date().toISOString() : null } as never)
     .eq("id", orderId);
 
   if (error) return { success: false, error: error.message };
 
+  revalidatePath("/admin/call-center/queue");
   revalidatePath("/admin/call-center/orders");
   revalidatePath("/admin/orders");
   return { success: true };

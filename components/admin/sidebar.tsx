@@ -5,29 +5,37 @@ import {
   LayoutDashboard, Package, ShoppingCart, PhoneCall,
   Truck, Layers, FileSpreadsheet, FileText, FolderOpen,
   ScanLine, RotateCcw, BarChart3, Globe, Settings,
-  Shield, Phone, CalendarClock, Award,
+  Shield, Phone, Award, Users, ListOrdered,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/lib/settings/users-constants";
 
-// ─── Nav item definition ────────────────────────────────────────────────────
 type NavItem = { href: string; label: string; icon: React.ElementType; exact?: boolean };
-type NavGroup = { label: string | null; items: NavItem[] };
+type NavGroup = { label: string | null; items: NavItem[]; groupPrefix?: string };
 
-// ─── Full nav map — filtered per role ───────────────────────────────────────
-const ALL_NAV: NavGroup[] = [
+// ─── Admin / Manager full nav ─────────────────────────────────────────────────
+const ADMIN_NAV: NavGroup[] = [
   {
     label: null,
     items: [
-      { href: "/admin",             label: "Dashboard",    icon: LayoutDashboard, exact: true  },
-      { href: "/admin/products",    label: "Produits",     icon: Package          },
-      { href: "/admin/orders",      label: "Commandes",    icon: ShoppingCart     },
-      { href: "/admin/call-center", label: "Call Center",  icon: PhoneCall        },
-      { href: "/admin/call-center/commissions", label: "Commissions CC", icon: Award },  
+      { href: "/admin",          label: "Dashboard", icon: LayoutDashboard, exact: true },
+      { href: "/admin/products", label: "Produits",  icon: Package          },
+      { href: "/admin/orders",   label: "Commandes", icon: ShoppingCart     },
+    ],
+  },
+  {
+    label: "Call Center",
+    groupPrefix: "/admin/call-center",
+    items: [
+      { href: "/admin/call-center",             label: "Vue globale",     icon: PhoneCall,    exact: true },
+      { href: "/admin/call-center/queue",        label: "File d'appels",   icon: ListOrdered   },
+      { href: "/admin/call-center/agents",       label: "Agents",          icon: Users         },
+      { href: "/admin/call-center/commissions",  label: "Commissions",     icon: Award         },
     ],
   },
   {
     label: "Livraison",
+    groupPrefix: "/admin/delivery",
     items: [
       { href: "/admin/delivery",            label: "Suivi Livraison",    icon: Truck,          exact: true },
       { href: "/admin/delivery/documents",  label: "BL du Jour",         icon: FileText        },
@@ -56,19 +64,20 @@ const ALL_NAV: NavGroup[] = [
   },
 ];
 
-// ─── Call center agent gets its own minimal nav ──────────────────────────────
+// ─── Call center agent — minimal nav ──────────────────────────────────────────
 const CC_AGENT_NAV: NavGroup[] = [
   {
     label: null,
     items: [
       { href: "/admin/call-center/my-dashboard", label: "Mon Dashboard",  icon: LayoutDashboard, exact: true  },
-      { href: "/admin/call-center/queue",         label: "File d'appels", icon: Phone,           exact: false },
+      { href: "/admin/call-center/queue",         label: "File d'appels", icon: ListOrdered,     exact: false },
       { href: "/admin/call-center/my-orders",     label: "Mes commandes", icon: ShoppingCart,    exact: false },
+      { href: "/admin/call-center/my-dashboard",  label: "Mes gains",     icon: Award,           exact: true  },
     ],
   },
 ];
 
-// ─── Scanner agent nav ───────────────────────────────────────────────────────
+// ─── Scanner agent nav ────────────────────────────────────────────────────────
 const SCANNER_AGENT_NAV: NavGroup[] = [
   {
     label: null,
@@ -79,36 +88,13 @@ const SCANNER_AGENT_NAV: NavGroup[] = [
   },
 ];
 
-// ─── Routes allowed per role ─────────────────────────────────────────────────
-const ROLE_ALLOWED_PREFIXES: Record<AppRole, string[]> = {
-  super_admin:       ["/admin"],
-  admin:             ["/admin"],
-  manager:           ["/admin"],
-  finance:           ["/admin/finance", "/admin/delivery/invoices", "/admin/orders", "/admin/digylog", "/admin"],
-  scanner_agent:     ["/admin/scanner", "/admin/returns"],
-  call_center_agent: ["/admin/call-center/my-dashboard", "/admin/call-center/queue", "/admin/call-center/my-orders", "/admin/call-center"],
-  media_buyer:       ["/admin/finance", "/admin/landing-pages", "/admin"],
-  viewer:            ["/admin/orders", "/admin"],
-};
-
 function getNavForRole(role: AppRole): NavGroup[] {
   if (role === "call_center_agent") return CC_AGENT_NAV;
   if (role === "scanner_agent")     return SCANNER_AGENT_NAV;
-
-  // For other roles — filter ALL_NAV by allowed prefixes
-  const allowed = ROLE_ALLOWED_PREFIXES[role] ?? ["/admin"];
-
-  if (allowed.includes("/admin")) return ALL_NAV; // full access
-
-  return ALL_NAV.map((group) => ({
-    ...group,
-    items: group.items.filter((item) =>
-      allowed.some((prefix) => item.href.startsWith(prefix))
-    ),
-  })).filter((group) => group.items.length > 0);
+  // All management roles get admin nav (filtered if needed)
+  return ADMIN_NAV;
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
 export function AdminSidebar({ role }: { role: AppRole }) {
   const pathname  = usePathname();
   const navGroups = getNavForRole(role);
@@ -116,8 +102,14 @@ export function AdminSidebar({ role }: { role: AppRole }) {
   function isActive(href: string, exact?: boolean) {
     if (exact) return pathname === href;
     if (href === "/admin/delivery") return pathname === "/admin/delivery";
-    if (href === "/admin") return pathname === "/admin";
+    if (href === "/admin")          return pathname === "/admin";
+    if (href === "/admin/call-center") return pathname === "/admin/call-center";
     return pathname.startsWith(href);
+  }
+
+  function isGroupActive(prefix?: string) {
+    if (!prefix) return false;
+    return pathname.startsWith(prefix);
   }
 
   return (
@@ -131,28 +123,39 @@ export function AdminSidebar({ role }: { role: AppRole }) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-3 overflow-y-auto space-y-4">
-        {navGroups.map((group, gi) => (
-          <div key={gi} className="space-y-0.5">
-            {group.label && (
-              <p className="px-3 py-1 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">
-                {group.label}
-              </p>
-            )}
-            {group.items.map(({ href, label, icon: Icon, exact }) => (
-              <Link key={href} href={href}
-                className={cn(
-                  "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  isActive(href, exact)
-                    ? "bg-secondary text-foreground"
-                    : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+      <nav className="flex-1 px-2 py-3 overflow-y-auto space-y-1">
+        {navGroups.map((group, gi) => {
+          const groupActive = isGroupActive(group.groupPrefix);
+          return (
+            <div key={gi} className={cn("space-y-0.5", gi > 0 && "pt-2")}>
+              {group.label && (
+                <p className={cn(
+                  "px-3 py-1 text-[10px] font-bold uppercase tracking-widest",
+                  groupActive
+                    ? "text-primary"
+                    : "text-muted-foreground/60"
                 )}>
-                <Icon className="h-4 w-4 shrink-0" />
-                {label}
-              </Link>
-            ))}
-          </div>
-        ))}
+                  {group.label}
+                </p>
+              )}
+              {group.items.map(({ href, label, icon: Icon, exact }) => {
+                const active = isActive(href, exact);
+                return (
+                  <Link key={href} href={href}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      active
+                        ? "bg-secondary text-foreground"
+                        : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                    )}>
+                    <Icon className="h-4 w-4 shrink-0" />
+                    {label}
+                  </Link>
+                );
+              })}
+            </div>
+          );
+        })}
       </nav>
 
       <div className="px-4 py-3 border-t shrink-0">
