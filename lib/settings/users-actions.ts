@@ -44,31 +44,72 @@ export async function createUser(params: {
     return { success: false, error: "Permission refusée — vous ne pouvez pas créer un super admin." };
   }
 
-  // Create auth user via admin API
+  // 1. Create auth user via admin API (service role only — never exposed to frontend)
   const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-    email:    params.email,
-    password: params.password,
-    email_confirm: true,
-    user_metadata: { full_name: params.fullName },
+    email:         params.email,
+    password:      params.password,
+    email_confirm: true,  // skip email verification — admin created
+    user_metadata: { full_name: params.fullName, role: params.role },
   });
 
-  if (authError || !authUser.user) {
-    return { success: false, error: authError?.message ?? "Erreur création utilisateur." };
+  console.log("CREATE USER DEBUG", {
+    email:        params.email,
+    authCreated:  !!authUser?.user?.id,
+    authError:    authError?.message ?? null,
+    userId:       authUser?.user?.id ?? null,
+  });
+
+  if (authError || !authUser?.user) {
+    return { success: false, error: authError?.message ?? "Erreur création utilisateur Supabase Auth." };
   }
 
-  // Upsert in users table
-  const { error: dbError } = await supabaseAdmin.from("users").upsert({
-    id:        authUser.user.id,
-    email:     params.email,
-    full_name: params.fullName,
-    role:      params.role,
-    is_active: true,
-  } as never, { onConflict: "id" });
+  const userId = authUser.user.id;
 
-  if (dbError) {
-    // Cleanup auth user if DB insert fails
-    await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
-    return { success: false, error: dbError.message };
+  // 2. Wait briefly for trigger to fire (handle_new_auth_user creates row with role=viewer)
+  await new Promise((r) => setTimeout(r, 500));
+
+  // 3. Check if trigger created the row
+  const { data: existing } = await supabaseAdmin.from("users").select("id").eq("id", userId).maybeSingle();
+
+  let profileCreated = false;
+  let profileError: string | null = null;
+
+  if (existing) {
+    // Trigger fired — just update role/name
+    const { error: updError } = await supabaseAdmin.from("users").update({
+      full_name: params.fullName,
+      role:      params.role,
+      is_active: true,
+    } as never).eq("id", userId);
+    profileCreated = !updError;
+    profileError   = updError?.message ?? null;
+  } else {
+    // Trigger didn't fire — insert manually
+    const { error: insError } = await supabaseAdmin.from("users").insert({
+      id:        userId,
+      email:     params.email,
+      full_name: params.fullName,
+      role:      params.role,
+      is_active: true,
+    } as never);
+    profileCreated = !insError;
+    profileError   = insError?.message ?? null;
+  }
+
+  console.log("CREATE USER DEBUG", {
+    email:          params.email,
+    authCreated:    true,
+    userId,
+    triggerFired:   !!existing,
+    profileCreated,
+    roleAssigned:   params.role,
+    error:          profileError,
+  });
+
+  if (!profileCreated) {
+    // Rollback — delete auth user
+    await supabaseAdmin.auth.admin.deleteUser(userId);
+    return { success: false, error: `Profil non créé: ${profileError}` };
   }
 
   createAuditLog({
