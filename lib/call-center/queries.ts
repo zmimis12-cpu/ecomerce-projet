@@ -4,7 +4,9 @@
 import { createClient } from "@/lib/supabase/server";
 import type { AgentStats, CallCenterOrder, CallLog } from "@/types/call-center";
 
-// ─── Agent stats ───────────────────────────────────────────────────────────────
+// ============================================================================
+// Agent stats (SOURCE UNIQUE : call_center_agents JOIN users)
+// ============================================================================
 export async function getAgentStats(): Promise<AgentStats[]> {
   const supabase = await createClient();
 
@@ -113,4 +115,139 @@ export async function getAgentStats(): Promise<AgentStats[]> {
       };
     })
     .filter(Boolean);
+}
+
+// ============================================================================
+// Orders for call center list
+// ============================================================================
+export async function getCallCenterOrders(
+  options: {
+    agentId?: string;
+    unassigned?: boolean;
+    callStatus?: string;
+    isAgent?: boolean;
+    authId?: string;
+  } = {}
+): Promise<CallCenterOrder[]> {
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("orders")
+    .select(`
+      id, order_number, customer_name, customer_phone,
+      customer_city, customer_address, status, call_status,
+      call_attempts, last_call_at, assigned_to, notes, created_at
+    `)
+    .not("status", "in", '("cancelled","returned","paid","delivered")')
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (options.isAgent && options.authId) {
+    query = query.eq("assigned_to", options.authId);
+  } else {
+    if (options.agentId)    query = query.eq("assigned_to", options.agentId);
+    if (options.unassigned) query = query.is("assigned_to", null);
+    if (options.callStatus) query = query.eq("call_status", options.callStatus);
+  }
+
+  const { data, error } = await query;
+  if (error) { console.error("[cc] getCallCenterOrders:", error.message); return []; }
+
+  const orderRows = (data ?? []) as unknown as CallCenterOrder[];
+  if (orderRows.length === 0) return [];
+
+  // Fetch agent names
+  const agentIds = [...new Set(orderRows.map((o) => o.assigned_to).filter(Boolean))] as string[];
+  const agentMap: Record<string, string> = {};
+  if (agentIds.length > 0) {
+    const { data: agents } = await supabase
+      .from("users").select("id, full_name").in("id", agentIds);
+    for (const a of (agents ?? []) as unknown as { id: string; full_name: string }[]) {
+      agentMap[a.id] = a.full_name;
+    }
+  }
+
+  // Fetch first product per order
+  const orderIds = orderRows.map((o) => o.id);
+  const { data: items } = await supabase
+    .from("order_items")
+    .select("order_id, product_name, product_sku")
+    .in("order_id", orderIds);
+
+  const itemMap: Record<string, { product_name: string; product_sku: string }> = {};
+  for (const item of (items ?? []) as unknown as { order_id: string; product_name: string; product_sku: string }[]) {
+    if (!itemMap[item.order_id]) itemMap[item.order_id] = item;
+  }
+
+  return orderRows.map((o) => ({
+    ...o,
+    agent_name:         o.assigned_to ? (agentMap[o.assigned_to] ?? null) : null,
+    first_product_name: itemMap[o.id]?.product_name ?? null,
+    first_product_sku:  itemMap[o.id]?.product_sku  ?? null,
+  }));
+}
+
+// ============================================================================
+// Single order for agent view
+// ============================================================================
+export async function getCallCenterOrderDetail(id: string) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select(`
+      id, order_number, customer_name, customer_phone,
+      customer_city, customer_address, customer_region,
+      status, call_status, call_attempts, last_call_at,
+      assigned_to, notes, created_at
+    `)
+    .eq("id", id)
+    .single();
+
+  if (error || !data) return null;
+  const order = data as unknown as CallCenterOrder;
+
+  // Items (no price — agents don't see profit)
+  const { data: items } = await supabase
+    .from("order_items")
+    .select("id, product_name, product_sku, quantity")
+    .eq("order_id", id);
+
+  // Last 10 call logs for this order
+  const { data: logs } = await supabase
+    .from("call_logs")
+    .select("id, agent_id, disposition, duration_seconds, notes, call_started_at, created_at")
+    .eq("order_id", id)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  return {
+    order,
+    items: (items ?? []) as unknown as { id: string; product_name: string; product_sku: string; quantity: number }[],
+    logs:  (logs  ?? []) as unknown as CallLog[],
+  };
+}
+
+// ============================================================================
+// Dashboard summary
+// ============================================================================
+export async function getCallCenterSummary() {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("orders")
+    .select("id, assigned_to, call_status, status")
+    .not("status", "in", '("cancelled","returned","paid","delivered")');
+
+  const rows = (data ?? []) as { id: string; assigned_to: string | null; call_status: string | null; status: string }[];
+
+  const total      = rows.length;
+  const assigned   = rows.filter((o) => o.assigned_to).length;
+  const unassigned = rows.filter((o) => !o.assigned_to).length;
+  const confirmed  = rows.filter((o) => o.call_status === "confirmed").length;
+  const refused    = rows.filter((o) => o.call_status === "refused").length;
+  const no_answer  = rows.filter((o) => o.call_status === "no_answer").length;
+  const rate       = assigned === 0 ? 0 : Math.round((confirmed / assigned) * 100);
+
+  return { total, assigned, unassigned, confirmed, refused, no_answer, confirmation_rate: rate };
 }
