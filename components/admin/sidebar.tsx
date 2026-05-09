@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, PhoneCall,
   Truck, Layers, FileSpreadsheet, FileText, FolderOpen,
   ScanLine, RotateCcw, BarChart3, Globe, Settings,
-  Shield, Phone, CalendarClock,
+  Shield, Phone, CalendarClock, Award,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/lib/settings/users-constants";
@@ -23,6 +23,7 @@ const ALL_NAV: NavGroup[] = [
       { href: "/admin/products",    label: "Produits",     icon: Package          },
       { href: "/admin/orders",      label: "Commandes",    icon: ShoppingCart     },
       { href: "/admin/call-center", label: "Call Center",  icon: PhoneCall        },
+      { href: "/admin/call-center/commissions", label: "Commissions CC", icon: Award },  
     ],
   },
   {
@@ -60,9 +61,9 @@ const CC_AGENT_NAV: NavGroup[] = [
   {
     label: null,
     items: [
-      { href: "/admin",                       label: "Dashboard",      icon: LayoutDashboard, exact: true },
-      { href: "/admin/call-center",           label: "File d'appels",  icon: Phone            },
-      { href: "/admin/call-center/orders",    label: "Mes commandes",  icon: ShoppingCart     },
+      { href: "/admin/call-center/my-dashboard", label: "Mon Dashboard",   icon: LayoutDashboard, exact: true },
+      { href: "/admin/call-center",              label: "File d'appels",  icon: Phone            },
+      { href: "/admin/call-center/orders",       label: "Mes commandes",   icon: ShoppingCart     },
     ],
   },
 ];
