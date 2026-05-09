@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * lib/call-center/queries.ts
  */
@@ -28,7 +30,7 @@ export async function getAgentStats(): Promise<AgentStats[]> {
   }
 
   // Étape 2 : Récupérer les infos users pour ces agents
-  const userIds = agents.map((a: any) => a.user_id);
+  const userIds = (agents as any[]).map((a) => a.user_id);
 
   const { data: users } = await supabase
     .from("users")
@@ -58,7 +60,7 @@ export async function getAgentStats(): Promise<AgentStats[]> {
 
   // Étape 4 : Construire le résultat
   return (agents as any[])
-    .map((agent) => {
+    .map((agent): AgentStats | null => {
       const user = userMap[agent.user_id];
       if (!user) return null;
 
@@ -105,9 +107,9 @@ export async function getAgentStats(): Promise<AgentStats[]> {
         confirmation_rate: confirmationRate,
         fake_rate: fakeRate,
         avg_duration_sec: avgDur,
-      } as AgentStats;
+      };
     })
-    .filter(Boolean) as AgentStats[];
+    .filter((a): a is AgentStats => a !== null);
 }
 
 // ============================================================================
