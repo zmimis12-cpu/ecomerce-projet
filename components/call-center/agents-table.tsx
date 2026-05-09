@@ -10,8 +10,8 @@ export function AgentsTable({ agents }: { agents: AgentStats[] }) {
         <Phone className="h-9 w-9 text-muted-foreground/30 mb-2" />
         <p className="text-sm font-medium">Aucun agent</p>
         <p className="text-xs text-muted-foreground mt-1">
-  Créez des utilisateurs avec le rôle <strong>Call Center</strong> dans Paramètres → Utilisateurs.
-</p>
+          Créez des utilisateurs avec le rôle <strong>Call Center</strong> dans Paramètres → Utilisateurs.
+        </p>
       </div>
     );
   }
