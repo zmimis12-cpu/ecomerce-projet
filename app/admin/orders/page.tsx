@@ -12,6 +12,13 @@ export default async function OrdersPage() {
     "super_admin", "admin", "manager", "call_center_agent", "finance", "viewer"
   ]);
   const isAgent   = session.role === "call_center_agent";
+
+  // CC agents → redirect to their dedicated call center queue
+  if (isAgent) {
+    const { redirect } = await import("next/navigation");
+    redirect("/admin/call-center/orders");
+  }
+
   const canManage = hasRole(session.role, ["super_admin", "admin", "manager"]);
   const orders    = await getOrders({}, isAgent, session.authId);
 

@@ -262,3 +262,78 @@ export async function getAgentCommissions(agentId?: string) {
 
   return [...map.entries()].map(([id, stats]) => ({ agentId: id, ...stats }));
 }
+
+// ─── Set agent availability ───────────────────────────────────────────────────
+export async function setAgentAvailability(
+  status: "available" | "in_call" | "away" | "offline"
+) {
+  const session = await requireRole([...CC_ROLES]);
+  const supabase = await createClient();
+  await supabase.from("users").update({ availability_status: status } as never)
+    .eq("id", session.authId);
+  revalidatePath("/admin/call-center");
+  return { success: true };
+}
+
+// ─── Auto-assign orders to agents (least-assigned) ───────────────────────────
+export async function autoAssignOrders(): Promise<{
+  success: boolean; assigned: number; skipped: number;
+}> {
+  await requireRole([...MANAGER_ROLES]);
+  const supabase = await createClient();
+
+  // Get available agents (call_center_agent + available status)
+  const { data: agents } = await supabase
+    .from("users")
+    .select("id")
+    .eq("role", "call_center_agent")
+    .eq("is_active", true)
+    .eq("availability_status", "available");
+
+  const agentList = (agents ?? []) as { id: string }[];
+  if (!agentList.length) return { success: true, assigned: 0, skipped: 0 };
+
+  // Get unassigned orders in pending_call
+  const { data: unassigned } = await supabase
+    .from("orders")
+    .select("id")
+    .is("assigned_to", null)
+    .in("status", ["new", "confirmed", "no_answer"])
+    .order("created_at", { ascending: true })
+    .limit(100);
+
+  const orders = (unassigned ?? []) as { id: string }[];
+  if (!orders.length) return { success: true, assigned: 0, skipped: 0 };
+
+  // Count pending assigned per agent
+  const { data: counts } = await supabase
+    .from("orders")
+    .select("assigned_to")
+    .in("assigned_to", agentList.map((a) => a.id))
+    .in("status", ["new", "confirmed", "no_answer"]);
+
+  const countMap = new Map<string, number>();
+  for (const a of agentList) countMap.set(a.id, 0);
+  for (const row of (counts ?? []) as { assigned_to: string }[]) {
+    countMap.set(row.assigned_to, (countMap.get(row.assigned_to) ?? 0) + 1);
+  }
+
+  let assigned = 0;
+  for (const order of orders) {
+    // Pick agent with least pending
+    const agent = [...countMap.entries()].sort((a, b) => a[1] - b[1])[0];
+    if (!agent) break;
+
+    await supabase.from("orders").update({
+      assigned_to: agent[0],
+      assigned_at: new Date().toISOString(),
+      call_status: "pending_call",
+    } as never).eq("id", order.id);
+
+    countMap.set(agent[0], (countMap.get(agent[0]) ?? 0) + 1);
+    assigned++;
+  }
+
+  revalidatePath("/admin/call-center");
+  return { success: true, assigned, skipped: orders.length - assigned };
+}

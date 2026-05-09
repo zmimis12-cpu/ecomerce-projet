@@ -3,8 +3,8 @@ import { ensureProfile } from "@/lib/auth/session";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { AdminHeader } from "@/components/admin/header";
 import { MissingProfileBanner } from "@/components/admin/missing-profile-banner";
+import type { AppRole } from "@/lib/settings/users-constants";
 
-// Layout must be dynamic — auth session is per-request
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -13,7 +13,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <AdminSidebar />
+      <AdminSidebar role={session.role as AppRole} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <AdminHeader
           displayName={session.displayName}
