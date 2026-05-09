@@ -119,7 +119,7 @@ export async function createUser(params: {
 
   createAuditLog({
     userId:       session.authId,
-    userLabel:    session.email,
+    userLabel:    session.authEmail,
     actionType:   "CREATE",
     entityType:   "user",
     entityId:     authUser.user.id,
@@ -162,7 +162,7 @@ export async function updateUserRole(userId: string, newRole: AppRole): Promise<
 
   createAuditLog({
     userId:       session.authId,
-    userLabel:    session.email,
+    userLabel:    session.authEmail,
     actionType:   "UPDATE",
     entityType:   "user",
     entityId:     userId,
@@ -207,7 +207,7 @@ export async function toggleUserActive(userId: string, isActive: boolean): Promi
 
   createAuditLog({
     userId:       session.authId,
-    userLabel:    session.email,
+    userLabel:    session.authEmail,
     actionType:   "UPDATE",
     entityType:   "user",
     entityId:     userId,
@@ -240,7 +240,7 @@ export async function deleteUser(userId: string): Promise<{ success: boolean; er
 
   createAuditLog({
     userId:       session.authId,
-    userLabel:    session.email,
+    userLabel:    session.authEmail,
     actionType:   "DELETE",
     entityType:   "user",
     entityId:     userId,
