@@ -8,55 +8,9 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/session";
 import { createAuditLog } from "@/lib/audit/audit-logger";
-
-// All roles in the system
-export type AppRole =
-  | "super_admin" | "admin" | "manager" | "finance"
-  | "scanner_agent" | "call_center_agent" | "media_buyer" | "viewer";
-
-export const ROLE_LABELS: Record<AppRole, string> = {
-  super_admin:       "Super Admin",
-  admin:             "Admin",
-  manager:           "Manager",
-  finance:           "Finance",
-  scanner_agent:     "Scanner",
-  call_center_agent: "Call Center",
-  media_buyer:       "Media Buyer",
-  viewer:            "Viewer",
-};
-
-export const ROLE_COLORS: Record<AppRole, string> = {
-  super_admin:       "bg-red-100 text-red-800",
-  admin:             "bg-purple-100 text-purple-800",
-  manager:           "bg-blue-100 text-blue-800",
-  finance:           "bg-green-100 text-green-800",
-  scanner_agent:     "bg-amber-100 text-amber-800",
-  call_center_agent: "bg-orange-100 text-orange-800",
-  media_buyer:       "bg-pink-100 text-pink-800",
-  viewer:            "bg-gray-100 text-gray-600",
-};
-
-// Module access per role
-export const ROLE_MODULES: Record<AppRole, string[]> = {
-  super_admin:       ["dashboard","orders","stock","scanner","returns","finance","ads","call_center","digylog","settings","users","audit_logs"],
-  admin:             ["dashboard","orders","stock","scanner","returns","finance","call_center","digylog","settings","users","audit_logs"],
-  manager:           ["dashboard","orders","stock","scanner","returns","finance","call_center","digylog"],
-  finance:           ["dashboard","finance","orders","digylog"],
-  scanner_agent:     ["scanner","returns"],
-  call_center_agent: ["call_center","orders"],
-  media_buyer:       ["dashboard","ads","finance"],
-  viewer:            ["dashboard","orders"],
-};
-
-export type UserRow = {
-  id:         string;
-  email:      string;
-  full_name:  string;
-  role:       AppRole;
-  is_active:  boolean;
-  created_at: string;
-  last_sign_in?: string | null;
-};
+import type { AppRole, UserRow } from "@/lib/settings/users-constants";
+// Re-export types for convenience (no constants — those stay in users-constants.ts)
+export type { AppRole, UserRow } from "@/lib/settings/users-constants";
 
 // ─── Get all users ─────────────────────────────────────────────────────────────
 export async function getUsers(): Promise<UserRow[]> {

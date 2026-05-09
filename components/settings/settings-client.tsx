@@ -7,7 +7,7 @@ import {
   Phone, FileSpreadsheet, Users, CheckCircle2, X
 } from "lucide-react";
 import { UsersTab } from "@/components/settings/users-tab";
-import type { UserRow } from "@/lib/settings/users-actions";
+import type { UserRow } from "@/lib/settings/users-constants";
 
 interface SettingRow {
   key: string; value: unknown; category: string;

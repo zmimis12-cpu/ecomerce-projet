@@ -2,24 +2,18 @@
 import { useState, useTransition } from "react";
 import {
   createUser, updateUserRole, toggleUserActive, deleteUser,
-  ROLE_LABELS, ROLE_COLORS, ROLE_MODULES,
 } from "@/lib/settings/users-actions";
-import type { UserRow, AppRole } from "@/lib/settings/users-actions";
+import type { UserRow, AppRole } from "@/lib/settings/users-constants";
+import {
+  ROLE_LABELS, ROLE_COLORS, ROLE_MODULES, ALL_ROLES, ALL_MODULES,
+} from "@/lib/settings/users-constants";
 import { cn } from "@/lib/utils";
 import {
   UserPlus, Shield, CheckCircle2, X, AlertTriangle,
   Eye, EyeOff, Trash2, ChevronDown,
 } from "lucide-react";
 
-const ALL_ROLES: AppRole[] = [
-  "super_admin","admin","manager","finance",
-  "scanner_agent","call_center_agent","media_buyer","viewer",
-];
-
-const ALL_MODULES = [
-  "dashboard","orders","stock","scanner","returns",
-  "finance","ads","call_center","digylog","settings","users","audit_logs",
-];
+// ALL_ROLES and ALL_MODULES imported from users-constants
 
 export function UsersTab({ initialUsers }: { initialUsers: UserRow[] }) {
   const [users, setUsers]           = useState(initialUsers);
