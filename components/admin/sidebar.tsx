@@ -22,22 +22,18 @@ const NAV_GROUPS = [
   {
     label: "Livraison",
     items: [
-      { href: "/admin/delivery",             label: "Livraison",    icon: Truck,          exact: true  },
-      { href: "/admin/delivery/batches",     label: "Groupes Tickets", icon: Layers,      exact: false },
-      { href: "/admin/delivery/notes",        label: "Récap / Notes",   icon: FileText,     exact: false },
-      { href: "/admin/delivery/documents",    label: "BL du Jour",      icon: FileText,     exact: false },
-      { href: "/admin/delivery/sheet-sync",   label: "Sheet Sync",      icon: FileSpreadsheet, exact: false },
-      { href: "/admin/delivery/invoices",     label: "Factures",        icon: FileText,     exact: false },
-      { href: "/admin/digylog/documents",    label: "Documents Digylog", icon: FolderOpen, exact: false },
+      { href: "/admin/delivery",             label: "Suivi Livraison",    icon: Truck,           exact: true  },
+      { href: "/admin/delivery/documents",   label: "BL du Jour",         icon: FileText,        exact: false },
+      { href: "/admin/delivery/batches",     label: "Tickets Impression", icon: Layers,          exact: false },
+      { href: "/admin/delivery/notes",       label: "Récap Tickets",      icon: FileText,        exact: false },
+      { href: "/admin/digylog/documents",    label: "Documents Digylog",  icon: FolderOpen,      exact: false },
+      { href: "/admin/delivery/invoices",    label: "Factures",           icon: FileText,        exact: false },
+      { href: "/admin/scanner",              label: "Scanner",            icon: ScanLine,        exact: false },
+      { href: "/admin/returns",              label: "Retours",            icon: RotateCcw,       exact: false },
+      { href: "/admin/delivery/sheet-sync",  label: "Sheet Sync",         icon: FileSpreadsheet, exact: false },
     ],
   },
-  {
-    label: "Opérations",
-    items: [
-      { href: "/admin/scanner",  label: "Scanner",  icon: ScanLine,  exact: false },
-      { href: "/admin/returns",  label: "Retours",  icon: RotateCcw, exact: false },
-    ],
-  },
+
   {
     label: "Business",
     items: [

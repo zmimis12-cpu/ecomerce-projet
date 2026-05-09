@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { Package, Plus, Send, FileDown, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Groupes Livraison" };
+export const metadata: Metadata = { title: "Tickets Impression" };
 export const dynamic = "force-dynamic";
 
 const STATUS_CFG = {
@@ -42,7 +42,7 @@ export default async function BatchesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Groupes Livraison</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Tickets Impression</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Gérez vos envois groupés vers Digylog.
           </p>

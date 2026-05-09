@@ -26,7 +26,7 @@ export default async function DeliveryPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Livraison</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Suivi Livraison</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Expéditions Digylog — suivi en temps réel via webhook.
         </p>
