@@ -10,43 +10,38 @@ import type { AgentStats, CallCenterOrder, CallLog } from "@/types/call-center";
 export async function getAgentStats(): Promise<AgentStats[]> {
   const supabase = await createClient();
 
+  // Étape 1 : Récupérer les agents actifs depuis call_center_agents
   const { data: agents, error: agentsError } = await supabase
     .from("call_center_agents")
-    .select(`
-      user_id,
-      display_name,
-      active,
-      availability_status,
-      commission_per_delivered,
-      users:users!inner (
-        id,
-        email,
-        role,
-        is_active
-      )
-    `)
+    .select("user_id, display_name, active, availability_status, commission_per_delivered")
     .eq("active", true)
     .order("display_name");
 
-  if (agentsError || !agents || agents.length === 0) return [];
+  if (agentsError) {
+    console.error("[getAgentStats] Error fetching agents:", agentsError.message);
+    return [];
+  }
 
-  type AgentRow = {
-    user_id: string;
-    display_name: string | null;
-    active: boolean;
-    availability_status: string | null;
-    commission_per_delivered: number;
-    users: {
-      id: string;
-      email: string;
-      role: string;
-      is_active: boolean;
-    } | null;
-  };
+  if (!agents || agents.length === 0) {
+    console.log("[getAgentStats] No active agents found in call_center_agents");
+    return [];
+  }
 
-  const agentRows = agents as unknown as AgentRow[];
-  const userIds = agentRows.map((a) => a.user_id);
+  // Étape 2 : Récupérer les infos users pour ces agents
+  const userIds = agents.map((a: any) => a.user_id);
 
+  const { data: users } = await supabase
+    .from("users")
+    .select("id, email, role, is_active")
+    .in("id", userIds);
+
+  // Construire un map user_id → user
+  const userMap: Record<string, any> = {};
+  for (const u of (users ?? [])) {
+    userMap[u.id] = u;
+  }
+
+  // Étape 3 : Récupérer les commandes et call logs en parallèle
   const [{ data: orders }, { data: callLogs }] = await Promise.all([
     supabase
       .from("orders")
@@ -58,16 +53,14 @@ export async function getAgentStats(): Promise<AgentStats[]> {
       .in("agent_id", userIds),
   ]);
 
-  type OrderRow = { id: string; assigned_to: string; status: string; call_status: string | null };
-  type LogRow = { agent_id: string; disposition: string; duration_seconds: number | null };
+  const orderRows = (orders ?? []) as { id: string; assigned_to: string; status: string; call_status: string | null }[];
+  const logRows = (callLogs ?? []) as { agent_id: string; disposition: string; duration_seconds: number | null }[];
 
-  const orderRows = (orders ?? []) as OrderRow[];
-  const logRows = (callLogs ?? []) as LogRow[];
-
-  return agentRows
+  // Étape 4 : Construire le résultat
+  return (agents as any[])
     .map((agent) => {
-      const user = agent.users;
-      if (!user) return null as unknown as AgentStats;
+      const user = userMap[agent.user_id];
+      if (!user) return null;
 
       const agentOrders = orderRows.filter((o) => o.assigned_to === agent.user_id);
       const agentLogs = logRows.filter((l) => l.agent_id === agent.user_id);
@@ -112,9 +105,9 @@ export async function getAgentStats(): Promise<AgentStats[]> {
         confirmation_rate: confirmationRate,
         fake_rate: fakeRate,
         avg_duration_sec: avgDur,
-      };
+      } as AgentStats;
     })
-    .filter(Boolean);
+    .filter(Boolean) as AgentStats[];
 }
 
 // ============================================================================
@@ -156,18 +149,16 @@ export async function getCallCenterOrders(
   const orderRows = (data ?? []) as unknown as CallCenterOrder[];
   if (orderRows.length === 0) return [];
 
-  // Fetch agent names
   const agentIds = [...new Set(orderRows.map((o) => o.assigned_to).filter(Boolean))] as string[];
   const agentMap: Record<string, string> = {};
   if (agentIds.length > 0) {
-    const { data: agents } = await supabase
+    const { data: agentUsers } = await supabase
       .from("users").select("id, full_name").in("id", agentIds);
-    for (const a of (agents ?? []) as unknown as { id: string; full_name: string }[]) {
+    for (const a of (agentUsers ?? []) as { id: string; full_name: string }[]) {
       agentMap[a.id] = a.full_name;
     }
   }
 
-  // Fetch first product per order
   const orderIds = orderRows.map((o) => o.id);
   const { data: items } = await supabase
     .from("order_items")
@@ -175,7 +166,7 @@ export async function getCallCenterOrders(
     .in("order_id", orderIds);
 
   const itemMap: Record<string, { product_name: string; product_sku: string }> = {};
-  for (const item of (items ?? []) as unknown as { order_id: string; product_name: string; product_sku: string }[]) {
+  for (const item of (items ?? []) as { order_id: string; product_name: string; product_sku: string }[]) {
     if (!itemMap[item.order_id]) itemMap[item.order_id] = item;
   }
 
@@ -207,13 +198,11 @@ export async function getCallCenterOrderDetail(id: string) {
   if (error || !data) return null;
   const order = data as unknown as CallCenterOrder;
 
-  // Items (no price — agents don't see profit)
   const { data: items } = await supabase
     .from("order_items")
     .select("id, product_name, product_sku, quantity")
     .eq("order_id", id);
 
-  // Last 10 call logs for this order
   const { data: logs } = await supabase
     .from("call_logs")
     .select("id, agent_id, disposition, duration_seconds, notes, call_started_at, created_at")
