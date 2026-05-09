@@ -23,7 +23,8 @@ const NAV_GROUPS = [
     label: "Livraison",
     items: [
       { href: "/admin/delivery",             label: "Livraison",    icon: Truck,          exact: true  },
-      { href: "/admin/delivery/batches",     label: "Groupes BL",   icon: Layers,         exact: false },
+      { href: "/admin/delivery/batches",     label: "Groupes Tickets", icon: Layers,      exact: false },
+      { href: "/admin/delivery/documents",    label: "BL du Jour",   icon: FileText,       exact: false },
       { href: "/admin/delivery/sheet-sync",  label: "Sheet Sync",   icon: FileSpreadsheet,exact: false },
       { href: "/admin/delivery/invoices",    label: "Factures",     icon: FileText,       exact: false },
       { href: "/admin/digylog/documents",    label: "Documents Digylog", icon: FolderOpen, exact: false },
