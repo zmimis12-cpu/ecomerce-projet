@@ -9,14 +9,17 @@ import type { CallCenterOrder } from "@/types/call-center";
 import type { OrderStatus } from "@/types/orders";
 import { Phone, Search, UserCheck } from "lucide-react";
 
+type CCTableMode = "queue" | "history" | "all";
+
 interface CCOrdersTableProps {
+  mode?: CCTableMode;
   orders: CallCenterOrder[];
   agents: { id: string; full_name: string }[];
   canManage: boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function CCOrdersTable({ orders, agents, canManage }: CCOrdersTableProps) {
+export function CCOrdersTable({ orders, agents, canManage, mode = "all" }: CCOrdersTableProps) {
   const [search, setSearch]       = useState("");
   const [agentFilter, setAgent]   = useState("");
   const [statusFilter, setStatus] = useState("");

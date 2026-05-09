@@ -11,6 +11,10 @@ export const metadata: Metadata = { title: "Commandes CC" };
 export const dynamic = "force-dynamic";
 
 export default async function CCOrdersPage() {
+  const { redirect } = await import("next/navigation");
+  redirect("/admin/call-center/queue");
+  // Legacy route — redirected
+
   const session   = await requireRole(["super_admin","admin","manager","call_center_agent"]);
   const isAgent   = session.role === "call_center_agent";
   const canManage = hasRole(session.role, ["super_admin","admin","manager"]);

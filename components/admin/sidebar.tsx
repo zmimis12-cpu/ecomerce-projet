@@ -61,9 +61,9 @@ const CC_AGENT_NAV: NavGroup[] = [
   {
     label: null,
     items: [
-      { href: "/admin/call-center/my-dashboard", label: "Mon Dashboard",   icon: LayoutDashboard, exact: true },
-      { href: "/admin/call-center",              label: "File d'appels",  icon: Phone            },
-      { href: "/admin/call-center/orders",       label: "Mes commandes",   icon: ShoppingCart     },
+      { href: "/admin/call-center/my-dashboard", label: "Mon Dashboard",  icon: LayoutDashboard, exact: true  },
+      { href: "/admin/call-center/queue",         label: "File d'appels", icon: Phone,           exact: false },
+      { href: "/admin/call-center/my-orders",     label: "Mes commandes", icon: ShoppingCart,    exact: false },
     ],
   },
 ];
@@ -86,7 +86,7 @@ const ROLE_ALLOWED_PREFIXES: Record<AppRole, string[]> = {
   manager:           ["/admin"],
   finance:           ["/admin/finance", "/admin/delivery/invoices", "/admin/orders", "/admin/digylog", "/admin"],
   scanner_agent:     ["/admin/scanner", "/admin/returns"],
-  call_center_agent: ["/admin/call-center", "/admin"],
+  call_center_agent: ["/admin/call-center/my-dashboard", "/admin/call-center/queue", "/admin/call-center/my-orders", "/admin/call-center"],
   media_buyer:       ["/admin/finance", "/admin/landing-pages", "/admin"],
   viewer:            ["/admin/orders", "/admin"],
 };
