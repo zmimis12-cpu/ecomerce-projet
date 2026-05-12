@@ -12,11 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function AgentsPage() {
   await requireRole(["super_admin", "admin", "manager"]);
 
-  const { data, error } = await supabaseAdmin
-    .from("cc_agents")
-    .select("*")
-    .eq("active", true)
-    .order("full_name");
+  const { data, error } = await supabaseAdmin.rpc("get_cc_agents");
 
   const agents: AgentStats[] = (data ?? []).map((row: Record<string, unknown>) => ({
     agent_id: String(row.id ?? ""),
