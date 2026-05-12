@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
-import { getAgentStats } from "@/lib/call-center/queries";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { AgentsTable } from "@/components/call-center/agents-table";
 
 export const metadata: Metadata = { title: "Agents — Call Center" };
@@ -10,7 +10,12 @@ export const dynamic = "force-dynamic";
 
 export default async function AgentsPage() {
   await requireRole(["super_admin", "admin", "manager"]);
-  const agents = await getAgentStats();
+
+  const { data: agents, error } = await supabaseAdmin
+    .from("cc_agents")
+    .select("*")
+    .eq("active", true)
+    .order("full_name");
 
   return (
     <div className="space-y-6">
@@ -29,21 +34,20 @@ export default async function AgentsPage() {
         </p>
       </div>
 
-      {/* DEBUG */}
       <div className="rounded-xl border border-red-300 bg-red-50 p-4">
-        <p className="text-sm font-bold text-red-700">🔍 DEBUG: agents.length = {agents.length}</p>
-        {agents.length > 0 ? (
+        <p className="text-sm font-bold text-red-700">🔍 DEBUG</p>
+        <p className="text-xs text-red-600">Error: {error?.message ?? "none"}</p>
+        <p className="text-xs text-red-600">Count: {(agents ?? []).length}</p>
+        {agents && agents.length > 0 && (
           <ul className="list-disc pl-5 mt-2 text-xs text-red-600">
-            {agents.map((a) => (
-              <li key={a.agent_id}>{a.full_name} ({a.email})</li>
+            {(agents as any[]).map((a) => (
+              <li key={a.id}>{a.full_name} ({a.email})</li>
             ))}
           </ul>
-        ) : (
-          <p className="text-xs text-red-600 mt-1">Aucun agent retourné par getAgentStats()</p>
         )}
       </div>
 
-      <AgentsTable agents={agents} />
+      <AgentsTable agents={(agents as any[]) ?? []} />
     </div>
   );
 }
