@@ -28,6 +28,21 @@ export default async function AgentsPage() {
           Performance et statistiques des agents.
         </p>
       </div>
+
+      {/* DEBUG */}
+      <div className="rounded-xl border border-red-300 bg-red-50 p-4">
+        <p className="text-sm font-bold text-red-700">🔍 DEBUG: agents.length = {agents.length}</p>
+        {agents.length > 0 ? (
+          <ul className="list-disc pl-5 mt-2 text-xs text-red-600">
+            {agents.map((a) => (
+              <li key={a.agent_id}>{a.full_name} ({a.email})</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-red-600 mt-1">Aucun agent retourné par getAgentStats()</p>
+        )}
+      </div>
+
       <AgentsTable agents={agents} />
     </div>
   );
