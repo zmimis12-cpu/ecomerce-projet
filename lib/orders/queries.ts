@@ -69,18 +69,16 @@ export async function getOrders(
   const orderIds  = orders.map((o) => o.id);
   const agentIds  = [...new Set(orders.map((o) => o.assigned_to).filter(Boolean))] as string[];
 
-  // Parallel fetch: items (3 fields only) + agents
   const [itemsRes, agentsRes] = await Promise.all([
     supabase
       .from("order_items")
       .select("order_id, product_name, product_sku")
       .in("order_id", orderIds),
     agentIds.length > 0
-      ? supabase.from("users").select("id, full_name").in("id", agentIds)
+      ? supabase.from("cc_agents").select("id, full_name").in("id", agentIds)
       : { data: [] },
   ]);
 
-  // Build lookup maps
   const itemsByOrder: Record<string, { product_name: string; product_sku: string }[]> = {};
   for (const item of (itemsRes.data ?? []) as unknown as { order_id: string; product_name: string; product_sku: string }[]) {
     if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = [];
@@ -152,7 +150,7 @@ export async function getOrder(id: string): Promise<Order | null> {
       .order("created_at", { ascending: false })
       .limit(50),
     order.assigned_to
-      ? supabase.from("users").select("id, full_name, email").eq("id", order.assigned_to).single()
+      ? supabase.from("cc_agents").select("id, full_name, email").eq("id", order.assigned_to).single()
       : Promise.resolve({ data: null }),
   ]);
 
@@ -164,38 +162,26 @@ export async function getOrder(id: string): Promise<Order | null> {
   };
 }
 
-// SOURCE UNIQUE : call_center_agents JOIN users
 export async function getAgents() {
   const supabase = await createClient();
 
   const { data } = await supabase
-    .from("call_center_agents")
-    .select(`
-      user_id,
-      display_name,
-      active,
-      availability_status,
-      users:users!inner (
-        id,
-        email,
-        role
-      )
-    `)
+    .from("cc_agents")
+    .select("id, full_name, email, active, availability")
     .eq("active", true)
-    .order("display_name");
+    .order("full_name");
 
-  return (
-    (data ?? []) as {
-      user_id: string;
-      display_name: string | null;
-      availability_status: string | null;
-      users: { id: string; email: string; role: string } | null;
-    }[]
-  ).map((a) => ({
-    id: a.user_id,
-    full_name: a.display_name ?? a.users?.email ?? "Agent",
-    email: a.users?.email ?? "",
-    role: a.users?.role ?? "call_center_agent",
-    availability_status: a.availability_status ?? "offline",
+  return ((data ?? []) as {
+    id: string;
+    full_name: string;
+    email: string | null;
+    active: boolean;
+    availability: string | null;
+  }[]).map((a) => ({
+    id: a.id,
+    full_name: a.full_name,
+    email: a.email ?? "",
+    role: "call_center_agent",
+    availability_status: a.availability ?? "offline",
   }));
 }

@@ -13,7 +13,6 @@ export default async function NewOrderPage() {
   await requireRole(["super_admin", "admin", "manager"]);
   const supabase = await createClient();
 
-  // Fetch active products
   const { data: products } = await supabase
     .from("products")
     .select("id, name, sku, sale_price_mad, total_cost_mad")

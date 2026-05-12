@@ -8,12 +8,34 @@ interface Product {
   id: string; name: string; sku: string;
   sale_price_mad: number; total_cost_mad: number;
 }
-interface Agent { id: string; full_name: string; email: string; role: string; }
+interface Agent {
+  id: string; full_name: string; email: string; role: string;
+  availability_status?: string | null;
+}
 
 interface OrderFormProps {
   products: Product[];
   agents: Agent[];
-  onSubmit: (fd: FormData) => Promise<{ success: boolean; errors?: Record<string, string>; orderId?: string; orderNumber?: string; isDuplicate?: boolean; duplicateOfNumber?: string | null }>;
+  onSubmit: (fd: FormData) => Promise<{
+    success: boolean;
+    errors?: Record<string, string>;
+    orderId?: string;
+    orderNumber?: string;
+    isDuplicate?: boolean;
+    duplicateOfNumber?: string | null;
+  }>;
+}
+
+const AVAILABILITY_LABEL: Record<string, string> = {
+  available: "disponible",
+  in_call: "en appel",
+  away: "absent",
+  offline: "hors ligne",
+};
+
+function agentDisplayName(a: Agent): string {
+  const status = a.availability_status ?? "offline";
+  return `${a.full_name} — ${AVAILABILITY_LABEL[status] ?? status}`;
 }
 
 export function OrderForm({ products, agents, onSubmit }: OrderFormProps) {
@@ -42,7 +64,6 @@ export function OrderForm({ products, agents, onSubmit }: OrderFormProps) {
     setSelectedProduct(p);
   }, [values.product_id, products]);
 
-  // Live calculations
   const unitPrice  = selectedProduct?.sale_price_mad ?? 0;
   const unitCost   = selectedProduct?.total_cost_mad ?? 0;
   const subtotal   = unitPrice * values.quantity;
@@ -89,7 +110,6 @@ export function OrderForm({ products, agents, onSubmit }: OrderFormProps) {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Customer info */}
         <Section title="Informations client">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Nom complet *" error={errors.customer_name}>
@@ -111,7 +131,6 @@ export function OrderForm({ products, agents, onSubmit }: OrderFormProps) {
           </div>
         </Section>
 
-        {/* Product */}
         <Section title="Produit">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Produit *" error={errors.product_id} className="sm:col-span-2">
@@ -151,7 +170,6 @@ export function OrderForm({ products, agents, onSubmit }: OrderFormProps) {
             </Field>
           </div>
 
-          {/* Live calc */}
           {selectedProduct && (
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-lg bg-slate-50 p-4">
               <CalcStat label="Sous-total"     value={`${subtotal.toFixed(2)} MAD`} />
@@ -163,7 +181,6 @@ export function OrderForm({ products, agents, onSubmit }: OrderFormProps) {
           )}
         </Section>
 
-        {/* Order meta */}
         <Section title="Informations commande">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Source">
@@ -177,14 +194,20 @@ export function OrderForm({ products, agents, onSubmit }: OrderFormProps) {
             </Field>
 
             <Field label="Assigner à un agent">
-              <select value={values.assigned_to} onChange={(e) => set("assigned_to", e.target.value)}
-                disabled={isPending}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50">
-                <option value="">— Non assigné —</option>
-                {agents.map((a) => (
-                  <option key={a.id} value={a.id}>{a.full_name} ({a.role})</option>
-                ))}
-              </select>
+              {agents.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-2">
+                  Aucun agent call center actif.
+                </p>
+              ) : (
+                <select value={values.assigned_to} onChange={(e) => set("assigned_to", e.target.value)}
+                  disabled={isPending}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50">
+                  <option value="">— Non assigné —</option>
+                  {agents.map((a) => (
+                    <option key={a.id} value={a.id}>{agentDisplayName(a)}</option>
+                  ))}
+                </select>
+              )}
             </Field>
 
             <Field label="Notes" className="sm:col-span-2">
@@ -225,7 +248,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Field({ label, children, error, className }: { label: string; children: React.ReactNode; error?: string; className?: string }) {
+function Field({ label, children, error, className }: {
+  label: string; children: React.ReactNode; error?: string; className?: string;
+}) {
   return (
     <div className={cn("space-y-1.5", className)}>
       <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</label>
@@ -235,7 +260,9 @@ function Field({ label, children, error, className }: { label: string; children:
   );
 }
 
-function Input({ value, onChange, placeholder, disabled }: { value: string; onChange: (v: string) => void; placeholder?: string; disabled?: boolean }) {
+function Input({ value, onChange, placeholder, disabled }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; disabled?: boolean;
+}) {
   return (
     <input type="text" value={value} onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder} disabled={disabled}
