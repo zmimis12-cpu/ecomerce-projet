@@ -1,217 +1,153 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, Phone, CheckCircle2, XCircle, Award, TrendingUp, Clock } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
-import { supabaseAdmin } from "@/lib/supabase/admin";
-import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/server";
+import { CallResultBadge } from "@/components/call-center/call-result-badge";
+import { StatusBadge } from "@/components/orders/status-badge";
+import type { OrderStatus } from "@/types/orders";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-  const { id } = await params;
-  return { title: `Agent — Call Center` };
-}
-
-function mad(n: number) {
-  return n.toLocaleString("fr-MA", { minimumFractionDigits: 2 }) + " MAD";
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: "Agent — Call Center" };
 }
 
 export default async function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requireRole(["super_admin", "admin", "manager"]);
+  const supabase = await createClient();
 
-  // Récupérer l'agent depuis call_center_agents
-  const { data: agentData } = await supabaseAdmin
-    .from("call_center_agents")
-    .select("user_id, display_name, active, availability_status, commission_per_delivered")
-    .eq("user_id", id)
-    .maybeSingle();
-
-  if (!agentData) {
-    return (
-      <div className="max-w-2xl mx-auto space-y-4">
-        <Link href="/admin/call-center/agents" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="h-4 w-4" /> Agents
-        </Link>
-        <div className="rounded-xl border bg-card flex flex-col items-center justify-center py-20">
-          <p className="text-lg font-semibold">Agent introuvable</p>
-          <p className="text-sm text-muted-foreground mt-1">Cet agent n'existe pas ou a été désactivé.</p>
-          <Link href="/admin/call-center/agents" className="mt-4 text-sm text-primary hover:underline">
-            ← Retour à la liste
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const agent = agentData as { user_id: string; display_name: string | null; active: boolean; availability_status: string | null; commission_per_delivered: number };
-
-  // Récupérer l'utilisateur
-  const { data: user } = await supabaseAdmin
+  const { data: agent } = await supabase
     .from("users")
-    .select("id, email, full_name, role, is_active")
-    .eq("id", agent.user_id)
+    .select("id, full_name, email, role, is_active")
+    .eq("id", id)
     .single();
 
-  if (!user) {
-    return (
-      <div className="max-w-2xl mx-auto space-y-4">
-        <Link href="/admin/call-center/agents" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="h-4 w-4" /> Agents
-        </Link>
-        <div className="rounded-xl border bg-card flex flex-col items-center justify-center py-20">
-          <p className="text-lg font-semibold">Utilisateur introuvable</p>
-          <p className="text-sm text-muted-foreground mt-1">Le compte utilisateur de cet agent n'existe plus.</p>
-          <Link href="/admin/call-center/agents" className="mt-4 text-sm text-primary hover:underline">
-            ← Retour à la liste
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  if (!agent) notFound();
+  const a = agent as unknown as { id: string; full_name: string; email: string; role: string; is_active: boolean };
 
-  const u = user as { id: string; email: string; full_name: string; role: string; is_active: boolean };
+  // Recent call logs
+  const { data: logs } = await supabase
+    .from("call_logs")
+    .select("id, order_id, disposition, duration_seconds, notes, call_started_at, created_at")
+    .eq("agent_id", id)
+    .order("created_at", { ascending: false })
+    .limit(50);
 
-  // Stats
-  const [{ data: orders }, { data: logs }, { data: payments }] = await Promise.all([
-    supabaseAdmin.from("orders").select("id, status, total_amount_mad").eq("assigned_to", u.id),
-    supabaseAdmin.from("call_logs").select("id, disposition, duration_seconds, created_at, notes").eq("agent_id", u.id).order("created_at", { ascending: false }).limit(50),
-    supabaseAdmin.from("call_center_agent_payments").select("*").eq("agent_id", u.id).order("period_start", { ascending: false }),
-  ]);
+  // Assigned orders
+  const { data: orders } = await supabase
+    .from("orders")
+    .select("id, order_number, customer_name, customer_phone, status, call_status, call_attempts, last_call_at")
+    .eq("assigned_to", id)
+    .order("created_at", { ascending: false })
+    .limit(50);
 
-  const orderRows = (orders ?? []) as { id: string; status: string; total_amount_mad: number }[];
-  const logRows = (logs ?? []) as { id: string; disposition: string; duration_seconds: number | null; created_at: string; notes: string | null }[];
-  const paymentRows = (payments ?? []) as { id: string; period_start: string; period_end: string; delivered_paid_count: number; gross_amount: number; paid_amount: number; remaining_amount: number; status: string; paid_at: string | null; notes: string | null }[];
+  const logRows    = (logs   ?? []) as unknown as { id: string; order_id: string; disposition: string; duration_seconds: number | null; notes: string | null; call_started_at: string | null; created_at: string }[];
+  const orderRows  = (orders ?? []) as unknown as { id: string; order_number: string; customer_name: string; customer_phone: string; status: string; call_status: string | null; call_attempts: number; last_call_at: string | null }[];
 
-  const totalAssigned = orderRows.length;
-  const confirmed = logRows.filter((l) => l.disposition === "confirmed").length;
-  const refused = logRows.filter((l) => l.disposition === "refused").length;
-  const noAnswer = logRows.filter((l) => l.disposition === "no_answer").length;
-  const deliveredPaid = orderRows.filter((o) => ["delivered", "paid"].includes(o.status)).length;
-  const commissionEarned = deliveredPaid * (agent.commission_per_delivered ?? 3);
-  const totalPaid = paymentRows.reduce((s, p) => s + p.paid_amount, 0);
-  const callsMade = logRows.length;
-  const confirmationRate = callsMade === 0 ? 0 : Math.round((confirmed / callsMade) * 100);
-  const durations = logRows.map((l) => l.duration_seconds).filter((d): d is number => d !== null);
-  const avgDur = durations.length > 0 ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length) : null;
-
-  const availLabel: Record<string, string> = {
-    available: "Disponible",
-    in_call: "En appel",
-    away: "Absent",
-    offline: "Hors ligne",
-  };
+  const confirmed  = logRows.filter((l) => l.disposition === "confirmed").length;
+  const refused    = logRows.filter((l) => l.disposition === "refused").length;
+  const no_answer  = logRows.filter((l) => l.disposition === "no_answer").length;
+  const rate       = logRows.length === 0 ? 0 : Math.round((confirmed / logRows.length) * 100);
+  const durations  = logRows.map((l) => l.duration_seconds).filter((d): d is number => d !== null);
+  const avgDur     = durations.length > 0 ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length) : null;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      {/* Breadcrumb */}
+    <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-2">
-        <Link href="/admin/call-center/agents" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <Link href="/admin/call-center/agents"
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft className="h-4 w-4" /> Agents
         </Link>
         <span className="text-muted-foreground">/</span>
-        <span className="text-sm font-medium">{agent.display_name ?? u.full_name}</span>
+        <span className="text-sm font-medium">{a.full_name}</span>
       </div>
 
-      {/* Header */}
+      {/* Agent header */}
       <div className="rounded-xl border bg-card p-5 flex items-center gap-4">
         <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-          <span className="text-lg font-bold text-primary">{(agent.display_name ?? u.full_name).charAt(0).toUpperCase()}</span>
+          <span className="text-lg font-bold text-primary">{a.full_name.charAt(0).toUpperCase()}</span>
         </div>
         <div>
-          <h1 className="text-lg font-semibold">{agent.display_name ?? u.full_name}</h1>
-          <p className="text-sm text-muted-foreground">{u.email}</p>
+          <h1 className="text-lg font-semibold">{a.full_name}</h1>
+          <p className="text-sm text-muted-foreground">{a.email}</p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          <span className={cn(
-            "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold",
-            agent.availability_status === "available" ? "bg-green-100 text-green-700" :
-            agent.availability_status === "in_call" ? "bg-blue-100 text-blue-700" :
-            "bg-gray-100 text-gray-600"
-          )}>
-            {availLabel[agent.availability_status ?? "offline"] ?? "Hors ligne"}
-          </span>
-        </div>
+        <span className={`ml-auto inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${a.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+          {a.is_active ? "Actif" : "Inactif"}
+        </span>
       </div>
 
-      {/* KPI cards */}
+      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
-          { label: "Commandes assignées", value: totalAssigned, cls: "" },
-          { label: "Appels", value: callsMade, cls: "" },
-          { label: "Confirmés", value: confirmed, cls: "text-green-700" },
-          { label: "Livrés payés", value: deliveredPaid, cls: "text-emerald-700" },
-          { label: "Taux confirmation", value: `${confirmationRate}%`, cls: confirmationRate >= 50 ? "text-green-700" : "text-amber-600" },
-        ].map((k) => (
-          <div key={k.label} className="rounded-xl border bg-card p-4">
-            <p className="text-xs text-muted-foreground mb-1">{k.label}</p>
-            <p className={cn("text-2xl font-bold", k.cls)}>{k.value}</p>
+          { label: "Appels total", value: logRows.length, color: "" },
+          { label: "Confirmés",    value: confirmed,       color: "text-green-600" },
+          { label: "Refusés",      value: refused,         color: "text-red-600" },
+          { label: "Sans réponse", value: no_answer,       color: "text-orange-600" },
+          { label: "Taux confir.", value: `${rate}%`,      color: rate >= 50 ? "text-green-600" : "text-red-600" },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="rounded-xl border bg-card p-4">
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className={`text-xl font-bold font-mono mt-1 ${color}`}>{value}</p>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Commission card */}
+        {/* Assigned orders */}
         <div className="rounded-xl border bg-card p-5 space-y-3">
-          <h2 className="text-sm font-semibold flex items-center gap-2"><Award className="h-4 w-4 text-amber-500" /> Commissions</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: "Commission / livraison", value: mad(agent.commission_per_delivered ?? 3) },
-              { label: "Total gagné", value: mad(commissionEarned), cls: "text-emerald-700" },
-              { label: "Total payé", value: mad(totalPaid), cls: "text-green-700" },
-              { label: "Restant dû", value: mad(commissionEarned - totalPaid), cls: commissionEarned - totalPaid > 0 ? "text-amber-700" : "text-green-700" },
-            ].map((k) => (
-              <div key={k.label} className="rounded-lg bg-secondary/30 p-3">
-                <p className="text-xs text-muted-foreground">{k.label}</p>
-                <p className={cn("text-sm font-bold font-mono mt-0.5", k.cls)}>{k.value}</p>
-              </div>
-            ))}
-          </div>
-
-          {paymentRows.length > 0 && (
-            <div className="pt-3 border-t">
-              <p className="text-xs font-semibold text-muted-foreground mb-2">Historique paiements</p>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {paymentRows.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between text-xs bg-secondary/20 rounded-lg px-3 py-2">
-                    <span className="font-mono">{p.period_start} → {p.period_end}</span>
-                    <span className="font-mono font-semibold">{mad(p.paid_amount)}</span>
-                    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                      p.status === "paid" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
-                    )}>{p.status === "paid" ? "Payé" : "Partiel"}</span>
+          <h3 className="text-sm font-semibold">Commandes assignées ({orderRows.length})</h3>
+          {orderRows.length === 0
+            ? <p className="text-xs text-muted-foreground">Aucune commande.</p>
+            : (
+              <div className="divide-y max-h-80 overflow-y-auto">
+                {orderRows.map((o) => (
+                  <div key={o.id} className="py-2.5 flex items-center justify-between gap-3">
+                    <div>
+                      <Link href={`/admin/call-center/orders/${o.id}`}
+                        className="text-xs font-mono font-medium hover:underline">{o.order_number}</Link>
+                      <p className="text-xs text-muted-foreground">{o.customer_name} · {o.customer_phone}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <StatusBadge status={o.status as OrderStatus} />
+                      {o.call_status && <CallResultBadge result={o.call_status} />}
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
         </div>
 
-        {/* Recent calls */}
+        {/* Call history */}
         <div className="rounded-xl border bg-card p-5 space-y-3">
-          <h2 className="text-sm font-semibold flex items-center gap-2"><Phone className="h-4 w-4" /> Appels récents</h2>
-          {logRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">Aucun appel.</p>
-          ) : (
-            <div className="divide-y max-h-80 overflow-y-auto">
-              {logRows.slice(0, 20).map((l) => (
-                <div key={l.id} className="flex items-center gap-3 py-2.5">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">
-                      {l.disposition === "confirmed" ? "✅ Confirmé" :
-                       l.disposition === "refused" ? "❌ Refusé" :
-                       l.disposition === "no_answer" ? "📵 Sans réponse" : l.disposition}
-                    </p>
-                    {l.notes && <p className="text-xs text-muted-foreground truncate">{l.notes}</p>}
-                  </div>
-                  <div className="text-right shrink-0">
-                    {l.duration_seconds !== null && <p className="text-xs font-mono">{l.duration_seconds}s</p>}
-                    <p className="text-xs text-muted-foreground">{new Date(l.created_at).toLocaleDateString("fr-MA")}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <h3 className="text-sm font-semibold">Historique appels ({logRows.length})</h3>
+          {avgDur !== null && (
+            <p className="text-xs text-muted-foreground">Durée moyenne : <span className="font-mono font-medium">{avgDur}s</span></p>
           )}
+          {logRows.length === 0
+            ? <p className="text-xs text-muted-foreground">Aucun appel.</p>
+            : (
+              <div className="divide-y max-h-80 overflow-y-auto">
+                {logRows.map((l) => (
+                  <div key={l.id} className="py-2.5 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <CallResultBadge result={l.disposition} />
+                      {l.notes && <p className="text-xs text-muted-foreground mt-0.5 truncate">{l.notes}</p>}
+                    </div>
+                    <div className="text-right shrink-0">
+                      {l.duration_seconds !== null && (
+                        <p className="text-xs font-mono">{l.duration_seconds}s</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(l.created_at).toLocaleDateString("fr-MA")}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
         </div>
       </div>
     </div>

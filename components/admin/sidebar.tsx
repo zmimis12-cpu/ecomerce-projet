@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, PhoneCall,
   Truck, Layers, FileSpreadsheet, FileText, FolderOpen,
   ScanLine, RotateCcw, BarChart3, Globe, Settings,
-  Shield, Award, Users, ListOrdered,
+  Shield, Phone, Award, Users, ListOrdered,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/lib/settings/users-constants";
@@ -13,6 +13,7 @@ import type { AppRole } from "@/lib/settings/users-constants";
 type NavItem = { href: string; label: string; icon: React.ElementType; exact?: boolean };
 type NavGroup = { label: string | null; items: NavItem[]; groupPrefix?: string };
 
+// ─── Admin / Manager full nav ─────────────────────────────────────────────────
 const ADMIN_NAV: NavGroup[] = [
   {
     label: null,
@@ -63,6 +64,7 @@ const ADMIN_NAV: NavGroup[] = [
   },
 ];
 
+// ─── Call center agent — minimal nav ──────────────────────────────────────────
 const CC_AGENT_NAV: NavGroup[] = [
   {
     label: null,
@@ -70,11 +72,12 @@ const CC_AGENT_NAV: NavGroup[] = [
       { href: "/admin/call-center/my-dashboard", label: "Mon Dashboard",  icon: LayoutDashboard, exact: true  },
       { href: "/admin/call-center/queue",         label: "File d'appels", icon: ListOrdered,     exact: false },
       { href: "/admin/call-center/my-orders",     label: "Mes commandes", icon: ShoppingCart,    exact: false },
-      { href: "/admin/call-center/my-earnings",   label: "Mes gains",     icon: Award,           exact: false },
+      { href: "/admin/call-center/my-dashboard",  label: "Mes gains",     icon: Award,           exact: true  },
     ],
   },
 ];
 
+// ─── Scanner agent nav ────────────────────────────────────────────────────────
 const SCANNER_AGENT_NAV: NavGroup[] = [
   {
     label: null,
@@ -88,6 +91,7 @@ const SCANNER_AGENT_NAV: NavGroup[] = [
 function getNavForRole(role: AppRole): NavGroup[] {
   if (role === "call_center_agent") return CC_AGENT_NAV;
   if (role === "scanner_agent")     return SCANNER_AGENT_NAV;
+  // All management roles get admin nav (filtered if needed)
   return ADMIN_NAV;
 }
 
@@ -110,6 +114,7 @@ export function AdminSidebar({ role }: { role: AppRole }) {
 
   return (
     <aside className="w-56 shrink-0 border-r bg-card flex flex-col">
+      {/* Logo */}
       <div className="flex items-center gap-2.5 px-4 py-5 border-b">
         <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center shrink-0">
           <span className="text-primary-foreground font-bold text-xs">GP</span>
@@ -117,6 +122,7 @@ export function AdminSidebar({ role }: { role: AppRole }) {
         <span className="font-semibold text-sm tracking-tight">GestionPro</span>
       </div>
 
+      {/* Nav */}
       <nav className="flex-1 px-2 py-3 overflow-y-auto space-y-1">
         {navGroups.map((group, gi) => {
           const groupActive = isGroupActive(group.groupPrefix);
