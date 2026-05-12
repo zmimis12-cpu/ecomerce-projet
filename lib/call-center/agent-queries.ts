@@ -1,8 +1,5 @@
 "use server";
-/**
- * lib/call-center/agent-queries.ts
- * Queries for call center agent personal dashboard.
- */
+
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth/session";
@@ -23,7 +20,12 @@ export async function getMyAssignedOrders() {
     .order("created_at", { ascending: false })
     .limit(100);
 
-  return (data ?? []) as any[];
+  return (data ?? []) as {
+    id: string; order_number: string; customer_name: string; customer_phone: string; customer_city: string;
+    total_amount_mad: number; status: string; call_status: string | null;
+    assigned_at: string | null; callback_scheduled_at: string | null; callback_reason: string | null;
+    order_items: { product_name: string; quantity: number }[];
+  }[];
 }
 
 export async function getMyStats() {
@@ -60,12 +62,12 @@ export async function getMyCommissions() {
   const agentId = session.authId;
 
   const { data: deliveredOrders } = await supabaseAdmin.from("orders").select("id, order_number, total_amount_mad, updated_at").eq("assigned_to", agentId).eq("status", "paid");
-  const delivered = (deliveredOrders ?? []) as any[];
+  const delivered = (deliveredOrders ?? []) as { id: string; order_number: string; total_amount_mad: number; updated_at: string }[];
   const totalEarned = delivered.length * COMMISSION_PER_ORDER;
 
   const { data: payments } = await supabaseAdmin.from("call_center_agent_payments").select("*").eq("agent_id", agentId).order("period_start", { ascending: false });
-  const paymentRows = (payments ?? []) as any[];
-  const totalPaid = paymentRows.reduce((s: number, p: any) => s + (p.paid_amount ?? 0), 0);
+  const paymentRows = (payments ?? []) as { id: string; period_start: string; period_end: string; delivered_paid_count: number; gross_amount: number; paid_amount: number; remaining_amount: number; status: string; paid_at: string | null; notes: string | null }[];
+  const totalPaid = paymentRows.reduce((s, p) => s + (p.paid_amount ?? 0), 0);
   const totalRemaining = totalEarned - totalPaid;
 
   return { commissionPerOrder: COMMISSION_PER_ORDER, totalDeliveredPaid: delivered.length, totalEarned, totalPaid, totalRemaining, payments: paymentRows, recentOrders: delivered.slice(0, 20) };
@@ -76,7 +78,7 @@ export async function getMyCallbacks() {
   const supabase = await createClient();
 
   const { data } = await supabase.from("orders").select("id, order_number, customer_name, customer_phone, callback_scheduled_at, callback_reason, total_amount_mad").eq("assigned_to", session.authId).not("callback_scheduled_at", "is", null).lte("callback_scheduled_at", new Date(Date.now() + 86400000).toISOString()).order("callback_scheduled_at", { ascending: true });
-  return (data ?? []) as any[];
+  return (data ?? []) as { id: string; order_number: string; customer_name: string; customer_phone: string; callback_scheduled_at: string; callback_reason: string | null; total_amount_mad: number }[];
 }
 
 export async function recordAgentPayment(params: { agentId: string; periodStart: string; periodEnd: string; paidAmount: number; notes?: string }): Promise<{ success: boolean; error?: string }> {
@@ -111,8 +113,9 @@ export async function getAllAgentsCommissions() {
 
   if (!agents || agents.length === 0) return [];
 
-  const agentRows = agents as unknown as { id: string; full_name: string; email: string | null; availability: string | null; commission: number; }[];
-  const results = [];
+  type AgentRow = { id: string; full_name: string; email: string | null; availability: string | null; commission: number };
+  const agentRows = agents as unknown as AgentRow[];
+  const results: { id: string; full_name: string; email: string; availability_status: string; deliveredPaid: number; earned: number; totalPaid: number; remaining: number }[] = [];
 
   for (const agent of agentRows) {
     const { data: orders } = await supabaseAdmin.from("orders").select("id").eq("assigned_to", agent.id).eq("status", "paid");

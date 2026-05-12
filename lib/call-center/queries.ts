@@ -1,6 +1,3 @@
-/**
- * lib/call-center/queries.ts
- */
 import { createClient } from "@/lib/supabase/server";
 import type { AgentStats, CallCenterOrder, CallLog } from "@/types/call-center";
 
@@ -16,15 +13,9 @@ export async function getAgentStats(): Promise<AgentStats[]> {
   if (agentsError || !agents || agents.length === 0) return [];
 
   const agentRows = agents as unknown as {
-    id: string;
-    full_name: string;
-    email: string | null;
-    active: boolean;
-    availability: string | null;
-    commission: number;
+    id: string; full_name: string; email: string | null;
+    active: boolean; availability: string | null; commission: number;
   }[];
-
-  const agentIds = agentRows.map((a) => a.id);
 
   const [{ data: orders }, { data: callLogs }] = await Promise.all([
     supabase.from("orders").select("assigned_to, status"),
@@ -44,12 +35,8 @@ export async function getAgentStats(): Promise<AgentStats[]> {
     const fakeOrders = agentLogs.filter((l) => l.disposition === "fake_order").length;
     const duplicates = agentLogs.filter((l) => l.disposition === "duplicate").length;
 
-    const durations = agentLogs
-      .map((l) => l.duration_seconds)
-      .filter((d): d is number => d !== null);
-    const avgDur = durations.length > 0
-      ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length)
-      : null;
+    const durations = agentLogs.map((l) => l.duration_seconds).filter((d): d is number => d !== null);
+    const avgDur = durations.length > 0 ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length) : null;
 
     const callsMade = agentLogs.length;
     const deliveredPaid = agentOrders.filter((o) => ["paid", "delivered"].includes(o.status)).length;
@@ -78,11 +65,8 @@ export async function getAgentStats(): Promise<AgentStats[]> {
 
 export async function getCallCenterOrders(
   options: {
-    agentId?: string;
-    unassigned?: boolean;
-    callStatus?: string;
-    isAgent?: boolean;
-    authId?: string;
+    agentId?: string; unassigned?: boolean; callStatus?: string;
+    isAgent?: boolean; authId?: string;
   } = {}
 ): Promise<CallCenterOrder[]> {
   const supabase = await createClient();
@@ -94,9 +78,8 @@ export async function getCallCenterOrders(
     .order("created_at", { ascending: false })
     .limit(200);
 
-  if (options.isAgent && options.authId) {
-    query = query.eq("assigned_to", options.authId);
-  } else {
+  if (options.isAgent && options.authId) query = query.eq("assigned_to", options.authId);
+  else {
     if (options.agentId) query = query.eq("assigned_to", options.agentId);
     if (options.unassigned) query = query.is("assigned_to", null);
     if (options.callStatus) query = query.eq("call_status", options.callStatus);
@@ -108,18 +91,15 @@ export async function getCallCenterOrders(
   const orderRows = (data ?? []) as unknown as CallCenterOrder[];
   if (!orderRows.length) return [];
 
-  const agentIds = [...new Set(orderRows.map((o) => o.assigned_to).filter(Boolean))] as string[];
+  const ids = [...new Set(orderRows.map((o) => o.assigned_to).filter(Boolean))] as string[];
   const agentMap: Record<string, string> = {};
-  if (agentIds.length) {
-    const { data: au } = await supabase.from("cc_agents").select("id, full_name").in("id", agentIds);
-    for (const a of (au ?? []) as { id: string; full_name: string }[]) {
-      agentMap[a.id] = a.full_name;
-    }
+  if (ids.length) {
+    const { data: au } = await supabase.from("cc_agents").select("id, full_name").in("id", ids);
+    for (const a of (au ?? []) as { id: string; full_name: string }[]) agentMap[a.id] = a.full_name;
   }
 
   const orderIds = orderRows.map((o) => o.id);
   const { data: items } = await supabase.from("order_items").select("order_id, product_name, product_sku").in("order_id", orderIds);
-
   const itemMap: Record<string, { product_name: string; product_sku: string }> = {};
   for (const item of (items ?? []) as { order_id: string; product_name: string; product_sku: string }[]) {
     if (!itemMap[item.order_id]) itemMap[item.order_id] = item;
@@ -136,35 +116,24 @@ export async function getCallCenterOrders(
 export async function getCallCenterOrderDetail(id: string) {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("orders")
+  const { data, error } = await supabase.from("orders")
     .select("id, order_number, customer_name, customer_phone, customer_city, customer_address, customer_region, status, call_status, call_attempts, last_call_at, assigned_to, notes, created_at")
-    .eq("id", id)
-    .single();
-
+    .eq("id", id).single();
   if (error || !data) return null;
-  const order = data as unknown as CallCenterOrder;
 
+  const order = data as unknown as CallCenterOrder;
   const [{ data: items }, { data: logs }] = await Promise.all([
     supabase.from("order_items").select("id, product_name, product_sku, quantity").eq("order_id", id),
     supabase.from("call_logs").select("id, agent_id, disposition, duration_seconds, notes, call_started_at, created_at").eq("order_id", id).order("created_at", { ascending: false }).limit(10),
   ]);
 
-  return {
-    order,
-    items: (items ?? []) as { id: string; product_name: string; product_sku: string; quantity: number }[],
-    logs: (logs ?? []) as unknown as CallLog[],
-  };
+  return { order, items: (items ?? []) as { id: string; product_name: string; product_sku: string; quantity: number }[], logs: (logs ?? []) as unknown as CallLog[] };
 }
 
 export async function getCallCenterSummary() {
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("orders")
-    .select("id, assigned_to, call_status, status")
-    .not("status", "in", '("cancelled","returned","paid","delivered")');
-
+  const { data } = await supabase.from("orders").select("id, assigned_to, call_status, status").not("status", "in", '("cancelled","returned","paid","delivered")');
   const rows = (data ?? []) as { id: string; assigned_to: string | null; call_status: string | null; status: string }[];
 
   const total = rows.length;
