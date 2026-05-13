@@ -96,11 +96,10 @@ export async function assignOrderToAgent(orderId: string, agentId: string | null
   const supabase = await createClient();
 
   if (agentId) {
-    // Validate against public.users — source of truth
-    const { data: agent } = await supabase.from("users").select("role, is_active").eq("id", agentId).maybeSingle();
-    const a = agent as { role: string; is_active: boolean } | null;
-    if (!a || a.role !== "call_center_agent" || !a.is_active) {
-      return { success: false, error: "Agent invalide — doit être call_center_agent actif." };
+    const { data: agent } = await supabase.from("cc_agents").select("active").eq("id", agentId).maybeSingle();
+    const a = agent as { active: boolean } | null;
+    if (!a || !a.active) {
+      return { success: false, error: "Agent invalide ou inactif." };
     }
   }
 
@@ -150,15 +149,20 @@ export async function scheduleCallback(data: { orderId: string; callbackAt: stri
 export async function setAgentAvailability(status: "available" | "in_call" | "away" | "offline") {
   const session = await requireRole([...CC_ROLES]);
   const supabase = await createClient();
-  // Update availability_status on public.users — source of truth
-  await supabase.from("users").update({ availability_status: status } as never).eq("id", session.authId);
+  await supabase.from("cc_agents").update({ availability: status } as never).eq("id", session.authId);
   revalidatePath("/admin/call-center");
   return { success: true };
 }
 
 export async function updateAgentPresence(status: "available" | "in_call" | "away" | "offline") {
   const session = await requireRole([...CC_ROLES]);
-  await supabaseAdmin.from("users").update({ availability_status: status } as never).eq("id", session.authId);
+
+  const { error } = await supabaseAdmin
+    .from("cc_agents")
+    .update({ availability: status, last_seen: new Date().toISOString() } as never)
+    .eq("id", session.authId);
+
+  if (error) return { success: false, error: error.message };
   return { success: true };
 }
 
@@ -166,8 +170,7 @@ export async function autoAssignOrders(): Promise<{ success: boolean; assigned: 
   await requireRole([...MANAGER_ROLES]);
   const supabase = await createClient();
 
-  // Use public.users — source of truth
-  const { data: agents } = await supabase.from("users").select("id").eq("role", "call_center_agent").eq("is_active", true).neq("availability_status", "offline");
+  const { data: agents } = await supabase.from("cc_agents").select("id").eq("active", true);
   const agentList = (agents ?? []) as { id: string }[];
   if (!agentList.length) return { success: true, assigned: 0, skipped: 0 };
 

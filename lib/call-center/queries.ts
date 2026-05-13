@@ -1,72 +1,96 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { AgentStats, CallCenterOrder, CallLog } from "@/types/call-center";
 
-// ─── SOURCE OF TRUTH: public.users with role = 'call_center_agent' ───────────
-// Do NOT use cc_agents, call_center_agents, or gp_users — they do not exist.
-
-type UserRow = {
-  id: string;
-  full_name: string;
-  email: string;
+type AgentRow = {
+  user_id: string;
+  display_name: string | null;
   availability_status: string | null;
+  commission_per_delivered: number;
 };
-type OrderRow   = { assigned_to: string; status: string };
-type LogRow     = { agent_id: string; disposition: string; duration_seconds: number | null };
 
-const COMMISSION_PER_ORDER = 3; // MAD
+type GpUserRow = {
+  id: string;
+  prenom: string | null;
+  nom: string | null;
+  email: string;
+};
+
+type OrderRow = {
+  assigned_to: string;
+  status: string;
+};
+
+type LogRow = {
+  agent_id: string;
+  disposition: string;
+  duration_seconds: number | null;
+};
 
 export async function getAgentStats(): Promise<AgentStats[]> {
-  // Query public.users directly — single source of truth
   const { data: agents } = await supabaseAdmin
-    .from("users")
-    .select("id, full_name, email, availability_status")
-    .eq("role", "call_center_agent")
-    .eq("is_active", true)
-    .order("full_name");
+    .from("call_center_agents")
+    .select("user_id, display_name, availability_status, commission_per_delivered")
+    .eq("active", true)
+    .order("display_name");
 
   if (!agents || agents.length === 0) return [];
 
-  const rows = agents as unknown as UserRow[];
-  const userIds = rows.map((a) => a.id);
+  const rows = agents as unknown as AgentRow[];
+  const userIds = rows.map((a) => a.user_id);
 
-  const [{ data: orders }, { data: callLogs }] = await Promise.all([
+  const [{ data: users }, { data: orders }, { data: callLogs }] = await Promise.all([
+    supabaseAdmin.from("gp_users").select("id, prenom, nom, email").in("id", userIds),
     supabaseAdmin.from("orders").select("assigned_to, status").in("assigned_to", userIds),
     supabaseAdmin.from("call_logs").select("agent_id, disposition, duration_seconds").in("agent_id", userIds),
   ]);
 
+  const userMap = new Map<string, string>();
+  for (const u of (users ?? []) as unknown as GpUserRow[]) {
+    userMap.set(u.id, u.prenom ? `${u.prenom} ${u.nom ?? ""}`.trim() : u.email);
+  }
+
   const orderRows = (orders ?? []) as unknown as OrderRow[];
-  const logRows   = (callLogs ?? []) as unknown as LogRow[];
+  const logRows = (callLogs ?? []) as unknown as LogRow[];
 
   return rows.map((a): AgentStats => {
-    const agentOrders = orderRows.filter((o) => o.assigned_to === a.id);
-    const agentLogs   = logRows.filter((l) => l.agent_id === a.id);
-    const confirmed   = agentLogs.filter((l) => l.disposition === "confirmed").length;
-    const refused     = agentLogs.filter((l) => l.disposition === "refused").length;
-    const noAnswer    = agentLogs.filter((l) => l.disposition === "no_answer").length;
-    const fakeOrders  = agentLogs.filter((l) => l.disposition === "fake_order").length;
-    const duplicates  = agentLogs.filter((l) => l.disposition === "duplicate").length;
-    const durations   = agentLogs.map((l) => l.duration_seconds).filter((d): d is number => d !== null);
-    const avgDur      = durations.length > 0 ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length) : null;
-    const callsMade   = agentLogs.length;
-    const deliveredPaid = agentOrders.filter((o) => ["paid", "delivered"].includes(o.status)).length;
+    const agentOrders = orderRows.filter((o) => o.assigned_to === a.user_id);
+    const agentLogs = logRows.filter((l) => l.agent_id === a.user_id);
+    const confirmed = agentLogs.filter((l) => l.disposition === "confirmed").length;
+    const refused = agentLogs.filter((l) => l.disposition === "refused").length;
+    const noAnswer = agentLogs.filter((l) => l.disposition === "no_answer").length;
+    const fakeOrders = agentLogs.filter((l) => l.disposition === "fake_order").length;
+    const duplicates = agentLogs.filter((l) => l.disposition === "duplicate").length;
+
+    const durations = agentLogs
+      .map((l) => l.duration_seconds)
+      .filter((d): d is number => d !== null);
+    const avgDur =
+      durations.length > 0
+        ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length)
+        : null;
+
+    const callsMade = agentLogs.length;
+    const deliveredPaid = agentOrders.filter((o) =>
+      ["paid", "delivered"].includes(o.status)
+    ).length;
 
     return {
-      agent_id:          a.id,
-      full_name:         a.full_name,
-      email:             a.email,
-      role:              "call_center_agent",
-      total_assigned:    agentOrders.length,
-      calls_made:        callsMade,
+      agent_id: a.user_id,
+      full_name: a.display_name ?? userMap.get(a.user_id) ?? "",
+      email: "",
+      role: "call_center_agent",
+      total_assigned: agentOrders.length,
+      calls_made: callsMade,
       confirmed,
       refused,
-      no_answer:         noAnswer,
-      fake_orders:       fakeOrders,
+      no_answer: noAnswer,
+      fake_orders: fakeOrders,
       duplicates,
-      delivered_paid:    deliveredPaid,
-      commission_mad:    deliveredPaid * COMMISSION_PER_ORDER,
+      delivered_paid: deliveredPaid,
+      commission_mad: deliveredPaid * (a.commission_per_delivered ?? 3),
       confirmation_rate: callsMade === 0 ? 0 : Math.round((confirmed / callsMade) * 100),
-      fake_rate:         callsMade === 0 ? 0 : Math.round((fakeOrders / callsMade) * 100),
-      avg_duration_sec:  avgDur,
+      fake_rate: callsMade === 0 ? 0 : Math.round((fakeOrders / callsMade) * 100),
+      avg_duration_sec: avgDur,
     };
   });
 }
@@ -104,13 +128,12 @@ export async function getCallCenterOrders(
   const ids = [...new Set(rows.map((o) => o.assigned_to).filter(Boolean))] as string[];
   const agentMap: Record<string, string> = {};
   if (ids.length) {
-    // Use public.users — single source of truth
     const { data: au } = await supabaseAdmin
-      .from("users")
-      .select("id, full_name")
-      .in("id", ids);
-    for (const a of (au ?? []) as unknown as { id: string; full_name: string }[]) {
-      agentMap[a.id] = a.full_name;
+      .from("call_center_agents")
+      .select("user_id, display_name")
+      .in("user_id", ids);
+    for (const a of (au ?? []) as unknown as { user_id: string; display_name: string | null }[]) {
+      agentMap[a.user_id] = a.display_name ?? "";
     }
   }
 

@@ -105,24 +105,22 @@ export async function recordAgentPayment(params: { agentId: string; periodStart:
 export async function getAllAgentsCommissions() {
   await requireRole(["super_admin", "admin", "manager"]);
 
-  // Source of truth: public.users with role = 'call_center_agent'
   const { data: agents } = await supabaseAdmin
-    .from("users")
-    .select("id, full_name, email, availability_status")
-    .eq("role", "call_center_agent")
-    .eq("is_active", true)
+    .from("cc_agents")
+    .select("id, full_name, email, active, availability, commission")
+    .eq("active", true)
     .order("full_name");
 
   if (!agents || agents.length === 0) return [];
 
-  type AgentRow = { id: string; full_name: string; email: string; availability_status: string | null };
+  type AgentRow = { id: string; full_name: string; email: string | null; availability: string | null; commission: number };
   const agentRows = agents as unknown as AgentRow[];
   const results: { id: string; full_name: string; email: string; availability_status: string; deliveredPaid: number; earned: number; totalPaid: number; remaining: number }[] = [];
 
   for (const agent of agentRows) {
     const { data: orders } = await supabaseAdmin.from("orders").select("id").eq("assigned_to", agent.id).eq("status", "paid");
     const deliveredPaid = (orders ?? []).length;
-    const earned = deliveredPaid * 3; // 3 MAD per delivered_paid — COMMISSION_PER_ORDER
+    const earned = deliveredPaid * (agent.commission ?? 3);
     const { data: payments } = await supabaseAdmin.from("call_center_agent_payments").select("paid_amount").eq("agent_id", agent.id);
     const totalPaid = ((payments ?? []) as { paid_amount: number }[]).reduce((s, p) => s + (p.paid_amount ?? 0), 0);
 
@@ -130,7 +128,7 @@ export async function getAllAgentsCommissions() {
       id: agent.id,
       full_name: agent.full_name,
       email: agent.email ?? "",
-      availability_status: agent.availability_status ?? "offline",
+      availability_status: agent.availability ?? "offline",
       deliveredPaid,
       earned,
       totalPaid,

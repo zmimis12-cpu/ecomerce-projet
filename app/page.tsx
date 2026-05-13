@@ -1,8 +1,9 @@
-export default function HomePage() {
-  return (
-    <div style={{padding:"40px",fontFamily:"sans-serif"}}>
-      <h1>GestionPro</h1>
-      <a href="/login" style={{color:"blue"}}>→ Login</a>
-    </div>
-  );
+import { redirect } from "next/navigation";
+
+/**
+ * Root route — redirect to /admin.
+ * Middleware will redirect to /login if not authenticated.
+ */
+export default function RootPage() {
+  redirect("/admin");
 }

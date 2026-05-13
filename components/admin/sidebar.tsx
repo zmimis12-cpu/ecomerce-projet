@@ -72,7 +72,7 @@ const CC_AGENT_NAV: NavGroup[] = [
       { href: "/admin/call-center/my-dashboard", label: "Mon Dashboard",  icon: LayoutDashboard, exact: true  },
       { href: "/admin/call-center/queue",         label: "File d'appels", icon: ListOrdered,     exact: false },
       { href: "/admin/call-center/my-orders",     label: "Mes commandes", icon: ShoppingCart,    exact: false },
-      { href: "/admin/call-center/my-earnings",   label: "Mes gains",     icon: Award,           exact: false },
+      { href: "/admin/call-center/my-dashboard",  label: "Mes gains",     icon: Award,           exact: true  },
     ],
   },
 ];

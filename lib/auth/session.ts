@@ -53,9 +53,7 @@ export async function getSession(): Promise<SessionUser | null> {
 export async function ensureProfile(): Promise<SessionUser | null> {
   try {
     const supabase = await createClient();
-
     const { data: { user } } = await supabase.auth.getUser();
-
     if (!user) return null;
 
     let profile = await fetchProfile(user.id);
