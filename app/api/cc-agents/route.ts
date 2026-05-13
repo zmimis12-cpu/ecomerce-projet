@@ -6,9 +6,10 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const { data, error } = await supabaseAdmin
-      .from("cc_agents")
-      .select("*")
-      .eq("active", true)
+      .from("users")
+      .select("id, full_name, email, availability_status")
+      .eq("role", "call_center_agent")
+      .eq("is_active", true)
       .order("full_name");
 
     if (error) {
