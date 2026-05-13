@@ -1,47 +1,54 @@
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Static assets and public routes — pass through immediately
   if (
-    pathname.startsWith("/_next/") ||
-    pathname.startsWith("/api/public/") ||
-    pathname.startsWith("/lp/") ||
-    pathname === "/lp" ||
-    pathname.includes(".")
+    pathname.startsWith("/lp/") || pathname === "/lp" ||
+    pathname.startsWith("/api/public/")
   ) {
     return NextResponse.next();
   }
 
-  // Check auth cookie exists (lightweight — no Supabase call)
-  const hasSession =
-    request.cookies.has("sb-access-token") ||
-    request.cookies.has("sb-refresh-token") ||
-    [...request.cookies.getAll()].some((c) =>
-      c.name.includes("auth-token") || c.name.includes("supabase")
-    );
+  let supabaseResponse = NextResponse.next({ request });
 
-  // Protect /admin — redirect to login if no session cookie
-  if (pathname.startsWith("/admin") && !hasSession) {
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return request.cookies.getAll(); },
+        setAll(cookiesToSet: { name: string; value: string; options?: CookieOptions }[]) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          supabaseResponse = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options));
+        },
+      },
+    }
+  );
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (pathname.startsWith("/admin") && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(url);
   }
 
-  // /login while authenticated — redirect to admin
-  if (pathname === "/login" && hasSession) {
+  if (pathname === "/login" && user) {
     const url = request.nextUrl.clone();
     url.pathname = "/admin";
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  return supabaseResponse;
 }
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!lp(?:/.*)?$|api/public(?:/.*)?$|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
