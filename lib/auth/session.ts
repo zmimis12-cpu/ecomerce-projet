@@ -31,7 +31,13 @@ const fetchProfile = cache(async function fetchProfile(userId: string): Promise<
 export async function getSession(): Promise<SessionUser | null> {
   try {
     const supabase = await createClient();
-    const { data: { user }, error } = await supabase.auth.getUser();
+    const timeout = new Promise<{ data: { user: null }; error: null }>((resolve) =>
+      setTimeout(() => resolve({ data: { user: null }, error: null }), 5000)
+    );
+    const { data: { user }, error } = await Promise.race([
+      supabase.auth.getUser(),
+      timeout,
+    ]) as Awaited<ReturnType<typeof supabase.auth.getUser>>;
     if (error || !user) return null;
 
     const profile = await fetchProfile(user.id);
@@ -53,7 +59,16 @@ export async function getSession(): Promise<SessionUser | null> {
 export async function ensureProfile(): Promise<SessionUser | null> {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+
+    // Timeout protection — if Supabase hangs, treat as unauthenticated
+    const timeout = new Promise<{ data: { user: null } }>((resolve) =>
+      setTimeout(() => resolve({ data: { user: null } }), 5000)
+    );
+    const { data: { user } } = await Promise.race([
+      supabase.auth.getUser(),
+      timeout,
+    ]) as Awaited<ReturnType<typeof supabase.auth.getUser>>;
+
     if (!user) return null;
 
     let profile = await fetchProfile(user.id);

@@ -292,4 +292,3 @@ npm run start      # Production server
 npm run lint       # ESLint
 npm run type-check # TypeScript check (no emit)
 ```
-
