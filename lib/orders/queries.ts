@@ -1,6 +1,7 @@
 /**
  * lib/orders/queries.ts — Optimised queries
  */
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Order, OrderListItem, OrderStatus } from "@/types/orders";
 
@@ -163,9 +164,8 @@ export async function getOrder(id: string): Promise<Order | null> {
 }
 
 export async function getAgents() {
-  const supabase = await createClient();
-
-  const { data } = await supabase
+  // supabaseAdmin bypasses RLS — same source as Agents page
+  const { data } = await supabaseAdmin
     .from("users")
     .select("id, full_name, email, availability_status")
     .eq("role", "call_center_agent")
