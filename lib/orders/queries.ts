@@ -175,14 +175,13 @@ export async function getAgents() {
   return ((data ?? []) as {
     id: string;
     full_name: string;
-    email: string | null;
-    active: boolean;
-    availability: string | null;
+    email: string;
+    availability_status: string | null;
   }[]).map((a) => ({
     id: a.id,
     full_name: a.full_name,
     email: a.email ?? "",
     role: "call_center_agent",
-    availability_status: a.availability ?? "offline",
+    availability_status: a.availability_status ?? "offline",
   }));
 }

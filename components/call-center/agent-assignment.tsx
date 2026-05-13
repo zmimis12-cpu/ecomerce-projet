@@ -21,9 +21,13 @@ function agentLabel(a: Agent): string {
   return `${a.full_name} — ${AVAILABILITY_LABELS[status] ?? status}`;
 }
 
-function isAssignable(a: Agent): boolean {
+function isAssignable(_a: Agent): boolean {
+  return true; // Admin can assign to any active call center agent
+}
+
+function isPreferred(a: Agent): boolean {
   const s = a.availability_status ?? "offline";
-  return s === "available" || s === "in_call"; // allow in_call too for manual assignment
+  return s === "available" || s === "in_call";
 }
 
 interface AgentAssignmentProps {
@@ -48,8 +52,8 @@ export function AgentAssignment({ orderId, currentAgentId, agents, onAssigned }:
     });
   }
 
-  const available  = agents.filter(isAssignable);
-  const unavailable = agents.filter((a) => !isAssignable(a));
+  const available  = agents.filter(isPreferred);
+  const unavailable = agents.filter((a) => !isPreferred(a));
 
   return (
     <div className="flex items-center gap-2">
@@ -105,7 +109,7 @@ export function BulkAssignToolbar({ selectedIds, agents, onComplete }: BulkAssig
     });
   }
 
-  const available = agents.filter(isAssignable);
+  const available = agents; // show all active agents
 
   return (
     <div className="flex items-center gap-2 rounded-lg border bg-primary/5 px-4 py-2">
