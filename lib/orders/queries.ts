@@ -75,7 +75,7 @@ export async function getOrders(
       .select("order_id, product_name, product_sku")
       .in("order_id", orderIds),
     agentIds.length > 0
-      ? supabase.from("cc_agents").select("id, full_name").in("id", agentIds)
+      ? supabase.from("users").select("id, full_name").in("id", agentIds)
       : { data: [] },
   ]);
 
@@ -150,7 +150,7 @@ export async function getOrder(id: string): Promise<Order | null> {
       .order("created_at", { ascending: false })
       .limit(50),
     order.assigned_to
-      ? supabase.from("cc_agents").select("id, full_name, email").eq("id", order.assigned_to).single()
+      ? supabase.from("users").select("id, full_name, email").eq("id", order.assigned_to).single()
       : Promise.resolve({ data: null }),
   ]);
 
@@ -166,9 +166,10 @@ export async function getAgents() {
   const supabase = await createClient();
 
   const { data } = await supabase
-    .from("cc_agents")
-    .select("id, full_name, email, active, availability")
-    .eq("active", true)
+    .from("users")
+    .select("id, full_name, email, availability_status")
+    .eq("role", "call_center_agent")
+    .eq("is_active", true)
     .order("full_name");
 
   return ((data ?? []) as {

@@ -1,63 +1,40 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { AgentStats, CallCenterOrder, CallLog } from "@/types/call-center";
 
-type AgentRow = {
-  user_id: string;
-  display_name: string | null;
-  availability_status: string | null;
-  commission_per_delivered: number;
-};
+type UserRow = { id: string; full_name: string; email: string; availability_status: string | null };
+type OrderRow = { assigned_to: string; status: string };
+type LogRow = { agent_id: string; disposition: string; duration_seconds: number | null };
 
-type GpUserRow = {
-  id: string;
-  prenom: string | null;
-  nom: string | null;
-  email: string;
-};
-
-type OrderRow = {
-  assigned_to: string;
-  status: string;
-};
-
-type LogRow = {
-  agent_id: string;
-  disposition: string;
-  duration_seconds: number | null;
-};
+const COMMISSION_PER_ORDER = 3;
 
 export async function getAgentStats(): Promise<AgentStats[]> {
+  // Same source as Settings → Users: public.users
   const { data: agents } = await supabaseAdmin
-    .from("call_center_agents")
-    .select("user_id, display_name, availability_status, commission_per_delivered")
-    .eq("active", true)
-    .order("display_name");
+    .from("users")
+    .select("id, full_name, email, availability_status")
+    .eq("role", "call_center_agent")
+    .eq("is_active", true)
+    .order("full_name");
 
   if (!agents || agents.length === 0) return [];
 
-  const rows = agents as unknown as AgentRow[];
-  const userIds = rows.map((a) => a.user_id);
+  const rows = agents as unknown as UserRow[];
+  const userIds = rows.map((a) => a.id);
 
-  const [{ data: users }, { data: orders }, { data: callLogs }] = await Promise.all([
-    supabaseAdmin.from("gp_users").select("id, prenom, nom, email").in("id", userIds),
+  const [{ data: orders }, { data: callLogs }] = await Promise.all([
     supabaseAdmin.from("orders").select("assigned_to, status").in("assigned_to", userIds),
     supabaseAdmin.from("call_logs").select("agent_id, disposition, duration_seconds").in("agent_id", userIds),
   ]);
 
-  const userMap = new Map<string, string>();
-  for (const u of (users ?? []) as unknown as GpUserRow[]) {
-    userMap.set(u.id, u.prenom ? `${u.prenom} ${u.nom ?? ""}`.trim() : u.email);
-  }
-
   const orderRows = (orders ?? []) as unknown as OrderRow[];
-  const logRows = (callLogs ?? []) as unknown as LogRow[];
+  const logRows   = (callLogs ?? []) as unknown as LogRow[];
 
   return rows.map((a): AgentStats => {
-    const agentOrders = orderRows.filter((o) => o.assigned_to === a.user_id);
-    const agentLogs = logRows.filter((l) => l.agent_id === a.user_id);
-    const confirmed = agentLogs.filter((l) => l.disposition === "confirmed").length;
-    const refused = agentLogs.filter((l) => l.disposition === "refused").length;
-    const noAnswer = agentLogs.filter((l) => l.disposition === "no_answer").length;
+    const agentOrders = orderRows.filter((o) => o.assigned_to === a.id);
+    const agentLogs   = logRows.filter((l) => l.agent_id === a.id);
+    const confirmed   = agentLogs.filter((l) => l.disposition === "confirmed").length;
+    const refused     = agentLogs.filter((l) => l.disposition === "refused").length;
+    const noAnswer    = agentLogs.filter((l) => l.disposition === "no_answer").length;
     const fakeOrders = agentLogs.filter((l) => l.disposition === "fake_order").length;
     const duplicates = agentLogs.filter((l) => l.disposition === "duplicate").length;
 
@@ -75,9 +52,9 @@ export async function getAgentStats(): Promise<AgentStats[]> {
     ).length;
 
     return {
-      agent_id: a.user_id,
-      full_name: a.display_name ?? userMap.get(a.user_id) ?? "",
-      email: "",
+      agent_id: a.id,
+      full_name: a.full_name,
+      email: a.email,
       role: "call_center_agent",
       total_assigned: agentOrders.length,
       calls_made: callsMade,
@@ -87,7 +64,7 @@ export async function getAgentStats(): Promise<AgentStats[]> {
       fake_orders: fakeOrders,
       duplicates,
       delivered_paid: deliveredPaid,
-      commission_mad: deliveredPaid * (a.commission_per_delivered ?? 3),
+      commission_mad: deliveredPaid * COMMISSION_PER_ORDER,
       confirmation_rate: callsMade === 0 ? 0 : Math.round((confirmed / callsMade) * 100),
       fake_rate: callsMade === 0 ? 0 : Math.round((fakeOrders / callsMade) * 100),
       avg_duration_sec: avgDur,
