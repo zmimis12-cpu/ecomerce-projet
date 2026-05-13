@@ -106,11 +106,11 @@ export async function getCallCenterOrders(
   const agentMap: Record<string, string> = {};
   if (ids.length) {
     const { data: au } = await supabaseAdmin
-      .from("call_center_agents")
-      .select("user_id, display_name")
-      .in("user_id", ids);
-    for (const a of (au ?? []) as unknown as { user_id: string; display_name: string | null }[]) {
-      agentMap[a.user_id] = a.display_name ?? "";
+      .from("users")
+      .select("id, full_name")
+      .in("id", ids);
+    for (const a of (au ?? []) as unknown as { id: string; full_name: string }[]) {
+      agentMap[a.id] = a.full_name ?? "";
     }
   }
 

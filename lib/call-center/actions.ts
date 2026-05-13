@@ -157,12 +157,11 @@ export async function setAgentAvailability(status: "available" | "in_call" | "aw
 export async function updateAgentPresence(status: "available" | "in_call" | "away" | "offline") {
   const session = await requireRole([...CC_ROLES]);
 
-  const { error } = await supabaseAdmin
-    .from("cc_agents")
-    .update({ availability: status, last_seen: new Date().toISOString() } as never)
+  await supabaseAdmin
+    .from("users")
+    .update({ availability_status: status } as never)
     .eq("id", session.authId);
 
-  if (error) return { success: false, error: error.message };
   return { success: true };
 }
 
