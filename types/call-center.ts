@@ -60,10 +60,11 @@ export interface CallLog {
 }
 
 export interface AgentStats {
-  agent_id:          string;
-  full_name:         string;
-  email:             string;
-  role:              string;
+  agent_id:            string;
+  full_name:           string;
+  email:               string;
+  role:                string;
+  availability_status?: string | null;
   total_assigned:    number;
   calls_made:        number;
   confirmed:         number;

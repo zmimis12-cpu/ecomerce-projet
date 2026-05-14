@@ -56,6 +56,7 @@ export async function getAgentStats(): Promise<AgentStats[]> {
       full_name: a.full_name,
       email: a.email,
       role: "call_center_agent",
+      availability_status: a.availability_status ?? "offline",
       total_assigned: agentOrders.length,
       calls_made: callsMade,
       confirmed,

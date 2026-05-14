@@ -37,6 +37,17 @@ export function AgentsTable({ agents }: { agents: AgentStats[] }) {
                   <p className="font-medium text-sm">{a.full_name}</p>
                   <p className="text-xs text-muted-foreground">{a.email}</p>
                 </td>
+                <td className="px-4 py-3">
+                  {(() => {
+                    const s = a.availability_status ?? "offline";
+                    const cls = s === "available" ? "bg-green-100 text-green-700" :
+                                s === "in_call"   ? "bg-blue-100 text-blue-700"  :
+                                s === "away"      ? "bg-amber-100 text-amber-700" :
+                                                    "bg-gray-100 text-gray-500";
+                    const lbl = s === "available" ? "Disponible" : s === "in_call" ? "En appel" : s === "away" ? "Absent" : "Hors ligne";
+                    return <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold", cls)}>{lbl}</span>;
+                  })()}
+                </td>
                 <td className="px-4 py-3 text-center font-mono text-sm">{a.total_assigned}</td>
                 <td className="px-4 py-3 text-center font-mono text-sm">{a.calls_made}</td>
                 <td className="px-4 py-3 text-center">
