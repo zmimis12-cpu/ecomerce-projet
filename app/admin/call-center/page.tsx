@@ -5,6 +5,7 @@ import { getCallCenterSummary, getAgentStats } from "@/lib/call-center/queries";
 import { AgentsTable } from "@/components/call-center/agents-table";
 import { hasRole } from "@/lib/auth/roles";
 import { Phone, PhoneCall, PhoneOff, PhoneMissed, Users, ListTodo } from "lucide-react";
+import { AgentPresence } from "@/components/call-center/agent-presence";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Call Center" };
@@ -30,6 +31,8 @@ export default async function CallCenterPage() {
   ]);
 
   return (
+    <>
+    {isAgent && <AgentPresence />}
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -67,6 +70,7 @@ export default async function CallCenterPage() {
         <AgentsTable agents={agents} />
       </div>
     </div>
+    </>
   );
 }
 

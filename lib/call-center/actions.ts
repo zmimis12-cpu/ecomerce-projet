@@ -148,9 +148,32 @@ export async function scheduleCallback(data: { orderId: string; callbackAt: stri
 
 export async function setAgentAvailability(status: "available" | "in_call" | "away" | "offline") {
   const session = await requireRole([...CC_ROLES]);
-  const supabase = await createClient();
-  await supabase.from("users").update({ availability_status: status } as never).eq("id", session.authId);
+  const now = new Date().toISOString();
+  await supabaseAdmin.from("users").update({
+    availability_status: status,
+    last_seen_at: now,
+  } as never).eq("id", session.authId);
+
+  console.log("AGENT PRESENCE UPDATE", { agentId: session.authId, status, lastSeenAt: now });
+
   revalidatePath("/admin/call-center");
+  return { success: true };
+}
+
+// Heartbeat — called every 30s from client
+export async function updateAgentHeartbeat() {
+  const session = await requireRole([...CC_ROLES]);
+  if (session.role !== "call_center_agent") return { success: true };
+
+  const now = new Date().toISOString();
+  await supabaseAdmin.from("users").update({
+    availability_status: "available",
+    last_seen_at: now,
+  } as never)
+    .eq("id", session.authId)
+    .neq("availability_status", "in_call"); // don't override in_call
+
+  console.log("AGENT PRESENCE UPDATE", { agentId: session.authId, status: "heartbeat", lastSeenAt: now });
   return { success: true };
 }
 
