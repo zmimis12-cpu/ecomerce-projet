@@ -57,11 +57,11 @@ export async function getAgentStats(): Promise<AgentStats[]> {
       email: a.email,
       role: "call_center_agent",
 availability_status: (() => {
-        // Offline if last_seen_at > 2 minutes ago
         if (!a.last_seen_at) return "offline";
         const diff = Date.now() - new Date(a.last_seen_at).getTime();
         return diff < 2 * 60 * 1000 ? (a.availability_status ?? "available") : "offline";
       })(),
+      last_seen_at: a.last_seen_at,
       total_assigned: agentOrders.length,
       calls_made: callsMade,
       confirmed,

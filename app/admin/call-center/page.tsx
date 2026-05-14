@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getAgentStats } from "@/lib/call-center/queries";
-import { AgentsTable } from "@/components/call-center/agents-table";
+import { LiveAgentsTable } from "@/components/call-center/live-agents-table";
 import { AgentPresence } from "@/components/call-center/agent-presence";
 import {
   Phone, PhoneCall, PhoneOff, PhoneMissed,
@@ -135,7 +135,7 @@ export default async function CallCenterPage() {
         {/* Agents table */}
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Performance agents</p>
-          <AgentsTable agents={agents} />
+          <LiveAgentsTable initialAgents={agents} />
         </div>
 
       </div>

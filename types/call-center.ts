@@ -65,6 +65,7 @@ export interface AgentStats {
   email:               string;
   role:                string;
   availability_status?: string | null;
+  last_seen_at?:        string | null;
   total_assigned:    number;
   calls_made:        number;
   confirmed:         number;

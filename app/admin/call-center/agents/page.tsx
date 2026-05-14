@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
 import { getAgentStats } from "@/lib/call-center/queries";
-import { AgentsTable } from "@/components/call-center/agents-table";
+import { LiveAgentsTable } from "@/components/call-center/live-agents-table";
 
 export const metadata: Metadata = { title: "Agents — Call Center" };
 export const dynamic = "force-dynamic";
@@ -28,7 +28,7 @@ export default async function AgentsPage() {
         <h1 className="text-xl font-semibold tracking-tight">Agents Call Center</h1>
         <p className="text-sm text-muted-foreground mt-1">Performance et statistiques des agents.</p>
       </div>
-      <AgentsTable agents={agents} />
+      <LiveAgentsTable initialAgents={agents} />
     </div>
   );
 }
