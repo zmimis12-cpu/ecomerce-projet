@@ -34,53 +34,75 @@ export async function logCall(data: {
   endedAt: string;
 }) {
   const session = await requireRole([...CC_ROLES]);
-  const supabase = await createClient();
 
+  // Use supabaseAdmin for reliable reads/writes — bypass RLS
+  const { data: currentOrder } = await supabaseAdmin
+    .from("orders")
+    .select("id, status, call_status, call_attempts, assigned_to")
+    .eq("id", data.orderId)
+    .single();
+
+  const cur = currentOrder as {
+    status: string; call_status: string | null;
+    call_attempts: number; assigned_to: string | null;
+  } | null;
+
+  // Validate ownership for CC agents
   if (session.role === "call_center_agent") {
-    const { data: order } = await supabase.from("orders").select("assigned_to").eq("id", data.orderId).single();
-    const o = order as { assigned_to: string | null } | null;
-    if (!o || o.assigned_to !== session.authId) {
+    if (!cur || cur.assigned_to !== session.authId) {
       return { success: false, error: "Commande non assignée à vous." };
     }
   }
 
-  const { error: logErr } = await supabase.from("call_logs").insert({
-    order_id: data.orderId, agent_id: session.authId,
-    phone_dialed: data.phoneDialed, call_direction: "outbound",
-    duration_seconds: data.durationSeconds, disposition: data.result,
-    notes: data.notes || null, call_started_at: data.startedAt, call_ended_at: data.endedAt,
+  // ── IDEMPOTENCY: block duplicate confirmed ────────────────────────────────
+  if (data.result === "confirmed" && cur?.status === "confirmed") {
+    return { success: false, error: "Commande déjà confirmée." };
+  }
+
+  // ── Insert call log ───────────────────────────────────────────────────────
+  const { error: logErr } = await supabaseAdmin.from("call_logs").insert({
+    order_id:         data.orderId,
+    agent_id:         session.authId,
+    phone_dialed:     data.phoneDialed,
+    call_direction:   "outbound",
+    duration_seconds: data.durationSeconds,
+    disposition:      data.result,
+    notes:            data.notes || null,
+    call_started_at:  data.startedAt,
+    call_ended_at:    data.endedAt,
   } as never);
 
   if (logErr) return { success: false, error: logErr.message };
 
+  // ── Update order status ───────────────────────────────────────────────────
   const newStatus = RESULT_TO_STATUS[data.result];
-  const { data: currentOrder } = await supabase.from("orders").select("status, call_attempts").eq("id", data.orderId).single();
-  const cur = currentOrder as { status: string; call_attempts: number } | null;
-
   const updatePayload: Record<string, unknown> = {
-    call_status: data.result,
-    last_call_at: data.endedAt,
+    call_status:   data.result,
+    last_call_at:  data.endedAt,
     call_attempts: (cur?.call_attempts ?? 0) + 1,
-    status: newStatus,
+    status:        newStatus,
   };
 
-  if (data.notes && data.notes.trim()) {
-    updatePayload.notes = data.notes.trim();
-  }
+  if (data.notes?.trim()) updatePayload.notes = data.notes.trim();
 
   if (data.result === "confirmed") {
     updatePayload.confirmed_by = session.authId;
     updatePayload.confirmed_at = data.endedAt;
   }
 
-  await supabase.from("orders").update(updatePayload as never).eq("id", data.orderId);
+  await supabaseAdmin.from("orders").update(updatePayload as never).eq("id", data.orderId);
 
-  await supabase.from("order_status_history").insert({
-    order_id: data.orderId, from_status: cur?.status ?? null, to_status: newStatus,
-    changed_by: session.authId, notes: `Appel: ${data.result} — durée: ${data.durationSeconds}s`,
+  // ── Status history ────────────────────────────────────────────────────────
+  await supabaseAdmin.from("order_status_history").insert({
+    order_id:    data.orderId,
+    from_status: cur?.status ?? null,
+    to_status:   newStatus,
+    changed_by:  session.authId,
+    notes:       `Appel: ${data.result} — durée: ${data.durationSeconds}s`,
   } as never);
 
   revalidatePath("/admin/call-center");
+  revalidatePath("/admin/call-center/queue");
   revalidatePath("/admin/call-center/orders");
   revalidatePath(`/admin/orders/${data.orderId}`);
 

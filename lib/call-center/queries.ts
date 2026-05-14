@@ -2,7 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { AgentStats, CallCenterOrder, CallLog } from "@/types/call-center";
 
 type UserRow = { id: string; full_name: string; email: string; availability_status: string | null; last_seen_at: string | null };
-type OrderRow = { assigned_to: string; status: string };
+type OrderRow = { assigned_to: string; status: string; call_status: string | null };
 type LogRow = { agent_id: string; disposition: string; duration_seconds: number | null };
 
 const COMMISSION_PER_ORDER = 3;
@@ -22,7 +22,7 @@ export async function getAgentStats(): Promise<AgentStats[]> {
   const userIds = rows.map((a) => a.id);
 
   const [{ data: orders }, { data: callLogs }] = await Promise.all([
-    supabaseAdmin.from("orders").select("assigned_to, status").in("assigned_to", userIds),
+    supabaseAdmin.from("orders").select("assigned_to, status, call_status").in("assigned_to", userIds),
     supabaseAdmin.from("call_logs").select("agent_id, disposition, duration_seconds").in("agent_id", userIds),
   ]);
 
@@ -32,10 +32,11 @@ export async function getAgentStats(): Promise<AgentStats[]> {
   return rows.map((a): AgentStats => {
     const agentOrders = orderRows.filter((o) => o.assigned_to === a.id);
     const agentLogs   = logRows.filter((l) => l.agent_id === a.id);
-    const confirmed   = agentLogs.filter((l) => l.disposition === "confirmed").length;
-    const refused     = agentLogs.filter((l) => l.disposition === "refused").length;
+    // Confirmed = unique orders confirmed, not raw call log count
+    const confirmed   = agentOrders.filter((o) => o.status === "confirmed" || o.call_status === "confirmed").length;
+    const refused     = agentOrders.filter((o) => o.status === "refused").length;
     const noAnswer    = agentLogs.filter((l) => l.disposition === "no_answer").length;
-    const fakeOrders = agentLogs.filter((l) => l.disposition === "fake_order").length;
+    const fakeOrders  = agentLogs.filter((l) => l.disposition === "fake_order").length;
     const duplicates = agentLogs.filter((l) => l.disposition === "duplicate").length;
 
     const durations = agentLogs
