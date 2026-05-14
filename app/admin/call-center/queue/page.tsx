@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AgentPresence } from "@/components/call-center/agent-presence";
 import Link from "next/link";
 import { ChevronLeft, Phone, CalendarClock, Clock } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
@@ -35,7 +36,9 @@ export default async function QueuePage() {
   const in24h = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   return (
-    <div className="space-y-5">
+    <>
+      <AgentPresence />
+      <div className="space-y-5">
       <div className="flex items-center gap-2 flex-wrap">
         {canManage && (
           <Link href="/admin/call-center"
@@ -79,5 +82,6 @@ export default async function QueuePage() {
         mode="queue"
       />
     </div>
+    </>
   );
 }

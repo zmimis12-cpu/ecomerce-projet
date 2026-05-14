@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AgentPresence } from "@/components/call-center/agent-presence";
 import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { Award, CheckCircle, Clock, AlertTriangle } from "lucide-react";
@@ -41,7 +42,9 @@ export default async function MyEarningsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <>
+      <AgentPresence />
+      <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
           <Award className="h-5 w-5 text-emerald-600" />
@@ -144,5 +147,6 @@ export default async function MyEarningsPage() {
         </div>
       )}
     </div>
+    </>
   );
 }

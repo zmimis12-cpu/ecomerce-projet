@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AgentPresence } from "@/components/call-center/agent-presence";
 import Link from "next/link";
 import { ChevronLeft, ShoppingCart } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
@@ -42,7 +43,9 @@ export default async function MyOrdersPage() {
   const pending    = orders.filter((o) => ["new", "no_answer", "pending"].includes(o.status)).length;
 
   return (
-    <div className="space-y-5">
+    <>
+      <AgentPresence />
+      <div className="space-y-5">
       <div className="flex items-center gap-2 flex-wrap">
         {canManage && (
           <Link href="/admin/call-center"
@@ -83,5 +86,6 @@ export default async function MyOrdersPage() {
         mode="history"
       />
     </div>
+    </>
   );
 }

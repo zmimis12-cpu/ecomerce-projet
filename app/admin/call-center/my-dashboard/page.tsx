@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AgentPresence } from "@/components/call-center/agent-presence";
 import { requireRole } from "@/lib/auth/session";
 import { getMyStats, getMyCallbacks, getMyCommissions, getMyAssignedOrders } from "@/lib/call-center/agent-queries";
 import { Phone, CheckCircle2, XCircle, Clock, Award, TrendingUp, CalendarClock, AlertTriangle } from "lucide-react";
@@ -25,7 +26,9 @@ export default async function AgentDashboardPage() {
   function mad(n: number) { return n.toLocaleString("fr-MA", { minimumFractionDigits: 2 }) + " MAD"; }
 
   return (
-    <div className="space-y-6">
+    <>
+      <AgentPresence />
+      <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Mon Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">Vos performances et commissions personnelles.</p>
@@ -167,5 +170,6 @@ export default async function AgentDashboardPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

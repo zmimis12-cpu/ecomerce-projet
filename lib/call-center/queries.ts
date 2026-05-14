@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { AgentStats, CallCenterOrder, CallLog } from "@/types/call-center";
 
-type UserRow = { id: string; full_name: string; email: string; availability_status: string | null };
+type UserRow = { id: string; full_name: string; email: string; availability_status: string | null; last_seen_at: string | null };
 type OrderRow = { assigned_to: string; status: string };
 type LogRow = { agent_id: string; disposition: string; duration_seconds: number | null };
 
@@ -11,7 +11,7 @@ export async function getAgentStats(): Promise<AgentStats[]> {
   // Same source as Settings → Users: public.users
   const { data: agents } = await supabaseAdmin
     .from("users")
-    .select("id, full_name, email, availability_status")
+    .select("id, full_name, email, availability_status, last_seen_at")
     .eq("role", "call_center_agent")
     .eq("is_active", true)
     .order("full_name");
@@ -56,7 +56,12 @@ export async function getAgentStats(): Promise<AgentStats[]> {
       full_name: a.full_name,
       email: a.email,
       role: "call_center_agent",
-      availability_status: a.availability_status ?? "offline",
+availability_status: (() => {
+        // Offline if last_seen_at > 2 minutes ago
+        if (!a.last_seen_at) return "offline";
+        const diff = Date.now() - new Date(a.last_seen_at).getTime();
+        return diff < 2 * 60 * 1000 ? (a.availability_status ?? "available") : "offline";
+      })(),
       total_assigned: agentOrders.length,
       calls_made: callsMade,
       confirmed,
