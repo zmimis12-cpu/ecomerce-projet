@@ -57,6 +57,27 @@ export default async function DeliveryNotesPage() {
     }
   }
 
+  // Auto-rebuild product summary for batches that have orders but no summary
+  const emptyBatches = rows.filter((b) => b.total_orders > 0 && b.total_products === 0);
+  if (emptyBatches.length > 0) {
+    const { rebuildBatchProductSummary } = await import("@/lib/delivery/batch/actions");
+    await Promise.all(emptyBatches.map((b) => rebuildBatchProductSummary(b.id)));
+    // Refresh product data after rebuild
+    if (rows.length > 0) {
+      const batchIds = rows.map((r) => r.id);
+      const { data: freshProds } = await supabaseAdmin
+        .from("delivery_batch_product_summary")
+        .select("batch_id,product_name,sku,total_quantity,order_count")
+        .in("batch_id", batchIds)
+        .order("total_quantity", { ascending: false });
+      for (const p of (freshProds ?? []) as ProductSummary[]) {
+        if (!productsByBatch.has(p.batch_id)) productsByBatch.set(p.batch_id, []);
+        const arr = productsByBatch.get(p.batch_id)!;
+        if (arr.length < 3) arr.push(p);
+      }
+    }
+  }
+
   const stores    = [...new Set(rows.map((r) => r.store_name).filter(Boolean))] as string[];
   const companies = [...new Set(rows.map((r) => r.shipping_company ?? "Digylog"))] as string[];
 

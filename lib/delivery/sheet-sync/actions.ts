@@ -407,10 +407,16 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
         .eq("id", batchId);
 
       console.log(`[sheet-sync] ✓ Daily batch ${batchNumber} now has ${count} orders. No BL yet — click "Générer BL du jour" when ready.`);
+
+      // Rebuild product summary so Récap + Tickets print correctly
+      const { rebuildBatchProductSummary } = await import("../batch/actions");
+      await rebuildBatchProductSummary(batchId);
     }
   }
 
   revalidatePath("/admin/delivery/batches");
+  revalidatePath("/admin/delivery/notes");
+  revalidatePath("/admin/delivery/documents");
   revalidatePath("/admin/delivery/sheet-sync");
 
   const totalRows = rawRows.filter((r) => r[0]?.trim() || r[1]?.trim()).length;

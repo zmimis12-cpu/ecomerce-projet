@@ -1215,3 +1215,91 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
     productsFound:   products.length,
   };
 }
+
+// ─── Rebuild product summary for any batch ────────────────────────────────────
+// Called after sheet-sync adds orders to batch. Ensures Récap + Tickets work.
+export async function rebuildBatchProductSummary(batchId: string): Promise<void> {
+  // Get all orders in batch with their items
+  const { data: batchOrders } = await supabaseAdmin
+    .from("delivery_batch_orders")
+    .select("order_id")
+    .eq("batch_id", batchId);
+
+  const orderIds = ((batchOrders ?? []) as { order_id: string }[]).map((r) => r.order_id);
+  if (!orderIds.length) return;
+
+  const { data: items } = await supabaseAdmin
+    .from("order_items")
+    .select("order_id, quantity, product_id, product_name, sku")
+    .in("order_id", orderIds);
+
+  type Item = { order_id: string; quantity: number; product_id: string | null; product_name: string | null; sku: string | null };
+  const itemRows = (items ?? []) as Item[];
+
+  // Group by product
+  const prodMap = new Map<string, { product_id: string | null; product_name: string; sku: string; total_quantity: number; order_count: number; order_ids: Set<string> }>();
+
+  for (const item of itemRows) {
+    const key  = item.product_id ?? item.product_name ?? "unknown";
+    const name = item.product_name ?? "Produit";
+    const sku  = item.sku ?? "";
+
+    if (!prodMap.has(key)) {
+      prodMap.set(key, { product_id: item.product_id, product_name: name, sku, total_quantity: 0, order_count: 0, order_ids: new Set() });
+    }
+    const entry = prodMap.get(key)!;
+    entry.total_quantity += item.quantity ?? 1;
+    if (!entry.order_ids.has(item.order_id)) {
+      entry.order_ids.add(item.order_id);
+      entry.order_count++;
+    }
+  }
+
+  // If no order_items — try to fetch from sheet data stored in orders
+  if (prodMap.size === 0) {
+    const { data: orders } = await supabaseAdmin
+      .from("orders")
+      .select("id, first_product_name, first_product_sku")
+      .in("id", orderIds);
+
+    for (const o of (orders ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null }[]) {
+      const name = o.first_product_name ?? "Produit";
+      const sku  = o.first_product_sku  ?? "";
+      const key  = sku || name;
+      if (!prodMap.has(key)) {
+        prodMap.set(key, { product_id: null, product_name: name, sku, total_quantity: 0, order_count: 0, order_ids: new Set() });
+      }
+      const entry = prodMap.get(key)!;
+      entry.total_quantity += 1;
+      entry.order_ids.add(o.id);
+      entry.order_count++;
+    }
+  }
+
+  if (prodMap.size === 0) {
+    console.warn(`[batch] No products found for batch ${batchId} — product summary will be empty`);
+    return;
+  }
+
+  // Delete old summary and rebuild
+  await supabaseAdmin.from("delivery_batch_product_summary").delete().eq("batch_id", batchId);
+
+  const summaryRows = [...prodMap.values()].map((p) => ({
+    batch_id:       batchId,
+    product_id:     p.product_id,
+    product_name:   p.product_name,
+    sku:            p.sku,
+    total_quantity: p.total_quantity,
+    order_count:    p.order_count,
+  }));
+
+  await supabaseAdmin.from("delivery_batch_product_summary").insert(summaryRows as never);
+
+  // Update total_products on batch
+  const totalQty = summaryRows.reduce((s, r) => s + r.total_quantity, 0);
+  await supabaseAdmin.from("delivery_batches")
+    .update({ total_products: totalQty } as never)
+    .eq("id", batchId);
+
+  console.log(`[batch] ✓ Product summary rebuilt for batch ${batchId}: ${summaryRows.length} products, ${totalQty} units`);
+}

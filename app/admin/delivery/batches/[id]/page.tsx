@@ -37,12 +37,24 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
     sent_at: string | null; created_at: string;
   };
 
-  // Product summary
-  const { data: summary } = await supabaseAdmin
+  // Product summary — auto-rebuild if empty
+  let { data: summary } = await supabaseAdmin
     .from("delivery_batch_product_summary")
     .select("product_name, sku, total_quantity, order_count")
     .eq("batch_id", id)
     .order("total_quantity", { ascending: false });
+
+  // If summary is empty but batch has orders — trigger rebuild
+  if ((!summary || summary.length === 0) && b.total_orders > 0) {
+    const { rebuildBatchProductSummary } = await import("@/lib/delivery/batch/actions");
+    await rebuildBatchProductSummary(id);
+    const { data: rebuilt } = await supabaseAdmin
+      .from("delivery_batch_product_summary")
+      .select("product_name, sku, total_quantity, order_count")
+      .eq("batch_id", id)
+      .order("total_quantity", { ascending: false });
+    summary = rebuilt;
+  }
 
   // Batch orders with order details
   const { data: batchOrders } = await supabaseAdmin
