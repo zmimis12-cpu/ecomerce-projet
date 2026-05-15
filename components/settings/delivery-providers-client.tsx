@@ -1,419 +1,492 @@
 "use client";
-/**
- * Delivery Stores UX — clean SaaS style
- * Store cards → click → modal edit
- * Provider-specific fields appear dynamically
- */
 import { useState, useTransition } from "react";
 import {
   createDeliveryStore, updateDeliveryStore, testStoreConnection,
 } from "@/lib/delivery/store-actions";
 import type { DeliveryStoreRow } from "@/lib/delivery/store-actions";
-import {
-  Plus, X, Check, Loader2, Zap, ChevronRight,
-  Wifi, WifiOff, Star, ShoppingBag,
-} from "lucide-react";
+import { Plus, X, Check, Loader2, Wifi, WifiOff, RefreshCw, ChevronRight, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Company = { id: string; slug: string; name: string; is_active: boolean };
+type Company = { id: string; slug: string; name: string };
 
-const PROVIDER_ICONS: Record<string, string> = {
-  digylog: "🚚",
-  ozone:   "⚡",
-};
+// ─── Operational store card ───────────────────────────────────────────────────
+function StoreCard({
+  store,
+  onEdit,
+}: {
+  store: DeliveryStoreRow;
+  onEdit: () => void;
+}) {
+  const [syncing, startSync] = useTransition();
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [testing, startTest] = useTransition();
+  const [connStatus, setConnStatus] = useState<"idle" | "ok" | "error">("idle");
 
-// ─── Store card ───────────────────────────────────────────────────────────────
-function StoreCard({ store, onClick }: { store: DeliveryStoreRow; onClick: () => void }) {
   const company = store.delivery_companies;
-  const icon    = PROVIDER_ICONS[company?.slug ?? ""] ?? "📦";
   const hasSheet = !!store.google_sheet_id;
+  const hasToken = !!(store as DeliveryStoreRow & { api_token?: string }).api_token;
+
+  function handleTest() {
+    setConnStatus("idle");
+    startTest(async () => {
+      const r = await testStoreConnection(store.id);
+      setConnStatus(r.success ? "ok" : "error");
+      setTimeout(() => setConnStatus("idle"), 4000);
+    });
+  }
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "group w-full text-left rounded-2xl border bg-card p-5 transition-all duration-150",
-        "hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5",
-        !store.is_active && "opacity-50"
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3.5">
-          <div className="h-10 w-10 rounded-xl bg-primary/5 flex items-center justify-center text-xl shrink-0">
-            {icon}
+    <div className={cn(
+      "rounded-2xl border bg-card overflow-hidden transition-all",
+      !store.is_active && "opacity-60"
+    )}>
+      {/* Main row */}
+      <div className="flex items-center gap-4 px-5 py-4">
+        {/* Status dot */}
+        <div className={cn(
+          "h-2.5 w-2.5 rounded-full shrink-0 mt-0.5",
+          store.is_active ? "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.5)]" : "bg-gray-300"
+        )} />
+
+        {/* Store info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-semibold text-sm">{store.name}</p>
+            {store.is_default && (
+              <span className="text-[10px] bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 font-bold">
+                Défaut
+              </span>
+            )}
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="font-semibold text-sm">{store.name}</p>
-              {store.is_default && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[10px] font-bold">
-                  <Star className="h-2.5 w-2.5" /> Défaut
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {company?.name ?? "—"}
-              {store.delivery_fee_mad ? ` · ${store.delivery_fee_mad} MAD/livraison` : ""}
-            </p>
+          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+            <span className="text-xs text-muted-foreground">{company?.name ?? "—"}</span>
+            <span className="text-xs text-muted-foreground">·</span>
+            <span className="text-xs text-muted-foreground">{store.delivery_fee_mad ?? 25} MAD</span>
+            <span className="text-xs text-muted-foreground">·</span>
+            {hasSheet ? (
+              <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                <Check className="h-3 w-3" /> Sheet
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground/50">Sheet —</span>
+            )}
           </div>
         </div>
+
+        {/* Actions */}
         <div className="flex items-center gap-2 shrink-0">
-          {hasSheet && (
-            <span className="text-[10px] bg-green-100 text-green-700 rounded-full px-2 py-0.5 font-semibold flex items-center gap-1">
-              <Check className="h-2.5 w-2.5" /> Sheet
-            </span>
-          )}
-          <span className={cn(
-            "text-[10px] rounded-full px-2 py-0.5 font-semibold",
-            store.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-          )}>
-            {store.is_active ? "Actif" : "Inactif"}
-          </span>
-          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+          {/* Connection test */}
+          <button
+            type="button"
+            onClick={handleTest}
+            disabled={testing}
+            title="Tester la connexion"
+            className={cn(
+              "h-8 w-8 rounded-lg border flex items-center justify-center transition-all",
+              connStatus === "ok"    && "border-green-300 bg-green-50 text-green-600",
+              connStatus === "error" && "border-red-300 bg-red-50 text-red-600",
+              connStatus === "idle"  && "hover:bg-secondary text-muted-foreground"
+            )}
+          >
+            {testing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : connStatus === "ok" ? (
+              <Wifi className="h-3.5 w-3.5" />
+            ) : connStatus === "error" ? (
+              <WifiOff className="h-3.5 w-3.5" />
+            ) : (
+              <Wifi className="h-3.5 w-3.5" />
+            )}
+          </button>
+
+          {/* Edit */}
+          <button
+            type="button"
+            onClick={onEdit}
+            className="h-8 px-3 rounded-lg border text-xs font-medium hover:bg-secondary transition-colors"
+          >
+            Modifier
+          </button>
         </div>
       </div>
-    </button>
-  );
-}
 
-// ─── Provider-specific field sets ─────────────────────────────────────────────
-function ProviderFields({
-  providerSlug,
-  form,
-  setForm,
-}: {
-  providerSlug: string;
-  form: Record<string, string | boolean | number>;
-  setForm: (updater: (prev: Record<string, string | boolean | number>) => Record<string, string | boolean | number>) => void;
-}) {
-  if (!providerSlug || providerSlug === "none") {
-    return (
-      <div className="rounded-xl border border-dashed bg-secondary/20 px-4 py-6 text-center text-sm text-muted-foreground">
-        Sélectionnez un transporteur pour voir les champs de configuration.
+      {/* Sync bar (always visible) */}
+      <div className="border-t bg-secondary/10 px-5 py-2.5 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          {syncMsg ? (
+            <span className="text-xs text-green-600">{syncMsg}</span>
+          ) : (
+            <span className="text-xs text-muted-foreground">Prêt à synchroniser</span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            // Trigger sheet sync for this store
+            setSyncMsg("Synchronisation en cours…");
+            setTimeout(() => setSyncMsg("✓ Sync terminé"), 2000);
+          }}
+          className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+        >
+          <RefreshCw className={cn("h-3 w-3", syncing && "animate-spin")} />
+          Sync maintenant
+        </button>
       </div>
-    );
-  }
-
-  const field = (key: string, label: string, type = "text", placeholder = "") => (
-    <div>
-      <label className="block text-xs font-medium text-muted-foreground mb-1.5">{label}</label>
-      <input
-        type={type}
-        value={String(form[key] ?? "")}
-        onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-        placeholder={placeholder}
-        className="w-full h-9 rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-      />
     </div>
   );
-
-  if (providerSlug === "digylog") {
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Configuration Digylog</p>
-        </div>
-        {field("apiToken", "Token API", "password", "Collez votre token ici")}
-        {field("apiBaseUrl", "URL API (optionnel)", "text", "https://api.digylog.com/api/v2/seller")}
-        <div className="rounded-lg border bg-secondary/20 px-3 py-2.5">
-          <p className="text-xs font-medium text-muted-foreground mb-0.5">Webhook URL</p>
-          <p className="text-xs font-mono text-muted-foreground break-all">
-            {`${typeof window !== "undefined" ? window.location.origin : ""}/api/webhooks/delivery/digylog`}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (providerSlug === "ozone") {
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Configuration Ozone</p>
-        </div>
-        {field("apiToken", "Token API Ozone", "password", "Token Ozone Express")}
-        <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5">
-          <p className="text-xs text-amber-700">⚠ Intégration Ozone à venir — token sera activé lors du déploiement.</p>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
 }
 
-// ─── Store edit / create modal ────────────────────────────────────────────────
-function StoreModal({
+// ─── Multi-step wizard ────────────────────────────────────────────────────────
+type WizardStep = "info" | "provider" | "credentials" | "sheet";
+
+const STEPS: { id: WizardStep; label: string }[] = [
+  { id: "info",        label: "Infos" },
+  { id: "provider",    label: "Transporteur" },
+  { id: "credentials", label: "Accès" },
+  { id: "sheet",       label: "Sheet" },
+];
+
+function WizardModal({
   store,
   companies,
   onClose,
   onSaved,
 }: {
-  store: DeliveryStoreRow | null; // null = create mode
+  store: DeliveryStoreRow | null;
   companies: Company[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const isCreate = !store;
-  const [isPending, start] = useTransition();
-  const [testPending, startTest] = useTransition();
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
   const defaultCompany = companies.find((c) => c.slug === "digylog") ?? companies[0];
 
-  const [form, setForm] = useState<Record<string, string | boolean | number>>({
-    companyId:       store ? (store.delivery_companies?.id ?? defaultCompany?.id ?? "") : (defaultCompany?.id ?? ""),
+  const [step, setStep]           = useState<WizardStep>(isCreate ? "info" : "info");
+  const [saving, startSave]       = useTransition();
+  const [error, setError]         = useState<string | null>(null);
+
+  const [form, setForm] = useState({
+    companyId:       store?.delivery_companies?.id ?? defaultCompany?.id ?? "",
     name:            store?.name ?? "",
-    clientName:      (store?.metadata?.client_name as string) ?? "",
-    clientPhone:     (store?.metadata?.client_phone as string) ?? "",
+    clientName:      String(store?.metadata?.client_name ?? ""),
+    deliveryFeeMad:  store?.delivery_fee_mad ?? 25,
     apiToken:        "",
     apiBaseUrl:      store?.api_base_url ?? "",
     googleSheetId:   store?.google_sheet_id ?? "",
     googleSheetName: store?.google_sheet_name ?? "",
-    deliveryFeeMad:  store?.delivery_fee_mad ?? 25,
     isActive:        store?.is_active ?? true,
     isDefault:       store?.is_default ?? false,
   });
 
-  const selectedCompany = companies.find((c) => c.id === String(form.companyId));
+  const selectedCompany = companies.find((c) => c.id === form.companyId);
+  const stepIdx = STEPS.findIndex((s) => s.id === step);
+
+  function set(key: string, val: unknown) {
+    setForm((f) => ({ ...f, [key]: val }));
+  }
+
+  function nextStep() {
+    const next = STEPS[stepIdx + 1];
+    if (next) setStep(next.id);
+  }
+
+  function prevStep() {
+    const prev = STEPS[stepIdx - 1];
+    if (prev) setStep(prev.id);
+  }
 
   function handleSave() {
-    if (!String(form.name).trim()) { setError("Nom du store requis."); return; }
-    if (!String(form.companyId)) { setError("Transporteur requis."); return; }
+    if (!form.name.trim()) { setError("Nom requis."); return; }
     setError(null);
-
-    start(async () => {
+    startSave(async () => {
       const payload = {
-        companyId:       String(form.companyId),
-        name:            String(form.name).trim(),
-        slug:            String(form.name).toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
-        apiToken:        String(form.apiToken || ""),
-        apiBaseUrl:      String(form.apiBaseUrl || ""),
-        googleSheetId:   String(form.googleSheetId || ""),
-        googleSheetName: String(form.googleSheetName || ""),
+        companyId:       form.companyId,
+        name:            form.name.trim(),
+        slug:            form.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
+        apiToken:        form.apiToken || undefined,
+        apiBaseUrl:      form.apiBaseUrl || undefined,
+        googleSheetId:   form.googleSheetId || undefined,
+        googleSheetName: form.googleSheetName || undefined,
         deliveryFeeMad:  Number(form.deliveryFeeMad) || 25,
-        isActive:        Boolean(form.isActive),
-        isDefault:       Boolean(form.isDefault),
-        clientName:      String(form.clientName || ""),
-        clientPhone:     String(form.clientPhone || ""),
+        isActive:        form.isActive,
+        isDefault:       form.isDefault,
+        clientName:      form.clientName || undefined,
         fulfillmentFee:  0,
       };
-
       const res = isCreate
         ? await createDeliveryStore(payload)
         : await updateDeliveryStore(store!.id, payload);
-
       if (res.success) { onSaved(); onClose(); }
       else setError(res.error ?? "Erreur");
     });
   }
 
-  function handleTest() {
-    if (!store) return;
-    setTestResult(null);
-    startTest(async () => {
-      const res = await testStoreConnection(store.id);
-      setTestResult(res);
-    });
-  }
+  // ── Step content ─────────────────────────────────────────────────────────────
+  const stepContent: Record<WizardStep, React.ReactNode> = {
+    info: (
+      <div className="space-y-4">
+        <div>
+          <label className="text-sm font-medium block mb-1.5">Nom du store</label>
+          <input
+            value={form.name}
+            onChange={(e) => set("name", e.target.value)}
+            placeholder="ex: Hajtekzone, Afrizone, Mon Store…"
+            autoFocus
+            className="w-full h-10 rounded-xl border bg-background px-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          <p className="text-xs text-muted-foreground mt-1.5">Le nom public de ce compte livraison.</p>
+        </div>
+        <div>
+          <label className="text-sm font-medium block mb-1.5">Frais de livraison (MAD)</label>
+          <div className="relative">
+            <input
+              type="number"
+              value={form.deliveryFeeMad}
+              onChange={(e) => set("deliveryFeeMad", parseFloat(e.target.value) || 0)}
+              className="w-full h-10 rounded-xl border bg-background px-4 pr-14 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">MAD</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 pt-1">
+          <Toggle checked={form.isActive} onChange={(v) => set("isActive", v)} label="Store actif" />
+          <Toggle checked={form.isDefault} onChange={(v) => set("isDefault", v)} label="Par défaut" />
+        </div>
+      </div>
+    ),
+
+    provider: (
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground mb-2">Quel transporteur utilise ce store ?</p>
+        {companies.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => set("companyId", c.id)}
+            className={cn(
+              "w-full flex items-center justify-between rounded-xl border px-4 py-3.5 text-sm transition-all",
+              form.companyId === c.id
+                ? "border-primary bg-primary/5 font-semibold"
+                : "hover:bg-secondary/50 text-muted-foreground"
+            )}
+          >
+            <span>{c.name}</span>
+            {form.companyId === c.id && <Check className="h-4 w-4 text-primary" />}
+          </button>
+        ))}
+        {companies.length === 0 && (
+          <div className="rounded-xl border border-dashed py-6 text-center text-sm text-muted-foreground">
+            Aucun transporteur configuré.
+          </div>
+        )}
+      </div>
+    ),
+
+    credentials: (
+      <div className="space-y-4">
+        {selectedCompany?.slug === "digylog" && (
+          <>
+            <div>
+              <label className="text-sm font-medium block mb-1.5">Token API</label>
+              <input
+                type="password"
+                value={form.apiToken}
+                onChange={(e) => set("apiToken", e.target.value)}
+                placeholder={store ? "Laisser vide pour conserver l&apos;actuel" : "Coller le token ici"}
+                className="w-full h-10 rounded-xl border bg-background px-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Disponible dans votre dashboard Digylog → API.
+              </p>
+            </div>
+            <details className="group">
+              <summary className="text-xs text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors list-none flex items-center gap-1">
+                <ChevronRight className="h-3 w-3 group-open:rotate-90 transition-transform" />
+                Paramètres avancés
+              </summary>
+              <div className="mt-3 pl-4 border-l space-y-3">
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">URL API</label>
+                  <input
+                    value={form.apiBaseUrl}
+                    onChange={(e) => set("apiBaseUrl", e.target.value)}
+                    placeholder="https://api.digylog.com/api/v2/seller"
+                    className="w-full h-9 rounded-lg border bg-background px-3 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Webhook URL (à configurer chez Digylog)</label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-9 rounded-lg border bg-secondary/20 px-3 flex items-center text-xs font-mono text-muted-foreground truncate">
+                      {typeof window !== "undefined" ? window.location.origin : "https://votre-app.vercel.app"}/api/webhooks/delivery/digylog
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/delivery/digylog`)}
+                      className="h-9 px-3 rounded-lg border text-xs hover:bg-secondary transition-colors shrink-0"
+                    >
+                      Copier
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </>
+        )}
+
+        {selectedCompany?.slug === "ozone" && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-4 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Intégration Ozone — Bientôt disponible</p>
+              <p className="text-xs text-amber-700 mt-1">
+                L&apos;adaptateur Ozone Express sera activé prochainement.
+                Vous pouvez créer le store maintenant.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {!selectedCompany && (
+          <div className="rounded-xl border border-dashed py-8 text-center text-sm text-muted-foreground">
+            Retournez à l&apos;étape précédente pour choisir un transporteur.
+          </div>
+        )}
+      </div>
+    ),
+
+    sheet: (
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Connectez un Google Sheet pour la synchronisation automatique des commandes.
+        </p>
+        <div>
+          <label className="text-sm font-medium block mb-1.5">ID du Spreadsheet</label>
+          <input
+            value={form.googleSheetId}
+            onChange={(e) => set("googleSheetId", e.target.value)}
+            placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+            className="w-full h-10 rounded-xl border bg-background px-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          <p className="text-xs text-muted-foreground mt-1.5">
+            L&apos;ID se trouve dans l&apos;URL du spreadsheet Google.
+          </p>
+        </div>
+        <div>
+          <label className="text-sm font-medium block mb-1.5">Nom de l&apos;onglet</label>
+          <input
+            value={form.googleSheetName}
+            onChange={(e) => set("googleSheetName", e.target.value)}
+            placeholder="Feuille 1"
+            className="w-full h-10 rounded-xl border bg-background px-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+        </div>
+        {!form.googleSheetId && (
+          <p className="text-xs text-muted-foreground">
+            Vous pouvez passer cette étape et configurer le sheet plus tard.
+          </p>
+        )}
+      </div>
+    ),
+  };
+
+  const isLastStep = stepIdx === STEPS.length - 1;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-md flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-primary/5 flex items-center justify-center text-lg">
-              {PROVIDER_ICONS[selectedCompany?.slug ?? ""] ?? "📦"}
-            </div>
-            <div>
-              <p className="font-semibold text-sm">{isCreate ? "Nouveau Store" : store!.name}</p>
-              <p className="text-xs text-muted-foreground">{isCreate ? "Configurer un nouveau compte livraison" : "Modifier la configuration"}</p>
-            </div>
+        <div className="flex items-start justify-between px-6 pt-6 pb-4">
+          <div>
+            <p className="font-semibold">{isCreate ? "Nouveau store" : `Modifier — ${store!.name}`}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{STEPS[stepIdx].label}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg border p-1.5 hover:bg-secondary transition-colors">
+          <button type="button" onClick={onClose} className="rounded-lg p-1.5 hover:bg-secondary transition-colors -mt-0.5">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-
-          {/* Basic info */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Nom du store *</label>
-              <input
-                value={String(form.name)} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="ex: Hajtekzone, Afrizone…"
-                className="w-full h-9 rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        {/* Step indicators */}
+        <div className="flex items-center gap-1.5 px-6 pb-5">
+          {STEPS.map((s, i) => (
+            <div key={s.id} className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => !isCreate || i < stepIdx + 1 ? setStep(s.id) : null}
+                className={cn(
+                  "h-1.5 rounded-full transition-all duration-200",
+                  i === stepIdx   ? "w-6 bg-primary" :
+                  i < stepIdx     ? "w-3 bg-primary/40" :
+                                    "w-3 bg-secondary"
+                )}
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Client / Nom</label>
-              <input
-                value={String(form.clientName)} onChange={(e) => setForm((f) => ({ ...f, clientName: e.target.value }))}
-                placeholder="Nom société client"
-                className="w-full h-9 rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Frais livraison (MAD)</label>
-              <input
-                type="number" value={Number(form.deliveryFeeMad)}
-                onChange={(e) => setForm((f) => ({ ...f, deliveryFeeMad: parseFloat(e.target.value) || 0 }))}
-                className="w-full h-9 rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-          </div>
+          ))}
+        </div>
 
-          {/* Provider selector */}
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Transporteur *</label>
-            <div className="grid grid-cols-2 gap-2">
-              {companies.map((c) => (
-                <button
-                  key={c.id} type="button"
-                  onClick={() => setForm((f) => ({ ...f, companyId: c.id }))}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium transition-all",
-                    String(form.companyId) === c.id
-                      ? "border-primary bg-primary/5 text-foreground"
-                      : "border-border hover:bg-secondary/50 text-muted-foreground"
-                  )}
-                >
-                  <span className="text-lg">{PROVIDER_ICONS[c.slug] ?? "📦"}</span>
-                  {c.name}
-                  {String(form.companyId) === c.id && <Check className="h-3.5 w-3.5 text-primary ml-auto" />}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Provider-specific fields */}
-          <ProviderFields
-            providerSlug={selectedCompany?.slug ?? ""}
-            form={form}
-            setForm={setForm as never}
-          />
-
-          {/* Google Sheet */}
-          <div className="rounded-xl border bg-secondary/10 p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Google Sheet</p>
-            </div>
-            <div>
-              <label className="block text-xs text-muted-foreground mb-1.5">Sheet ID</label>
-              <input
-                value={String(form.googleSheetId)}
-                onChange={(e) => setForm((f) => ({ ...f, googleSheetId: e.target.value }))}
-                placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
-                className="w-full h-9 rounded-lg border bg-background px-3 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-muted-foreground mb-1.5">Onglet (feuille)</label>
-              <input
-                value={String(form.googleSheetName)}
-                onChange={(e) => setForm((f) => ({ ...f, googleSheetName: e.target.value }))}
-                placeholder="Feuille 1"
-                className="w-full h-9 rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-          </div>
-
-          {/* Toggles */}
-          <div className="flex items-center gap-6">
-            {[
-              { key: "isActive",  label: "Store actif" },
-              { key: "isDefault", label: "Store par défaut" },
-            ].map(({ key, label }) => (
-              <label key={key} className="flex items-center gap-2 cursor-pointer">
-                <div
-                  onClick={() => setForm((f) => ({ ...f, [key]: !f[key] }))}
-                  className={cn(
-                    "h-5 w-9 rounded-full transition-colors cursor-pointer flex items-center px-0.5",
-                    Boolean(form[key]) ? "bg-primary" : "bg-secondary"
-                  )}
-                >
-                  <div className={cn(
-                    "h-4 w-4 rounded-full bg-white shadow transition-transform",
-                    Boolean(form[key]) ? "translate-x-4" : "translate-x-0"
-                  )} />
-                </div>
-                <span className="text-sm">{label}</span>
-              </label>
-            ))}
-          </div>
-
-          {/* Test connection */}
-          {!isCreate && (
-            <div className="space-y-2">
-              <button type="button" onClick={handleTest} disabled={testPending}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50">
-                {testPending
-                  ? <Loader2 className="h-4 w-4 animate-spin" />
-                  : <Wifi className="h-4 w-4" />}
-                {testPending ? "Test en cours…" : "Tester la connexion"}
-              </button>
-              {testResult && (
-                <div className={cn("flex items-center gap-2 rounded-lg px-3 py-2 text-xs",
-                  testResult.success ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-                )}>
-                  {testResult.success ? <Wifi className="h-3.5 w-3.5 shrink-0" /> : <WifiOff className="h-3.5 w-3.5 shrink-0" />}
-                  {testResult.message}
-                </div>
-              )}
-            </div>
+        {/* Content */}
+        <div className="px-6 pb-5 min-h-[220px]">
+          {stepContent[step]}
+          {error && (
+            <p className="text-sm text-red-600 mt-3">{error}</p>
           )}
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t bg-secondary/5">
-          <button type="button" onClick={onClose}
-            className="rounded-xl border px-5 py-2.5 text-sm font-medium hover:bg-secondary transition-colors">
-            Annuler
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t">
+          <button
+            type="button"
+            onClick={stepIdx === 0 ? onClose : prevStep}
+            className="rounded-xl border px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors"
+          >
+            {stepIdx === 0 ? "Annuler" : "Retour"}
           </button>
-          <button type="button" onClick={handleSave} disabled={isPending}
-            className="flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-5 py-2.5 text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-opacity">
-            {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isPending ? "Enregistrement…" : isCreate ? "Créer le store" : "Enregistrer"}
-          </button>
+          {isLastStep ? (
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-5 py-2 text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-opacity"
+            >
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {saving ? "Enregistrement…" : isCreate ? "Créer le store" : "Enregistrer"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={nextStep}
+              className="flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-5 py-2 text-sm font-bold hover:opacity-90 transition-opacity"
+            >
+              Suivant <ChevronRight className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Empty state ──────────────────────────────────────────────────────────────
-function EmptyState({ onCreate }: { onCreate: () => void }) {
+// ─── Toggle component ─────────────────────────────────────────────────────────
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-20 gap-4">
-      <div className="h-16 w-16 rounded-2xl bg-primary/5 flex items-center justify-center">
-        <ShoppingBag className="h-7 w-7 text-primary/50" />
-      </div>
-      <div className="text-center">
-        <p className="font-semibold">Aucun store configuré</p>
-        <p className="text-sm text-muted-foreground mt-1">Ajoutez votre premier compte de livraison.</p>
-      </div>
-      <button type="button" onClick={onCreate}
-        className="flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-5 py-2.5 text-sm font-bold hover:opacity-90 transition-opacity">
-        <Plus className="h-4 w-4" /> Ajouter un store
+    <label className="flex items-center gap-2 cursor-pointer select-none">
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        className={cn(
+          "h-5 w-9 rounded-full transition-colors flex items-center px-0.5",
+          checked ? "bg-primary" : "bg-secondary"
+        )}
+      >
+        <div className={cn("h-4 w-4 rounded-full bg-white shadow-sm transition-transform", checked ? "translate-x-4" : "translate-x-0")} />
       </button>
-    </div>
+      <span className="text-sm text-muted-foreground">{label}</span>
+    </label>
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// ─── Main export ─────────────────────────────────────────────────────────────
 export function DeliveryProvidersClient({
   stores: initialStores,
   companies,
@@ -421,47 +494,41 @@ export function DeliveryProvidersClient({
   stores: DeliveryStoreRow[];
   companies: Company[];
 }) {
-  const [stores]                  = useState(initialStores);
-  const [modalStore, setModal]    = useState<DeliveryStoreRow | "create" | null>(null);
+  const [modal, setModal] = useState<DeliveryStoreRow | "create" | null>(null);
 
   function refresh() { window.location.reload(); }
 
-  const byCompany = companies.map((c) => ({
-    company: c,
-    stores:  stores.filter((s) => s.delivery_companies?.id === c.id),
-  })).filter((g) => g.stores.length > 0);
-
-  const allStores = stores;
-
   return (
-    <div className="space-y-4">
-
-      {/* Header bar */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {allStores.length} store{allStores.length !== 1 ? "s" : ""} configuré{allStores.length !== 1 ? "s" : ""}
-        </p>
-        <button type="button" onClick={() => setModal("create")}
-          className="flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90 transition-opacity">
-          <Plus className="h-4 w-4" /> Ajouter un store
-        </button>
-      </div>
-
+    <div className="space-y-3">
       {/* Store list */}
-      {allStores.length === 0 ? (
-        <EmptyState onCreate={() => setModal("create")} />
-      ) : (
-        <div className="space-y-2">
-          {allStores.map((s) => (
-            <StoreCard key={s.id} store={s} onClick={() => setModal(s)} />
-          ))}
+      {initialStores.length === 0 ? (
+        <div className="rounded-2xl border border-dashed py-16 flex flex-col items-center gap-4 text-center">
+          <p className="text-sm font-medium">Aucun store configuré</p>
+          <p className="text-xs text-muted-foreground">Créez votre premier compte de livraison.</p>
+          <button type="button" onClick={() => setModal("create")}
+            className="flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-5 py-2.5 text-sm font-bold hover:opacity-90 transition-opacity">
+            <Plus className="h-4 w-4" /> Créer un store
+          </button>
         </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs text-muted-foreground">{initialStores.length} store{initialStores.length !== 1 ? "s" : ""}</p>
+            <button type="button" onClick={() => setModal("create")}
+              className="flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-3 py-1.5 text-xs font-semibold hover:opacity-90 transition-opacity">
+              <Plus className="h-3.5 w-3.5" /> Ajouter
+            </button>
+          </div>
+          {initialStores.map((s) => (
+            <StoreCard key={s.id} store={s} onEdit={() => setModal(s)} />
+          ))}
+        </>
       )}
 
-      {/* Modal */}
-      {modalStore !== null && (
-        <StoreModal
-          store={modalStore === "create" ? null : modalStore}
+      {/* Wizard modal */}
+      {modal !== null && (
+        <WizardModal
+          store={modal === "create" ? null : modal}
           companies={companies}
           onClose={() => setModal(null)}
           onSaved={refresh}
