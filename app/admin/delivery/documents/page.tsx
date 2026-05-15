@@ -26,27 +26,36 @@ async function getDayStats() {
   // Also compute from orders for dates not yet in daily_bls
   const { data: ordSummary } = await supabaseAdmin
     .from("orders")
-    .select("created_at, total_amount_mad, delivery_tracking_number, delivery_company_id")
+    .select("created_at, sent_to_delivery_at, total_amount_mad, delivery_tracking_number, delivery_company_id")
     .in("status", ["sent_to_delivery","in_transit","delivered","paid","returned"])
     .not("delivery_tracking_number", "is", null)
     .order("created_at", { ascending: false })
     .limit(1000);
 
-  // Get Digylog settings for store name
+  // Get default store name from delivery_stores
+  const { data: defaultStore } = await supabaseAdmin
+    .from("delivery_stores")
+    .select("name")
+    .eq("is_default", true)
+    .eq("is_active", true)
+    .maybeSingle();
+  // Fallback to digylog_settings if no delivery_stores configured
   const { data: dgSettings } = await supabaseAdmin
     .from("digylog_settings")
     .select("default_store_name")
     .limit(1)
     .maybeSingle();
-  const storeName = (dgSettings as { default_store_name?: string } | null)?.default_store_name ?? "Default";
+  const storeName = (defaultStore as { name?: string } | null)?.name
+    ?? (dgSettings as { default_store_name?: string } | null)?.default_store_name
+    ?? "Default";
 
-  type OrdRow = { created_at: string; total_amount_mad: number; delivery_tracking_number: string };
+  type OrdRow = { created_at: string; sent_to_delivery_at?: string; total_amount_mad: number; delivery_tracking_number: string };
   const orders = (ordSummary ?? []) as OrdRow[];
 
   // Group by date
   const dateMap = new Map<string, { orders: number; trackings: number; cod: number }>();
   for (const o of orders) {
-    const day = o.created_at.slice(0, 10);
+    const day = ((o as unknown as { sent_to_delivery_at?: string }).sent_to_delivery_at ?? o.created_at).slice(0, 10);
     if (!dateMap.has(day)) dateMap.set(day, { orders: 0, trackings: 0, cod: 0 });
     const entry = dateMap.get(day)!;
     entry.orders++;
