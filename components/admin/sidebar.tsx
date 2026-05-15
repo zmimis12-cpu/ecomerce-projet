@@ -45,7 +45,6 @@ const ADMIN_NAV: NavGroup[] = [
       { href: "/admin/delivery/invoices",   label: "Factures",           icon: FileText        },
       { href: "/admin/scanner",             label: "Scanner",            icon: ScanLine        },
       { href: "/admin/returns",             label: "Retours",            icon: RotateCcw       },
-      { href: "/admin/delivery/sheet-sync", label: "Sheet Sync",         icon: FileSpreadsheet },
     ],
   },
   {

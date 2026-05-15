@@ -31,21 +31,26 @@ export interface DeliveryFilters {
   dateFrom?: string;
   dateTo?: string;
   search?: string;
+  provider?: string;
+  page?: number;
+  perPage?: number;
 }
 
-/** Orders in delivery pipeline */
+/** Orders in delivery pipeline — with pagination */
 export async function getDeliveryOrders(
   filters: DeliveryFilters = {}
-): Promise<DeliveryOrder[]> {
+): Promise<{ orders: DeliveryOrder[]; total: number }> {
   const supabase = await createClient();
+  const perPage  = filters.perPage ?? 50;
+  const page     = filters.page ?? 0;
 
   let query = supabase
     .from("orders")
-    .select(DELIVERY_LIST_FIELDS)
+    .select(DELIVERY_LIST_FIELDS, { count: "exact" })
     .not("status", "in", '("new","refused","no_answer","cancelled","pending")')
     .order("sent_to_delivery_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
-    .limit(200);
+    .range(page * perPage, (page + 1) * perPage - 1);
 
   if (filters.deliveryStatus && filters.deliveryStatus !== "all") {
     query = query.eq("delivery_status", filters.deliveryStatus);
@@ -63,11 +68,11 @@ export async function getDeliveryOrders(
   if (filters.dateFrom) query = query.gte("created_at", filters.dateFrom);
   if (filters.dateTo)   query = query.lte("created_at", filters.dateTo + "T23:59:59");
 
-  const { data, error } = await query;
-  if (error) { console.error("[delivery] getDeliveryOrders:", error.message); return []; }
+  const { data, error, count } = await query;
+  if (error) { console.error("[delivery] getDeliveryOrders:", error.message); return { orders: [], total: 0 }; }
 
   const orders = (data ?? []) as unknown as DeliveryOrder[];
-  if (orders.length === 0) return [];
+  if (orders.length === 0) return { orders: [], total: 0 };
 
   // Fetch first product per order
   const ids = orders.map((o) => o.id);
@@ -81,7 +86,8 @@ export async function getDeliveryOrders(
     if (!productMap[item.order_id]) productMap[item.order_id] = item.product_name;
   }
 
-  return orders.map((o) => ({ ...o, first_product_name: productMap[o.id] ?? null }));
+  const result = orders.map((o) => ({ ...o, first_product_name: productMap[o.id] ?? null })) as DeliveryOrder[];
+  return { orders: result, total: count ?? result.length };
 }
 
 /** Full order detail for delivery page */

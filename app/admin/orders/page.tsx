@@ -20,7 +20,7 @@ export default async function OrdersPage() {
   }
 
   const canManage = hasRole(session.role, ["super_admin", "admin", "manager"]);
-  const orders    = await getOrders({}, isAgent, session.authId);
+  const { orders } = await getOrders({}, isAgent, session.authId);
 
   return (
     <div className="space-y-6">

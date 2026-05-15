@@ -34,18 +34,20 @@ export interface OrderFilters {
 }
 
 export async function getOrders(
-  filters: OrderFilters = {},
+  filters: OrderFilters & { page?: number; perPage?: number } = {},
   isAgent = false,
   agentId?: string,
   limit = 200
-): Promise<OrderListItem[]> {
+): Promise<{ orders: OrderListItem[]; total: number }> {
   const supabase = await createClient();
+  const perPage  = filters.perPage ?? limit;
+  const page     = filters.page ?? 0;
 
   let query = supabase
     .from("orders")
-    .select(ORDER_LIST_FIELDS)
+    .select(ORDER_LIST_FIELDS, { count: "exact" })
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .range(page * perPage, (page + 1) * perPage - 1);
 
   if (isAgent && agentId) query = query.eq("assigned_to", agentId);
   if (filters.status && filters.status !== "all") query = query.eq("status", filters.status);
@@ -57,15 +59,15 @@ export async function getOrders(
   if (filters.dateFrom) query = query.gte("created_at", filters.dateFrom);
   if (filters.dateTo)   query = query.lte("created_at", filters.dateTo + "T23:59:59");
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
 
   if (error) {
     console.error("[orders] getOrders error:", error.message);
-    return [];
+    return { orders: [], total: 0 };
   }
 
   const orders = (data ?? []) as unknown as Order[];
-  if (orders.length === 0) return [];
+  if (orders.length === 0) return { orders: [], total: 0 };
 
   const orderIds  = orders.map((o) => o.id);
   const agentIds  = [...new Set(orders.map((o) => o.assigned_to).filter(Boolean))] as string[];
@@ -91,7 +93,7 @@ export async function getOrders(
     agentMap[a.id] = a.full_name;
   }
 
-  return orders.map((o) => {
+  const merged = orders.map((o) => {
     const items = itemsByOrder[o.id] ?? [];
     return {
       id: o.id,
@@ -120,6 +122,7 @@ export async function getOrders(
       created_at: o.created_at,
     } as OrderListItem;
   });
+  return { orders: merged as OrderListItem[], total: count ?? merged.length };
 }
 
 export async function getOrder(id: string): Promise<Order | null> {
