@@ -85,10 +85,9 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
     return { success: false, error: `ID réseau invalide: ${dg.default_network_id}`, total:0, sent:0, failed:0, skipped:0, rows:[] };
   }
 
-  const client = await getDeliveryClient();
-  if (!client.hasToken()) {
-    return { success: false, error: "Token Digylog manquant.", total:0, sent:0, failed:0, skipped:0, rows:[] };
-  }
+  // Use createDigylogClientFromDB which reads from delivery_stores then env
+  const { createDigylogClientFromDB } = await import("@/lib/delivery/digylog/client");
+  const client = await createDigylogClientFromDB();
 
   const { data: dcData } = await supabaseAdmin.from("delivery_companies").select("id").eq("slug","digylog").maybeSingle();
   const companyId = (dcData as { id:string }|null)?.id ?? null;

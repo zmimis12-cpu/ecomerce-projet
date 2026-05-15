@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import {
-  createDeliveryStore, updateDeliveryStore, testStoreConnection,
+  createDeliveryStore, updateDeliveryStore, testStoreConnection, syncStore,
 } from "@/lib/delivery/store-actions";
 import type { DeliveryStoreRow } from "@/lib/delivery/store-actions";
 import { Plus, X, Check, Loader2, Wifi, WifiOff, RefreshCw, ChevronRight, AlertCircle } from "lucide-react";
@@ -114,17 +114,29 @@ function StoreCard({
       <div className="border-t bg-secondary/10 px-5 py-2.5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {syncMsg ? (
-            <span className="text-xs text-green-600">{syncMsg}</span>
+            <span className={syncMsg.startsWith("✕") ? "text-xs text-red-600" : "text-xs text-green-600"}>
+              {syncMsg}
+            </span>
           ) : (
-            <span className="text-xs text-muted-foreground">Prêt à synchroniser</span>
+            <span className="text-xs text-muted-foreground">
+              {(store.metadata as Record<string,unknown>)?.last_sync_at
+                ? `Sync: ${new Date(String((store.metadata as Record<string,unknown>).last_sync_at)).toLocaleTimeString("fr-MA")}`
+                : "Prêt à synchroniser"}
+            </span>
           )}
         </div>
         <button
           type="button"
           onClick={() => {
-            // Trigger sheet sync for this store
             setSyncMsg("Synchronisation en cours…");
-            setTimeout(() => setSyncMsg("✓ Sync terminé"), 2000);
+            syncStore(store.id).then((r) => {
+              if (r.success) {
+                setSyncMsg(`✓ ${r.sent} envoyés · ${r.skipped} ignorés`);
+              } else {
+                setSyncMsg(`✕ ${r.error ?? "Erreur"}`);
+              }
+              setTimeout(() => setSyncMsg(null), 6000);
+            });
           }}
           className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
         >

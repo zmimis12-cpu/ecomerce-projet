@@ -191,3 +191,49 @@ export async function testStoreConnection(id: string): Promise<{ success: boolea
 
   return { success: false, message: `Provider '${companySlug}' — test non implémenté.` };
 }
+
+// ─── Real sync pipeline — reads store sheet + sends to provider ───────────────
+export async function syncStore(storeId: string): Promise<{
+  success: boolean;
+  sent: number;
+  skipped: number;
+  failed: number;
+  error?: string;
+}> {
+  await requireRole(["super_admin", "admin", "manager"]);
+
+  // Load store config
+  const { data: store } = await supabaseAdmin
+    .from("delivery_stores")
+    .select("id, name, google_sheet_id, google_sheet_name, delivery_companies(slug)")
+    .eq("id", storeId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  const s = store as {
+    id: string; name: string;
+    google_sheet_id: string | null;
+    google_sheet_name: string | null;
+    delivery_companies: { slug: string } | null;
+  } | null;
+
+  if (!s) return { success: false, sent: 0, skipped: 0, failed: 0, error: "Store introuvable." };
+  if (!s.google_sheet_id) return { success: false, sent: 0, skipped: 0, failed: 0, error: "Sheet non configuré pour ce store." };
+
+  // Delegate to existing sync pipeline
+  const { syncSheetToDigylog } = await import("./sheet-sync/actions");
+  const result = await syncSheetToDigylog(s.google_sheet_id);
+
+  // Log sync in store metadata
+  await supabaseAdmin.from("delivery_stores").update({
+    metadata: { last_sync_at: new Date().toISOString(), last_sync_sent: result.sent },
+  } as never).eq("id", storeId);
+
+  return {
+    success: result.success,
+    sent:    result.sent,
+    skipped: result.skipped,
+    failed:  result.failed,
+    error:   result.error,
+  };
+}
