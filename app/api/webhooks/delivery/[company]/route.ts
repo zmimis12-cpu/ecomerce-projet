@@ -1,140 +1,123 @@
 /**
- * POST /api/webhooks/delivery/[company]
- * Public webhook endpoint — receives delivery status updates.
- * Never requires authentication (delivery companies call this directly).
- * Security via webhook secret signature verification.
+ * /api/webhooks/delivery/[company]
+ * Universal delivery webhook — handles all providers.
+ *
+ * URLs:
+ *   PUT/POST /api/webhooks/delivery/digylog
+ *   PUT/POST /api/webhooks/delivery/ozone
+ *   etc.
+ *
+ * Always returns 200 — providers stop retrying on non-200.
  */
 import { type NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { applyStatusUpdate } from "@/lib/delivery/shipment-actions";
-import { createHmac, timingSafeEqual } from "crypto";
+import { applyDigylogStatusUpdate } from "@/lib/delivery/shipment-actions";
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ company: string }> }
-) {
-  const { company } = await params;
-  const ip = request.headers.get("cf-connecting-ip")
-    ?? request.headers.get("x-real-ip")
-    ?? "unknown";
+const OK = NextResponse.json({ success: true }, { status: 200 });
 
-  let body: string;
-  let payload: unknown;
+async function handle(request: NextRequest, company: string) {
+  let raw = "";
+  let payload: Record<string, unknown> = {};
 
   try {
-    body    = await request.text();
-    payload = JSON.parse(body);
+    raw     = await request.text();
+    payload = raw ? JSON.parse(raw) : {};
   } catch {
-    await logWebhook(company, "parse_error", null, { error: "Invalid JSON", ip });
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    await logWebhook(company, "parse_error", payload);
+    return OK;
   }
 
-  // Get delivery company config
-  const { data: dc } = await supabaseAdmin
-    .from("delivery_companies")
-    .select("id, slug, webhook_secret")
-    .eq("slug", company)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (!dc) {
-    return NextResponse.json({ error: "Unknown company" }, { status: 404 });
-  }
-
-  const dcData = dc as { id: string; slug: string; webhook_secret: string | null };
-
-  // Verify webhook signature if secret is configured
-  if (dcData.webhook_secret) {
-    const signature = request.headers.get("x-webhook-signature")
-      ?? request.headers.get("x-signature")
-      ?? request.headers.get("signature")
-      ?? "";
-
-    const expected = createHmac("sha256", dcData.webhook_secret)
-      .update(body)
-      .digest("hex");
-
-    const sigBuffer  = Buffer.from(signature.replace("sha256=", ""), "hex");
-    const expBuffer  = Buffer.from(expected, "hex");
-
-    if (
-      sigBuffer.length !== expBuffer.length ||
-      !timingSafeEqual(sigBuffer, expBuffer)
-    ) {
-      await logWebhook(company, "signature_invalid", payload, { ip });
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-    }
-  }
-
-  // Parse the event — handle different payload formats
-  const p = payload as Record<string, unknown>;
-  const events = extractEvents(p);
-
-  let processed = 0;
-  const errors: string[] = [];
-
-  for (const event of events) {
-    try {
-      await applyStatusUpdate(
-        event.trackingNumber,
-        event.externalStatus,
-        event.rawPayload,
-        event.eventTime
-      );
-      processed++;
-    } catch (err) {
-      errors.push(`${event.trackingNumber}: ${err instanceof Error ? err.message : "error"}`);
-    }
-  }
-
-  await logWebhook(company, processed > 0 ? "processed" : "no_events", payload, {
-    processed, errors: errors.length, ip,
+  console.log(`[webhook/${company}] received`, {
+    tracking: payload?.tracking ?? payload?.num ?? null,
+    status:   payload?.status ?? payload?.idStatus ?? null,
   });
 
-  return NextResponse.json({ success: true, processed, errors: errors.length });
+  await logWebhook(company, "received", payload);
+
+  // Route to correct handler
+  switch (company) {
+    case "digylog":
+      return handleDigylog(payload);
+    case "ozone":
+      return handleOzone(payload);
+    default:
+      console.warn(`[webhook] Unknown company: ${company}`);
+      return OK;
+  }
 }
 
-// Extract tracking events from various payload formats
-function extractEvents(p: Record<string, unknown>): {
-  trackingNumber: string;
-  externalStatus: string;
-  eventTime:      string;
-  rawPayload:     Record<string, unknown>;
-}[] {
-  const now = new Date().toISOString();
+// ─── Digylog handler ──────────────────────────────────────────────────────────
+async function handleDigylog(payload: Record<string, unknown>) {
+  const tracking = String(
+    payload.tracking ?? payload.num ?? payload.trackingNumber ?? payload.code ?? ""
+  ).trim();
 
-  // Array of events
-  if (Array.isArray(p.colis ?? p.events ?? p.shipments)) {
-    const arr = (p.colis ?? p.events ?? p.shipments) as Record<string, unknown>[];
-    return arr.map((item) => ({
-      trackingNumber: String(item.tracking_number ?? item.barcode ?? item.reference ?? ""),
-      externalStatus: String(item.statut ?? item.status ?? ""),
-      eventTime:      String(item.date ?? item.updated_at ?? now),
-      rawPayload:     item,
-    })).filter((e) => e.trackingNumber);
+  if (!tracking) {
+    await logWebhook("digylog", "ping_ok", payload);
+    return OK;
   }
 
-  // Single event
-  const trackingNumber = String(p.tracking_number ?? p.barcode ?? p.reference ?? "");
-  if (!trackingNumber) return [];
+  const idStatus  = Number(payload.idStatus ?? payload.id_status ?? 0);
+  const extStatus = String(payload.status ?? payload.libelle ?? "");
 
-  return [{
-    trackingNumber,
-    externalStatus: String(p.statut ?? p.status ?? ""),
-    eventTime:      String(p.date ?? p.updated_at ?? now),
-    rawPayload:     p,
-  }];
+  // Process async — return 200 immediately
+  processDigylog({ tracking, idStatus, extStatus, payload }).catch((e) =>
+    console.error("[webhook/digylog] error:", e?.message)
+  );
+
+  return OK;
 }
 
-async function logWebhook(
-  company: string,
-  status: string,
-  payload: unknown,
-  meta: Record<string, unknown>
-) {
+async function processDigylog(params: {
+  tracking: string; idStatus: number; extStatus: string; payload: Record<string, unknown>;
+}) {
+  const { tracking, idStatus, extStatus, payload } = params;
+  try {
+    await applyDigylogStatusUpdate({
+      tracking,
+      externalStatus: extStatus,
+      idStatus,
+      motif:       String(payload.motif ?? ""),
+      postponedTo: (payload.postponedTo as string | null) ?? null,
+      eventTime:   String(payload.updatedAt ?? payload.date ?? new Date().toISOString()),
+      rawPayload:  payload,
+    });
+    await logWebhook("digylog", "processed", payload);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unknown";
+    await logWebhook("digylog", "error", { ...payload, _error: msg });
+  }
+}
+
+// ─── Ozone handler (placeholder) ─────────────────────────────────────────────
+async function handleOzone(payload: Record<string, unknown>) {
+  // TODO: implement Ozone status normalization
+  console.log("[webhook/ozone] received — not yet implemented", payload);
+  await logWebhook("ozone", "not_implemented", payload);
+  return OK;
+}
+
+// ─── Logger ───────────────────────────────────────────────────────────────────
+async function logWebhook(company: string, status: string, payload: unknown) {
   await supabaseAdmin.from("webhook_logs").insert({
     event_type:  `delivery.${company}`,
     status,
-    raw_payload: { payload, ...meta } as never,
+    raw_payload: payload as never,
   } as never).then(() => {}, () => {});
+}
+
+// ─── Route handlers ───────────────────────────────────────────────────────────
+export async function POST(request: NextRequest, { params }: { params: Promise<{ company: string }> }) {
+  const { company } = await params;
+  return handle(request, company);
+}
+
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ company: string }> }) {
+  const { company } = await params;
+  return handle(request, company);
+}
+
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ company: string }> }) {
+  const { company } = await params;
+  return NextResponse.json({ status: "ok", provider: company });
 }

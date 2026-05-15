@@ -5,7 +5,7 @@
  * Token never reaches the browser.
  */
 import { requireRole } from "@/lib/auth/session";
-import { createDigylogClientFromDB } from "./digylog/client";
+import { getDeliveryClient } from "@/lib/delivery/client-factory";
 
 const MANAGER = ["super_admin", "admin", "manager"] as const;
 
@@ -16,7 +16,7 @@ export async function getBlPdfByBlId(blId: number): Promise<{
   await requireRole([...MANAGER]);
   if (!blId || isNaN(blId)) return { ok: false, error: "BL ID invalide." };
 
-  const client = await createDigylogClientFromDB();
+  const client = await getDeliveryClient();
   const result = await client.downloadBlPdf(blId);
   if (!result.ok || !result.blob) return { ok: false, error: result.error ?? "Erreur téléchargement BL." };
 
@@ -31,7 +31,7 @@ export async function getLabelsByTrackings(trackings: string[], format: 1 | 2 | 
   await requireRole([...MANAGER]);
   if (!trackings.length) return { ok: false, error: "Aucun tracking fourni." };
 
-  const client = await createDigylogClientFromDB();
+  const client = await getDeliveryClient();
   const result = await client.downloadLabels({ orders: trackings, format });
   if (!result.ok || !result.blob) return { ok: false, error: result.error ?? "Erreur téléchargement étiquettes." };
 

@@ -11,7 +11,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/session";
 import { getSheetsConfig, readSheetRows, updateSheetRow } from "@/lib/automation/google-sheets";
-import { createDigylogClientFromDB } from "@/lib/delivery/digylog/client";
+import { getDeliveryClient } from "@/lib/delivery/client-factory";
 import { revalidatePath } from "next/cache";
 
 const MANAGER = ["super_admin","admin","manager"] as const;
@@ -85,7 +85,7 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
     return { success: false, error: `ID réseau invalide: ${dg.default_network_id}`, total:0, sent:0, failed:0, skipped:0, rows:[] };
   }
 
-  const client = await createDigylogClientFromDB();
+  const client = await getDeliveryClient();
   if (!client.hasToken()) {
     return { success: false, error: "Token Digylog manquant.", total:0, sent:0, failed:0, skipped:0, rows:[] };
   }
@@ -267,16 +267,17 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
       }],
     });
 
-    if (!digylogResult.ok || !digylogResult.orders.length) {
-      const errMsg = digylogResult.error ?? "Pas de tracking retourné";
+    const digylogOrders = (digylogResult as { orders?: unknown[] }).orders ?? [];
+    if (!digylogResult.ok || !digylogOrders.length) {
+      const errMsg = String((digylogResult as { error?: unknown }).error ?? "Pas de tracking retourné");
       try { await updateSheetRow(spreadsheetId, sheetName, rowNumber, { K: "Not Sent", L: errMsg }); } catch {}
       results.push({ rowNumber, orderReference: orderRef, customerName: name, productSku: sku, tracking: null, status: "failed", error: errMsg });
       failed++;
       continue;
     }
 
-    const created  = digylogResult.orders[0];
-    const tracking = created.tracking;
+    const created  = digylogOrders[0] as { tracking?: string } | undefined;
+    const tracking = created?.tracking;
     // bl_id is NOT saved here — it will be set after PUT /orders/send groups all orders
 
     // Save shipment (no bl_id yet — will be set after grouped send)
@@ -298,13 +299,13 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
 
     // Write back to sheet
     try {
-      await updateSheetRow(spreadsheetId, sheetName, rowNumber, { J: tracking, K: "Sent", L: "" });
+      await updateSheetRow(spreadsheetId, sheetName, rowNumber, { J: tracking ?? "", K: "Sent", L: "" });
     } catch (e) {
       console.error("Sheet write-back failed:", e);
     }
 
     sentOrderIds.push(orderId);
-    results.push({ rowNumber, orderReference: orderRef, customerName: name, productSku: sku, tracking, status: "sent", error: null });
+    results.push({ rowNumber, orderReference: orderRef, customerName: name, productSku: sku, tracking: tracking ?? null, status: "sent", error: null });
     sent++;
   }
 

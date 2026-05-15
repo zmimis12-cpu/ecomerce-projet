@@ -7,7 +7,8 @@
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/session";
-import { createDigylogClientFromDB } from "./digylog/client";
+import { getDeliveryClient } from "@/lib/delivery/client-factory";
+import { createDigylogClientFromDB } from "@/lib/delivery/digylog/client";
 import { mapDigylogStatus } from "./digylog/status-map";
 import { createAuditLog, auditStatusChange } from "@/lib/audit/audit-logger";
 
@@ -158,16 +159,17 @@ export async function sendOrderToDigylog(orderId: string): Promise<{
   // 7. Send to Digylog
   const result = await client.createOrders(payload);
 
-  if (!result.ok || !result.orders.length) {
+  const resultOrders = (result as { orders?: unknown[] }).orders ?? [];
+  if (!result.ok || !resultOrders.length) {
     return {
       success: false,
-      error: result.error ?? "Digylog n'a pas retourné de tracking.",
+      error: String((result as { error?: unknown }).error ?? "Digylog n'a pas retourné de tracking."),
     };
   }
 
-  const created  = result.orders[0];
-  const tracking = created.tracking;
-  const blId     = created.bl != null ? Number(created.bl) : null;
+  const created  = ((result as { orders?: { tracking?: string; bl?: number | null }[] }).orders ?? [])[0];
+  const tracking = created?.tracking;
+  const blId     = created?.bl != null ? Number(created.bl) : null;
 
   if (!tracking) {
     return {
@@ -291,13 +293,13 @@ export async function sendTestOrderToDigylog(settings: {
   if (!result.ok) {
     return {
       ok:      false,
-      message: result.error ?? "Erreur inconnue",
+      message: String((result as { error?: unknown }).error ?? "Erreur inconnue"),
       payload: testPayload,
       response:result.rawResponse,
     };
   }
 
-  const tracking = result.orders[0]?.tracking ?? null;
+  const tracking = (((result as { orders?: { tracking?: string }[] }).orders) ?? [])[0]?.tracking ?? null;
   return {
     ok:      true,
     message: tracking

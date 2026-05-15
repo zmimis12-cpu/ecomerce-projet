@@ -19,7 +19,7 @@
  */
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/session";
-import { createDigylogClientFromDB } from "@/lib/delivery/digylog/client";
+import { getDeliveryClient } from "@/lib/delivery/client-factory";
 import { revalidatePath } from "next/cache";
 
 const MANAGER = ["super_admin","admin","manager"] as const;
@@ -118,7 +118,7 @@ export async function generateOrDownloadDailyBl(params: {
 
   // If BL already generated and not forcing regeneration → download directly
   if (blRow?.bl_id && !forceRegenerate) {
-    const client = await createDigylogClientFromDB();
+    const client = await getDeliveryClient();
     const result = await client.downloadBlPdf(blRow.bl_id);
     if (!result.ok || !result.blob) {
       return { ok: false, error: result.error ?? "Erreur téléchargement BL." };
@@ -180,7 +180,7 @@ export async function generateOrDownloadDailyBl(params: {
   console.log(`[daily-bl] ${businessDate} — sending ${trackings.length} trackings to Digylog PUT /orders/send`);
 
   // Call PUT /orders/send ONCE with ALL trackings
-  const client = await createDigylogClientFromDB();
+  const client = await getDeliveryClient();
   const sendRes = await client.sendOrders(trackings);
 
   if (!sendRes.ok || !sendRes.bl) {

@@ -17,7 +17,7 @@
  * NEVER calls PUT /orders/send — that is only done by "Télécharger BL du jour".
  */
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { createDigylogClientFromDB } from "@/lib/delivery/digylog/client";
+import { getDeliveryClient } from "@/lib/delivery/client-factory";
 import { revalidatePath } from "next/cache";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -193,7 +193,7 @@ export async function unifiedSendToDigylog(
   if (!refs.length) refs.push({ designation: "Produit", quantity: 1 });
 
   // Build Digylog client
-  const client = await createDigylogClientFromDB();
+  const client = await getDeliveryClient();
   if (!client.hasToken()) {
     return { success: false, error: "Token Digylog manquant." };
   }
@@ -224,11 +224,12 @@ export async function unifiedSendToDigylog(
     }],
   });
 
-  if (!result.ok || !result.orders.length) {
-    return { success: false, error: result.error ?? "Digylog n'a pas retourné de tracking." };
+  const uOrders = (result as { orders?: { tracking?: string }[] }).orders ?? [];
+  if (!result.ok || !uOrders.length) {
+    return { success: false, error: String((result as { error?: unknown }).error ?? "Digylog n'a pas retourné de tracking.") };
   }
 
-  const tracking = result.orders[0].tracking;
+  const tracking = uOrders[0]?.tracking;
   if (!tracking) {
     return { success: false, error: "Digylog a accepté mais n'a pas retourné de tracking." };
   }
@@ -251,7 +252,7 @@ export async function unifiedSendToDigylog(
       external_status_id:  0,
       internal_status:     "not_sent",
       bl_id:               null,
-      raw_payload:         result.orders[0] as never,
+      raw_payload:         uOrders[0] as never,
       last_synced_at:      now,
     } as never, { onConflict: "order_id" }),
 

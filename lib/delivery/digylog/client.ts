@@ -315,17 +315,38 @@ export function createDigylogClient(tokenOverride?: string): DigylogClient {
   return new DigylogClient(token, baseUrl, referer);
 }
 
-/** Server-side: reads token from DB first, falls back to env */
-export async function createDigylogClientFromDB(): Promise<DigylogClient> {
+/**
+ * Server-side factory: reads config from delivery_stores (multi-store).
+ * Falls back to digylog_settings → env for backward compatibility.
+ * @param storeId — optional store UUID from delivery_stores table
+ */
+export async function createDigylogClientFromDB(storeId?: string | null): Promise<DigylogClient> {
   const { supabaseAdmin } = await import("@/lib/supabase/admin");
-  const { data } = await supabaseAdmin
+
+  // 1. Try delivery_stores (new multi-store architecture)
+  const storeQuery = storeId
+    ? supabaseAdmin.from("delivery_stores").select("api_token, api_base_url, metadata").eq("id", storeId).eq("is_active", true).maybeSingle()
+    : supabaseAdmin.from("delivery_stores").select("api_token, api_base_url, metadata").eq("is_active", true).eq("is_default", true).maybeSingle();
+
+  const { data: storeData } = await storeQuery;
+  const store = storeData as { api_token: string | null; api_base_url: string | null; metadata: Record<string, unknown> | null } | null;
+
+  if (store?.api_token) {
+    const token   = store.api_token.trim();
+    const baseUrl = (store.api_base_url ?? process.env.DIGYLOG_BASE_URL ?? "https://api.digylog.com/api/v2/seller").trim();
+    const referer = (store.metadata?.referer as string | undefined) ?? process.env.DIGYLOG_REFERER ?? "https://apiseller.digylog.com";
+    return new DigylogClient(token, baseUrl, referer);
+  }
+
+  // 2. Fallback: digylog_settings table (legacy)
+  const { data: legacy } = await supabaseAdmin
     .from("digylog_settings")
     .select("token, referer")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const row       = data as { token?: string; referer?: string } | null;
+  const row       = legacy as { token?: string; referer?: string } | null;
   const dbToken   = (row?.token   ?? "").trim();
   const dbReferer = (row?.referer ?? "").trim();
   const token     = dbToken  || (process.env.DIGYLOG_TOKEN  ?? "").trim();

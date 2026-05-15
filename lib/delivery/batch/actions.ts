@@ -6,6 +6,7 @@
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/session";
+import { getDeliveryClient } from "@/lib/delivery/client-factory";
 import { createDigylogClientFromDB } from "@/lib/delivery/digylog/client";
 
 const MANAGER = ["super_admin","admin","manager"] as const;
@@ -142,7 +143,7 @@ export async function closeDailyBatch(batchId: string): Promise<{
   console.log(`[closeDailyBatch] Calling PUT /orders/send with ${allTrackings.length} trackings:`, allTrackings);
 
   // ONE single PUT /orders/send call
-  const client = await createDigylogClientFromDB();
+  const client = await getDeliveryClient();
   const sendRes = await client.sendOrders(allTrackings);
 
   if (!sendRes.ok || !sendRes.bl) {
@@ -406,7 +407,7 @@ export async function sendBatchToDigylog(batchId: string) {
     return { success: false, error: `ID réseau invalide: ${settings.default_network_id}` };
   }
 
-  const client = await createDigylogClientFromDB();
+  const client = await getDeliveryClient();
   if (!client.hasToken()) return { success: false, error: "Token Digylog manquant." };
 
   // Get Digylog company id
@@ -455,11 +456,12 @@ export async function sendBatchToDigylog(batchId: string) {
     orders:         digylogOrders,
   });
 
-  console.log(`📥 DIGYLOG BATCH RESULT: ok=${result.ok} orders=${result.orders.length}`);
+  const typedResult = result as { ok: boolean; orders: { num?: string; tracking?: string; bl?: number }[]; error?: string };
+  console.log(`📥 DIGYLOG BATCH RESULT: ok=${typedResult.ok} orders=${typedResult.orders?.length}`);
 
   // Process results — match by num (order_number)
   const trackingByNum = new Map<string, { tracking: string; bl?: number }>();
-  for (const created of result.orders) {
+  for (const created of typedResult.orders ?? []) {
     if (created.tracking) {
       trackingByNum.set(created.num ?? "", { tracking: created.tracking, bl: created.bl });
     }
@@ -512,9 +514,9 @@ export async function sendBatchToDigylog(batchId: string) {
 
     } else {
       failed++;
-      const errMsg = result.ok
+      const errMsg = typedResult.ok
         ? `Pas de tracking retourné pour ${o.order_number}`
-        : (result.error ?? "Erreur Digylog");
+        : (typedResult.error ?? "Erreur Digylog");
       errors.push(errMsg);
 
       if (batchOrderRow) {
@@ -721,9 +723,10 @@ export async function downloadBatchLabels(batchId: string): Promise<{
     return { ok: false, error: "Aucun tracking trouvé pour ce batch." };
   }
 
-  const client = await createDigylogClientFromDB();
-  const result = await client.downloadLabels({ orders: trackings, format: 3 });
+  const digylogClient2 = await (await import("@/lib/delivery/digylog/client")).createDigylogClientFromDB();
+  const result = await digylogClient2.downloadLabels({ orders: trackings, format: 3 });
   if (!result.ok || !result.blob) return { ok: false, error: result.error };
+  const resultData = result.blob;
 
   // Mark as tickets_printed — batch is now CLOSED to new orders
   // New synced orders will go into a new draft batch
@@ -738,7 +741,7 @@ export async function downloadBatchLabels(batchId: string): Promise<{
   revalidatePath(`/admin/delivery/notes`);
   revalidatePath(`/admin/delivery/notes/${batchId}`);
 
-  const buf = await result.blob.arrayBuffer();
+  const buf = await resultData.arrayBuffer();
   return { ok: true, blobBase64: Buffer.from(buf).toString("base64") };
 }
 
@@ -757,8 +760,8 @@ export async function downloadBatchBl(batchId: string): Promise<{
   const blId = (batch as { bl_id?: number } | null)?.bl_id;
   if (!blId) return { ok: false, error: "BL non disponible — envoyez le batch à Digylog d'abord." };
 
-  const client = await createDigylogClientFromDB();
-  const result = await client.downloadBlPdf(blId);
+  const digylogClient3 = await (await import("@/lib/delivery/digylog/client")).createDigylogClientFromDB();
+  const result = await digylogClient3.downloadBlPdf(blId);
   if (!result.ok || !result.blob) return { ok: false, error: result.error };
 
   await supabaseAdmin.from("delivery_batches")
@@ -785,15 +788,16 @@ export async function syncBatchStatuses(batchId: string) {
   const items = (rows ?? []) as { order_id: string; tracking_number: string }[];
   if (!items.length) return { success: false, error: "Aucun tracking à synchroniser." };
 
-  const client  = await createDigylogClientFromDB();
+  const digylogClient4 = await (await import("@/lib/delivery/digylog/client")).createDigylogClientFromDB();
   const trackings = items.map((r) => r.tracking_number);
-  const historics = await client.getHistorics(trackings);
+  const historicsRes = await digylogClient4.getHistorics(trackings);
+  const historics = (historicsRes as Record<string, { "new value"?: string; date?: string }[]> | null) ?? {};
 
   const { applyDigylogStatusUpdate } = await import("@/lib/delivery/shipment-actions");
   let synced = 0;
 
   for (const item of items) {
-    const events = historics[item.tracking_number];
+    const events = (historics as Record<string, { "new value"?: string; date?: string }[]>)[item.tracking_number];
     if (!events?.length) continue;
     const last = events[events.length - 1];
     const newVal = last["new value"] ?? "";
@@ -831,7 +835,7 @@ export async function sendBatchGetBl(batchId: string): Promise<{
 
   if (!trackings.length) return { ok: false, error: "Aucun tracking trouvé dans ce batch." };
 
-  const client = await createDigylogClientFromDB();
+  const client = await getDeliveryClient();
   const result = await client.sendOrders(trackings);
 
   if (!result.ok || !result.bl) {
@@ -921,7 +925,7 @@ export async function regenerateBatchBl(batchId: string): Promise<{
   }
 
   // Call PUT /orders/send with ALL trackings → get ONE grouped BL
-  const client = await createDigylogClientFromDB();
+  const client = await getDeliveryClient();
   const sendRes = await client.sendOrders(trackings);
 
   if (!sendRes.ok || !sendRes.bl) {
@@ -1153,7 +1157,7 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   // Digylog POST /labels ignores the order of trackings array — it returns
   // labels in its own internal order. The only way to guarantee sorted output
   // is to download each label individually and merge them ourselves.
-  const client = await createDigylogClientFromDB();
+  const client = await getDeliveryClient();
   const mergedDoc = await PDFDocument.create();
   const recapSrc  = await PDFDocument.load(recapBytes);
   const recapPages = await mergedDoc.copyPages(recapSrc, recapSrc.getPageIndices());
