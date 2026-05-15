@@ -143,6 +143,7 @@ export async function importDigylogDocument(params: ImportDocumentParams): Promi
         total_payout_mad: totalPayout,
         source,
         notes:            notes ?? null,
+        provider_slug:    "digylog",
         imported_by:      session.authId,
         synced_at:        new Date().toISOString(),
       } as never)

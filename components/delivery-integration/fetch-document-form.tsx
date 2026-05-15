@@ -40,7 +40,7 @@ export function FetchDocumentForm() {
       {/* Download BL by ID */}
       <div className="rounded-xl border bg-card p-5 space-y-4">
         <div>
-          <h3 className="text-sm font-semibold">Télécharger BL Digylog</h3>
+          <h3 className="text-sm font-semibold">Télécharger BL</h3>
           <p className="text-xs text-muted-foreground mt-1">
             Entrez le numéro BL Digylog (ex: 861409) pour télécharger le PDF.
           </p>

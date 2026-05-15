@@ -9,7 +9,7 @@ import { DocumentScannerClient } from "@/components/digylog/document-scanner-cli
 import { normalizeCity, getExpectedDeliveryCost } from "@/lib/delivery/reconciliation-utils";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Document Digylog" };
+export const metadata: Metadata = { title: "Document Livraison" };
 export const dynamic = "force-dynamic";
 
 export default async function DocumentDetailPage({ params }: { params: Promise<{ id: string }> }) {

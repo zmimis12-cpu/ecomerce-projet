@@ -380,7 +380,7 @@ export function ScannerClient() {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowBRImport(false)} />
           <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-            <h2 className="font-semibold text-lg">Importer BR Digylog</h2>
+            <h2 className="font-semibold text-lg">Importer BR</h2>
             <div>
               <label className="text-xs font-medium text-muted-foreground block mb-1">N° BR</label>
               <input type="text" value={brNumber} onChange={(e) => setBrNumber(e.target.value)}

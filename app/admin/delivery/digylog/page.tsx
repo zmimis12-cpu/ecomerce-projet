@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { DigylogOrdersClient } from "@/components/delivery-integration/digylog-orders-client";
 import { INTERNAL_STATUS_LABELS } from "@/lib/delivery/digylog/status-map";
 
-export const metadata: Metadata = { title: "Commandes Digylog" };
+export const metadata: Metadata = { title: "Commandes en Livraison" };
 export const dynamic = "force-dynamic";
 
 export default async function DigylogOrdersPage() {
@@ -55,7 +55,7 @@ export default async function DigylogOrdersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Commandes Digylog</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Commandes Livraison</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Toutes les commandes envoyées à Digylog — tickets et BL.
         </p>

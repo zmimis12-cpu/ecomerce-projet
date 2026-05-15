@@ -35,7 +35,7 @@ export function SendToDigylogButton({ orderId, disabled }: Props) {
         disabled={isPending || disabled}
         className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50">
         <Send className="h-4 w-4" />
-        {isPending ? "Envoi…" : "Envoyer à Digylog"}
+        {isPending ? "Envoi…" : "Envoyer en livraison"}
       </button>
     </div>
   );

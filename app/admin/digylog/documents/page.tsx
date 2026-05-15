@@ -7,7 +7,7 @@ import { SyncStatusButton } from "@/components/digylog/sync-status-button";
 import { FileText, CheckCircle, AlertTriangle, Clock, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Documents Digylog" };
+export const metadata: Metadata = { title: "Documents Livraison" };
 export const dynamic = "force-dynamic";
 
 export default async function DigylogDocumentsPage() {
@@ -42,7 +42,7 @@ export default async function DigylogDocumentsPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Documents Digylog</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Documents Livraison</h1>
           <p className="text-sm text-muted-foreground mt-1">
             BL, BR, Ramassage, BLFC, BRFC, Factures, Remboursements.
           </p>

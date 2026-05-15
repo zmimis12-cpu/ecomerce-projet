@@ -136,7 +136,7 @@ export default async function FinancePage({
           <KpiCard label="Marge Livraison Casa" value={mad(summary.total_delivery_margin)}
             icon={MapPin} variant="green"
             sub={`${summary.casa_orders_count} cmd Casa (+10 MAD chacune)`} />
-          <KpiCard label="Surcharges Digylog" value={mad(summary.total_delivery_overcharge)}
+          <KpiCard label="Surcharges transporteur" value={mad(summary.total_delivery_overcharge)}
             icon={AlertTriangle} variant={summary.total_delivery_overcharge > 0 ? "red" : "green"}
             sub="À réclamer à Digylog" />
           <KpiCard label="Coût Livraison Total" value={mad(summary.total_delivery_cost)}

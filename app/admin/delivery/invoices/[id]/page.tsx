@@ -75,11 +75,11 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     const digylogFee  = item.delivery_fee_mad ?? 0;
     const feeDiff     = digylogFee - expectedFee;
     const codSystem   = item.orders?.total_amount_mad ?? null;
-    const codDigylog  = item.cod_amount_mad;
+    const codTransporteur  = item.cod_amount_mad;
     const expPayout   = codSystem !== null ? codSystem - expectedFee : null;
     const actPayout   = item.amount_paid_mad;
     const payoutDiff  = expPayout !== null ? actPayout - expPayout : null;
-    return { ...item, city, normalizedCity, expectedFee, digylogFee, feeDiff, codSystem, codDigylog, expPayout, actPayout, payoutDiff };
+    return { ...item, city, normalizedCity, expectedFee, digylogFee, feeDiff, codSystem, codTransporteur, expPayout, actPayout, payoutDiff };
   });
 
   const totalFeeOvercharge = enrichedRows.reduce((s, r) => s + (r.feeDiff > 0.5 ? r.feeDiff : 0), 0);
@@ -179,8 +179,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                       )}
                     </td>
                     <td className="px-3 py-2.5 font-mono">{item.codSystem !== null ? mad(item.codSystem) : "—"}</td>
-                    <td className={cn("px-3 py-2.5 font-mono", item.codSystem !== null && Math.abs(item.codDigylog - item.codSystem) > 0.5 && "text-red-600 font-bold")}>
-                      {mad(item.codDigylog)}
+                    <td className={cn("px-3 py-2.5 font-mono", item.codSystem !== null && Math.abs(item.codTransporteur - item.codSystem) > 0.5 && "text-red-600 font-bold")}>
+                      {mad(item.codTransporteur)}
                     </td>
                     <td className="px-3 py-2.5 font-mono text-muted-foreground">{mad(item.expectedFee)}</td>
                     <td className={cn("px-3 py-2.5 font-mono", item.feeDiff > 0.5 && "text-orange-600 font-bold")}>

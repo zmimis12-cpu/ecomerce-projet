@@ -40,7 +40,7 @@ export function SheetSyncClient({ sheetConfigured }: { sheetConfigured: boolean 
             disabled={isPending || !sheetConfigured}
             className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
             <RefreshCw className={`h-4 w-4 ${isPending ? "animate-spin" : ""}`} />
-            {isPending ? "Synchronisation en cours…" : "Sync Google Sheet → Digylog"}
+            {isPending ? "Synchronisation en cours…" : "Sheet Sync Livraison"}
           </button>
         </div>
 

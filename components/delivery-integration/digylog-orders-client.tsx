@@ -160,7 +160,7 @@ export function DigylogOrdersClient({
     return (
       <div className="rounded-xl border bg-card flex flex-col items-center justify-center py-16 text-center gap-3 text-muted-foreground">
         <CheckCircle className="h-10 w-10 opacity-20" />
-        <p className="text-sm font-medium">Aucune commande envoyée à Digylog</p>
+        <p className="text-sm font-medium">Aucune commande en livraison</p>
         <p className="text-xs">Les commandes confirmées apparaissent ici après envoi.</p>
       </div>
     );
@@ -214,7 +214,7 @@ export function DigylogOrdersClient({
                     checked={selected.length === filtered.length && filtered.length > 0}
                     onChange={toggleAll} />
                 </th>
-                {["Commande","Client","Ville","Tracking","Statut Digylog","Statut interne","BL","Sync","Actions"].map((h) => (
+                {["Commande","Client","Ville","Tracking","Statut transporteur","Statut interne","BL","Sync","Actions"].map((h) => (
                   <th key={h} className="text-left px-3 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
                     {h}
                   </th>

@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 const STATUS_CFG = {
   draft:             { label:"Brouillon",          cls:"bg-gray-100 text-gray-700" },
-  sent:              { label:"Envoyé Digylog",     cls:"bg-blue-100 text-blue-800" },
+  sent:              { label:"Envoyé",     cls:"bg-blue-100 text-blue-800" },
   labels_downloaded: { label:"Tickets téléchargés",cls:"bg-violet-100 text-violet-800" },
   bl_downloaded:     { label:"BL téléchargé",      cls:"bg-green-100 text-green-800" },
   completed:         { label:"Terminé",             cls:"bg-emerald-100 text-emerald-800" },

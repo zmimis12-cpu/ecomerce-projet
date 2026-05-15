@@ -83,7 +83,7 @@ export function DigylogSettingsForm({ settings, appUrl, hasToken, tokenSource, c
 
       {/* ── TOKEN ── */}
       <div className="rounded-xl border bg-card p-5 space-y-4">
-        <h3 className="text-sm font-semibold">Token API Digylog</h3>
+        <h3 className="text-sm font-semibold">Token API</h3>
 
         {tokenSource === "env" && (
           <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
@@ -104,7 +104,7 @@ export function DigylogSettingsForm({ settings, appUrl, hasToken, tokenSource, c
               type={showToken ? "text" : "password"}
               value={form.token}
               onChange={(e) => set("token", e.target.value)}
-              placeholder="Collez votre token Digylog ici"
+              placeholder="Token API transporteur"
               className={`${INP} pr-10`}
               autoComplete="off"
             />
@@ -137,7 +137,7 @@ export function DigylogSettingsForm({ settings, appUrl, hasToken, tokenSource, c
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={LBL}>Réseau Digylog</label>
+            <label className={LBL}>Réseau transporteur</label>
             {cachedNetworks.length > 0 ? (
               <select value={form.default_network_id}
                 onChange={(e) => set("default_network_id", Number(e.target.value))}
@@ -266,7 +266,7 @@ export function DigylogSettingsForm({ settings, appUrl, hasToken, tokenSource, c
             </pre>
           </div>
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase">Réponse Digylog</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase">Réponse transporteur</p>
             <pre className="text-[10px] bg-secondary/40 rounded-lg p-3 overflow-x-auto max-h-48">
               {JSON.stringify(testResult.response, null, 2)}
             </pre>

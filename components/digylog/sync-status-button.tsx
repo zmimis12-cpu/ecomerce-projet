@@ -33,7 +33,7 @@ export function SyncStatusButton() {
       <button type="button" onClick={handleSync} disabled={isPending}
         className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-2 text-sm font-medium hover:bg-secondary transition-colors disabled:opacity-50">
         <RefreshCw className={`h-4 w-4 ${isPending ? "animate-spin" : ""}`} />
-        {isPending ? "Sync…" : "Sync Statuts Digylog"}
+        {isPending ? "Sync…" : "Sync Statuts"}
       </button>
     </div>
   );

@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { DigylogSettingsForm } from "@/components/delivery-integration/digylog-settings-form";
 
-export const metadata: Metadata = { title: "Paramètres Digylog" };
+export const metadata: Metadata = { title: "Paramètres Livraison" };
 export const dynamic = "force-dynamic";
 
 export default async function DeliverySettingsPage() {
@@ -31,7 +31,7 @@ export default async function DeliverySettingsPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Digylog — Paramètres</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Paramètres Livraison</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Configurez votre intégration avec Digylog API v2.4.
         </p>

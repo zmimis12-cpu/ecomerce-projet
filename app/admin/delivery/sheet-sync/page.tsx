@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth/session";
 import { AlertTriangle } from "lucide-react";
 import { SheetSyncClient } from "@/components/delivery-batch/sheet-sync-client";
 
-export const metadata: Metadata = { title: "Sync Google Sheet → Digylog" };
+export const metadata: Metadata = { title: "Sheet Sync Livraison" };
 export const dynamic = "force-dynamic";
 
 const SHEET_CONFIGURED = !!(
@@ -18,7 +18,7 @@ export default async function SheetSyncPage() {
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Sync Google Sheet → Digylog</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Sheet Sync Livraison</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Lit les commandes du Google Sheet, envoie à Digylog, et écrit le tracking en retour.
         </p>
@@ -66,7 +66,7 @@ export default async function SheetSyncPage() {
                 ["I","Notes","","Note pour le livreur"],
                 ["J","Tracking Number","","Rempli automatiquement par le système"],
                 ["K","Status","","Rempli: Sent / Not Sent"],
-                ["L","Errors","","Erreur Digylog si Not Sent"],
+                ["L","Errors","","Erreur transporteur si Not Sent"],
               ].map(([col, field, req, note]) => (
                 <tr key={col} className="hover:bg-secondary/20">
                   <td className="px-3 py-2 font-mono font-bold text-primary">{col}</td>

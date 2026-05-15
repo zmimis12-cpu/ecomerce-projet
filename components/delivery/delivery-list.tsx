@@ -127,7 +127,7 @@ export function DeliveryList({ orders }: DeliveryListProps) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-secondary/30">
-                  {["","Commande","Client","Produit","Tracking","Statut Digylog","Envoyé","Livré","Paiement","Profit réel","Actions"].map((h) => (
+                  {["","Commande","Client","Produit","Tracking","Statut transporteur","Envoyé","Livré","Paiement","Profit réel","Actions"].map((h) => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
