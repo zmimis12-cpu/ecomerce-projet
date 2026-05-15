@@ -50,10 +50,13 @@ export default async function DeliveryNotesPage() {
       .order("total_quantity", { ascending: false });
 
     const allProds = (prods ?? []) as ProductSummary[];
+    // Deduplicate by (batch_id + product key) before adding to preview
     for (const p of allProds) {
       if (!productsByBatch.has(p.batch_id)) productsByBatch.set(p.batch_id, []);
       const arr = productsByBatch.get(p.batch_id)!;
-      if (arr.length < 3) arr.push(p); // keep top-3 only
+      const key = p.sku || p.product_name;
+      const exists = arr.some((x) => (x.sku || x.product_name) === key);
+      if (!exists && arr.length < 3) arr.push(p);
     }
   }
 
@@ -73,7 +76,9 @@ export default async function DeliveryNotesPage() {
       for (const p of (freshProds ?? []) as ProductSummary[]) {
         if (!productsByBatch.has(p.batch_id)) productsByBatch.set(p.batch_id, []);
         const arr = productsByBatch.get(p.batch_id)!;
-        if (arr.length < 3) arr.push(p);
+        const key = p.sku || p.product_name;
+        const exists = arr.some((x) => (x.sku || x.product_name) === key);
+        if (!exists && arr.length < 3) arr.push(p);
       }
     }
   }
