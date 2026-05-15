@@ -1,8 +1,44 @@
 "use client";
+// ─── Sync result badges ───────────────────────────────────────────────────────
+function SyncResultBadges({ result }: { result: FullSyncResult }) {
+  const items = [
+    { key: "statuses" as const, label: "Statuts" },
+    { key: "bl"       as const, label: "BL" },
+    { key: "invoices" as const, label: "Factures" },
+    { key: "refunds"  as const, label: "Remb." },
+    { key: "br"       as const, label: "BR" },
+  ];
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {items.map(({ key, label }) => {
+        const r = result[key];
+        return (
+          <span key={key} title={r.message}
+            className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold cursor-help",
+              !r.available ? "bg-gray-100 text-gray-400" :
+              r.success    ? "bg-green-100 text-green-700" :
+                             "bg-amber-100 text-amber-600"
+            )}>
+            {!r.available ? "—" : r.success ? "✓" : "!"}{" "}{label}
+            {r.available && r.synced > 0 && ` ×${r.synced}`}
+          </span>
+        );
+      })}
+      {result.reconciled && (
+        <span className="inline-flex rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold">
+          ✓ Réconcilié
+        </span>
+      )}
+    </div>
+  );
+}
+
 import { useState, useTransition } from "react";
 import {
-  createDeliveryStore, updateDeliveryStore, testStoreConnection, syncStore,
+  createDeliveryStore, updateDeliveryStore, testStoreConnection,
 } from "@/lib/delivery/store-actions";
+import { syncProviderDocuments } from "@/lib/delivery/providers/document-sync";
+import type { FullSyncResult } from "@/lib/delivery/providers/document-sync";
 import type { DeliveryStoreRow } from "@/lib/delivery/store-actions";
 import { Plus, X, Check, Loader2, Wifi, WifiOff, RefreshCw, ChevronRight, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,8 +53,9 @@ function StoreCard({
   store: DeliveryStoreRow;
   onEdit: () => void;
 }) {
-  const [syncing, startSync] = useTransition();
-  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [syncing, startSync]   = useTransition();
+  const [syncMsg, setSyncMsg]  = useState<string | null>(null);
+  const [syncRes, setSyncRes]  = useState<FullSyncResult | null>(null);
   const [testing, startTest] = useTransition();
   const [connStatus, setConnStatus] = useState<"idle" | "ok" | "error">("idle");
 
@@ -114,9 +151,9 @@ function StoreCard({
       <div className="border-t bg-secondary/10 px-5 py-2.5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {syncMsg ? (
-            <span className={syncMsg.startsWith("✕") ? "text-xs text-red-600" : "text-xs text-green-600"}>
-              {syncMsg}
-            </span>
+            <span className="text-xs text-muted-foreground animate-pulse">{syncMsg}</span>
+          ) : syncRes ? (
+            <SyncResultBadges result={syncRes} />
           ) : (
             <span className="text-xs text-muted-foreground">
               {(store.metadata as Record<string,unknown>)?.last_sync_at
@@ -129,13 +166,14 @@ function StoreCard({
           type="button"
           onClick={() => {
             setSyncMsg("Synchronisation en cours…");
-            syncStore(store.id).then((r) => {
-              if (r.success) {
-                setSyncMsg(`✓ ${r.sent} envoyés · ${r.skipped} ignorés`);
-              } else {
-                setSyncMsg(`✕ ${r.error ?? "Erreur"}`);
-              }
-              setTimeout(() => setSyncMsg(null), 6000);
+            setSyncRes(null);
+            syncProviderDocuments(store.id).then((r) => {
+              setSyncRes(r);
+              setSyncMsg(null);
+              setTimeout(() => setSyncRes(null), 30000);
+            }).catch((e) => {
+              setSyncMsg(`✕ ${String(e)}`);
+              setTimeout(() => setSyncMsg(null), 8000);
             });
           }}
           className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
