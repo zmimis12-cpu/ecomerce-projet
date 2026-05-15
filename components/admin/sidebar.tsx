@@ -41,7 +41,7 @@ const ADMIN_NAV: NavGroup[] = [
       { href: "/admin/delivery/documents",  label: "BL du Jour",         icon: FileText        },
       { href: "/admin/delivery/batches",    label: "Tickets Impression", icon: Layers          },
       { href: "/admin/delivery/notes",      label: "Récap Tickets",      icon: FileText        },
-      { href: "/admin/digylog/documents",   label: "Documents Digylog",  icon: FolderOpen      },
+      { href: "/admin/digylog/documents",   label: "Documents Livraison",  icon: FolderOpen      },
       { href: "/admin/delivery/invoices",   label: "Factures",           icon: FileText        },
       { href: "/admin/scanner",             label: "Scanner",            icon: ScanLine        },
       { href: "/admin/returns",             label: "Retours",            icon: RotateCcw       },
@@ -58,6 +58,7 @@ const ADMIN_NAV: NavGroup[] = [
   {
     label: "Admin",
     items: [
+      { href: "/admin/settings/delivery-providers", label: "Transporteurs", icon: Truck },
       { href: "/admin/audit-logs", label: "Audit Logs",  icon: Shield   },
       { href: "/admin/settings",   label: "Paramètres",  icon: Settings },
     ],
@@ -100,10 +101,11 @@ export function AdminSidebar({ role }: { role: AppRole }) {
   const navGroups = getNavForRole(role);
 
   function isActive(href: string, exact?: boolean) {
-    if (exact) return pathname === href;
-    if (href === "/admin/delivery") return pathname === "/admin/delivery";
-    if (href === "/admin")          return pathname === "/admin";
+    // Always exact match for these special routes
+    if (href === "/admin")             return pathname === "/admin";
     if (href === "/admin/call-center") return pathname === "/admin/call-center";
+    if (href === "/admin/delivery")    return pathname === "/admin/delivery";
+    if (exact) return pathname === href;
     return pathname.startsWith(href);
   }
 
