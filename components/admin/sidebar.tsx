@@ -50,7 +50,8 @@ const ADMIN_NAV: NavGroup[] = [
   {
     label: "Business",
     items: [
-      { href: "/admin/finance",       label: "Finance",       icon: BarChart3 },
+      { href: "/admin/finance",                    label: "Finance",          icon: BarChart3 },
+      { href: "/admin/finance/reconciliation", label: "Réconciliation",   icon: Shield },
       { href: "/admin/landing-pages", label: "Landing Pages", icon: Globe     },
     ],
   },
