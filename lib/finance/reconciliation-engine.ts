@@ -322,8 +322,17 @@ export async function getReconciliationIssues(filters?: {
 
   q = q.range(filters?.offset ?? 0, (filters?.offset ?? 0) + (filters?.limit ?? 50) - 1);
 
-  const { data, count } = await q;
-  return { issues: (data ?? []) as ReconciliationRow[], total: count ?? 0 };
+  try {
+    const { data, count, error } = await q;
+    if (error) {
+      console.error("[reconciliation] getReconciliationIssues error:", error.message);
+      return { issues: [] as ReconciliationRow[], total: 0 };
+    }
+    return { issues: (data ?? []) as ReconciliationRow[], total: count ?? 0 };
+  } catch (e) {
+    console.error("[reconciliation] table missing or query failed:", e);
+    return { issues: [] as ReconciliationRow[], total: 0 };
+  }
 }
 
 export async function resolveIssue(issueId: string, note: string, userId: string) {
@@ -336,15 +345,20 @@ export async function resolveIssue(issueId: string, note: string, userId: string
 }
 
 export async function getSummary(providerSlug?: string) {
-  let q = supabaseAdmin
-    .from("reconciliation_issues")
-    .select("issue_type, severity, difference, cod_amount, expected_fee, actual_fee")
-    .eq("is_resolved", false);
-  if (providerSlug) q = q.eq("provider_slug", providerSlug);
-
-  const { data } = await q;
   type R = { issue_type: string; severity: string; difference: number | null; cod_amount: number | null; expected_fee: number | null; actual_fee: number | null };
-  const rows = (data ?? []) as R[];
+  let rows: R[] = [];
+  try {
+    let q = supabaseAdmin
+      .from("reconciliation_issues")
+      .select("issue_type, severity, difference, cod_amount, expected_fee, actual_fee")
+      .eq("is_resolved", false);
+    if (providerSlug) q = q.eq("provider_slug", providerSlug);
+    const { data, error } = await q;
+    if (error) console.error("[reconciliation] getSummary error:", error.message);
+    else rows = (data ?? []) as R[];
+  } catch (e) {
+    console.error("[reconciliation] getSummary table missing:", e);
+  }
 
   const totalDiff       = rows.reduce((s, r) => s + (r.difference ?? 0), 0);
   const overcharged     = rows.filter((r) => r.issue_type === "casa_overcharged").length;

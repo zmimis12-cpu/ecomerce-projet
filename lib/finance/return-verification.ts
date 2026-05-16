@@ -66,7 +66,8 @@ export async function recordReturnScan(params: {
     discrepancyNote = issues.join("; ");
   }
 
-  // Upsert return verification record
+  // Upsert return verification record (table may not exist yet)
+  try {
   await supabaseAdmin.from("return_verifications").upsert({
     tracking_number:          trackingNumber,
     order_id:                 o?.id ?? null,
@@ -81,6 +82,7 @@ export async function recordReturnScan(params: {
     refund_eligible:          reconStatus === "verified_ok" || reconStatus === "discrepancy",
     updated_at:               new Date().toISOString(),
   } as never, { onConflict: "tracking_number,provider_slug" });
+  } catch (e) { console.warn("[return-verification] table missing:", e); }
 
   // Update order status if not already returned
   if (o) {

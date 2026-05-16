@@ -27,19 +27,28 @@ async function getRules(providerSlug: string): Promise<FeeRule[]> {
     return cachedRules.get(providerSlug) ?? [];
   }
 
-  const { data } = await supabaseAdmin
-    .from("shipping_fee_rules")
-    .select("provider_slug, city_pattern, is_casablanca, shipping_fee, return_fee, fulfillment_fee, priority")
-    .eq("is_active", true)
-    .order("priority", { ascending: false });
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("shipping_fee_rules")
+      .select("provider_slug, city_pattern, is_casablanca, shipping_fee, return_fee, fulfillment_fee, priority")
+      .eq("is_active", true)
+      .order("priority", { ascending: false });
 
-  cachedRules = new Map<string, FeeRule[]>();
-  for (const r of (data ?? []) as (FeeRule & { provider_slug: string })[]) {
-    const arr = cachedRules.get(r.provider_slug) ?? [];
-    arr.push(r);
-    cachedRules.set(r.provider_slug, arr);
+    if (error) throw error;
+
+    cachedRules = new Map<string, FeeRule[]>();
+    for (const r of (data ?? []) as (FeeRule & { provider_slug: string })[]) {
+      const arr = cachedRules.get(r.provider_slug) ?? [];
+      arr.push(r);
+      cachedRules.set(r.provider_slug, arr);
+    }
+    cacheExpiry = now + 5 * 60 * 1000;
+  } catch (e) {
+    // Table missing in production — use empty map (fallback to hardcoded)
+    console.warn("[fee-rules] shipping_fee_rules unavailable, using fallback:", e);
+    cachedRules = new Map<string, FeeRule[]>();
+    cacheExpiry = now + 60 * 1000; // retry in 1 min
   }
-  cacheExpiry = now + 5 * 60 * 1000; // 5 minutes
 
   return cachedRules.get(providerSlug) ?? [];
 }

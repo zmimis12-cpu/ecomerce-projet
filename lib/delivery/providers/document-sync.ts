@@ -1,3 +1,4 @@
+"use server";
 /**
  * lib/delivery/providers/document-sync.ts
  *
@@ -12,7 +13,6 @@
  *   ❌ syncBR/BLFC/Ramassage — API missing → manual import
  */
 
-"use server";
 import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createDigylogClientFromDB } from "@/lib/delivery/digylog/client";
