@@ -38,12 +38,21 @@ export async function getDailyBls(limit = 60): Promise<{
   generated_at: string | null;
   created_at: string;
 }[]> {
-  const { data } = await supabaseAdmin
-    .from("delivery_daily_bls")
-    .select("*")
-    .order("business_date", { ascending: false })
-    .limit(limit);
-  return (data ?? []) as ReturnType<typeof getDailyBls> extends Promise<infer T> ? T : never;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("delivery_daily_bls")
+      .select("*")
+      .order("business_date", { ascending: false })
+      .limit(limit);
+    if (error) {
+      console.error("[getDailyBls] query error:", error.message);
+      return [];
+    }
+    return (data ?? []) as ReturnType<typeof getDailyBls> extends Promise<infer T> ? T : never;
+  } catch (e) {
+    console.error("[getDailyBls] unexpected error:", e);
+    return [];
+  }
 }
 
 // ── Refresh daily BL stats from orders ───────────────────────────────────────
@@ -56,16 +65,28 @@ async function refreshDailyBlStats(
   const dateStart = `${businessDate}T00:00:00`;
   const dateEnd   = `${businessDate}T23:59:59`;
 
-  const { data: orders } = await supabaseAdmin
+  // Get company_id — fallback gracefully if delivery_companies missing
+  let companyId: string | null = null;
+  try {
+    const compRes = await supabaseAdmin
+      .from("delivery_companies").select("id").eq("slug", provider).maybeSingle();
+    companyId = (compRes.data as { id: string } | null)?.id ?? null;
+  } catch { /* table may not exist */ }
+
+  // Build query — if no companyId, fall back to sent_to_delivery orders with tracking
+  let ordersQuery = supabaseAdmin
     .from("orders")
     .select("id, total_amount_mad, delivery_tracking_number")
     .eq("status", "sent_to_delivery")
-    .eq("delivery_company_id", (await supabaseAdmin
-      .from("delivery_companies").select("id").eq("slug", provider).maybeSingle()
-      .then((r) => (r.data as { id: string } | null)?.id ?? "")) as string)
     .gte("created_at", dateStart)
     .lt("created_at", dateEnd)
     .not("delivery_tracking_number", "is", null);
+
+  if (companyId) {
+    ordersQuery = ordersQuery.eq("delivery_company_id", companyId);
+  }
+
+  const { data: orders } = await ordersQuery;
 
   type O = { id: string; total_amount_mad: number; delivery_tracking_number: string };
   const rows = (orders ?? []) as O[];

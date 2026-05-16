@@ -33,39 +33,6 @@ export default async function DocumentsPage({
   await requireRole(["super_admin", "admin", "manager"]);
   const sp = await searchParams;
 
-  const tab      = (sp.tab as DocType) || "BL";
-  const provider = sp.provider || undefined;
-  const dateFrom = sp.from || undefined;
-  const dateTo   = sp.to || undefined;
-  const page     = Number(sp.page ?? 0);
-  const perPage  = 50;
-
-  // Get counts per type for tabs
-  const { data: counts } = await supabaseAdmin
-    .from("delivery_documents")
-    .select("document_type")
-    .not("document_type", "is", null);
-
-  const countMap: Record<string, number> = {};
-  for (const r of (counts ?? []) as { document_type: string }[]) {
-    countMap[r.document_type] = (countMap[r.document_type] ?? 0) + 1;
-  }
-
-  // Get documents for current tab
-  let q = supabaseAdmin
-    .from("delivery_documents")
-    .select("id, provider_slug, store_name, document_number, document_date, status, total_cod, total_fees, total_payout, line_count, source, synced_at, created_at", { count: "exact" })
-    .eq("document_type", tab)
-    .order("document_date", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false })
-    .range(page * perPage, (page + 1) * perPage - 1);
-
-  if (provider) q = q.eq("provider_slug", provider);
-  if (dateFrom) q = q.gte("document_date", dateFrom);
-  if (dateTo)   q = q.lte("document_date", dateTo);
-
-  const { data: docs, count: total } = await q;
-
   type DocRow = {
     id: string; provider_slug: string; store_name: string | null;
     document_number: string | null; document_date: string | null;
@@ -73,20 +40,69 @@ export default async function DocumentsPage({
     total_payout: number | null; line_count: number | null;
     source: string | null; synced_at: string | null; created_at: string;
   };
-  const documents = (docs ?? []) as DocRow[];
+
+  const tab      = (sp.tab as DocType) || "BL";
+  const provider = sp.provider || undefined;
+  const dateFrom = sp.from || undefined;
+  const dateTo   = sp.to || undefined;
+  const page     = Number(sp.page ?? 0);
+  const perPage  = 50;
+
+  // Get counts per type — safe fallback if table missing
+  const countMap: Record<string, number> = {};
+  let documents: DocRow[] = [];
+  let total = 0;
+
+  try {
+    const { data: counts } = await supabaseAdmin
+      .from("delivery_documents")
+      .select("document_type")
+      .not("document_type", "is", null);
+
+    for (const r of (counts ?? []) as { document_type: string }[]) {
+      countMap[r.document_type] = (countMap[r.document_type] ?? 0) + 1;
+    }
+
+    // Get documents for current tab
+    let q = supabaseAdmin
+      .from("delivery_documents")
+      .select("id, provider_slug, store_name, document_number, document_date, status, total_cod, total_fees, total_payout, line_count, source, synced_at, created_at", { count: "exact" })
+      .eq("document_type", tab)
+      .order("document_date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .range(page * perPage, (page + 1) * perPage - 1);
+
+    if (provider) q = q.eq("provider_slug", provider);
+    if (dateFrom) q = q.gte("document_date", dateFrom);
+    if (dateTo)   q = q.lte("document_date", dateTo);
+
+    const { data: docs, count: cnt } = await q;
+    documents = (docs ?? []) as DocRow[];
+    total = cnt ?? 0;
+
+  } catch (e) {
+    // Table may not exist yet — show empty state
+    console.warn("[documents] delivery_documents table missing:", e);
+    documents = [];
+    total = 0;
+  }
+
+
   const pages = Math.ceil((total ?? 0) / perPage);
 
-  // Totals for current tab
-  const { data: totals } = await supabaseAdmin
-    .from("delivery_documents")
-    .select("total_cod, total_fees, total_payout")
-    .eq("document_type", tab);
-
-  type TRow = { total_cod: number | null; total_fees: number | null; total_payout: number | null };
-  const tRows = (totals ?? []) as TRow[];
-  const sumCod     = tRows.reduce((s, r) => s + (r.total_cod     ?? 0), 0);
-  const sumFees    = tRows.reduce((s, r) => s + (r.total_fees    ?? 0), 0);
-  const sumPayout  = tRows.reduce((s, r) => s + (r.total_payout  ?? 0), 0);
+  // Totals for current tab — safe
+  let sumCod = 0, sumFees = 0, sumPayout = 0;
+  try {
+    const { data: totals } = await supabaseAdmin
+      .from("delivery_documents")
+      .select("total_cod, total_fees, total_payout")
+      .eq("document_type", tab);
+    type TRow = { total_cod: number | null; total_fees: number | null; total_payout: number | null };
+    const tRows = (totals ?? []) as TRow[];
+    sumCod    = tRows.reduce((s, r) => s + (r.total_cod    ?? 0), 0);
+    sumFees   = tRows.reduce((s, r) => s + (r.total_fees   ?? 0), 0);
+    sumPayout = tRows.reduce((s, r) => s + (r.total_payout ?? 0), 0);
+  } catch { /* table missing */ }
 
   function mad(n: number) { return n.toLocaleString("fr-MA", { minimumFractionDigits: 2 }) + " MAD"; }
 
@@ -106,16 +122,23 @@ export default async function DocumentsPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <select value={provider ?? ""} onChange={(e) => window && (window.location.href = buildUrl(e.target.value ? { provider: e.target.value } : {}))}
-            className="h-9 rounded-lg border bg-background px-3 text-sm focus:outline-none">
-            <option value="">Tous providers</option>
-            <option value="digylog">Digylog</option>
-            <option value="ozone">Ozone</option>
-          </select>
-          <input type="date" defaultValue={dateFrom} onChange={(e) => window && (window.location.href = buildUrl({ from: e.target.value }))}
-            className="h-9 rounded-lg border bg-background px-3 text-sm" />
-          <input type="date" defaultValue={dateTo} onChange={(e) => window && (window.location.href = buildUrl({ to: e.target.value }))}
-            className="h-9 rounded-lg border bg-background px-3 text-sm" />
+          <form method="get" action="/admin/delivery/documents" className="flex items-center gap-2">
+            <input type="hidden" name="tab" value={tab} />
+            <select name="provider" defaultValue={provider ?? ""}
+              className="h-9 rounded-lg border bg-background px-3 text-sm focus:outline-none">
+              <option value="">Tous providers</option>
+              <option value="digylog">Digylog</option>
+              <option value="ozone">Ozone</option>
+            </select>
+            <input type="date" name="from" defaultValue={dateFrom}
+              className="h-9 rounded-lg border bg-background px-3 text-sm" />
+            <input type="date" name="to" defaultValue={dateTo}
+              className="h-9 rounded-lg border bg-background px-3 text-sm" />
+            <button type="submit"
+              className="h-9 px-3 rounded-lg border bg-background text-sm hover:bg-secondary transition-colors">
+              Filtrer
+            </button>
+          </form>
         </div>
       </div>
 
