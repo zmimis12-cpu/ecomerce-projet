@@ -1,110 +1,250 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { DailyBlClient } from "@/components/delivery-integration/daily-bl-client";
+import { cn } from "@/lib/utils";
+import { FileText, CheckCircle2, Clock, AlertTriangle, Download } from "lucide-react";
 
-export const metadata: Metadata = { title: "BL du Jour" };
+export const metadata: Metadata = { title: "Documents Livraison" };
 export const dynamic = "force-dynamic";
 
-type DailyBlRow = {
-  id: string; provider: string; store_name: string;
-  business_date: string; bl_id: number | null;
-  total_orders: number; total_trackings: number;
-  total_cod: number; payment_status: string;
-  generated_at: string | null; created_at: string;
+const DOC_TYPES = ["BL", "BR", "BLFC", "BRFC", "INVOICE", "REFUND", "RAMASSAGE", "PAYOUT"] as const;
+type DocType = typeof DOC_TYPES[number];
+
+const DOC_LABELS: Record<string, string> = {
+  BL: "Bons de Livraison", BR: "Bons de Retour",
+  BLFC: "BL Fulfillment", BRFC: "BR Fulfillment",
+  INVOICE: "Factures", REFUND: "Remboursements",
+  RAMASSAGE: "Ramassage", PAYOUT: "Paiements COD",
 };
 
-// Compute day stats from orders (for days not yet in delivery_daily_bls)
-async function getDayStats() {
-  // Get from delivery_daily_bls table
-  const { data: existing } = await supabaseAdmin
-    .from("delivery_daily_bls")
-    .select("*")
-    .order("business_date", { ascending: false })
-    .limit(60);
+const DOC_COLORS: Record<string, string> = {
+  BL: "bg-blue-100 text-blue-700", BR: "bg-orange-100 text-orange-700",
+  BLFC: "bg-blue-100 text-blue-600", BRFC: "bg-orange-100 text-orange-600",
+  INVOICE: "bg-green-100 text-green-700", REFUND: "bg-purple-100 text-purple-700",
+  RAMASSAGE: "bg-amber-100 text-amber-700", PAYOUT: "bg-emerald-100 text-emerald-700",
+};
 
-  // Also compute from orders for dates not yet in daily_bls
-  const { data: ordSummary } = await supabaseAdmin
-    .from("orders")
-    .select("created_at, sent_to_delivery_at, total_amount_mad, delivery_tracking_number, delivery_company_id")
-    .in("status", ["sent_to_delivery","in_transit","delivered","paid","returned"])
-    .not("delivery_tracking_number", "is", null)
+export default async function DocumentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}) {
+  await requireRole(["super_admin", "admin", "manager"]);
+  const sp = await searchParams;
+
+  const tab      = (sp.tab as DocType) || "BL";
+  const provider = sp.provider || undefined;
+  const dateFrom = sp.from || undefined;
+  const dateTo   = sp.to || undefined;
+  const page     = Number(sp.page ?? 0);
+  const perPage  = 50;
+
+  // Get counts per type for tabs
+  const { data: counts } = await supabaseAdmin
+    .from("delivery_documents")
+    .select("document_type")
+    .not("document_type", "is", null);
+
+  const countMap: Record<string, number> = {};
+  for (const r of (counts ?? []) as { document_type: string }[]) {
+    countMap[r.document_type] = (countMap[r.document_type] ?? 0) + 1;
+  }
+
+  // Get documents for current tab
+  let q = supabaseAdmin
+    .from("delivery_documents")
+    .select("id, provider_slug, store_name, document_number, document_date, status, total_cod, total_fees, total_payout, line_count, source, synced_at, created_at", { count: "exact" })
+    .eq("document_type", tab)
+    .order("document_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
-    .limit(1000);
+    .range(page * perPage, (page + 1) * perPage - 1);
 
-  // Get default store name from delivery_stores
-  const { data: defaultStore } = await supabaseAdmin
-    .from("delivery_stores")
-    .select("name")
-    .eq("is_default", true)
-    .eq("is_active", true)
-    .maybeSingle();
-  // Fallback to digylog_settings if no delivery_stores configured
-  const { data: dgSettings } = await supabaseAdmin
-    .from("digylog_settings")
-    .select("default_store_name")
-    .limit(1)
-    .maybeSingle();
-  const storeName = (defaultStore as { name?: string } | null)?.name
-    ?? (dgSettings as { default_store_name?: string } | null)?.default_store_name
-    ?? "Default";
+  if (provider) q = q.eq("provider_slug", provider);
+  if (dateFrom) q = q.gte("document_date", dateFrom);
+  if (dateTo)   q = q.lte("document_date", dateTo);
 
-  type OrdRow = { created_at: string; sent_to_delivery_at?: string; total_amount_mad: number; delivery_tracking_number: string };
-  const orders = (ordSummary ?? []) as OrdRow[];
+  const { data: docs, count: total } = await q;
 
-  // Group by date
-  const dateMap = new Map<string, { orders: number; trackings: number; cod: number }>();
-  for (const o of orders) {
-    const day = ((o as unknown as { sent_to_delivery_at?: string }).sent_to_delivery_at ?? o.created_at).slice(0, 10);
-    if (!dateMap.has(day)) dateMap.set(day, { orders: 0, trackings: 0, cod: 0 });
-    const entry = dateMap.get(day)!;
-    entry.orders++;
-    if (o.delivery_tracking_number) entry.trackings++;
-    entry.cod += o.total_amount_mad || 0;
-  }
+  type DocRow = {
+    id: string; provider_slug: string; store_name: string | null;
+    document_number: string | null; document_date: string | null;
+    status: string; total_cod: number | null; total_fees: number | null;
+    total_payout: number | null; line_count: number | null;
+    source: string | null; synced_at: string | null; created_at: string;
+  };
+  const documents = (docs ?? []) as DocRow[];
+  const pages = Math.ceil((total ?? 0) / perPage);
 
-  // Merge: existing daily_bls take priority
-  const existingDates = new Set((existing ?? []).map((r) => (r as { business_date: string }).business_date));
-  const computedRows: DailyBlRow[] = [];
+  // Totals for current tab
+  const { data: totals } = await supabaseAdmin
+    .from("delivery_documents")
+    .select("total_cod, total_fees, total_payout")
+    .eq("document_type", tab);
 
-  for (const [date, stats] of [...dateMap.entries()].sort((a, b) => b[0].localeCompare(a[0]))) {
-    if (existingDates.has(date)) continue; // covered by delivery_daily_bls
-    computedRows.push({
-      id:             `computed_${date}`,
-      provider:       "digylog",
-      store_name:     storeName,
-      business_date:  date,
-      bl_id:          null,
-      total_orders:   stats.orders,
-      total_trackings:stats.trackings,
-      total_cod:      stats.cod,
-      payment_status: "unpaid",
-      generated_at:   null,
-      created_at:     date + "T00:00:00",
-    });
-  }
+  type TRow = { total_cod: number | null; total_fees: number | null; total_payout: number | null };
+  const tRows = (totals ?? []) as TRow[];
+  const sumCod     = tRows.reduce((s, r) => s + (r.total_cod     ?? 0), 0);
+  const sumFees    = tRows.reduce((s, r) => s + (r.total_fees    ?? 0), 0);
+  const sumPayout  = tRows.reduce((s, r) => s + (r.total_payout  ?? 0), 0);
 
-  const allRows: DailyBlRow[] = [
-    ...(existing ?? []) as DailyBlRow[],
-    ...computedRows,
-  ].sort((a, b) => b.business_date.localeCompare(a.business_date));
+  function mad(n: number) { return n.toLocaleString("fr-MA", { minimumFractionDigits: 2 }) + " MAD"; }
 
-  return { rows: allRows, storeName };
-}
-
-export default async function DocumentsPage() {
-  await requireRole(["super_admin","admin","manager"]);
-  const { rows, storeName } = await getDayStats();
+  const buildUrl = (params: Record<string, string>) => {
+    const p = new URLSearchParams({ tab, ...sp, ...params });
+    return `/admin/delivery/documents?${p.toString()}`;
+  };
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Bons de Livraison — par jour</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Un BL par jour. Cliquez Télécharger BL du jour pour grouper toutes les commandes en 1 BL Digylog.
-        </p>
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Documents Livraison</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Centre documents transporteurs — tous providers.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <select value={provider ?? ""} onChange={(e) => window && (window.location.href = buildUrl(e.target.value ? { provider: e.target.value } : {}))}
+            className="h-9 rounded-lg border bg-background px-3 text-sm focus:outline-none">
+            <option value="">Tous providers</option>
+            <option value="digylog">Digylog</option>
+            <option value="ozone">Ozone</option>
+          </select>
+          <input type="date" defaultValue={dateFrom} onChange={(e) => window && (window.location.href = buildUrl({ from: e.target.value }))}
+            className="h-9 rounded-lg border bg-background px-3 text-sm" />
+          <input type="date" defaultValue={dateTo} onChange={(e) => window && (window.location.href = buildUrl({ to: e.target.value }))}
+            className="h-9 rounded-lg border bg-background px-3 text-sm" />
+        </div>
       </div>
-      <DailyBlClient rows={rows} defaultStoreName={storeName} />
+
+      {/* Tab navigation */}
+      <div className="flex gap-1.5 flex-wrap border-b pb-0">
+        {DOC_TYPES.map((t) => (
+          <Link key={t} href={buildUrl({ tab: t, page: "0" })}
+            className={cn(
+              "px-3 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors",
+              tab === t
+                ? "border-primary text-primary bg-primary/5"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+            )}>
+            {DOC_LABELS[t]}
+            {countMap[t] ? (
+              <span className={cn("ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold", tab === t ? "bg-primary/15" : "bg-secondary")}>
+                {countMap[t]}
+              </span>
+            ) : null}
+          </Link>
+        ))}
+      </div>
+
+      {/* Summary cards */}
+      {["BL", "BR", "INVOICE", "PAYOUT"].includes(tab) && (
+        <div className="grid grid-cols-3 gap-3">
+          {tab !== "BR" && (
+            <div className="rounded-xl border bg-card p-4">
+              <p className="text-xs text-muted-foreground">COD total</p>
+              <p className="text-lg font-bold font-mono mt-1">{mad(sumCod)}</p>
+            </div>
+          )}
+          <div className="rounded-xl border bg-card p-4">
+            <p className="text-xs text-muted-foreground">Frais total</p>
+            <p className="text-lg font-bold font-mono mt-1">{mad(sumFees)}</p>
+          </div>
+          <div className={cn("rounded-xl border p-4", sumPayout > 0 ? "bg-emerald-50/30 border-emerald-200" : "bg-card")}>
+            <p className="text-xs text-muted-foreground">Net payout</p>
+            <p className={cn("text-lg font-bold font-mono mt-1", sumPayout > 0 ? "text-emerald-700" : "")}>{mad(sumPayout)}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Documents table */}
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-secondary/30">
+                {["Numéro", "Date", "Provider", "Store", "Lignes", "COD", "Frais", "Net", "Statut", "Source", ""].map((h) => (
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {documents.length === 0 && (
+                <tr>
+                  <td colSpan={11} className="px-4 py-12 text-center">
+                    <FileText className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">
+                      Aucun document {DOC_LABELS[tab]?.toLowerCase()} trouvé.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Synchronisez depuis les stores ou importez manuellement.
+                    </p>
+                  </td>
+                </tr>
+              )}
+              {documents.map((doc) => (
+                <tr key={doc.id} className="hover:bg-secondary/20 transition-colors">
+                  <td className="px-4 py-2.5 font-mono text-xs font-bold">{doc.document_number ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    {doc.document_date ? new Date(doc.document_date).toLocaleDateString("fr-MA") : "—"}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold", DOC_COLORS[tab] ?? "bg-gray-100 text-gray-600")}>
+                      {doc.provider_slug}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-xs">{doc.store_name ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-center text-xs font-mono">{doc.line_count ?? "—"}</td>
+                  <td className="px-4 py-2.5 font-mono text-xs">{doc.total_cod != null ? mad(doc.total_cod) : "—"}</td>
+                  <td className="px-4 py-2.5 font-mono text-xs">{doc.total_fees != null ? mad(doc.total_fees) : "—"}</td>
+                  <td className="px-4 py-2.5 font-mono text-xs font-bold text-emerald-700">
+                    {doc.total_payout != null ? mad(doc.total_payout) : "—"}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                      doc.status === "synced"      && "bg-green-100 text-green-700",
+                      doc.status === "imported"    && "bg-blue-100 text-blue-700",
+                      doc.status === "reconciled"  && "bg-emerald-100 text-emerald-700",
+                      doc.status === "error"       && "bg-red-100 text-red-700",
+                    )}>
+                      {doc.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-[10px] text-muted-foreground">
+                    {doc.source === "api_sync" ? "API" : doc.source === "webhook" ? "Webhook" : "Manuel"}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {doc.document_number && (
+                      <button type="button" className="text-xs text-primary hover:underline flex items-center gap-1">
+                        <Download className="h-3 w-3" /> PDF
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {pages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t bg-secondary/10">
+            <span className="text-xs text-muted-foreground">{total} document(s) · Page {page + 1}/{pages}</span>
+            <div className="flex gap-1">
+              {page > 0 && (
+                <Link href={buildUrl({ page: String(page - 1) })}
+                  className="h-7 px-3 rounded border text-xs flex items-center hover:bg-secondary transition-colors">← Préc.</Link>
+              )}
+              {page < pages - 1 && (
+                <Link href={buildUrl({ page: String(page + 1) })}
+                  className="h-7 px-3 rounded border text-xs flex items-center hover:bg-secondary transition-colors">Suiv. →</Link>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -17,16 +17,11 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createDigylogClientFromDB } from "@/lib/delivery/digylog/client";
 import { mapDigylogStatus } from "@/lib/delivery/digylog/status-map";
+import { getShippingFeeSync, isKnownCasablanca } from "@/lib/finance/fee-rules";
 
-// ─── Casablanca fee rule ──────────────────────────────────────────────────────
-const CASA_CITIES = ["casablanca", "casa", "derb sultan", "ain chock", "hay hassani", "sidi maarouf", "ain sebaa", "moulay rachid", "sbata", "bournazel", "maarif"];
-function isCasablanca(city: string): boolean {
-  const normalized = city.toLowerCase().trim();
-  return CASA_CITIES.some((c) => normalized.includes(c));
-}
-function expectedProviderFee(city: string): number {
-  return isCasablanca(city) ? 25 : 35;
-}
+// ─── Fee rules — use dynamic engine ──────────────────────────────────────────
+function isCasablanca(city: string): boolean { return isKnownCasablanca(city); }
+function expectedProviderFee(city: string): number { return getShippingFeeSync(city).shippingFee; }
 
 // ─── Issue types ──────────────────────────────────────────────────────────────
 type IssueType =
