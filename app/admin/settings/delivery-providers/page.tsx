@@ -1,32 +1,75 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { getDeliveryStores } from "@/lib/delivery/store-actions";
 import { DeliveryProvidersClient } from "@/components/settings/delivery-providers-client";
+import type { DeliveryStoreRow } from "@/lib/delivery/store-actions";
 
 export const metadata: Metadata = { title: "Sociétés de Livraison" };
 export const dynamic = "force-dynamic";
 
+type Company = { id: string; slug: string; name: string; is_active: boolean };
+
 export default async function DeliveryProvidersPage() {
   await requireRole(["super_admin", "admin"]);
 
-  const [stores, { data: companies }] = await Promise.all([
-    getDeliveryStores(),
-    supabaseAdmin.from("delivery_companies").select("id, slug, name, is_active").order("name"),
-  ]);
+  let stores: DeliveryStoreRow[] = [];
+  let companies: Company[] = [];
+  let setupNeeded = false;
 
-  type Company = { id: string; slug: string; name: string; is_active: boolean };
-  const cos = (companies ?? []) as Company[];
+  // Load stores — graceful fallback if tables not migrated yet
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("delivery_stores")
+      .select(`
+        id, name, slug, is_active, is_default,
+        delivery_fee_mad, google_sheet_id, google_sheet_name,
+        api_base_url, metadata, created_at,
+        delivery_companies(id, slug, name)
+      `)
+      .order("name");
+
+    if (error) throw error;
+    stores = (data ?? []) as DeliveryStoreRow[];
+  } catch (e) {
+    console.error("[delivery-providers] delivery_stores missing:", e);
+    setupNeeded = true;
+  }
+
+  // Load companies — graceful fallback
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("delivery_companies")
+      .select("id, slug, name, is_active")
+      .order("name");
+
+    if (error) throw error;
+    companies = (data ?? []) as Company[];
+  } catch (e) {
+    console.error("[delivery-providers] delivery_companies missing:", e);
+    setupNeeded = true;
+  }
 
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Sociétés de Livraison</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Gérez vos transporteurs, comptes/stores, tokens API, Google Sheets et webhooks.
+          Gérez vos transporteurs, comptes/stores, tokens API et webhooks.
         </p>
       </div>
-      <DeliveryProvidersClient stores={stores} companies={cos} />
+
+      {setupNeeded && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
+          <p className="font-semibold text-amber-800 text-sm">⚠ Migration SQL requise</p>
+          <p className="text-xs text-amber-700 mt-1">
+            Les tables <code className="font-mono bg-amber-100 px-1 rounded">delivery_companies</code> et{" "}
+            <code className="font-mono bg-amber-100 px-1 rounded">delivery_stores</code> sont manquantes.
+            Exécutez les migrations SQL dans Supabase.
+          </p>
+        </div>
+      )}
+
+      <DeliveryProvidersClient stores={stores} companies={companies} />
     </div>
   );
 }

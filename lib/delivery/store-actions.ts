@@ -27,18 +27,27 @@ export type StoreFormData = {
 };
 
 // ─── List all stores with company info ────────────────────────────────────────
-export async function getDeliveryStores() {
+export async function getDeliveryStores(): Promise<DeliveryStoreRow[]> {
   await requireRole([...ADMIN_ROLES]);
-  const { data } = await supabaseAdmin
-    .from("delivery_stores")
-    .select(`
-      id, name, slug, is_active, is_default,
-      delivery_fee_mad, google_sheet_id, google_sheet_name,
-      api_base_url, metadata, created_at,
-      delivery_companies(id, slug, name)
-    `)
-    .order("name");
-  return (data ?? []) as DeliveryStoreRow[];
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("delivery_stores")
+      .select(`
+        id, name, slug, is_active, is_default,
+        delivery_fee_mad, google_sheet_id, google_sheet_name,
+        api_base_url, metadata, created_at,
+        delivery_companies(id, slug, name)
+      `)
+      .order("name");
+    if (error) {
+      console.error("[getDeliveryStores] error:", error.message);
+      return [];
+    }
+    return (data ?? []) as DeliveryStoreRow[];
+  } catch (e) {
+    console.error("[getDeliveryStores] table missing:", e);
+    return [];
+  }
 }
 
 export type DeliveryStoreRow = {
@@ -78,7 +87,9 @@ export async function createDeliveryStore(data: StoreFormData): Promise<{ succes
   // Generate slug if empty
   const slug = data.slug.trim() || data.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 
-  const { data: inserted, error } = await supabaseAdmin
+  let inserted: { id: string } | null = null;
+  try {
+  const { data: ins, error } = await supabaseAdmin
     .from("delivery_stores")
     .insert({
       company_id:        data.companyId,
@@ -102,16 +113,21 @@ export async function createDeliveryStore(data: StoreFormData): Promise<{ succes
     .single();
 
   if (error) return { success: false, error: error.message };
+  inserted = ins as { id: string };
+  } catch (e) {
+    return { success: false, error: String(e) };
+  }
+  if (!inserted) return { success: false, error: "Insertion échouée." };
 
   // If set as default, unset others
   if (data.isDefault) {
     await supabaseAdmin.from("delivery_stores")
       .update({ is_default: false } as never)
-      .neq("id", (inserted as { id: string }).id);
+      .neq("id", inserted.id);
   }
 
   revalidatePath("/admin/settings/delivery-providers");
-  return { success: true, id: (inserted as { id: string }).id };
+  return { success: true, id: inserted.id };
 }
 
 // ─── Update store ─────────────────────────────────────────────────────────────
