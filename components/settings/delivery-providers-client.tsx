@@ -38,7 +38,7 @@ import {
   createDeliveryStore, updateDeliveryStore, testStoreConnection,
 } from "@/lib/delivery/store-actions";
 import { syncProviderDocuments } from "@/lib/delivery/providers/document-sync";
-import type { FullSyncResult } from "@/lib/delivery/providers/document-sync";
+import type { FullSyncResult } from "@/lib/delivery/providers/document-sync-types";
 import type { DeliveryStoreRow } from "@/lib/delivery/store-actions";
 import { Plus, X, Check, Loader2, Wifi, WifiOff, RefreshCw, ChevronRight, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";

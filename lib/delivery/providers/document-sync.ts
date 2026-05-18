@@ -5,33 +5,13 @@
  * All errors are caught and returned as structured DocSyncResult.
  */
 
-import { supabaseAdmin } from "@/lib/supabase/admin";
-import { requireRole } from "@/lib/auth/session";
-import { createDigylogClientFromDB } from "@/lib/delivery/digylog/client";
-import { mapDigylogStatus } from "@/lib/delivery/digylog/status-map";
-import { revalidatePath } from "next/cache";
+// All heavy imports are lazy — prevents supabaseAdmin from loading in client bundle
+// These are resolved at runtime inside server functions only
 
 const MANAGER = ["super_admin", "admin", "manager"] as const;
 
-export type DocSyncResult = {
-  available: boolean;
-  success:   boolean;
-  synced:    number;
-  message:   string;
-};
-
-export type FullSyncResult = {
-  storeName:    string;
-  providerSlug: string;
-  statuses:     DocSyncResult;
-  bl:           DocSyncResult;
-  invoices:     DocSyncResult;
-  refunds:      DocSyncResult;
-  br:           DocSyncResult;
-  reconciled:   boolean;
-  totalSynced:  number;
-  fatalError?:  string;
-};
+export type { DocSyncResult, FullSyncResult } from "./document-sync-types";
+import type { DocSyncResult, FullSyncResult } from "./document-sync-types";
 
 // ─── MAIN ENTRY — never throws ────────────────────────────────────────────────
 export async function syncProviderDocuments(storeId: string): Promise<FullSyncResult> {
@@ -51,12 +31,14 @@ export async function syncProviderDocuments(storeId: string): Promise<FullSyncRe
 }
 
 async function _syncProviderDocuments(storeId: string): Promise<FullSyncResult> {
+  const { requireRole } = await import("@/lib/auth/session");
   await requireRole([...MANAGER]);
 
   // Load store
   let storeName    = "";
   let providerSlug = "digylog";
 
+  const { supabaseAdmin } = await import("@/lib/supabase/admin");
   const { data: storeData, error: storeErr } = await supabaseAdmin
     .from("delivery_stores")
     .select("id, name, delivery_companies(slug)")
@@ -80,7 +62,8 @@ async function _syncProviderDocuments(storeId: string): Promise<FullSyncResult> 
   // Log start — best effort
   let syncLogId: string | null = null;
   try {
-    const { data: log } = await supabaseAdmin.from("provider_sync_logs").insert({
+    const { supabaseAdmin: sa } = await import("@/lib/supabase/admin");
+    const { data: log } = await sa.from("provider_sync_logs").insert({
       provider_slug: providerSlug, store_id: storeId, store_name: storeName,
       sync_type: "full", status: "running",
     } as never).select("id").single();
@@ -109,7 +92,8 @@ async function _syncProviderDocuments(storeId: string): Promise<FullSyncResult> 
   // Log end — best effort
   try {
     if (syncLogId) {
-      await supabaseAdmin.from("provider_sync_logs").update({
+      const { supabaseAdmin: sa2 } = await import("@/lib/supabase/admin");
+      await sa2.from("provider_sync_logs").update({
         status: "success", finished_at: new Date().toISOString(),
         success_count: statusRes.synced + blRes.synced,
         error_count: (statusRes.success ? 0 : 1) + (blRes.success ? 0 : 1),
@@ -119,8 +103,7 @@ async function _syncProviderDocuments(storeId: string): Promise<FullSyncResult> 
   } catch { /* ignore */ }
 
   // Revalidate — only non-store pages to avoid re-render crash
-  try { revalidatePath("/admin/delivery/documents"); } catch { /* ignore */ }
-  try { revalidatePath("/admin/finance/reconciliation"); } catch { /* ignore */ }
+  try { const { revalidatePath } = await import("next/cache"); revalidatePath("/admin/delivery/documents"); revalidatePath("/admin/finance/reconciliation"); } catch { /* ignore */ }
   // NOT revalidating delivery-providers — causes Server Component re-render crash
 
   const duration = Date.now() - startedAt;
@@ -150,6 +133,9 @@ async function syncStatuses(storeId: string, providerSlug: string): Promise<DocS
     return { available: false, success: false, synced: 0, message: `Provider '${providerSlug}' non implémenté.` };
   }
 
+  const { supabaseAdmin } = await import("@/lib/supabase/admin");
+  const { createDigylogClientFromDB } = await import("@/lib/delivery/digylog/client");
+  const { mapDigylogStatus } = await import("@/lib/delivery/digylog/status-map");
   const client = await createDigylogClientFromDB(storeId);
 
   const { data: orders, error: ordErr } = await supabaseAdmin
@@ -200,7 +186,7 @@ async function syncStatuses(storeId: string, providerSlug: string): Promise<DocS
 
 // ─── Sync BL ──────────────────────────────────────────────────────────────────
 async function syncBL(storeId: string, storeName: string, providerSlug: string): Promise<DocSyncResult> {
-  // Check if delivery_documents table exists
+  const { supabaseAdmin } = await import("@/lib/supabase/admin");
   const { data: bls, error: blErr } = await supabaseAdmin
     .from("delivery_daily_bls")
     .select("id, bl_id, business_date, total_trackings, total_cod")
