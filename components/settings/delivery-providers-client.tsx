@@ -34,12 +34,14 @@ function SyncResultBadges({ result }: { result: FullSyncResult }) {
 }
 
 import { useState, useTransition } from "react";
+// Server actions — OK to import in client (Next.js handles these as references)
 import {
   createDeliveryStore, updateDeliveryStore, testStoreConnection,
-} from "@/lib/delivery/store-actions";
+} from "@/lib/delivery/store-client-actions";
 import { syncProviderDocuments } from "@/lib/delivery/providers/document-sync";
+// Types-only imports — no server code, safe for client bundle
 import type { FullSyncResult } from "@/lib/delivery/providers/document-sync-types";
-import type { DeliveryStoreRow } from "@/lib/delivery/store-actions";
+import type { DeliveryStoreRow } from "@/lib/delivery/store-actions-types";
 import { Plus, X, Check, Loader2, Wifi, WifiOff, RefreshCw, ChevronRight, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
