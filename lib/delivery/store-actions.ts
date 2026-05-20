@@ -7,7 +7,6 @@ import type { DeliveryStoreRow, StoreFormData } from "./store-actions-types";
  */
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/session";
-import { revalidatePath } from "next/cache";
 
 const ADMIN_ROLES = ["super_admin", "admin"] as const;
 
@@ -105,7 +104,6 @@ export async function createDeliveryStore(data: StoreFormData): Promise<{ succes
       .neq("id", inserted.id);
   }
 
-  revalidatePath("/admin/settings/delivery-providers");
   return { success: true, id: inserted.id };
 }
 
@@ -146,7 +144,6 @@ export async function updateDeliveryStore(
     await supabaseAdmin.from("delivery_stores").update({ is_default: false } as never).neq("id", id);
   }
 
-  revalidatePath("/admin/settings/delivery-providers");
   return { success: true };
 }
 

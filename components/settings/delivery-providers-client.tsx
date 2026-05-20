@@ -267,8 +267,12 @@ function WizardModal({
       const res = isCreate
         ? await createDeliveryStore(payload)
         : await updateDeliveryStore(store!.id, payload);
-      if (res.success) { onSaved(); onClose(); }
-      else setError(res.error ?? "Erreur");
+      if (res.success) {
+        onClose();
+        window.location.reload();
+      } else {
+        setError(res.error ?? "Erreur");
+      }
     });
   }
 
