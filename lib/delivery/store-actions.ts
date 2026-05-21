@@ -7,6 +7,13 @@ export type { DeliveryStoreRow, StoreFormData, StoreSyncResult } from "./store-a
 
 const ADMIN = ["super_admin", "admin"] as const;
 
+/** Strip non-ASCII characters from API tokens (prevents ByteString errors) */
+function sanitizeToken(t?: string | null): string | null {
+  if (!t) return null;
+  const clean = t.replace(/[^\x20-\x7E]/g, "").trim();
+  return clean || null;
+}
+
 // ─── List stores ─────────────────────────────────────────────────────────────
 export async function getDeliveryStores(): Promise<DeliveryStoreRow[]> {
   await requireRole([...ADMIN]);
@@ -32,7 +39,7 @@ export async function createDeliveryStore(
         company_id:        data.companyId,
         name:              data.name.trim(),
         slug,
-        api_token:         data.apiToken?.trim() || null,
+        api_token:         sanitizeToken(data.apiToken),
         api_base_url:      data.apiBaseUrl?.trim() || null,
         google_sheet_id:   data.googleSheetId?.trim() || null,
         google_sheet_name: data.googleSheetName?.trim() || null,
@@ -70,7 +77,7 @@ export async function updateDeliveryStore(
     if (data.isActive       !== undefined) update.is_active = data.isActive;
     if (data.isDefault      !== undefined) update.is_default = data.isDefault;
     if (data.clearToken)   update.api_token = null;
-    if (data.apiToken?.trim()) update.api_token = data.apiToken.trim();
+    if (data.apiToken) update.api_token = sanitizeToken(data.apiToken);
 
     const { error } = await supabaseAdmin.from("delivery_stores").update(update as never).eq("id", id);
     if (error) return { success: false, error: error.message };
@@ -115,11 +122,34 @@ export async function testStoreConnection(id: string): Promise<{
       ? { ok: true,  message: `Sheet configuré (${s.google_sheet_id.slice(0, 12)}…)` }
       : { ok: false, message: "Google Sheet non configuré" };
 
-    // Token source
-    const storeToken = s.api_token?.trim();
-    const envToken   = process.env.DIGYLOG_TOKEN?.trim();
-    const token      = storeToken || envToken;
+    // Sanitize token — remove non-ASCII chars (from bad copy/paste: en-dash, em-dash, smart quotes...)
+    const sanitize = (t?: string | null): string =>
+      (t ?? "").replace(/[^ -~]/g, "").trim();
+
+    const rawStoreToken = s.api_token?.trim() ?? "";
+    const storeToken    = sanitize(rawStoreToken);
+    const envToken      = sanitize(process.env.DIGYLOG_TOKEN);
+    const token         = storeToken || envToken;
     const tokenSource: "store" | "env" | "none" = storeToken ? "store" : envToken ? "env" : "none";
+
+    // Detect bad characters in stored token
+    if (rawStoreToken && rawStoreToken !== storeToken) {
+      const badChars = [...rawStoreToken]
+        .filter(c => c.charCodeAt(0) > 127)
+        .map(c => `'${c}' (U+${c.charCodeAt(0).toString(16).toUpperCase()})`)
+        .slice(0, 3)
+        .join(", ");
+      return {
+        success: false,
+        message: "Token invalide — caractères spéciaux détectés",
+        provider: {
+          ok: false,
+          message: `Token contient des caractères invalides: ${badChars}. Ouvrez Modifier → Accès et recollez le token en texte brut depuis le dashboard Digylog.`,
+        },
+        sheet,
+        token: { present: true, source: "store" as const },
+      };
+    }
 
     if (!token) {
       return {
