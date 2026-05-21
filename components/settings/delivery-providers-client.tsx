@@ -7,11 +7,32 @@ import { cn } from "@/lib/utils";
 
 type Company = { id: string; slug: string; name: string; is_active: boolean };
 
+// ─── Status line component ───────────────────────────────────────────────────
+function StatusLine({ ok, label, detail }: { ok: boolean; label: string; detail: string }) {
+  return (
+    <div className="flex items-start gap-2">
+      <span className={cn("text-[10px] font-bold mt-0.5 shrink-0", ok ? "text-green-600" : "text-red-500")}>
+        {ok ? "✓" : "✕"}
+      </span>
+      <div>
+        <span className="text-xs font-medium">{label}</span>
+        <span className={cn("text-xs ml-1.5", ok ? "text-muted-foreground" : "text-red-600")}>
+          {detail}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Store card ───────────────────────────────────────────────────────────────
 function StoreCard({ store, onEdit }: { store: DeliveryStoreRow; onEdit: () => void }) {
   const [testing, startTest]   = useTransition();
   const [syncing, startSync]   = useTransition();
-  const [connOk,  setConnOk]   = useState<boolean | null>(null);
+  const [testRes, setTestRes]  = useState<{
+    provider: { ok: boolean; message: string };
+    sheet:    { ok: boolean; message: string };
+    token:    { present: boolean; source: string };
+  } | null>(null);
   const [syncMsg, setSyncMsg]  = useState<string | null>(null);
   const [syncErr, setSyncErr]  = useState(false);
 
@@ -23,11 +44,11 @@ function StoreCard({ store, onEdit }: { store: DeliveryStoreRow; onEdit: () => v
     : null;
 
   function handleTest() {
-    setConnOk(null);
+    setTestRes(null);
     startTest(async () => {
       const r = await testStoreConnection(store.id);
-      setConnOk(r.success);
-      setTimeout(() => setConnOk(null), 5000);
+      setTestRes({ provider: r.provider, sheet: r.sheet, token: r.token });
+      setTimeout(() => setTestRes(null), 12000);
     });
   }
 
@@ -69,16 +90,11 @@ function StoreCard({ store, onEdit }: { store: DeliveryStoreRow; onEdit: () => v
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button type="button" onClick={handleTest} disabled={testing} title="Tester connexion"
-            className={cn("h-8 w-8 rounded-lg border flex items-center justify-center transition-all",
-              connOk === true  && "border-green-300 bg-green-50 text-green-600",
-              connOk === false && "border-red-300 bg-red-50 text-red-600",
-              connOk === null  && "hover:bg-secondary text-muted-foreground"
-            )}>
-            {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              : connOk === true  ? <Wifi className="h-3.5 w-3.5" />
-              : connOk === false ? <WifiOff className="h-3.5 w-3.5" />
-              : <Wifi className="h-3.5 w-3.5" />}
+          <button type="button" onClick={handleTest} disabled={testing}
+            title="Tester la connexion API"
+            className="h-8 px-2.5 rounded-lg border flex items-center gap-1.5 text-xs text-muted-foreground hover:bg-secondary transition-colors disabled:opacity-50">
+            {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wifi className="h-3.5 w-3.5" />}
+            {testing ? "Test…" : "Tester"}
           </button>
           <button type="button" onClick={onEdit}
             className="h-8 px-3 rounded-lg border text-xs font-medium hover:bg-secondary transition-colors">
@@ -86,6 +102,27 @@ function StoreCard({ store, onEdit }: { store: DeliveryStoreRow; onEdit: () => v
           </button>
         </div>
       </div>
+
+      {/* Connection status — shown after test */}
+      {testRes && (
+        <div className="border-t px-5 py-3 space-y-1.5 bg-secondary/5">
+          <StatusLine
+            ok={testRes.provider.ok}
+            label={`Provider API`}
+            detail={testRes.provider.message}
+          />
+          <StatusLine
+            ok={testRes.sheet.ok}
+            label="Google Sheet"
+            detail={testRes.sheet.message}
+          />
+          <p className="text-[10px] text-muted-foreground">
+            Token: {testRes.token.source === "store" ? "✓ configuré dans ce store"
+              : testRes.token.source === "env" ? "⚠ depuis variable d'environnement (.env)"
+              : "✕ manquant"}
+          </p>
+        </div>
+      )}
 
       {/* Sync bar */}
       <div className="border-t bg-secondary/10 px-5 py-2.5 flex items-center justify-between gap-3">

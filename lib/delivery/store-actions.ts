@@ -83,35 +83,92 @@ export async function updateDeliveryStore(
   }
 }
 
-// ─── Test connection ──────────────────────────────────────────────────────────
-export async function testStoreConnection(
-  id: string
-): Promise<{ success: boolean; message: string }> {
+// ─── Test connection — returns detailed status for each component ─────────────
+export async function testStoreConnection(id: string): Promise<{
+  success: boolean;
+  message: string;
+  provider: { ok: boolean; message: string };
+  sheet:    { ok: boolean; message: string };
+  token:    { present: boolean; source: "store" | "env" | "none" };
+}> {
+  const NOT_TESTED = { ok: false, message: "Non testé" };
+
   await requireRole([...ADMIN]);
   try {
     const { data } = await supabaseAdmin
       .from("delivery_stores")
-      .select("api_token, api_base_url, delivery_companies(slug)")
+      .select("api_token, api_base_url, google_sheet_id, delivery_companies(slug)")
       .eq("id", id)
       .single();
 
-    const s = data as { api_token: string | null; api_base_url: string | null; delivery_companies: { slug: string } | null } | null;
-    if (!s) return { success: false, message: "Store introuvable." };
+    const s = data as {
+      api_token: string | null;
+      api_base_url: string | null;
+      google_sheet_id: string | null;
+      delivery_companies: { slug: string } | null;
+    } | null;
 
-    const token = s.api_token || process.env.DIGYLOG_TOKEN;
-    if (!token) return { success: false, message: "Aucun token API configuré." };
+    if (!s) return { success: false, message: "Store introuvable.", provider: NOT_TESTED, sheet: NOT_TESTED, token: { present: false, source: "none" } };
 
-    const baseUrl = s.api_base_url ?? process.env.DIGYLOG_BASE_URL ?? "https://seller.digylog.com/api";
-    const res = await fetch(`${baseUrl}/orders?page=1&limit=1`, {
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(5000),
-    });
+    // Sheet status
+    const sheet = s.google_sheet_id
+      ? { ok: true,  message: `Sheet configuré (${s.google_sheet_id.slice(0, 12)}…)` }
+      : { ok: false, message: "Google Sheet non configuré" };
 
-    return res.ok || res.status === 404
-      ? { success: true, message: `✓ Connexion réussie (HTTP ${res.status})` }
-      : { success: false, message: `Erreur HTTP ${res.status}` };
+    // Token source
+    const storeToken = s.api_token?.trim();
+    const envToken   = process.env.DIGYLOG_TOKEN?.trim();
+    const token      = storeToken || envToken;
+    const tokenSource: "store" | "env" | "none" = storeToken ? "store" : envToken ? "env" : "none";
+
+    if (!token) {
+      return {
+        success: false,
+        message: "Token API manquant",
+        provider: { ok: false, message: "Token API non configuré. Ajoutez-le dans Modifier → Accès." },
+        sheet,
+        token: { present: false, source: "none" },
+      };
+    }
+
+    // Provider API test
+    const providerSlug = s.delivery_companies?.slug ?? "digylog";
+    const baseUrl = (s.api_base_url?.trim() || process.env.DIGYLOG_BASE_URL || "https://seller.digylog.com/api").trim();
+
+    let provider = NOT_TESTED;
+    try {
+      const res = await fetch(`${baseUrl}/orders?page=1&limit=1`, {
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(8000),
+      });
+
+      if (res.ok || res.status === 404) {
+        provider = { ok: true, message: `✓ API ${providerSlug} connectée (HTTP ${res.status})` + (tokenSource === "env" ? " · token: .env" : " · token: store") };
+      } else if (res.status === 401) {
+        provider = { ok: false, message: `Token invalide — HTTP 401 Unauthorized` };
+      } else if (res.status === 403) {
+        provider = { ok: false, message: `Accès refusé — HTTP 403 Forbidden` };
+      } else {
+        provider = { ok: false, message: `API a répondu HTTP ${res.status}` };
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("timeout") || msg.includes("abort")) {
+        provider = { ok: false, message: "Timeout — API ne répond pas (>8s)" };
+      } else if (msg.includes("ENOTFOUND") || msg.includes("fetch")) {
+        provider = { ok: false, message: `URL invalide: ${baseUrl}` };
+      } else {
+        provider = { ok: false, message: `Erreur réseau: ${msg}` };
+      }
+    }
+
+    const success = provider.ok;
+    const message = provider.ok ? `✓ ${providerSlug} connecté` : provider.message;
+    return { success, message, provider, sheet, token: { present: true, source: tokenSource } };
+
   } catch (e) {
-    return { success: false, message: e instanceof Error ? e.message : "Connexion échouée" };
+    const msg = e instanceof Error ? e.message : String(e);
+    return { success: false, message: msg, provider: NOT_TESTED, sheet: NOT_TESTED, token: { present: false, source: "none" } };
   }
 }
 
