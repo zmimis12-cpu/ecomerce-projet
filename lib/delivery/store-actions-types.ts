@@ -1,4 +1,4 @@
-// store-actions-types.ts — types only, no server imports
+// Types only — no imports. Safe for client components.
 export type DeliveryStoreRow = {
   id: string;
   name: string;
@@ -20,13 +20,21 @@ export type StoreFormData = {
   slug:             string;
   apiToken?:        string;
   apiBaseUrl?:      string;
-  webhookSecret?:   string;
   googleSheetId?:   string;
   googleSheetName?: string;
   deliveryFeeMad?:  number;
   isActive:         boolean;
   isDefault:        boolean;
   clientName?:      string;
-  clientPhone?:     string;
   fulfillmentFee?:  number;
+};
+
+export type StoreSyncResult = {
+  ok:       boolean;
+  message:  string;
+  step?:    string;
+  sent?:    number;
+  skipped?: number;
+  failed?:  number;
+  error?:   string;
 };
