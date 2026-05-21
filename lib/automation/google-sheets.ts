@@ -117,7 +117,7 @@ export async function appendRowToSheet(
 ): Promise<{ updatedRange: string; updatedRows: number }> {
   const token = await getAccessToken();
 
-  const range    = encodeURIComponent(`${sheetName}!A1`);
+  const range    = encodeURIComponent(`${escapeSheetName(sheetName)}!A1`);
   const endpoint = `${SHEETS_BASE}/${spreadsheetId}/values/${range}:append`;
 
   const res = await fetch(`${endpoint}?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
@@ -147,7 +147,7 @@ export async function findRowByOrderNumber(
   orderNumber: string
 ): Promise<number | null> {
   const token   = await getAccessToken();
-  const range   = encodeURIComponent(`${sheetName}!A:A`);
+  const range   = encodeURIComponent(`${escapeSheetName(sheetName)}!A:A`);
   const endpoint = `${SHEETS_BASE}/${spreadsheetId}/values/${range}`;
 
   const res = await fetch(endpoint, {
@@ -169,7 +169,7 @@ export async function ensureSheetHeader(
   sheetName: string
 ): Promise<void> {
   const token = await getAccessToken();
-  const range = encodeURIComponent(`${sheetName}!A1:L1`);
+  const range = encodeURIComponent(`${escapeSheetName(sheetName)}!A1:L1`);
   const res   = await fetch(`${SHEETS_BASE}/${spreadsheetId}/values/${range}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -188,7 +188,7 @@ export async function ensureSheetHeader(
   ];
 
   await fetch(
-    `${SHEETS_BASE}/${spreadsheetId}/values/${encodeURIComponent(`${sheetName}!A1`)}?valueInputOption=RAW`,
+    `${SHEETS_BASE}/${spreadsheetId}/values/${encodeURIComponent(`${escapeSheetName(sheetName)}!A1`)}?valueInputOption=RAW`,
     {
       method:  "PUT",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -198,13 +198,26 @@ export async function ensureSheetHeader(
 }
 
 // ─── Read all rows from sheet ──────────────────────────────────────────────────
+/** Escape sheet name for Google Sheets API — wrap in single quotes if contains spaces or special chars */
+function escapeSheetName(name: string): string {
+  // Already quoted
+  if (name.startsWith("'") && name.endsWith("'")) return name;
+  // Needs quoting if contains spaces, apostrophes, or special chars
+  if (/[ !@#$%^&*()\-+={}\[\]|\:;"<>,.?/]/.test(name)) {
+    // Escape internal single quotes by doubling them
+    return `'${name.replace(/'/g, "''")}'`;
+  }
+  return name;
+}
+
 export async function readSheetRows(
   spreadsheetId: string,
   sheetName: string,
   range = "A2:L1000"  // skip header row
 ): Promise<string[][]> {
   const token    = await getAccessToken();
-  const encoded  = encodeURIComponent(`${sheetName}!${range}`);
+  const safeName = escapeSheetName(sheetName);
+  const encoded  = encodeURIComponent(`${safeName}!${range}`);
   const endpoint = `${SHEETS_BASE}/${spreadsheetId}/values/${encoded}`;
 
   const res = await fetch(endpoint, {
@@ -232,7 +245,7 @@ export async function updateSheetRow(
 
   // Build batch update for specific cells
   const data = Object.entries(values).map(([col, val]) => ({
-    range:  `${sheetName}!${col}${rowNumber}`,
+    range:  `${escapeSheetName(sheetName)}!${col}${rowNumber}`,
     values: [[val]],
   }));
 
