@@ -206,30 +206,52 @@ export async function testStoreConnection(id: string): Promise<{
 export async function syncStore(storeId: string): Promise<StoreSyncResult> {
   await requireRole([...ADMIN, "manager"]);
   try {
-    const { data: store } = await supabaseAdmin
+    // Load FULL store config — never fallback to default
+    const { data: store, error: storeErr } = await supabaseAdmin
       .from("delivery_stores")
-      .select("name, google_sheet_id")
-      .eq("id", storeId)
+      .select("id, name, google_sheet_id, google_sheet_name, api_token, api_base_url, delivery_companies(id, slug, name)")
+      .eq("id", storeId)          // EXACT storeId — never default
       .eq("is_active", true)
-      .maybeSingle();
+      .single();
 
-    const s = store as { name: string; google_sheet_id: string | null } | null;
-    if (!s) return { ok: false, message: "Store introuvable.", step: "load_store" };
-    if (!s.google_sheet_id) return { ok: false, message: "Google Sheet non configuré pour ce store.", step: "check_sheet" };
+    if (storeErr || !store) {
+      return { ok: false, message: "Store introuvable ou inactif.", step: "load_store", error: storeErr?.message };
+    }
 
-    // Use proven existing sync pipeline
+    type StoreConfig = {
+      id: string; name: string;
+      google_sheet_id: string | null; google_sheet_name: string | null;
+      api_token: string | null; api_base_url: string | null;
+      delivery_companies: { id: string; slug: string; name: string } | null;
+    };
+    const s = store as StoreConfig;
+
+    if (!s.google_sheet_id) {
+      return { ok: false, message: `Google Sheet non configuré pour ${s.name}`, step: "check_sheet" };
+    }
+
+    console.log(`[syncStore] Syncing store: ${s.name} (${storeId}) sheet: ${s.google_sheet_id}`);
+
+    // Use proven existing sync pipeline — pass storeId explicitly
     const { syncSheetToDigylog } = await import("@/lib/delivery/sheet-sync/actions");
-    const result = await syncSheetToDigylog(s.google_sheet_id);
+    const result = await syncSheetToDigylog(s.google_sheet_id, {
+      storeId:       s.id,
+      storeName:     s.name,
+      sheetName:     s.google_sheet_name ?? undefined,
+      providerSlug:  s.delivery_companies?.slug ?? "digylog",
+      companyId:     s.delivery_companies?.id ?? undefined,
+    });
 
     // Update last_sync in metadata
+    const prevMeta = (s as unknown as { metadata?: Record<string, unknown> }).metadata ?? {};
     await supabaseAdmin.from("delivery_stores").update({
-      metadata: { last_sync_at: new Date().toISOString(), last_sync_sent: result.sent },
+      metadata: { ...prevMeta, last_sync_at: new Date().toISOString(), last_sync_sent: result.sent },
     } as never).eq("id", storeId);
 
     return {
       ok:      result.success,
       message: result.success
-        ? `✓ ${result.sent} commandes envoyées · ${result.skipped} ignorées`
+        ? `✓ ${result.sent} envoyées · ${result.skipped} ignorées${result.failed > 0 ? ` · ${result.failed} échecs` : ""}`
         : `Sync échoué: ${result.error ?? "erreur inconnue"}`,
       step:    "sheet_sync",
       sent:    result.sent,
@@ -238,7 +260,7 @@ export async function syncStore(storeId: string): Promise<StoreSyncResult> {
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error("[syncStore] error:", msg);
+    console.error("[syncStore] FAILED", { storeId, error: msg });
     return { ok: false, message: "Sync échoué", step: "sheet_sync", error: msg };
   }
 }

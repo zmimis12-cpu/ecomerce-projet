@@ -25,7 +25,7 @@ import { revalidatePath } from "next/cache";
 const MANAGER = ["super_admin","admin","manager"] as const;
 
 // ── Get all daily BL rows ─────────────────────────────────────────────────────
-export async function getDailyBls(limit = 60): Promise<{
+export type DailyBLRow = {
   id: string;
   provider: string;
   store_name: string;
@@ -37,20 +37,75 @@ export async function getDailyBls(limit = 60): Promise<{
   payment_status: string;
   generated_at: string | null;
   created_at: string;
-}[]> {
+};
+
+export async function getDailyBls(limit = 60): Promise<DailyBLRow[]> {
+  // First try delivery_daily_bls table
   try {
     const { data, error } = await supabaseAdmin
       .from("delivery_daily_bls")
       .select("*")
       .order("business_date", { ascending: false })
       .limit(limit);
-    if (error) {
-      console.error("[getDailyBls] query error:", error.message);
-      return [];
+    if (!error && data && data.length > 0) {
+      return data as DailyBLRow[];
     }
-    return (data ?? []) as ReturnType<typeof getDailyBls> extends Promise<infer T> ? T : never;
+  } catch { /* fall through */ }
+
+  // Fallback: build BL du Jour directly from orders grouped by date+store
+  try {
+    const { data: orders } = await supabaseAdmin
+      .from("orders")
+      .select("id, total_amount_mad, delivery_tracking_number, delivery_store_id, sent_to_delivery_at, created_at, delivery_stores(name, delivery_companies(slug))")
+      .not("delivery_tracking_number", "is", null)
+      .not("status", "in", '("new","confirmed","refused","no_answer","cancelled","pending")')
+      .order("sent_to_delivery_at", { ascending: false, nullsFirst: false })
+      .limit(500);
+
+    type ORow = {
+      id: string; total_amount_mad: number; delivery_tracking_number: string;
+      delivery_store_id: string | null; sent_to_delivery_at: string | null; created_at: string;
+      delivery_stores: { name: string; delivery_companies: { slug: string } | null } | null;
+    };
+    const rows = (orders ?? []) as ORow[];
+
+    // Group by date + store
+    const groups = new Map<string, DailyBLRow>();
+
+    for (const o of rows) {
+      const date  = (o.sent_to_delivery_at ?? o.created_at).slice(0, 10);
+      const store = o.delivery_stores?.name ?? "Default";
+      const prov  = o.delivery_stores?.delivery_companies?.slug ?? "digylog";
+      const key   = `${date}:${store}:${prov}`;
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          id:             key,
+          provider:       prov,
+          store_name:     store,
+          business_date:  date,
+          bl_id:          null,
+          total_orders:   0,
+          total_trackings: 0,
+          total_cod:      0,
+          payment_status: "pending",
+          generated_at:   null,
+          created_at:     new Date().toISOString(),
+        });
+      }
+      const g = groups.get(key)!;
+      g.total_orders++;
+      if (o.delivery_tracking_number) g.total_trackings++;
+      g.total_cod += o.total_amount_mad ?? 0;
+    }
+
+    // Sort by date desc + store
+    return [...groups.values()]
+      .sort((a, b) => b.business_date.localeCompare(a.business_date))
+      .slice(0, limit);
+
   } catch (e) {
-    console.error("[getDailyBls] unexpected error:", e);
+    console.error("[getDailyBls] fallback error:", e);
     return [];
   }
 }

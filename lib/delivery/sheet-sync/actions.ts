@@ -45,7 +45,15 @@ function normalizePhone(phone: string): string {
   return ("0" + d).slice(-10).padStart(10, "0");
 }
 
-export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> {
+type StoreContext = {
+  storeId?:      string;
+  storeName?:    string;
+  sheetName?:    string;
+  providerSlug?: string;
+  companyId?:    string;
+};
+
+export async function syncSheetToDigylog(sheetId?: string, storeCtx?: StoreContext): Promise<SyncResult> {
   await requireRole([...MANAGER]);
 
   let config: ReturnType<typeof getSheetsConfig>;
@@ -55,11 +63,14 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
   }
 
   const spreadsheetId = sheetId || config.sheets.confirmed.id;
-  const sheetName     = config.sheets.confirmed.sheetName;
+  // Use store-specific sheet name if provided, else fallback to env config
+  const sheetName = storeCtx?.sheetName || config.sheets.confirmed.sheetName;
 
   if (!spreadsheetId) {
     return { success: false, error: "GOOGLE_SHEET_ID_CONFIRMED manquant dans Vercel.", total:0, sent:0, failed:0, skipped:0, rows:[] };
   }
+
+  console.log(`[sheet-sync] Store: ${storeCtx?.storeName ?? "default"} | Sheet: ${spreadsheetId} | Tab: ${sheetName}`);
 
   let rawRows: string[][];
   try { rawRows = await readSheetRows(spreadsheetId, sheetName); }
@@ -85,12 +96,16 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
     return { success: false, error: `ID réseau invalide: ${dg.default_network_id}`, total:0, sent:0, failed:0, skipped:0, rows:[] };
   }
 
-  // Use createDigylogClientFromDB which reads from delivery_stores then env
+  // Use THIS store's token — never default
   const { createDigylogClientFromDB } = await import("@/lib/delivery/digylog/client");
-  const client = await createDigylogClientFromDB();
+  const client = await createDigylogClientFromDB(storeCtx?.storeId);
 
-  const { data: dcData } = await supabaseAdmin.from("delivery_companies").select("id").eq("slug","digylog").maybeSingle();
-  const companyId = (dcData as { id:string }|null)?.id ?? null;
+  // Use company ID from store context or lookup
+  let companyId = storeCtx?.companyId ?? null;
+  if (!companyId) {
+    const { data: dcData } = await supabaseAdmin.from("delivery_companies").select("id").eq("slug","digylog").maybeSingle();
+    companyId = (dcData as { id:string }|null)?.id ?? null;
+  }
 
   const results: SheetRowResult[] = [];
   let sent = 0, failed = 0, skipped = 0;
@@ -279,7 +294,7 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
     const tracking = created?.tracking;
     // bl_id is NOT saved here — it will be set after PUT /orders/send groups all orders
 
-    // Save shipment (no bl_id yet — will be set after grouped send)
+    // Save shipment — include delivery_store_id for isolation
     await supabaseAdmin.from("delivery_shipments").upsert({
       order_id: orderId, delivery_company_id: companyId,
       tracking_number: tracking, external_order_id: orderNumber,
@@ -289,10 +304,13 @@ export async function syncSheetToDigylog(sheetId?: string): Promise<SyncResult> 
     } as never, { onConflict: "order_id" });
 
     await supabaseAdmin.from("orders").update({
-      delivery_tracking_number: tracking, delivery_company_id: companyId,
+      delivery_tracking_number: tracking,
+      delivery_company_id:      companyId,
+      delivery_store_id:        storeCtx?.storeId ?? null,  // STORE ISOLATION
       delivery_external_status: "Non envoyée", delivery_external_status_id: 0,
       delivery_status: "not_sent", delivery_last_sync_at: new Date().toISOString(),
       status: "sent_to_delivery", bl_id: null,
+      sent_to_delivery_at: new Date().toISOString(),        // for BL du Jour grouping
       external_delivery_id: orderNumber, import_source: "sheet_sync",
     } as never).eq("id", orderId);
 
