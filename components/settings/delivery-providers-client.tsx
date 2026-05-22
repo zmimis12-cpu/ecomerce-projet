@@ -158,18 +158,22 @@ function WizardModal({ store, companies, onClose }: {
   const [step, setStep]     = useState<Step>("info");
   const [saving, startSave] = useTransition();
   const [error, setError]   = useState<string | null>(null);
-  const [form, setForm]     = useState<StoreFormData>({
-    companyId:       store?.delivery_companies?.id ?? defaultCo?.id ?? "",
-    name:            store?.name ?? "",
-    slug:            store?.slug ?? "",
-    apiBaseUrl:      store?.api_base_url ?? "",
-    googleSheetId:   store?.google_sheet_id ?? "",
-    googleSheetName: store?.google_sheet_name ?? "",
-    deliveryFeeMad:  store?.delivery_fee_mad ?? 25,
-    isActive:        store?.is_active ?? true,
-    isDefault:       store?.is_default ?? false,
-    clientName:      String(store?.metadata?.client_name ?? ""),
-    fulfillmentFee:  Number(store?.metadata?.fulfillment_fee ?? 0),
+  const meta = store?.metadata ?? {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [form, setForm]     = useState<any>({
+    companyId:         store?.delivery_companies?.id ?? defaultCo?.id ?? "",
+    name:              store?.name ?? "",
+    slug:              store?.slug ?? "",
+    apiBaseUrl:        store?.api_base_url ?? "",
+    googleSheetId:     store?.google_sheet_id ?? "",
+    googleSheetName:   store?.google_sheet_name ?? "",
+    deliveryFeeMad:    store?.delivery_fee_mad ?? 25,
+    isActive:          store?.is_active ?? true,
+    isDefault:         store?.is_default ?? false,
+    clientName:        String(meta.client_name ?? ""),
+    fulfillmentFee:    Number(meta.fulfillment_fee ?? 0),
+    digylogStoreName:  String(meta.digylog_store_name ?? ""),
+    digylogNetworkId:  String(meta.digylog_network_id ?? ""),
   });
 
   const idx = STEPS.findIndex(s => s.id === step);
@@ -177,7 +181,7 @@ function WizardModal({ store, companies, onClose }: {
   const isLast = idx === STEPS.length - 1;
 
   function set<K extends keyof StoreFormData>(key: K, val: StoreFormData[K]) {
-    setForm(f => ({ ...f, [key]: val }));
+    setForm((f: Record<string,unknown>) => ({ ...f, [key]: val }));
   }
 
   function handleSave() {
@@ -242,6 +246,26 @@ function WizardModal({ store, companies, onClose }: {
               <input type="password" value={form.apiToken ?? ""} onChange={e => set("apiToken", e.target.value)}
                 placeholder={store ? "Laisser vide pour conserver l'actuel" : "Coller le token ici"}
                 className="field-input font-mono text-xs" />
+            </Field>
+            <Field label="Nom store Digylog (seller)">
+              <input
+                value={String((form as StoreFormData & { digylogStoreName?: string }).digylogStoreName ?? "")}
+                onChange={e => set("digylogStoreName" as keyof StoreFormData, e.target.value as never)}
+                placeholder="ex: Armanishop, HajtekZone…"
+                className="field-input"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Nom exact du seller dans votre dashboard Digylog.
+              </p>
+            </Field>
+            <Field label="ID Réseau Digylog">
+              <input
+                type="number"
+                value={String((form as StoreFormData & { digylogNetworkId?: number }).digylogNetworkId ?? "")}
+                onChange={e => set("digylogNetworkId" as keyof StoreFormData, Number(e.target.value) as never)}
+                placeholder="ex: 1"
+                className="field-input"
+              />
             </Field>
             <details className="group">
               <summary className="text-xs text-muted-foreground cursor-pointer list-none flex items-center gap-1">

@@ -46,7 +46,12 @@ export async function createDeliveryStore(
         delivery_fee_mad:  data.deliveryFeeMad ?? 25,
         is_active:         data.isActive,
         is_default:        data.isDefault,
-        metadata:          { client_name: data.clientName?.trim() || null, fulfillment_fee: data.fulfillmentFee ?? 0 },
+        metadata:          {
+          client_name:          data.clientName?.trim() || null,
+          fulfillment_fee:      data.fulfillmentFee ?? 0,
+          digylog_store_name:   data.digylogStoreName?.trim() || null,
+          digylog_network_id:   data.digylogNetworkId || null,
+        },
       } as never)
       .select("id")
       .single();

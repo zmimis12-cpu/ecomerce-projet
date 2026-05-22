@@ -27,6 +27,8 @@ export type StoreFormData = {
   isDefault:        boolean;
   clientName?:      string;
   fulfillmentFee?:  number;
+  digylogStoreName?:  string;
+  digylogNetworkId?:  number;
 };
 
 export type StoreSyncResult = {

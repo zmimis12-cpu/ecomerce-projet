@@ -80,20 +80,60 @@ export async function syncSheetToDigylog(sheetId?: string, storeCtx?: StoreConte
 
   if (!rawRows.length) return { success: true, total:0, sent:0, failed:0, skipped:0, rows:[] };
 
-  // Load Digylog settings
+  // Load Digylog settings — prefer store-specific metadata, fallback to global digylog_settings
   const { data: dgRaw } = await supabaseAdmin
     .from("digylog_settings")
     .select("default_network_id,default_store_name,default_port,default_mode,default_status_on_create")
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
 
-  const dg = dgRaw as { default_network_id:number; default_store_name:string; default_port:1|2; default_mode:1|2; default_status_on_create:0|1 } | null;
-  if (!dg?.default_store_name) {
-    return { success: false, error: "Paramètres Digylog manquants.", total:0, sent:0, failed:0, skipped:0, rows:[] };
+  const dgGlobal = dgRaw as { default_network_id:number; default_store_name:string; default_port:1|2; default_mode:1|2; default_status_on_create:0|1 } | null;
+
+  // Load store-specific Digylog config from delivery_stores.metadata
+  let storeMeta: Record<string, unknown> = {};
+  if (storeCtx?.storeId) {
+    const { data: sm } = await supabaseAdmin
+      .from("delivery_stores")
+      .select("metadata, name")
+      .eq("id", storeCtx.storeId)
+      .single();
+    storeMeta = ((sm as { metadata?: Record<string,unknown> } | null)?.metadata) ?? {};
   }
 
-  const networkId = parseInt(String(dg.default_network_id), 10);
+  // Store name sent to Digylog: use store metadata → store name → global settings
+  const digylogStoreName = String(
+    storeMeta.digylog_store_name ??      // explicit override in store metadata
+    storeCtx?.storeName ??               // store name from delivery_stores
+    dgGlobal?.default_store_name ??      // fallback to global settings
+    ""
+  );
+
+  const networkId = parseInt(String(
+    storeMeta.digylog_network_id ?? dgGlobal?.default_network_id ?? "0"
+  ), 10);
+
+  const dg = {
+    default_store_name:          digylogStoreName,
+    default_network_id:          networkId,
+    default_port:                Number(storeMeta.digylog_port ?? dgGlobal?.default_port ?? 1) as 1|2,
+    default_mode:                Number(storeMeta.digylog_mode ?? dgGlobal?.default_mode ?? 1) as 1|2,
+    default_status_on_create:    Number(storeMeta.digylog_status ?? dgGlobal?.default_status_on_create ?? 0) as 0|1,
+  };
+
+  console.log("SYNC STORE CONTEXT", {
+    selectedStoreId: storeCtx?.storeId,
+    storeName:       storeCtx?.storeName,
+    providerSlug:    storeCtx?.providerSlug,
+    sheetId:         spreadsheetId,
+    digylogStoreName,
+    networkId,
+  });
+
+  if (!digylogStoreName) {
+    return { success: false, error: "Nom du store Digylog manquant. Configurez digylog_store_name dans les métadonnées du store.", total:0, sent:0, failed:0, skipped:0, rows:[] };
+  }
+
   if (!networkId) {
-    return { success: false, error: `ID réseau invalide: ${dg.default_network_id}`, total:0, sent:0, failed:0, skipped:0, rows:[] };
+    return { success: false, error: `ID réseau Digylog invalide (${networkId}). Configurez digylog_network_id dans les métadonnées du store.`, total:0, sent:0, failed:0, skipped:0, rows:[] };
   }
 
   // Use THIS store's token — never default
@@ -267,6 +307,12 @@ export async function syncSheetToDigylog(sheetId?: string, storeCtx?: StoreConte
     // IMPORTANT: Always use status=0 (add only, do NOT send per order).
     // We will call PUT /orders/send ONCE after all orders are created.
     // If status=1 is used, Digylog creates one BL per order — wrong behavior.
+    console.log("PROVIDER PAYLOAD STORE", {
+      storeNameSent: dg.default_store_name,
+      networkId,
+      orderRef: orderNumber,
+    });
+
     const digylogResult = await client.createOrders({
       network: networkId, store: dg.default_store_name,
       mode: (dg.default_mode ?? 1) as 1|2,
@@ -283,7 +329,11 @@ export async function syncSheetToDigylog(sheetId?: string, storeCtx?: StoreConte
 
     const digylogOrders = (digylogResult as { orders?: unknown[] }).orders ?? [];
     if (!digylogResult.ok || !digylogOrders.length) {
-      const errMsg = String((digylogResult as { error?: unknown }).error ?? "Pas de tracking retourné");
+      let errMsg = String((digylogResult as { error?: unknown }).error ?? "Pas de tracking retourné");
+      // Detect "not belong to seller" error and give clear message
+      if (errMsg.toLowerCase().includes("not belong") || errMsg.toLowerCase().includes("seller")) {
+        errMsg = `Token API invalide pour ce store: le token utilisé n'appartient pas au compte "${dg.default_store_name}". Vérifiez le token dans Modifier → Accès.`;
+      }
       try { await updateSheetRow(spreadsheetId, sheetName, rowNumber, { K: "Not Sent", L: errMsg }); } catch {}
       results.push({ rowNumber, orderReference: orderRef, customerName: name, productSku: sku, tracking: null, status: "failed", error: errMsg });
       failed++;
