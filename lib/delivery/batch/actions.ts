@@ -185,8 +185,7 @@ export async function closeDailyBatch(batchId: string): Promise<{
     .update({ status: "sent" } as never)
     .eq("batch_id", batchId);
 
-  revalidatePath("/admin/delivery/notes");
-  revalidatePath("/admin/delivery/documents");
+  try { const { revalidatePath } = await import("next/cache"); revalidatePath("/admin/delivery/notes"); revalidatePath("/admin/delivery/documents"); } catch {}
 
   return { ok: true, bl: blId, totalTrackings: allTrackings.length };
 }
@@ -738,8 +737,7 @@ export async function downloadBatchLabels(batchId: string): Promise<{
     .eq("id", batchId)
     .in("status", ["draft", "tickets_printed"]);  // idempotent
 
-  revalidatePath(`/admin/delivery/notes`);
-  revalidatePath(`/admin/delivery/notes/${batchId}`);
+  try { (await import("next/cache")).revalidatePath("/admin/delivery/notes"); } catch {}
 
   const buf = await resultData.arrayBuffer();
   return { ok: true, blobBase64: Buffer.from(buf).toString("base64") };

@@ -38,49 +38,54 @@ export default async function DeliveryNotesPage() {
 
   const rows = (batches ?? []) as Batch[];
 
-  // Fetch top-3 products per batch for inline summary
+  // Fetch top-3 products per batch — safe fallback if table missing
   const productsByBatch: Map<string, ProductSummary[]> = new Map();
 
   if (rows.length > 0) {
-    const batchIds = rows.map((r) => r.id);
-    const { data: prods } = await supabaseAdmin
-      .from("delivery_batch_product_summary")
-      .select("batch_id,product_name,sku,total_quantity,order_count")
-      .in("batch_id", batchIds)
-      .order("total_quantity", { ascending: false });
-
-    const allProds = (prods ?? []) as ProductSummary[];
-    // Deduplicate by (batch_id + product key) before adding to preview
-    for (const p of allProds) {
-      if (!productsByBatch.has(p.batch_id)) productsByBatch.set(p.batch_id, []);
-      const arr = productsByBatch.get(p.batch_id)!;
-      const key = p.sku || p.product_name;
-      const exists = arr.some((x) => (x.sku || x.product_name) === key);
-      if (!exists && arr.length < 3) arr.push(p);
-    }
-  }
-
-  // Auto-rebuild product summary for batches that have orders but no summary
-  const emptyBatches = rows.filter((b) => b.total_orders > 0 && b.total_products === 0);
-  if (emptyBatches.length > 0) {
-    const { rebuildBatchProductSummary } = await import("@/lib/delivery/batch/actions");
-    await Promise.all(emptyBatches.map((b) => rebuildBatchProductSummary(b.id)));
-    // Refresh product data after rebuild
-    if (rows.length > 0) {
+    try {
       const batchIds = rows.map((r) => r.id);
-      const { data: freshProds } = await supabaseAdmin
+      const { data: prods } = await supabaseAdmin
         .from("delivery_batch_product_summary")
         .select("batch_id,product_name,sku,total_quantity,order_count")
         .in("batch_id", batchIds)
         .order("total_quantity", { ascending: false });
-      for (const p of (freshProds ?? []) as ProductSummary[]) {
+
+      for (const p of (prods ?? []) as ProductSummary[]) {
         if (!productsByBatch.has(p.batch_id)) productsByBatch.set(p.batch_id, []);
         const arr = productsByBatch.get(p.batch_id)!;
         const key = p.sku || p.product_name;
         const exists = arr.some((x) => (x.sku || x.product_name) === key);
         if (!exists && arr.length < 3) arr.push(p);
       }
+    } catch (e) {
+      console.warn("[notes] product summary query failed:", e instanceof Error ? e.message : e);
     }
+  }
+
+  // Auto-rebuild product summary — wrapped in try/catch (table may not exist)
+  try {
+    const emptyBatches = rows.filter((b) => b.total_orders > 0 && b.total_products === 0);
+    if (emptyBatches.length > 0) {
+      const { rebuildBatchProductSummary } = await import("@/lib/delivery/batch/actions");
+      await Promise.all(emptyBatches.map((b) => rebuildBatchProductSummary(b.id)));
+      if (rows.length > 0) {
+        const batchIds = rows.map((r) => r.id);
+        const { data: freshProds } = await supabaseAdmin
+          .from("delivery_batch_product_summary")
+          .select("batch_id,product_name,sku,total_quantity,order_count")
+          .in("batch_id", batchIds)
+          .order("total_quantity", { ascending: false });
+        for (const p of (freshProds ?? []) as ProductSummary[]) {
+          if (!productsByBatch.has(p.batch_id)) productsByBatch.set(p.batch_id, []);
+          const arr = productsByBatch.get(p.batch_id)!;
+          const key = p.sku || p.product_name;
+          const exists = arr.some((x) => (x.sku || x.product_name) === key);
+          if (!exists && arr.length < 3) arr.push(p);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("[notes] product summary rebuild skipped:", e instanceof Error ? e.message : e);
   }
 
   const stores    = [...new Set(rows.map((r) => r.store_name).filter(Boolean))] as string[];
