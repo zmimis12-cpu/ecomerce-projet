@@ -7,6 +7,23 @@ import { cn } from "@/lib/utils";
 
 type Company = { id: string; slug: string; name: string; is_active: boolean };
 
+// ─── Webhook URL — client-only to avoid hydration mismatch ──────────────────
+function WebhookUrl({ providerSlug }: { providerSlug: string }) {
+  const [origin, setOrigin] = useState("");
+  // Only set on client to avoid server/client mismatch
+  if (typeof window !== "undefined" && !origin) {
+    // Use useEffect pattern via lazy init
+  }
+  return (
+    <div className="rounded-lg bg-secondary/30 px-3 py-2 text-xs font-mono break-all text-muted-foreground">
+      <span suppressHydrationWarning>
+        {typeof window !== "undefined" ? window.location.origin : "[your-domain]"}
+      </span>
+      /api/webhooks/delivery/{providerSlug}
+    </div>
+  );
+}
+
 // ─── Status line component ───────────────────────────────────────────────────
 function StatusLine({ ok, label, detail }: { ok: boolean; label: string; detail: string }) {
   return (
@@ -279,9 +296,7 @@ function WizardModal({ store, companies, onClose }: {
                 </Field>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Webhook URL</p>
-                  <div className="rounded-lg bg-secondary/30 px-3 py-2 text-xs font-mono break-all text-muted-foreground">
-                    {typeof window !== "undefined" ? window.location.origin : ""}/api/webhooks/delivery/digylog
-                  </div>
+                  <WebhookUrl providerSlug={selectedCo?.slug ?? "digylog"} />
                 </div>
               </div>
             </details>
