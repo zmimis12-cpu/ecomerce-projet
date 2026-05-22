@@ -9,6 +9,8 @@ import {
   getDashboardSummary, getProductPerformance, getDailyFinance,
 } from "@/lib/dashboard/queries";
 import { KpiCard, RateBadge } from "@/components/dashboard/kpi-card";
+import { StoreFilter } from "@/components/shared/store-filter";
+import { getStoreOptions } from "@/lib/delivery/store-filter-helper";
 import { ProductPerformanceTable } from "@/components/dashboard/product-performance-table";
 import { FinanceChart } from "@/components/dashboard/finance-chart";
 
@@ -19,17 +21,28 @@ function mad(n: number) {
   return n.toLocaleString("fr-MA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " MAD";
 }
 
-export default async function AdminDashboardPage() {
+export default async function AdminDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}) {
   const session        = await requireRole([
     "super_admin","admin","manager","finance","call_center_agent","scanner_agent"
   ]);
   const canSeeFinance  = hasRole(session.role, ["super_admin","admin","manager","finance"]);
+  const sp             = await searchParams;
+  const storeId        = sp.store || undefined;
+  const filter         = storeId ? { from: "2020-01-01", to: "2099-12-31", storeId } : undefined;
 
-  const [summary, products, daily] = await Promise.all([
-    canSeeFinance ? getDashboardSummary() : null,
-    canSeeFinance ? getProductPerformance() : null,
-    canSeeFinance ? getDailyFinance(14) : null,
+  const [summary, products, daily, storeOptions] = await Promise.all([
+    canSeeFinance ? getDashboardSummary(filter) : null,
+    canSeeFinance ? getProductPerformance(filter) : null,
+    canSeeFinance ? getDailyFinance(14, storeId) : null,
+    getStoreOptions(),
   ]);
+
+  // ── Store filter indicator for title
+  const selectedStore = storeOptions.find(s => s.id === storeId);
 
   // ── Alerts ────────────────────────────────────────────────────────────────────
   const alerts: { type: "warn"|"danger"; text: string }[] = [];

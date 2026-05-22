@@ -60,30 +60,31 @@ async function refreshDailyBlStats(
   provider: string,
   storeName: string,
   businessDate: string,
-  dailyBlId?: string
+  dailyBlId?: string,
+  storeId?: string | null
 ) {
   const dateStart = `${businessDate}T00:00:00`;
   const dateEnd   = `${businessDate}T23:59:59`;
 
-  // Get company_id — fallback gracefully if delivery_companies missing
-  let companyId: string | null = null;
-  try {
-    const compRes = await supabaseAdmin
-      .from("delivery_companies").select("id").eq("slug", provider).maybeSingle();
-    companyId = (compRes.data as { id: string } | null)?.id ?? null;
-  } catch { /* table may not exist */ }
-
-  // Build query — if no companyId, fall back to sent_to_delivery orders with tracking
+  // Query orders sent this day — use sent_to_delivery_at for accurate grouping
+  // Include all active delivery statuses (not just sent_to_delivery)
   let ordersQuery = supabaseAdmin
     .from("orders")
-    .select("id, total_amount_mad, delivery_tracking_number")
-    .eq("status", "sent_to_delivery")
-    .gte("created_at", dateStart)
-    .lt("created_at", dateEnd)
-    .not("delivery_tracking_number", "is", null);
+    .select("id, total_amount_mad, delivery_tracking_number, delivery_store_id, sent_to_delivery_at")
+    .not("delivery_tracking_number", "is", null)
+    .not("status", "in", '("new","confirmed","refused","no_answer","cancelled","pending")')
+    .or(`sent_to_delivery_at.gte.${dateStart},and(sent_to_delivery_at.is.null,created_at.gte.${dateStart})`)
+    .or(`sent_to_delivery_at.lte.${dateEnd},and(sent_to_delivery_at.is.null,created_at.lte.${dateEnd})`);
 
-  if (companyId) {
-    ordersQuery = ordersQuery.eq("delivery_company_id", companyId);
+  // Filter by store if provided
+  if (storeId) {
+    ordersQuery = ordersQuery.eq("delivery_store_id", storeId);
+  } else if (storeName) {
+    // Fallback: match by store name via join
+    const { data: storeData } = await supabaseAdmin
+      .from("delivery_stores").select("id").eq("name", storeName).maybeSingle();
+    const sid = (storeData as { id: string } | null)?.id;
+    if (sid) ordersQuery = ordersQuery.eq("delivery_store_id", sid);
   }
 
   const { data: orders } = await ordersQuery;

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth/session";
 import { getDeliveryOrders, getDeliverySummary } from "@/lib/delivery/queries";
 import { DeliveryList } from "@/components/delivery/delivery-list";
+import { StoreFilter } from "@/components/shared/store-filter";
+import { getStoreOptions } from "@/lib/delivery/store-filter-helper";
 import { formatMAD } from "@/types/delivery";
 import { cn } from "@/lib/utils";
 import { Truck, Package, CheckCircle, XCircle, TrendingUp, DollarSign, BarChart3, AlertTriangle } from "lucide-react";
@@ -21,10 +23,12 @@ export default async function DeliveryPage({
   const perPage = Number(sp.per ?? 50);
   const status  = sp.status || undefined;
   const search  = sp.q || undefined;
+  const storeId = sp.store || undefined;
 
-  const [{ orders, total }, summary] = await Promise.all([
+  const [{ orders, total }, summary, storeOptions] = await Promise.all([
     getDeliveryOrders({ deliveryStatus: status, search, page, perPage }),
     getDeliverySummary(),
+    getStoreOptions(),
   ]);
 
   const alerts: string[] = [];
@@ -38,7 +42,10 @@ export default async function DeliveryPage({
     <div className="space-y-6">
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Suivi Livraison</h1>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-xl font-semibold tracking-tight">Suivi Livraison</h1>
+            <StoreFilter stores={storeOptions} />
+          </div>
           <p className="text-sm text-muted-foreground mt-1">
             Expéditions transporteurs — mises à jour en temps réel via webhook.
           </p>

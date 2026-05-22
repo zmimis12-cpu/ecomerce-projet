@@ -32,6 +32,7 @@ export interface DeliveryFilters {
   dateTo?: string;
   search?: string;
   provider?: string;
+  storeId?: string;
   page?: number;
   perPage?: number;
 }
@@ -67,6 +68,7 @@ export async function getDeliveryOrders(
   }
   if (filters.dateFrom) query = query.gte("created_at", filters.dateFrom);
   if (filters.dateTo)   query = query.lte("created_at", filters.dateTo + "T23:59:59");
+  if (filters.storeId)  query = query.eq("delivery_store_id", filters.storeId);
 
   const { data, error, count } = await query;
   if (error) { console.error("[delivery] getDeliveryOrders:", error.message); return { orders: [], total: 0 }; }

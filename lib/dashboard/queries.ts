@@ -106,6 +106,8 @@ export interface DeliveryClaim {
 export interface DateFilter {
   from: string;
   to:   string;
+  storeId?:   string;
+  providerId?: string;
 }
 
 // ── Dashboard summary ──────────────────────────────────────────────────────────
@@ -123,6 +125,9 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
 
   if (filter) {
     q = q.gte("created_at", filter.from).lte("created_at", filter.to + "T23:59:59");
+  }
+  if (filter?.storeId) {
+    q = q.eq("delivery_store_id", filter.storeId);
   }
 
   const { data } = await q;
@@ -417,7 +422,7 @@ function makeEmptyPerf(p: { id: string; name: string; sku: string; sale_price_ma
 }
 
 // ── Daily finance ──────────────────────────────────────────────────────────────
-export async function getDailyFinance(days = 30): Promise<DailyFinance[]> {
+export async function getDailyFinance(days = 30, storeId?: string): Promise<DailyFinance[]> {
   const supabase = await createClient();
   const since = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
 
