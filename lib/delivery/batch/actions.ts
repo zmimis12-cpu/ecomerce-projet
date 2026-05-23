@@ -143,7 +143,17 @@ export async function closeDailyBatch(batchId: string): Promise<{
   console.log(`[closeDailyBatch] Calling PUT /orders/send with ${allTrackings.length} trackings:`, allTrackings);
 
   // ONE single PUT /orders/send call
-  const client = await getDeliveryClient();
+  // Load store_id for this batch to use correct token
+  let batchStoreIdForSend: string | undefined;
+  try {
+    const { data: batchForStore } = await supabaseAdmin
+      .from("delivery_batches")
+      .select("delivery_store_id")
+      .eq("id", batchId)
+      .maybeSingle();
+    batchStoreIdForSend = (batchForStore as { delivery_store_id?: string | null } | null)?.delivery_store_id ?? undefined;
+  } catch { /* use default */ }
+  const client = await getDeliveryClient(batchStoreIdForSend);
   const sendRes = await client.sendOrders(allTrackings);
 
   if (!sendRes.ok || !sendRes.bl) {
@@ -639,11 +649,30 @@ async function buildSortedTicketOrders(batchId: string): Promise<SortedTicketOrd
     total: productTotals.get(k)?.total,
   })));
 
+  // ── Step 3b: Fallback if order_items empty — use order-level product data ────
+  if (productTotals.size === 0 && rows.length > 0) {
+    console.warn("[buildSortedTicketOrders] order_items empty, using order-level fallback");
+    const orderIds = rows.map(r => r.order_id).filter(Boolean);
+    if (orderIds.length > 0) {
+      const { data: ordFallback } = await supabaseAdmin
+        .from("orders")
+        .select("id, first_product_name, first_product_sku, total_quantity")
+        .in("id", orderIds);
+      for (const o of (ordFallback ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null }[]) {
+        const name = o.first_product_name ?? "Produit";
+        const key  = o.first_product_sku || name;
+        productTotals.set(key, { total: o.total_quantity ?? 1, name });
+      }
+    }
+    if (productTotals.size === 0) {
+      productTotals.set("__unknown__", { total: rows.length, name: "Produit" });
+    }
+  }
+
   // ── Step 4: For each order, determine primary product via recapIndex ────────
   const sortable: SortedTicketOrder[] = [];
 
   for (const bo of rows) {
-    // Resolve tracking — prefer batch_orders.tracking_number, fallback to orders table
     const tracking = bo.tracking_number ?? bo.orders?.delivery_tracking_number;
     if (!bo.orders || !tracking) continue;
 
@@ -963,15 +992,21 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   await requireRole([...MANAGER]);
 
   // ── 1. Fetch batch meta ────────────────────────────────────────────────────
-  const { data: batchData } = await supabaseAdmin
+  const { data: batchData, error: batchErr } = await supabaseAdmin
     .from("delivery_batches")
-    .select("batch_number, total_orders")
+    .select("batch_number, total_orders, delivery_store_id")
     .eq("id", batchId)
     .maybeSingle();
 
-  type BD = { batch_number: string; total_orders: number };
+  if (batchErr) {
+    console.error("DELIVERY_NOTES_ERROR generateRecapAndLabels batch fetch:", batchErr.message);
+    return { ok: false, error: `Batch introuvable: ${batchErr.message}` };
+  }
+
+  type BD = { batch_number: string; total_orders: number; delivery_store_id?: string | null };
   const batchNum    = (batchData as BD | null)?.batch_number ?? "";
   const totalOrders = (batchData as BD | null)?.total_orders ?? 0;
+  const batchStoreId = (batchData as BD | null)?.delivery_store_id ?? null;
 
   // ── 2-5. Use shared buildSortedTicketOrders — single source of truth ────────
   // This guarantees recap order === ticket order === Digylog label input order.
@@ -1004,6 +1039,8 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
 
   type ProdEntry = { id: string; name: string; sku: string; totalQty: number; orderCount: number };
   const prodMap = new Map<string, ProdEntry>();
+
+  // Primary: order_items join
   for (const bo of recapRows) {
     for (const item of bo.orders?.order_items ?? []) {
       const pid  = item.product_id ?? item.products?.id ?? item.product_sku ?? item.product_name ?? "__unknown__";
@@ -1015,6 +1052,33 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
       e.orderCount += 1;
     }
   }
+
+  // Fallback: if order_items returned nothing, read from orders.first_product_name + delivery_batch_orders
+  if (prodMap.size === 0) {
+    console.warn("[generateRecapAndLabels] order_items empty — using order-level product fallback for batch", batchId);
+    const orderIds = recapRows.map((r) => r.order_id).filter(Boolean);
+    if (orderIds.length > 0) {
+      const { data: ordersForProd } = await supabaseAdmin
+        .from("orders")
+        .select("id, first_product_name, first_product_sku, total_quantity")
+        .in("id", orderIds);
+      for (const o of (ordersForProd ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null }[]) {
+        const name = o.first_product_name ?? "Produit";
+        const sku  = o.first_product_sku  ?? "";
+        const key  = sku || name;
+        const qty  = o.total_quantity ?? 1;
+        if (!prodMap.has(key)) prodMap.set(key, { id: key, name, sku, totalQty: 0, orderCount: 0 });
+        const e = prodMap.get(key)!;
+        e.totalQty   += qty;
+        e.orderCount += 1;
+      }
+    }
+    // Last resort: create placeholder so PDF doesn't crash
+    if (prodMap.size === 0 && recapRows.length > 0) {
+      prodMap.set("__placeholder__", { id: "__placeholder__", name: "Produit (données manquantes)", sku: "", totalQty: recapRows.length, orderCount: recapRows.length });
+    }
+  }
+
   const products = [...prodMap.values()].sort((a, b) =>
     b.totalQty !== a.totalQty ? b.totalQty - a.totalQty : a.name.localeCompare(b.name)
   );
@@ -1033,6 +1097,7 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   if (!trackings.length) return { ok: false, error: "Aucun tracking trouvé pour ce batch.", productsFound: products.length };
 
   // ── 4. Build recap PDF — 10×10 format (100mm = 283.46pt) ──────────────────
+  try { // PDF generation wrapped — never crash the page
   const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
 
   const SZ = 283.46;            // 100mm in PDF points
@@ -1212,6 +1277,11 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
     totalTrackings:  trackings.length,
     productsFound:   products.length,
   };
+  } catch (pdfErr) {
+    const msg = pdfErr instanceof Error ? pdfErr.message : String(pdfErr);
+    console.error("DELIVERY_NOTES_ERROR PDF generation:", msg);
+    return { ok: false, error: `Erreur génération PDF: ${msg}`, productsFound: products?.length ?? 0 };
+  }
 }
 
 // ─── Rebuild product summary for any batch ────────────────────────────────────
@@ -1257,10 +1327,10 @@ export async function rebuildBatchProductSummary(batchId: string): Promise<void>
   if (prodMap.size === 0) {
     const { data: orders } = await supabaseAdmin
       .from("orders")
-      .select("id, first_product_name, first_product_sku")
+      .select("id, first_product_name, first_product_sku, total_quantity")
       .in("id", orderIds);
 
-    for (const o of (orders ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null }[]) {
+    for (const o of (orders ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null }[]) {
       const name = o.first_product_name ?? "Produit";
       const sku  = o.first_product_sku  ?? "";
       const key  = sku || name;
@@ -1268,9 +1338,11 @@ export async function rebuildBatchProductSummary(batchId: string): Promise<void>
         prodMap.set(key, { product_id: null, product_name: name, sku, total_quantity: 0, order_count: 0, order_ids: new Set() });
       }
       const entry = prodMap.get(key)!;
-      entry.total_quantity += 1;
-      entry.order_ids.add(o.id);
-      entry.order_count++;
+      entry.total_quantity += (o.total_quantity ?? 1);
+      if (!entry.order_ids.has(o.id)) {
+        entry.order_ids.add(o.id);
+        entry.order_count++;
+      }
     }
   }
 
