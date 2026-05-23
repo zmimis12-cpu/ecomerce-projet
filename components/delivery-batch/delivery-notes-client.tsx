@@ -64,7 +64,10 @@ function PrintButton({ batch }: { batch: Batch }) {
       const r = await generateRecapAndLabels(batch.id);
       if (r.ok && r.blobBase64) {
         downloadBlob(r.blobBase64, `recap-tickets-${batch.batch_number}.pdf`);
-        setMsg({ ok: true, text: `✓ ${r.totalTrackings} tickets` });
+        const text = r.warning
+          ? `✓ ${r.labelsOk ?? r.totalTrackings} tickets — ⚠ ${r.warning}`
+          : `✓ ${r.totalTrackings} tickets`;
+        setMsg({ ok: true, text });
         setTimeout(() => window.location.reload(), 800);
       } else {
         setMsg({ ok: false, text: r.error ?? "Erreur" });

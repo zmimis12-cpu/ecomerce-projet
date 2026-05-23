@@ -987,7 +987,7 @@ export async function regenerateBatchBl(batchId: string): Promise<{
 // ── Generate recap page(s) + sorted Digylog labels — merged PDF ─────────────
 export async function generateRecapAndLabels(batchId: string): Promise<{
   ok: boolean; blobBase64?: string; totalTrackings?: number;
-  productsFound?: number; error?: string;
+  productsFound?: number; error?: string; warning?: string; labelsOk?: number; labelsSkipped?: number;
 }> {
   await requireRole([...MANAGER]);
 
@@ -1100,6 +1100,27 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   try { // PDF generation wrapped — never crash the page
   const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
 
+  // WinAnsi font (Helvetica) only supports Latin chars.
+  // Strip/replace any char outside Latin-1 range before drawText.
+  function pdfSafe(text: string): string {
+    return text
+      // Arabic → remove
+      .replace(/[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/g, "")
+      // Common replacements
+      .replace(/[àâä]/g, "a").replace(/[éèêë]/g, "e")
+      .replace(/[îï]/g, "i").replace(/[ôö]/g, "o")
+      .replace(/[ùûü]/g, "u").replace(/ç/g, "c").replace(/ñ/g, "n")
+      .replace(/[ÀÂÄÁÃÅ]/g, "A").replace(/[ÉÈÊË]/g, "E")
+      .replace(/[ÎÏÍÌ]/g, "I").replace(/[ÔÖÓÒ]/g, "O")
+      .replace(/[ÙÛÜÚÌ]/g, "U").replace(/Ç/g, "C").replace(/Ñ/g, "N")
+      // Smart quotes / dashes
+      .replace(/[‘’]/g, "'").replace(/[“”]/g, '"')
+      .replace(/[–—]/g, "-")
+      // Remove any remaining non-WinAnsi chars (above U+00FF)
+      .replace(/[^ -ÿ]/g, "?")
+      .trim();
+  }
+
   const SZ = 283.46;            // 100mm in PDF points
   const MARGIN = 10;
   const LINE_H = 14;
@@ -1133,14 +1154,14 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
 
     // Batch number
     const titleFontSize = batchNum.length > 18 ? 9 : 11;
-    page.drawText(batchNum, {
+    page.drawText(pdfSafe(batchNum), {
       x: MARGIN, y: SZ - MARGIN - titleFontSize,
       font: fontBold, size: titleFontSize, color: rgb(1, 1, 1),
     });
 
     // Orders count + page indicator
     const subLine = `${totalOrders} commandes  •  ${totalUnits} unités${chunks.length > 1 ? `  •  p.${pageIdx + 1}/${chunks.length}` : ""}`;
-    page.drawText(subLine, {
+    page.drawText(pdfSafe(subLine), {
       x: MARGIN, y: SZ - MARGIN - titleFontSize - 13,
       font: fontNormal, size: 7.5, color: rgb(0.75, 0.75, 0.75),
     });
@@ -1182,7 +1203,7 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
       });
 
       // Product name (max 28 chars)
-      const nameText = p.name.length > 28 ? p.name.slice(0, 28) + "…" : p.name;
+      const nameText = pdfSafe(p.name.length > 28 ? p.name.slice(0, 26) + "..." : p.name);
       page.drawText(nameText, {
         x: MARGIN + 14, y: rowY + 5,
         font: globalRank < 3 ? fontBold : fontNormal,
@@ -1191,7 +1212,7 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
 
       // SKU below name
       if (p.sku) {
-        page.drawText(p.sku.slice(0, 18), {
+        page.drawText(pdfSafe(p.sku.slice(0, 18)), {
           x: MARGIN + 14, y: rowY - 1,
           font: fontNormal, size: 6, color: rgb(0.6, 0.6, 0.6),
         });
@@ -1226,19 +1247,35 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   const recapPages = await mergedDoc.copyPages(recapSrc, recapSrc.getPageIndices());
   recapPages.forEach((p) => mergedDoc.addPage(p));
 
-  // Download each label individually and append in sorted order
+  // Download each label individually — skip deleted/not-found orders
+  let labelsOk = 0;
+  const labelErrors: string[] = [];
+
   for (const tracking of trackings) {
-    const labelRes = await client.downloadLabels({ orders: [tracking], format: 3 });
-    if (!labelRes.ok || !labelRes.blob) {
-      console.warn(`[generateRecapAndLabels] Failed to download label for ${tracking}: ${labelRes.error}`);
-      continue;
+    try {
+      const labelRes = await client.downloadLabels({ orders: [tracking], format: 3 });
+      if (!labelRes.ok || !labelRes.blob) {
+        console.warn(`[labels] skip ${tracking}: ${labelRes.error}`);
+        labelErrors.push(`${tracking}: ${labelRes.error ?? "not found"}`);
+        continue;
+      }
+      const labelBytes = new Uint8Array(await labelRes.blob.arrayBuffer());
+      const labelSrc   = await PDFDocument.load(labelBytes);
+      const labelPages = await mergedDoc.copyPages(labelSrc, labelSrc.getPageIndices());
+      labelPages.forEach((p) => mergedDoc.addPage(p));
+      labelsOk++;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[labels] error ${tracking}:`, msg);
+      labelErrors.push(`${tracking}: ${msg}`);
     }
-    const labelBytes = new Uint8Array(await labelRes.blob.arrayBuffer());
-    const labelSrc   = await PDFDocument.load(labelBytes);
-    const labelPages = await mergedDoc.copyPages(labelSrc, labelSrc.getPageIndices());
-    labelPages.forEach((p) => mergedDoc.addPage(p));
   }
 
+  if (labelErrors.length > 0) {
+    console.warn(`[generateRecapAndLabels] ${labelErrors.length} label(s) skipped:`, labelErrors);
+  }
+
+  // Always save PDF — even if some labels failed (recap pages always present)
   const mergedBytes = await mergedDoc.save();
 
   // ── 7. Mark batch as printed ───────────────────────────────────────────────
@@ -1276,6 +1313,11 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
     blobBase64:      Buffer.from(mergedBytes).toString("base64"),
     totalTrackings:  trackings.length,
     productsFound:   products.length,
+    labelsOk,
+    labelsSkipped:   labelErrors.length,
+    warning:         labelErrors.length > 0
+      ? `${labelErrors.length} étiquette(s) non disponible(s) — commande(s) introuvable(s) chez le transporteur.`
+      : undefined,
   };
   } catch (pdfErr) {
     const msg = pdfErr instanceof Error ? pdfErr.message : String(pdfErr);
