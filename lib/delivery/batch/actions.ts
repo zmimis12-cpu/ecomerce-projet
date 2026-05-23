@@ -994,7 +994,7 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   // ── 1. Fetch batch meta ────────────────────────────────────────────────────
   const { data: batchData, error: batchErr } = await supabaseAdmin
     .from("delivery_batches")
-    .select("batch_number, total_orders, delivery_store_id")
+    .select("batch_number, total_orders")
     .eq("id", batchId)
     .maybeSingle();
 
@@ -1003,10 +1003,10 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
     return { ok: false, error: `Batch introuvable: ${batchErr.message}` };
   }
 
-  type BD = { batch_number: string; total_orders: number; delivery_store_id?: string | null };
+  type BD = { batch_number: string; total_orders: number };
   const batchNum    = (batchData as BD | null)?.batch_number ?? "";
   const totalOrders = (batchData as BD | null)?.total_orders ?? 0;
-  const batchStoreId = (batchData as BD | null)?.delivery_store_id ?? null;
+  const batchStoreId: string | null = null; // delivery_store_id not yet in production
 
   // ── 2-5. Use shared buildSortedTicketOrders — single source of truth ────────
   // This guarantees recap order === ticket order === Digylog label input order.
