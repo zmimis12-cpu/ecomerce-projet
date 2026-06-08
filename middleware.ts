@@ -5,12 +5,14 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // ── Public routes — bypass entirely, no Supabase call ──────────────────────
-  if (pathname.startsWith("/lp/") || pathname === "/lp" ||
-      pathname.startsWith("/api/public/")) {
+  if (
+    pathname.startsWith("/lp/") || pathname === "/lp" ||
+    pathname.startsWith("/api/public/") ||
+    pathname.startsWith("/api/webhooks/")
+  ) {
     return NextResponse.next();
   }
 
-  // ── Session refresh (required for SSR auth) ────────────────────────────────
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -29,10 +31,13 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  // Use getSession() — reads from cookie, NO network call → no timeout risk
+  // getUser() makes a network request to Supabase on every request → timeout
+  const { data: { session } } = await supabase.auth.getSession();
+  const isAuthenticated = !!session?.user;
 
   // ── Protect /admin ─────────────────────────────────────────────────────────
-  if (pathname.startsWith("/admin") && !user) {
+  if (pathname.startsWith("/admin") && !isAuthenticated) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirectTo", pathname);
@@ -40,7 +45,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── /login while authenticated ─────────────────────────────────────────────
-  if (pathname === "/login" && user) {
+  if (pathname === "/login" && isAuthenticated) {
     const url = request.nextUrl.clone();
     url.pathname = "/admin";
     return NextResponse.redirect(url);
@@ -50,8 +55,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Matcher explicitly excludes: /lp/*, /api/public/*, static assets
   matcher: [
-    "/((?!lp(?:/.*)?$|api/public(?:/.*)?$|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!lp(?:/.*)?$|api/public(?:/.*)?$|api/webhooks(?:/.*)?$|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
