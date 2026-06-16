@@ -656,13 +656,14 @@ async function buildSortedTicketOrders(batchId: string): Promise<SortedTicketOrd
     if (orderIds.length > 0) {
       const { data: ordFallback } = await supabaseAdmin
         .from("orders")
-        .select("id, first_product_name, first_product_sku, total_quantity")
+        .select("id, first_product_name, first_product_sku, total_quantity, notes")
         .in("id", orderIds);
       for (const o of (ordFallback ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null; notes: string | null }[]) {
         let name = (o.first_product_name ?? "").trim();
         if (!name && o.notes) {
-          name = o.notes.replace(/_x[0-9]+/i, "").replace(/\u00d7[0-9]+/, "").trim();
+          name = o.notes.replace(/_x[0-9]+/i, "").replace(/\u00d7[0-9]+/, "").replace(/[×x][0-9]+/g, "").trim();
         }
+        console.log("[buildSorted fallback]", { id: o.id, first_product_name: o.first_product_name, notes: o.notes, resolved: name });
         const key = o.first_product_sku || name || "Produit";
         productTotals.set(key, { total: o.total_quantity ?? 1, name: name || key });
       }
@@ -1016,104 +1017,67 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   const sortedOrders = await buildSortedTicketOrders(batchId);
   const trackings = sortedOrders.map((o) => o.tracking).filter(Boolean) as string[];
 
-  // Also rebuild products list for the recap PDF (needed for rendering)
-  const { data: boRowsForRecap } = await supabaseAdmin
-    .from("delivery_batch_orders")
-    .select(`
-      order_id,
-      orders (
-        order_items (
-          quantity,
-          product_id,
-          product_name,
-          product_sku,
-          products ( id, name, sku )
-        )
-      )
-    `)
-    .eq("batch_id", batchId);
-
-  type RItem = {
-    quantity: number; product_id: string | null; product_name: string | null;
-    product_sku: string | null; products: { id: string; name: string; sku: string } | null;
-  };
-  type RRow = { order_id: string; orders: { order_items: RItem[] } | null };
-  const recapRows = (boRowsForRecap ?? []) as RRow[];
-
+  // ── Build product list from all available sources ─────────────────────────
   type ProdEntry = { id: string; name: string; sku: string; totalQty: number; orderCount: number };
   const prodMap = new Map<string, ProdEntry>();
 
-  // Primary: order_items join
-  for (const bo of recapRows) {
-    for (const item of bo.orders?.order_items ?? []) {
-      const pid  = item.product_id ?? item.products?.id ?? item.product_sku ?? item.product_name ?? "__unknown__";
-      const name = item.products?.name ?? item.product_name ?? item.product_sku ?? "Produit inconnu";
-      const sku  = item.products?.sku  ?? item.product_sku ?? "";
-      if (!prodMap.has(pid)) prodMap.set(pid, { id: pid, name, sku, totalQty: 0, orderCount: 0 });
-      const e = prodMap.get(pid)!;
-      e.totalQty   += item.quantity;
+  // Get all order IDs in this batch
+  const { data: batchOrderIds } = await supabaseAdmin
+    .from("delivery_batch_orders")
+    .select("order_id")
+    .eq("batch_id", batchId);
+  const orderIds = ((batchOrderIds ?? []) as { order_id: string }[]).map(r => r.order_id).filter(Boolean);
+
+  if (orderIds.length > 0) {
+    // Source 1: order_items (most accurate)
+    const { data: items } = await supabaseAdmin
+      .from("order_items")
+      .select("order_id, product_id, product_name, product_sku, quantity")
+      .in("order_id", orderIds);
+
+    for (const item of (items ?? []) as { order_id: string; product_id: string | null; product_name: string | null; product_sku: string | null; quantity: number }[]) {
+      const name = (item.product_name ?? item.product_sku ?? "").trim();
+      const sku  = (item.product_sku ?? "").trim();
+      if (!name && !sku) continue;
+      const key = sku || name;
+      if (!prodMap.has(key)) prodMap.set(key, { id: key, name: name || sku, sku, totalQty: 0, orderCount: 0 });
+      const e = prodMap.get(key)!;
+      e.totalQty   += item.quantity ?? 1;
       e.orderCount += 1;
     }
-  }
 
-  // Fallback: if order_items join returned nothing
-  if (prodMap.size === 0) {
-    const orderIds = recapRows.map((r) => r.order_id).filter(Boolean);
-    if (orderIds.length > 0) {
+    // Source 2: orders table (first_product_name + notes) — used if order_items empty or incomplete
+    if (prodMap.size === 0) {
+      const { data: ordRows } = await supabaseAdmin
+        .from("orders")
+        .select("id, first_product_name, first_product_sku, total_quantity, notes")
+        .in("id", orderIds);
 
-      // Try 1: direct order_items query (join may have failed)
-      const { data: directItems } = await supabaseAdmin
-        .from("order_items")
-        .select("order_id, product_name, product_sku, quantity")
-        .in("order_id", orderIds);
+      for (const o of (ordRows ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null; notes: string | null }[]) {
+        let name = (o.first_product_name ?? "").trim();
+        const sku  = (o.first_product_sku  ?? "").trim();
 
-      for (const item of (directItems ?? []) as { order_id: string; product_name: string | null; product_sku: string | null; quantity: number }[]) {
-        const name = item.product_name ?? "Produit";
-        const sku  = item.product_sku  ?? "";
-        const key  = sku || name;
-        if (!prodMap.has(key)) prodMap.set(key, { id: key, name, sku, totalQty: 0, orderCount: 0 });
+        // Extract from notes: "نافورة شمسية_x2" → "نافورة شمسية"
+        if (!name && o.notes) {
+          name = o.notes
+            .replace(/_x[0-9]+/gi, "")
+            .replace(/[×x][0-9]+/g, "")
+            .replace(/\s*[0-9]+$/, "")
+            .trim();
+        }
+
+        console.log("[recap products fallback]", { orderId: o.id, first_product_name: o.first_product_name, notes: o.notes, resolved: name, sku });
+
+        if (!name && !sku) continue;
+        const key = sku || name;
+        if (!prodMap.has(key)) prodMap.set(key, { id: key, name: name || sku, sku, totalQty: 0, orderCount: 0 });
         const e = prodMap.get(key)!;
-        e.totalQty   += item.quantity ?? 1;
+        e.totalQty   += o.total_quantity ?? 1;
         e.orderCount += 1;
       }
-
-      // Try 2: orders fields — first_product_name, notes, external_delivery_id
-      if (prodMap.size === 0) {
-        console.warn("[generateRecapAndLabels] order_items empty — using orders fields fallback");
-        const { data: ordersForProd } = await supabaseAdmin
-          .from("orders")
-          .select("id, first_product_name, first_product_sku, total_quantity, notes")
-          .in("id", orderIds);
-        for (const o of (ordersForProd ?? []) as {
-          id: string; first_product_name: string | null;
-          first_product_sku: string | null; total_quantity: number | null;
-          notes: string | null;
-        }[]) {
-          // Try first_product_name first
-          let name = (o.first_product_name ?? "").trim();
-          const sku  = (o.first_product_sku  ?? "").trim();
-
-          // Try to extract from notes (format: "نافورة شمسية_x2" or "product name ×2")
-          if (!name && o.notes) {
-            const notesClean = o.notes.replace(/_x\d+/i, "").replace(/×\d+/, "").trim();
-            if (notesClean.length > 2) name = notesClean;
-          }
-
-          if (!name && !sku) continue;
-          const key = sku || name;
-          if (!prodMap.has(key)) prodMap.set(key, { id: key, name: name || sku, sku, totalQty: 0, orderCount: 0 });
-          const e = prodMap.get(key)!;
-          e.totalQty   += o.total_quantity ?? 1;
-          e.orderCount += 1;
-        }
-      }
-    }
-
-    // Last resort placeholder (never shows if product data exists anywhere)
-    if (prodMap.size === 0 && recapRows.length > 0) {
-      prodMap.set("__placeholder__", { id: "__placeholder__", name: "Produit inconnu", sku: "", totalQty: recapRows.length, orderCount: recapRows.length });
     }
   }
+
 
   const products = [...prodMap.values()].sort((a, b) =>
     b.totalQty !== a.totalQty ? b.totalQty - a.totalQty : a.name.localeCompare(b.name)
