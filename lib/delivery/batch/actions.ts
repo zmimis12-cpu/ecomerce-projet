@@ -1029,50 +1029,55 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   const orderIds = ((batchOrderIds ?? []) as { order_id: string }[]).map(r => r.order_id).filter(Boolean);
 
   if (orderIds.length > 0) {
-    // Source 1: order_items (most accurate)
-    const { data: items } = await supabaseAdmin
-      .from("order_items")
-      .select("order_id, product_id, product_name, product_sku, quantity")
-      .in("order_id", orderIds);
+    // Load orders with ALL product fields in one query
+    const { data: ordRows } = await supabaseAdmin
+      .from("orders")
+      .select("id, first_product_name, first_product_sku, total_quantity, notes")
+      .in("id", orderIds);
 
-    for (const item of (items ?? []) as { order_id: string; product_id: string | null; product_name: string | null; product_sku: string | null; quantity: number }[]) {
-      const name = (item.product_name ?? item.product_sku ?? "").trim();
-      const sku  = (item.product_sku ?? "").trim();
-      if (!name && !sku) continue;
+    type OrdRow = { id: string; first_product_name: string|null; first_product_sku: string|null; total_quantity: number|null; notes: string|null };
+
+    for (const o of (ordRows ?? []) as OrdRow[]) {
+      // Priority 1: first_product_name (set by sheet-sync)
+      let name = (o.first_product_name ?? "").trim();
+      const sku = (o.first_product_sku ?? "").trim();
+
+      // Priority 2: extract from notes field "نافورة شمسية_x2" → "نافورة شمسية"
+      if (!name && o.notes) {
+        name = o.notes
+          .replace(/_x[0-9]+/gi, "")
+          .replace(/[×x][0-9]+/g, "")
+          .replace(/\s*[0-9]+$/, "")
+          .trim();
+      }
+
+      // Priority 3: SKU
+      if (!name) name = sku;
+
+      console.log("[recap products]", { id: o.id, name, sku, notes: o.notes });
+      if (!name) continue;
+
       const key = sku || name;
-      if (!prodMap.has(key)) prodMap.set(key, { id: key, name: name || sku, sku, totalQty: 0, orderCount: 0 });
+      if (!prodMap.has(key)) prodMap.set(key, { id: key, name, sku, totalQty: 0, orderCount: 0 });
       const e = prodMap.get(key)!;
-      e.totalQty   += item.quantity ?? 1;
+      e.totalQty   += o.total_quantity ?? 1;
       e.orderCount += 1;
     }
 
-    // Source 2: orders table (first_product_name + notes) — used if order_items empty or incomplete
+    // Also try order_items (for orders that have proper product records)
     if (prodMap.size === 0) {
-      const { data: ordRows } = await supabaseAdmin
-        .from("orders")
-        .select("id, first_product_name, first_product_sku, total_quantity, notes")
-        .in("id", orderIds);
-
-      for (const o of (ordRows ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null; notes: string | null }[]) {
-        let name = (o.first_product_name ?? "").trim();
-        const sku  = (o.first_product_sku  ?? "").trim();
-
-        // Extract from notes: "نافورة شمسية_x2" → "نافورة شمسية"
-        if (!name && o.notes) {
-          name = o.notes
-            .replace(/_x[0-9]+/gi, "")
-            .replace(/[×x][0-9]+/g, "")
-            .replace(/\s*[0-9]+$/, "")
-            .trim();
-        }
-
-        console.log("[recap products fallback]", { orderId: o.id, first_product_name: o.first_product_name, notes: o.notes, resolved: name, sku });
-
+      const { data: items } = await supabaseAdmin
+        .from("order_items")
+        .select("order_id, product_name, product_sku, quantity")
+        .in("order_id", orderIds);
+      for (const item of (items ?? []) as { product_name: string|null; product_sku: string|null; quantity: number }[]) {
+        const name = (item.product_name ?? item.product_sku ?? "").trim();
+        const sku  = (item.product_sku ?? "").trim();
         if (!name && !sku) continue;
         const key = sku || name;
-        if (!prodMap.has(key)) prodMap.set(key, { id: key, name: name || sku, sku, totalQty: 0, orderCount: 0 });
+        if (!prodMap.has(key)) prodMap.set(key, { id: key, name: name||sku, sku, totalQty: 0, orderCount: 0 });
         const e = prodMap.get(key)!;
-        e.totalQty   += o.total_quantity ?? 1;
+        e.totalQty += item.quantity ?? 1;
         e.orderCount += 1;
       }
     }
@@ -1392,17 +1397,29 @@ export async function rebuildBatchProductSummary(batchId: string): Promise<void>
     }
   }
 
-  // If no order_items — try to fetch from sheet data stored in orders
-  if (prodMap.size === 0) {
-    const { data: orders } = await supabaseAdmin
+  // Always also read from orders.first_product_name + notes as supplement/fallback
+  {
+    const { data: ordersForSummary } = await supabaseAdmin
       .from("orders")
-      .select("id, first_product_name, first_product_sku, total_quantity")
+      .select("id, first_product_name, first_product_sku, total_quantity, notes")
       .in("id", orderIds);
 
-    for (const o of (orders ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null }[]) {
-      const name = o.first_product_name ?? "Produit";
-      const sku  = o.first_product_sku  ?? "";
-      const key  = sku || name;
+    for (const o of (ordersForSummary ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null; notes: string | null }[]) {
+      let name = (o.first_product_name ?? "").trim();
+      const sku = (o.first_product_sku ?? "").trim();
+
+      // Extract from notes if no product name
+      if (!name && o.notes) {
+        name = o.notes
+          .replace(/_x[0-9]+/gi, "")
+          .replace(/[×x][0-9]+/g, "")
+          .replace(/\s*[0-9]+$/, "")
+          .trim();
+      }
+      if (!name) name = sku;
+      if (!name) continue;
+
+      const key = sku || name;
       if (!prodMap.has(key)) {
         prodMap.set(key, { product_id: null, product_name: name, sku, total_quantity: 0, order_count: 0, order_ids: new Set() });
       }
