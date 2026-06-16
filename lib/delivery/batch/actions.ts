@@ -1103,20 +1103,31 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   // WinAnsi font (Helvetica) only supports Latin chars.
   // Strip/replace any char outside Latin-1 range before drawText.
   function pdfSafe(text: string): string {
-    return text
-      // Arabic → remove
-      .replace(/[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/g, "")
-      // Common replacements
+    // Transliterate Arabic to Latin for WinAnsi (Helvetica) PDF font
+    const ar: [string, string][] = [
+      ["ا","a"],["ب","b"],["ت","t"],["ث","th"],["ج","j"],
+      ["ح","h"],["خ","kh"],["د","d"],["ذ","dh"],["ر","r"],
+      ["ز","z"],["س","s"],["ش","sh"],["ص","s"],["ض","d"],
+      ["ط","t"],["ظ","z"],["ع","a"],["غ","gh"],["ف","f"],
+      ["ق","q"],["ك","k"],["ل","l"],["م","m"],["ن","n"],
+      ["ه","h"],["و","w"],["ي","y"],["ة","a"],["ى","a"],
+      ["أ","a"],["إ","i"],["آ","a"],["ؤ","w"],["ئ","y"],
+      ["ء",""],
+      // Harakat
+      ["ً",""],["ٌ",""],["ٍ",""],["َ",""],
+      ["ُ",""],["ِ",""],["ّ",""],["ْ",""],
+    ];
+    let out = text;
+    for (const [a, l] of ar) out = out.split(a).join(l);
+    return out
       .replace(/[àâä]/g, "a").replace(/[éèêë]/g, "e")
       .replace(/[îï]/g, "i").replace(/[ôö]/g, "o")
-      .replace(/[ùûü]/g, "u").replace(/ç/g, "c").replace(/ñ/g, "n")
-      .replace(/[ÀÂÄÁÃÅ]/g, "A").replace(/[ÉÈÊË]/g, "E")
-      .replace(/[ÎÏÍÌ]/g, "I").replace(/[ÔÖÓÒ]/g, "O")
-      .replace(/[ÙÛÜÚÌ]/g, "U").replace(/Ç/g, "C").replace(/Ñ/g, "N")
-      // Smart quotes / dashes
-      .replace(/[‘’]/g, "'").replace(/[“”]/g, '"')
+      .replace(/[ùûü]/g, "u").replace(/ç/g, "c")
+      .replace(/[ÀÂÄ]/g, "A").replace(/[ÉÈÊË]/g, "E")
+      .replace(/[ÎÏ]/g, "I").replace(/[ÔÖ]/g, "O")
+      .replace(/[ÙÛÜ]/g, "U").replace(/Ç/g, "C")
+      .replace(/’/g, "'").replace(/[“”]/g, '"')
       .replace(/[–—]/g, "-")
-      // Remove any remaining non-WinAnsi chars (above U+00FF)
       .replace(/[^ -ÿ]/g, "?")
       .trim();
   }
