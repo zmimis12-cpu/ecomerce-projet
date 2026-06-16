@@ -1125,18 +1125,37 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   const fontkit = await import("@pdf-lib/fontkit");
   recapDoc.registerFontkit(fontkit.default ?? fontkit);
 
-  // Load Amiri font (supports Arabic + Latin + French)
+  // Load Amiri font — try fs first (local dev), then fetch (Vercel production)
   let fontBold: import("pdf-lib").PDFFont;
   let fontNormal: import("pdf-lib").PDFFont;
+
+  async function loadFontBytes(filename: string): Promise<Uint8Array> {
+    // Try fs (local/dev)
+    try {
+      const fs   = await import("fs");
+      const path = await import("path");
+      const buf  = fs.readFileSync(path.join(process.cwd(), "public/fonts", filename));
+      return new Uint8Array(buf);
+    } catch { /* not available */ }
+
+    // Try fetch (Vercel — public/ is served as static)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+      ?? process.env.VERCEL_URL
+      ?? "http://localhost:3000";
+    const url = `${baseUrl.startsWith("http") ? baseUrl : "https://" + baseUrl}/fonts/${filename}`;
+    const res = await fetch(url, { cache: "force-cache" });
+    if (!res.ok) throw new Error(`Font fetch failed: ${url} → ${res.status}`);
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
   try {
-    const fs = await import("fs");
-    const path = await import("path");
-    const boldBytes   = fs.readFileSync(path.join(process.cwd(), "public/fonts/Amiri-Bold.ttf"));
-    const normalBytes = fs.readFileSync(path.join(process.cwd(), "public/fonts/Amiri-Regular.ttf"));
-    fontBold   = await recapDoc.embedFont(boldBytes);
-    fontNormal = await recapDoc.embedFont(normalBytes);
-  } catch {
-    // Fallback to Helvetica if fonts missing
+    const boldBytes   = await loadFontBytes("Amiri-Bold.ttf");
+    const normalBytes = await loadFontBytes("Amiri-Regular.ttf");
+    fontBold   = await recapDoc.embedFont(boldBytes, { subset: true });
+    fontNormal = await recapDoc.embedFont(normalBytes, { subset: true });
+    console.log("[PDF] Amiri font loaded successfully");
+  } catch (fontErr) {
+    console.error("[PDF] Font load failed, using Helvetica (Arabic will not render):", fontErr);
     fontBold   = await recapDoc.embedFont(StandardFonts.HelveticaBold);
     fontNormal = await recapDoc.embedFont(StandardFonts.Helvetica);
   }

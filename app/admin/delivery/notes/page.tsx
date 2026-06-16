@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { DeliveryNotesClient } from "@/components/delivery-batch/delivery-notes-client";
 
-export const metadata: Metadata = { title: "Delivery Notes" };
+export const metadata: Metadata = { title: "Récap Tickets" };
 export const dynamic = "force-dynamic";
 
 type Batch = {
@@ -27,18 +27,33 @@ type ProductSummary = {
 };
 
 export default async function DeliveryNotesPage() {
-  await requireRole(["super_admin", "admin", "manager"]);
+  try {
+    await requireRole(["super_admin", "admin", "manager"]);
+  } catch (e) {
+    console.error("DELIVERY_NOTES_ERROR auth:", e);
+    throw e;
+  }
 
-  const { data: batches } = await supabaseAdmin
-    .from("delivery_batches")
-    .select("id,batch_number,status,shipping_company,store_name,total_orders,total_products,created_at,labels_downloaded_at")
-    .not("status", "eq", "cancelled")
-    .order("created_at", { ascending: false })
-    .limit(200);
+  // Load batches — safe fallback
+  let rows: Batch[] = [];
+  try {
+    const { data: batches, error } = await supabaseAdmin
+      .from("delivery_batches")
+      .select("id,batch_number,status,shipping_company,store_name,total_orders,total_products,created_at,labels_downloaded_at")
+      .not("status", "eq", "cancelled")
+      .order("created_at", { ascending: false })
+      .limit(100);
 
-  const rows = (batches ?? []) as Batch[];
+    if (error) {
+      console.error("DELIVERY_NOTES_ERROR batches query:", error.message);
+    } else {
+      rows = (batches ?? []) as Batch[];
+    }
+  } catch (e) {
+    console.error("DELIVERY_NOTES_ERROR batches:", e);
+  }
 
-  // Fetch top-3 products per batch — safe fallback if table missing
+  // Load product summaries — safe fallback
   const productsByBatch: Map<string, ProductSummary[]> = new Map();
 
   if (rows.length > 0) {
@@ -54,38 +69,25 @@ export default async function DeliveryNotesPage() {
         if (!productsByBatch.has(p.batch_id)) productsByBatch.set(p.batch_id, []);
         const arr = productsByBatch.get(p.batch_id)!;
         const key = p.sku || p.product_name;
-        const exists = arr.some((x) => (x.sku || x.product_name) === key);
-        if (!exists && arr.length < 3) arr.push(p);
-      }
-    } catch (e) {
-      console.warn("[notes] product summary query failed:", e instanceof Error ? e.message : e);
-    }
-  }
-
-  // Auto-rebuild product summary — wrapped in try/catch (table may not exist)
-  try {
-    const emptyBatches = rows.filter((b) => b.total_orders > 0 && b.total_products === 0);
-    if (emptyBatches.length > 0) {
-      const { rebuildBatchProductSummary } = await import("@/lib/delivery/batch/actions");
-      await Promise.all(emptyBatches.map((b) => rebuildBatchProductSummary(b.id)));
-      if (rows.length > 0) {
-        const batchIds = rows.map((r) => r.id);
-        const { data: freshProds } = await supabaseAdmin
-          .from("delivery_batch_product_summary")
-          .select("batch_id,product_name,sku,total_quantity,order_count")
-          .in("batch_id", batchIds)
-          .order("total_quantity", { ascending: false });
-        for (const p of (freshProds ?? []) as ProductSummary[]) {
-          if (!productsByBatch.has(p.batch_id)) productsByBatch.set(p.batch_id, []);
-          const arr = productsByBatch.get(p.batch_id)!;
-          const key = p.sku || p.product_name;
-          const exists = arr.some((x) => (x.sku || x.product_name) === key);
-          if (!exists && arr.length < 3) arr.push(p);
+        if (!arr.some((x) => (x.sku || x.product_name) === key) && arr.length < 3) {
+          arr.push(p);
         }
       }
+    } catch (e) {
+      console.warn("DELIVERY_NOTES_ERROR product_summary:", e instanceof Error ? e.message : e);
+      // Not fatal — page still works, just no product previews
     }
-  } catch (e) {
-    console.warn("[notes] product summary rebuild skipped:", e instanceof Error ? e.message : e);
+
+    // Auto-rebuild empty summaries — best effort only
+    try {
+      const empty = rows.filter((b) => b.total_orders > 0 && b.total_products === 0);
+      if (empty.length > 0) {
+        const { rebuildBatchProductSummary } = await import("@/lib/delivery/batch/actions");
+        await Promise.allSettled(empty.map((b) => rebuildBatchProductSummary(b.id)));
+      }
+    } catch (e) {
+      console.warn("DELIVERY_NOTES_ERROR rebuild:", e instanceof Error ? e.message : e);
+    }
   }
 
   const stores    = [...new Set(rows.map((r) => r.store_name).filter(Boolean))] as string[];

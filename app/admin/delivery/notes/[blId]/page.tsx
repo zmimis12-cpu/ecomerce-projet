@@ -37,16 +37,34 @@ export default async function DeliveryNoteDetailPage({
   };
   const b = batch as unknown as BatchRow;
 
-  // ── Product summary sorted by qty DESC ─────────────────────────────────────
-  const { data: products } = await supabaseAdmin
-    .from("delivery_batch_product_summary")
-    .select("product_id,product_name,sku,total_quantity,order_count")
-    .eq("batch_id", blId)
-    .order("total_quantity", { ascending: false });
-
-  // Get product images
+  // ── Product summary — auto-rebuild if empty ────────────────────────────────
   type ProdRow = { product_id: string|null; product_name: string; sku: string|null; total_quantity: number; order_count: number };
-  const prodRows = (products ?? []) as ProdRow[];
+  let prodRows: ProdRow[] = [];
+
+  try {
+    const { data: products } = await supabaseAdmin
+      .from("delivery_batch_product_summary")
+      .select("product_id,product_name,sku,total_quantity,order_count")
+      .eq("batch_id", blId)
+      .order("total_quantity", { ascending: false });
+    prodRows = (products ?? []) as ProdRow[];
+  } catch { /* table may not exist */ }
+
+  // Auto-rebuild if empty — reads from order_items + orders.notes
+  if (prodRows.length === 0) {
+    try {
+      const { rebuildBatchProductSummary } = await import("@/lib/delivery/batch/actions");
+      await rebuildBatchProductSummary(blId);
+      const { data: rebuilt } = await supabaseAdmin
+        .from("delivery_batch_product_summary")
+        .select("product_id,product_name,sku,total_quantity,order_count")
+        .eq("batch_id", blId)
+        .order("total_quantity", { ascending: false });
+      prodRows = (rebuilt ?? []) as ProdRow[];
+    } catch (e) {
+      console.warn("[batch detail] rebuild failed:", e instanceof Error ? e.message : e);
+    }
+  }
   const productIds = prodRows.map((p) => p.product_id).filter(Boolean) as string[];
 
   type ImgRow = { product_id: string; public_url: string; is_primary: boolean };
