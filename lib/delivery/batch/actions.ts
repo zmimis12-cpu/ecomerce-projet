@@ -658,10 +658,13 @@ async function buildSortedTicketOrders(batchId: string): Promise<SortedTicketOrd
         .from("orders")
         .select("id, first_product_name, first_product_sku, total_quantity")
         .in("id", orderIds);
-      for (const o of (ordFallback ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null }[]) {
-        const name = o.first_product_name ?? "Produit";
-        const key  = o.first_product_sku || name;
-        productTotals.set(key, { total: o.total_quantity ?? 1, name });
+      for (const o of (ordFallback ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null; notes: string | null }[]) {
+        let name = (o.first_product_name ?? "").trim();
+        if (!name && o.notes) {
+          name = o.notes.replace(/_x[0-9]+/i, "").replace(/\u00d7[0-9]+/, "").trim();
+        }
+        const key = o.first_product_sku || name || "Produit";
+        productTotals.set(key, { total: o.total_quantity ?? 1, name: name || key });
       }
     }
     if (productTotals.size === 0) {
@@ -1074,18 +1077,30 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
         e.orderCount += 1;
       }
 
-      // Try 2: orders.first_product_name
+      // Try 2: orders fields — first_product_name, notes, external_delivery_id
       if (prodMap.size === 0) {
-        console.warn("[generateRecapAndLabels] order_items empty — using first_product_name fallback");
+        console.warn("[generateRecapAndLabels] order_items empty — using orders fields fallback");
         const { data: ordersForProd } = await supabaseAdmin
           .from("orders")
-          .select("id, first_product_name, first_product_sku, total_quantity")
+          .select("id, first_product_name, first_product_sku, total_quantity, notes")
           .in("id", orderIds);
-        for (const o of (ordersForProd ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null }[]) {
-          const name = o.first_product_name ?? "";
-          const sku  = o.first_product_sku  ?? "";
-          const key  = sku || name;
-          if (!name && !sku) continue; // skip truly empty
+        for (const o of (ordersForProd ?? []) as {
+          id: string; first_product_name: string | null;
+          first_product_sku: string | null; total_quantity: number | null;
+          notes: string | null;
+        }[]) {
+          // Try first_product_name first
+          let name = (o.first_product_name ?? "").trim();
+          const sku  = (o.first_product_sku  ?? "").trim();
+
+          // Try to extract from notes (format: "نافورة شمسية_x2" or "product name ×2")
+          if (!name && o.notes) {
+            const notesClean = o.notes.replace(/_x\d+/i, "").replace(/×\d+/, "").trim();
+            if (notesClean.length > 2) name = notesClean;
+          }
+
+          if (!name && !sku) continue;
+          const key = sku || name;
           if (!prodMap.has(key)) prodMap.set(key, { id: key, name: name || sku, sku, totalQty: 0, orderCount: 0 });
           const e = prodMap.get(key)!;
           e.totalQty   += o.total_quantity ?? 1;
