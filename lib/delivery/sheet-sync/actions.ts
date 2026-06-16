@@ -161,11 +161,12 @@ export async function syncSheetToDigylog(sheetId?: string, storeCtx?: StoreConte
     const address  = (row[3] ?? "").trim();
     const city     = (row[4] ?? "").trim();
     const codAmt   = parseFloat((row[5] ?? "0").replace(/[^0-9.]/g, "")) || 0;
-    const sku      = (row[6] ?? "").trim();
-    const qty      = parseInt(row[7] ?? "1", 10) || 1;
-    const notes    = (row[8] ?? "").trim();
+    const sku            = (row[6] ?? "").trim();
+    const qty            = parseInt(row[7] ?? "1", 10) || 1;
+    const notes          = (row[8] ?? "").trim();
     const existingTracking = (row[9] ?? "").trim();
     const statusCell       = (row[10] ?? "").trim().toLowerCase();
+    const sheetProductName = (row[11] ?? "").trim(); // col L — optional product name override
 
     if (!orderRef && !name && !phone) continue;
 
@@ -286,9 +287,10 @@ export async function syncSheetToDigylog(sheetId?: string, storeCtx?: StoreConte
       try { await updateSheetRow(spreadsheetId, sheetName, rowNumber, { A: orderNumber }); } catch {}
 
       // Create order item
-      const prodId   = prod?.id   ?? null;
-      const prodName = prod?.name ?? (sku || "Produit");
-      const prodSku  = prod?.sku  ?? sku ?? "";
+      const prodId    = prod?.id   ?? null;
+      // Priority: DB product name → sheet column L → SKU → fallback
+      const prodName  = prod?.name ?? (sheetProductName || sku || "Produit");
+      const prodSku   = prod?.sku  ?? sku ?? "";
       const unitPrice = prod?.sale_price_mad ?? codAmt;
 
       await supabaseAdmin.from("order_items").insert({
@@ -301,6 +303,13 @@ export async function syncSheetToDigylog(sheetId?: string, storeCtx?: StoreConte
         quantity:     qty,
         discount_pct: 0,
       } as never);
+
+      // Also update first_product_name on the order for faster lookups
+      await supabaseAdmin.from("orders").update({
+        first_product_name: prodName,
+        first_product_sku:  prodSku,
+        total_quantity:     qty,
+      } as never).eq("id", orderId);
     }
 
     // Send to Digylog

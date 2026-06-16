@@ -1053,29 +1053,50 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
     }
   }
 
-  // Fallback: if order_items returned nothing, read from orders.first_product_name + delivery_batch_orders
+  // Fallback: if order_items join returned nothing
   if (prodMap.size === 0) {
-    console.warn("[generateRecapAndLabels] order_items empty — using order-level product fallback for batch", batchId);
     const orderIds = recapRows.map((r) => r.order_id).filter(Boolean);
     if (orderIds.length > 0) {
-      const { data: ordersForProd } = await supabaseAdmin
-        .from("orders")
-        .select("id, first_product_name, first_product_sku, total_quantity")
-        .in("id", orderIds);
-      for (const o of (ordersForProd ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null }[]) {
-        const name = o.first_product_name ?? "Produit";
-        const sku  = o.first_product_sku  ?? "";
+
+      // Try 1: direct order_items query (join may have failed)
+      const { data: directItems } = await supabaseAdmin
+        .from("order_items")
+        .select("order_id, product_name, product_sku, quantity")
+        .in("order_id", orderIds);
+
+      for (const item of (directItems ?? []) as { order_id: string; product_name: string | null; product_sku: string | null; quantity: number }[]) {
+        const name = item.product_name ?? "Produit";
+        const sku  = item.product_sku  ?? "";
         const key  = sku || name;
-        const qty  = o.total_quantity ?? 1;
         if (!prodMap.has(key)) prodMap.set(key, { id: key, name, sku, totalQty: 0, orderCount: 0 });
         const e = prodMap.get(key)!;
-        e.totalQty   += qty;
+        e.totalQty   += item.quantity ?? 1;
         e.orderCount += 1;
       }
+
+      // Try 2: orders.first_product_name
+      if (prodMap.size === 0) {
+        console.warn("[generateRecapAndLabels] order_items empty — using first_product_name fallback");
+        const { data: ordersForProd } = await supabaseAdmin
+          .from("orders")
+          .select("id, first_product_name, first_product_sku, total_quantity")
+          .in("id", orderIds);
+        for (const o of (ordersForProd ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null }[]) {
+          const name = o.first_product_name ?? "";
+          const sku  = o.first_product_sku  ?? "";
+          const key  = sku || name;
+          if (!name && !sku) continue; // skip truly empty
+          if (!prodMap.has(key)) prodMap.set(key, { id: key, name: name || sku, sku, totalQty: 0, orderCount: 0 });
+          const e = prodMap.get(key)!;
+          e.totalQty   += o.total_quantity ?? 1;
+          e.orderCount += 1;
+        }
+      }
     }
-    // Last resort: create placeholder so PDF doesn't crash
+
+    // Last resort placeholder (never shows if product data exists anywhere)
     if (prodMap.size === 0 && recapRows.length > 0) {
-      prodMap.set("__placeholder__", { id: "__placeholder__", name: "Produit (données manquantes)", sku: "", totalQty: recapRows.length, orderCount: recapRows.length });
+      prodMap.set("__placeholder__", { id: "__placeholder__", name: "Produit inconnu", sku: "", totalQty: recapRows.length, orderCount: recapRows.length });
     }
   }
 
