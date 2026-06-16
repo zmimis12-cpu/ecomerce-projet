@@ -1103,32 +1103,11 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   // WinAnsi font (Helvetica) only supports Latin chars.
   // Strip/replace any char outside Latin-1 range before drawText.
   function pdfSafe(text: string): string {
-    // Transliterate Arabic to Latin for WinAnsi (Helvetica) PDF font
-    const ar: [string, string][] = [
-      ["ا","a"],["ب","b"],["ت","t"],["ث","th"],["ج","j"],
-      ["ح","h"],["خ","kh"],["د","d"],["ذ","dh"],["ر","r"],
-      ["ز","z"],["س","s"],["ش","sh"],["ص","s"],["ض","d"],
-      ["ط","t"],["ظ","z"],["ع","a"],["غ","gh"],["ف","f"],
-      ["ق","q"],["ك","k"],["ل","l"],["م","m"],["ن","n"],
-      ["ه","h"],["و","w"],["ي","y"],["ة","a"],["ى","a"],
-      ["أ","a"],["إ","i"],["آ","a"],["ؤ","w"],["ئ","y"],
-      ["ء",""],
-      // Harakat
-      ["ً",""],["ٌ",""],["ٍ",""],["َ",""],
-      ["ُ",""],["ِ",""],["ّ",""],["ْ",""],
-    ];
-    let out = text;
-    for (const [a, l] of ar) out = out.split(a).join(l);
-    return out
-      .replace(/[àâä]/g, "a").replace(/[éèêë]/g, "e")
-      .replace(/[îï]/g, "i").replace(/[ôö]/g, "o")
-      .replace(/[ùûü]/g, "u").replace(/ç/g, "c")
-      .replace(/[ÀÂÄ]/g, "A").replace(/[ÉÈÊË]/g, "E")
-      .replace(/[ÎÏ]/g, "I").replace(/[ÔÖ]/g, "O")
-      .replace(/[ÙÛÜ]/g, "U").replace(/Ç/g, "C")
-      .replace(/’/g, "'").replace(/[“”]/g, '"')
-      .replace(/[–—]/g, "-")
-      .replace(/[^ -ÿ]/g, "?")
+    // Amiri font supports Arabic natively — only fix smart quotes/dashes
+    return text
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/[\u2013\u2014]/g, "-")
       .trim();
   }
 
@@ -1141,8 +1120,26 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   const ROWS_PER_PAGE = Math.floor(usableH / LINE_H);  // ~13 rows
 
   const recapDoc   = await PDFDocument.create();
-  const fontBold   = await recapDoc.embedFont(StandardFonts.HelveticaBold);
-  const fontNormal = await recapDoc.embedFont(StandardFonts.Helvetica);
+
+  // Register fontkit for custom font embedding
+  const fontkit = await import("@pdf-lib/fontkit");
+  recapDoc.registerFontkit(fontkit.default ?? fontkit);
+
+  // Load Amiri font (supports Arabic + Latin + French)
+  let fontBold: import("pdf-lib").PDFFont;
+  let fontNormal: import("pdf-lib").PDFFont;
+  try {
+    const fs = await import("fs");
+    const path = await import("path");
+    const boldBytes   = fs.readFileSync(path.join(process.cwd(), "public/fonts/Amiri-Bold.ttf"));
+    const normalBytes = fs.readFileSync(path.join(process.cwd(), "public/fonts/Amiri-Regular.ttf"));
+    fontBold   = await recapDoc.embedFont(boldBytes);
+    fontNormal = await recapDoc.embedFont(normalBytes);
+  } catch {
+    // Fallback to Helvetica if fonts missing
+    fontBold   = await recapDoc.embedFont(StandardFonts.HelveticaBold);
+    fontNormal = await recapDoc.embedFont(StandardFonts.Helvetica);
+  }
 
   // Chunk products into pages
   const chunks: ProdEntry[][] = [];
