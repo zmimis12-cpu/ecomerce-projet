@@ -671,6 +671,12 @@ async function buildSortedTicketOrders(batchId: string): Promise<SortedTicketOrd
     if (productTotals.size === 0) {
       productTotals.set("__unknown__", { total: rows.length, name: "Produit" });
     }
+    // Rebuild recapProductOrder + recapIndex from fallback data (was missing — caused empty PDF)
+    recapProductOrder.length = 0;
+    recapIndex.clear();
+    [...productTotals.entries()]
+      .sort(([, a], [, b]) => b.total !== a.total ? b.total - a.total : a.name.localeCompare(b.name))
+      .forEach(([key], i) => { recapProductOrder.push(key); recapIndex.set(key, i); });
   }
 
   // ── Step 4: For each order, determine primary product via recapIndex ────────
@@ -702,6 +708,18 @@ async function buildSortedTicketOrders(batchId: string): Promise<SortedTicketOrd
         primaryName = name;
         primaryIdx  = idx;
         primaryQty  = qty;
+      }
+    }
+
+    // order_items vide (cas sheet-sync) → résoudre via recapIndex construit en fallback
+    if (items.length === 0 && recapIndex.size > 0) {
+      for (const [key, idx] of recapIndex.entries()) {
+        if (idx < primaryIdx) {
+          primaryIdx  = idx;
+          primaryName = productTotals.get(key)?.name ?? key;
+          primaryQty  = productTotals.get(key)?.total ?? 1;
+        }
+        break;
       }
     }
 
@@ -1029,55 +1047,59 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   const orderIds = ((batchOrderIds ?? []) as { order_id: string }[]).map(r => r.order_id).filter(Boolean);
 
   if (orderIds.length > 0) {
-    // Load orders with ALL product fields in one query
-    const { data: ordRows } = await supabaseAdmin
-      .from("orders")
-      .select("id, first_product_name, first_product_sku, total_quantity, notes")
-      .in("id", orderIds);
+    // SOURCE 1 (priorité): order_items — quantités exactes par produit
+    const { data: itemRows } = await supabaseAdmin
+      .from("order_items")
+      .select("order_id, product_id, product_name, product_sku, quantity")
+      .in("order_id", orderIds);
 
-    type OrdRow = { id: string; first_product_name: string|null; first_product_sku: string|null; total_quantity: number|null; notes: string|null };
-
-    for (const o of (ordRows ?? []) as OrdRow[]) {
-      // Priority 1: first_product_name (set by sheet-sync)
-      let name = (o.first_product_name ?? "").trim();
-      const sku = (o.first_product_sku ?? "").trim();
-
-      // Priority 2: extract from notes field "نافورة شمسية_x2" → "نافورة شمسية"
-      if (!name && o.notes) {
-        name = o.notes
-          .replace(/_x[0-9]+/gi, "")
-          .replace(/[×x][0-9]+/g, "")
-          .replace(/\s*[0-9]+$/, "")
-          .trim();
-      }
-
-      // Priority 3: SKU
-      if (!name) name = sku;
-
-      console.log("[recap products]", { id: o.id, name, sku, notes: o.notes });
-      if (!name) continue;
-
-      const key = sku || name;
-      if (!prodMap.has(key)) prodMap.set(key, { id: key, name, sku, totalQty: 0, orderCount: 0 });
+    const ordersWithItems = new Set<string>();
+    for (const item of (itemRows ?? []) as { order_id: string; product_id: string|null; product_name: string|null; product_sku: string|null; quantity: number }[]) {
+      const name = (item.product_name ?? item.product_sku ?? "").trim();
+      const sku  = (item.product_sku ?? "").trim();
+      if (!name && !sku) continue;
+      const key = item.product_id ?? (sku || name);
+      if (!prodMap.has(key)) prodMap.set(key, { id: key, name: name || sku, sku, totalQty: 0, orderCount: 0 });
       const e = prodMap.get(key)!;
-      e.totalQty   += o.total_quantity ?? 1;
+      e.totalQty   += item.quantity ?? 1;
       e.orderCount += 1;
+      ordersWithItems.add(item.order_id);
     }
 
-    // Also try order_items (for orders that have proper product records)
-    if (prodMap.size === 0) {
-      const { data: items } = await supabaseAdmin
-        .from("order_items")
-        .select("order_id, product_name, product_sku, quantity")
-        .in("order_id", orderIds);
-      for (const item of (items ?? []) as { product_name: string|null; product_sku: string|null; quantity: number }[]) {
-        const name = (item.product_name ?? item.product_sku ?? "").trim();
-        const sku  = (item.product_sku ?? "").trim();
-        if (!name && !sku) continue;
+    // SOURCE 2 (fallback): orders.first_product_name + notes — seulement pour les orders sans order_items
+    const orderIdsWithoutItems = orderIds.filter(id => !ordersWithItems.has(id));
+    if (orderIdsWithoutItems.length > 0) {
+      const { data: ordRows } = await supabaseAdmin
+        .from("orders")
+        .select("id, first_product_name, first_product_sku, total_quantity, notes")
+        .in("id", orderIdsWithoutItems);
+
+      type OrdRow = { id: string; first_product_name: string|null; first_product_sku: string|null; total_quantity: number|null; notes: string|null };
+
+      for (const o of (ordRows ?? []) as OrdRow[]) {
+        // Priority 1: first_product_name (set by sheet-sync)
+        let name = (o.first_product_name ?? "").trim();
+        const sku = (o.first_product_sku ?? "").trim();
+
+        // Priority 2: extract from notes field "نافورة شمسية_x2" → "نافورة شمسية"
+        if (!name && o.notes) {
+          name = o.notes
+            .replace(/_x[0-9]+/gi, "")
+            .replace(/[×x][0-9]+/g, "")
+            .replace(/\s*[0-9]+$/, "")
+            .trim();
+        }
+
+        // Priority 3: SKU
+        if (!name) name = sku;
+
+        console.log("[recap products fallback]", { id: o.id, name, sku, notes: o.notes });
+        if (!name) continue;
+
         const key = sku || name;
-        if (!prodMap.has(key)) prodMap.set(key, { id: key, name: name||sku, sku, totalQty: 0, orderCount: 0 });
+        if (!prodMap.has(key)) prodMap.set(key, { id: key, name, sku, totalQty: 0, orderCount: 0 });
         const e = prodMap.get(key)!;
-        e.totalQty += item.quantity ?? 1;
+        e.totalQty   += o.total_quantity ?? 1;
         e.orderCount += 1;
       }
     }
@@ -1397,37 +1419,42 @@ export async function rebuildBatchProductSummary(batchId: string): Promise<void>
     }
   }
 
-  // Always also read from orders.first_product_name + notes as supplement/fallback
+  // Lire orders.first_product_name + notes — UNIQUEMENT pour les orders sans order_items (évite double-comptage)
   {
-    const { data: ordersForSummary } = await supabaseAdmin
-      .from("orders")
-      .select("id, first_product_name, first_product_sku, total_quantity, notes")
-      .in("id", orderIds);
+    const ordersWithItems = new Set(itemRows.map(r => r.order_id));
+    const orderIdsWithoutItems = orderIds.filter(id => !ordersWithItems.has(id));
 
-    for (const o of (ordersForSummary ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null; notes: string | null }[]) {
-      let name = (o.first_product_name ?? "").trim();
-      const sku = (o.first_product_sku ?? "").trim();
+    if (orderIdsWithoutItems.length > 0) {
+      const { data: ordersForSummary } = await supabaseAdmin
+        .from("orders")
+        .select("id, first_product_name, first_product_sku, total_quantity, notes")
+        .in("id", orderIdsWithoutItems);
 
-      // Extract from notes if no product name
-      if (!name && o.notes) {
-        name = o.notes
-          .replace(/_x[0-9]+/gi, "")
-          .replace(/[×x][0-9]+/g, "")
-          .replace(/\s*[0-9]+$/, "")
-          .trim();
-      }
-      if (!name) name = sku;
-      if (!name) continue;
+      for (const o of (ordersForSummary ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null; notes: string | null }[]) {
+        let name = (o.first_product_name ?? "").trim();
+        const sku = (o.first_product_sku ?? "").trim();
 
-      const key = sku || name;
-      if (!prodMap.has(key)) {
-        prodMap.set(key, { product_id: null, product_name: name, sku, total_quantity: 0, order_count: 0, order_ids: new Set() });
-      }
-      const entry = prodMap.get(key)!;
-      entry.total_quantity += (o.total_quantity ?? 1);
-      if (!entry.order_ids.has(o.id)) {
-        entry.order_ids.add(o.id);
-        entry.order_count++;
+        // Extract from notes if no product name
+        if (!name && o.notes) {
+          name = o.notes
+            .replace(/_x[0-9]+/gi, "")
+            .replace(/[×x][0-9]+/g, "")
+            .replace(/\s*[0-9]+$/, "")
+            .trim();
+        }
+        if (!name) name = sku;
+        if (!name) continue;
+
+        const key = sku || name;
+        if (!prodMap.has(key)) {
+          prodMap.set(key, { product_id: null, product_name: name, sku, total_quantity: 0, order_count: 0, order_ids: new Set() });
+        }
+        const entry = prodMap.get(key)!;
+        entry.total_quantity += (o.total_quantity ?? 1);
+        if (!entry.order_ids.has(o.id)) {
+          entry.order_ids.add(o.id);
+          entry.order_count++;
+        }
       }
     }
   }
