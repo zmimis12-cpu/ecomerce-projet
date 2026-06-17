@@ -1178,8 +1178,8 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   try {
     const boldBytes   = await loadFontBytes("Amiri-Bold.ttf");
     const normalBytes = await loadFontBytes("Amiri-Regular.ttf");
-    fontBold   = await recapDoc.embedFont(boldBytes, { subset: true });
-    fontNormal = await recapDoc.embedFont(normalBytes, { subset: true });
+    fontBold   = await recapDoc.embedFont(boldBytes, { subset: false });
+    fontNormal = await recapDoc.embedFont(normalBytes, { subset: false });
     console.log("[PDF] Amiri font loaded successfully");
   } catch (fontErr) {
     console.error("[PDF] Font load failed, using Helvetica (Arabic will not render):", fontErr);
