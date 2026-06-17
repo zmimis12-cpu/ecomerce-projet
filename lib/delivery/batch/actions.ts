@@ -1264,8 +1264,10 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
         size: 8, color: rgb(0.1, 0.1, 0.1),
       });
 
-      // SKU below name
-      if (p.sku) {
+      // SKU below name — skip if identical to product name (sheet-sync sometimes sets sku = name)
+      const skuNormalized  = (p.sku ?? "").trim().toLowerCase();
+      const nameNormalized = p.name.trim().toLowerCase();
+      if (p.sku && skuNormalized !== nameNormalized) {
         page.drawText(pdfSafe(p.sku.slice(0, 18)), {
           x: MARGIN + 14, y: rowY - 1,
           font: fontNormal, size: 6, color: rgb(0.6, 0.6, 0.6),
