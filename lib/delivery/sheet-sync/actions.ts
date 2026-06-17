@@ -45,6 +45,29 @@ function normalizePhone(phone: string): string {
   return ("0" + d).slice(-10).padStart(10, "0");
 }
 
+/**
+ * Nettoie un nom client venant du Sheet. Les cellules Google Sheets peuvent
+ * contenir des erreurs de formule (#REF!, #N/A), des artefacts de copier-coller,
+ * ou du texte corrompu (ex: "ee\"\"\"Z"). On filtre ces cas plutôt que de les
+ * laisser polluer customer_name et apparaître tels quels sur les étiquettes.
+ */
+function cleanSheetName(raw: string): string {
+  let name = raw.trim();
+
+  // Erreurs de formule Sheets
+  if (/^#(REF|N\/A|VALUE|DIV\/0|NAME|NULL|ERROR)/i.test(name)) return "";
+
+  // Supprime les guillemets/apostrophes répétés et caractères de contrôle non imprimables
+  name = name.replace(/["'`]{2,}/g, "").replace(/[\x00-\x1F\x7F]/g, "").trim();
+
+  // Si après nettoyage il reste trop peu de lettres réelles (lettres latines ou arabes),
+  // c'est probablement du bruit/corruption plutôt qu'un vrai nom
+  const letters = name.match(/[a-zA-Zà-ÿÀ-Ÿ\u0600-\u06FF]/g)?.length ?? 0;
+  if (letters < 2) return "";
+
+  return name;
+}
+
 type StoreContext = {
   storeId?:      string;
   storeName?:    string;
@@ -156,7 +179,7 @@ export async function syncSheetToDigylog(sheetId?: string, storeCtx?: StoreConte
     const rowNumber = i + 2;
 
     const orderRef = (row[0] ?? "").trim();
-    const name     = (row[1] ?? "").trim();
+    const name     = cleanSheetName(row[1] ?? "");
     const phone    = (row[2] ?? "").trim();
     const address  = (row[3] ?? "").trim();
     const city     = (row[4] ?? "").trim();
