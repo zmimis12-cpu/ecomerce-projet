@@ -1126,16 +1126,25 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   // ── 4. Build recap PDF — 10×10 format (100mm = 283.46pt) ──────────────────
   try { // PDF generation wrapped — never crash the page
   const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
+  const arabicReshaper = await import("arabic-reshaper");
+  const reshapeArabic = (arabicReshaper.default ?? arabicReshaper).convertArabic;
 
   // WinAnsi font (Helvetica) only supports Latin chars.
   // Strip/replace any char outside Latin-1 range before drawText.
+  // Arabic text must also be "reshaped" into presentation-form glyphs
+  // (pdf-lib draws each character in isolation — without reshaping, Arabic
+  // letters render disconnected and unreadable, e.g. "نافورة" → "ز ا ف و ر ة").
   function pdfSafe(text: string): string {
-    // Amiri font supports Arabic natively — only fix smart quotes/dashes
-    return text
+    const fixed = text
       .replace(/[\u2018\u2019]/g, "'")
       .replace(/[\u201C\u201D]/g, '"')
       .replace(/[\u2013\u2014]/g, "-")
       .trim();
+    // Reshape only if the text actually contains Arabic characters
+    if (/[\u0600-\u06FF]/.test(fixed)) {
+      try { return reshapeArabic(fixed); } catch { return fixed; }
+    }
+    return fixed;
   }
 
   const SZ = 283.46;            // 100mm in PDF points
