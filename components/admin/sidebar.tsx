@@ -38,10 +38,11 @@ const ADMIN_NAV: NavGroup[] = [
     groupPrefix: "/admin/delivery",
     items: [
       { href: "/admin/delivery",            label: "Suivi Livraison",    icon: Truck,          exact: true },
-      { href: "/admin/delivery/documents",  label: "BL du Jour",         icon: FileText        },
+      { href: "/admin/delivery/daily-bl",   label: "BL du Jour",         icon: FileText        },
       { href: "/admin/delivery/batches",    label: "Tickets Impression", icon: Layers          },
       { href: "/admin/delivery/notes",      label: "Récap Tickets",      icon: FileText        },
       { href: "/admin/digylog/documents",   label: "Documents Livraison",  icon: FolderOpen      },
+      { href: "/admin/delivery/documents",  label: "Documents Sync",     icon: FolderOpen      },
       { href: "/admin/delivery/invoices",   label: "Factures",           icon: FileText        },
       { href: "/admin/scanner",             label: "Scanner",            icon: ScanLine        },
       { href: "/admin/returns",             label: "Retours",            icon: RotateCcw       },
