@@ -250,14 +250,49 @@ export async function syncSheetToDigylog(sheetId?: string, storeCtx?: StoreConte
 
     } else {
       // ── AUTO-CREATE order from Sheet row ────────────────────────────────────
-      // Find product by SKU for pricing
-      const { data: prodData } = await supabaseAdmin
-        .from("products")
-        .select("id,name,sku,sale_price_mad,total_cost_mad")
-        .eq("sku", sku)
-        .maybeSingle();
+      // Find product by SKU. Try exact match first, then a normalized match
+      // (ignores spaces/case) since Sheet values and DB SKUs sometimes differ
+      // only by whitespace (e.g. "نافورة شمسية عائمة" vs "نافورةشمسيةعائمة").
       type ProdRow = { id:string; name:string; sku:string; sale_price_mad:number; total_cost_mad:number };
-      const prod = prodData as ProdRow | null;
+      let prod: ProdRow | null = null;
+
+      if (sku) {
+        const { data: exactMatch } = await supabaseAdmin
+          .from("products")
+          .select("id,name,sku,sale_price_mad,total_cost_mad")
+          .eq("sku", sku)
+          .maybeSingle();
+        prod = exactMatch as ProdRow | null;
+
+        if (!prod) {
+          const normalizedSku = sku.replace(/\s+/g, "").toLowerCase();
+          const { data: candidates } = await supabaseAdmin
+            .from("products")
+            .select("id,name,sku,sale_price_mad,total_cost_mad");
+          prod = ((candidates ?? []) as ProdRow[]).find(
+            (p) => p.sku.replace(/\s+/g, "").toLowerCase() === normalizedSku
+          ) ?? null;
+        }
+      }
+
+      // Product still not found → auto-create a minimal product instead of
+      // leaving product_id null (order_items.product_id is NOT NULL, so a
+      // null here used to make the order_items insert fail silently, which
+      // is why some batches showed "Aucun produit trouvé" on the recap PDF).
+      if (!prod && sku) {
+        const fallbackName = sheetProductName || sku;
+        const { data: createdProd, error: prodCreateErr } = await supabaseAdmin
+          .from("products")
+          .insert({ sku, name: fallbackName, sale_price_mad: codAmt, is_active: true } as never)
+          .select("id,name,sku,sale_price_mad,total_cost_mad")
+          .single();
+        if (prodCreateErr) {
+          console.error("[sheet-sync] auto-create product failed:", prodCreateErr.message, { sku, fallbackName });
+        } else {
+          prod = createdProd as ProdRow;
+          console.log(`[sheet-sync] Auto-created product "${fallbackName}" (sku: ${sku})`);
+        }
+      }
 
       const unitCost  = prod?.total_cost_mad ?? 0;
       const subtotal  = codAmt;
@@ -316,7 +351,7 @@ export async function syncSheetToDigylog(sheetId?: string, storeCtx?: StoreConte
       const prodSku   = prod?.sku  ?? sku ?? "";
       const unitPrice = prod?.sale_price_mad ?? codAmt;
 
-      await supabaseAdmin.from("order_items").insert({
+      const { error: itemErr } = await supabaseAdmin.from("order_items").insert({
         order_id:     orderId,
         product_id:   prodId,
         product_name: prodName,
@@ -327,12 +362,11 @@ export async function syncSheetToDigylog(sheetId?: string, storeCtx?: StoreConte
         discount_pct: 0,
       } as never);
 
-      // Also update first_product_name on the order for faster lookups
-      await supabaseAdmin.from("orders").update({
-        first_product_name: prodName,
-        first_product_sku:  prodSku,
-        total_quantity:     qty,
-      } as never).eq("id", orderId);
+      if (itemErr) {
+        // This used to fail silently when prodId was null (NOT NULL constraint),
+        // leaving the recap PDF with "Aucun produit trouvé". Now logged loudly.
+        console.error(`[sheet-sync] order_items insert FAILED for order ${orderNumber}:`, itemErr.message, { prodId, prodName, prodSku });
+      }
     }
 
     // Send to Digylog

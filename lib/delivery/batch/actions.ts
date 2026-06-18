@@ -654,18 +654,18 @@ async function buildSortedTicketOrders(batchId: string): Promise<SortedTicketOrd
     console.warn("[buildSortedTicketOrders] order_items empty, using order-level fallback");
     const orderIds = rows.map(r => r.order_id).filter(Boolean);
     if (orderIds.length > 0) {
-      const { data: ordFallback } = await supabaseAdmin
+      const { data: ordFallback, error: ordFallbackErr } = await supabaseAdmin
         .from("orders")
-        .select("id, first_product_name, first_product_sku, total_quantity, notes")
+        .select("id, notes")
         .in("id", orderIds);
-      for (const o of (ordFallback ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null; notes: string | null }[]) {
-        let name = (o.first_product_name ?? "").trim();
-        if (!name && o.notes) {
+      if (ordFallbackErr) console.error("[buildSortedTicketOrders] fallback query failed:", ordFallbackErr.message);
+      for (const o of (ordFallback ?? []) as { id: string; notes: string | null }[]) {
+        let name = "";
+        if (o.notes) {
           name = o.notes.replace(/_x[0-9]+/i, "").replace(/\u00d7[0-9]+/, "").replace(/[×x][0-9]+/g, "").trim();
         }
-        console.log("[buildSorted fallback]", { id: o.id, first_product_name: o.first_product_name, notes: o.notes, resolved: name });
-        const key = o.first_product_sku || name || "Produit";
-        productTotals.set(key, { total: o.total_quantity ?? 1, name: name || key });
+        const key = name || "Produit";
+        productTotals.set(key, { total: 1, name: name || key });
       }
     }
     if (productTotals.size === 0) {
@@ -1066,23 +1066,22 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
       ordersWithItems.add(item.order_id);
     }
 
-    // SOURCE 2 (fallback): orders.first_product_name + notes — seulement pour les orders sans order_items
+    // SOURCE 2 (fallback): orders.notes — seulement pour les orders sans order_items
     const orderIdsWithoutItems = orderIds.filter(id => !ordersWithItems.has(id));
     if (orderIdsWithoutItems.length > 0) {
-      const { data: ordRows } = await supabaseAdmin
+      const { data: ordRows, error: ordRowsErr } = await supabaseAdmin
         .from("orders")
-        .select("id, first_product_name, first_product_sku, total_quantity, notes")
+        .select("id, notes")
         .in("id", orderIdsWithoutItems);
+      if (ordRowsErr) console.error("[generateRecapAndLabels] fallback query failed:", ordRowsErr.message);
 
-      type OrdRow = { id: string; first_product_name: string|null; first_product_sku: string|null; total_quantity: number|null; notes: string|null };
+      type OrdRow = { id: string; notes: string|null };
 
       for (const o of (ordRows ?? []) as OrdRow[]) {
-        // Priority 1: first_product_name (set by sheet-sync)
-        let name = (o.first_product_name ?? "").trim();
-        const sku = (o.first_product_sku ?? "").trim();
+        let name = "";
 
-        // Priority 2: extract from notes field "نافورة شمسية_x2" → "نافورة شمسية"
-        if (!name && o.notes) {
+        // Extract from notes field "نافورة شمسية_x2" → "نافورة شمسية"
+        if (o.notes) {
           name = o.notes
             .replace(/_x[0-9]+/gi, "")
             .replace(/[×x][0-9]+/g, "")
@@ -1090,16 +1089,12 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
             .trim();
         }
 
-        // Priority 3: SKU
-        if (!name) name = sku;
-
-        console.log("[recap products fallback]", { id: o.id, name, sku, notes: o.notes });
         if (!name) continue;
 
-        const key = sku || name;
-        if (!prodMap.has(key)) prodMap.set(key, { id: key, name, sku, totalQty: 0, orderCount: 0 });
+        const key = name;
+        if (!prodMap.has(key)) prodMap.set(key, { id: key, name, sku: "", totalQty: 0, orderCount: 0 });
         const e = prodMap.get(key)!;
-        e.totalQty   += o.total_quantity ?? 1;
+        e.totalQty   += 1;
         e.orderCount += 1;
       }
     }
@@ -1434,38 +1429,37 @@ export async function rebuildBatchProductSummary(batchId: string): Promise<void>
     }
   }
 
-  // Lire orders.first_product_name + notes — UNIQUEMENT pour les orders sans order_items (évite double-comptage)
+  // Lire orders.notes — UNIQUEMENT pour les orders sans order_items (évite double-comptage)
   {
     const ordersWithItems = new Set(itemRows.map(r => r.order_id));
     const orderIdsWithoutItems = orderIds.filter(id => !ordersWithItems.has(id));
 
     if (orderIdsWithoutItems.length > 0) {
-      const { data: ordersForSummary } = await supabaseAdmin
+      const { data: ordersForSummary, error: ordersForSummaryErr } = await supabaseAdmin
         .from("orders")
-        .select("id, first_product_name, first_product_sku, total_quantity, notes")
+        .select("id, notes")
         .in("id", orderIdsWithoutItems);
+      if (ordersForSummaryErr) console.error("[rebuildBatchProductSummary] fallback query failed:", ordersForSummaryErr.message);
 
-      for (const o of (ordersForSummary ?? []) as { id: string; first_product_name: string | null; first_product_sku: string | null; total_quantity: number | null; notes: string | null }[]) {
-        let name = (o.first_product_name ?? "").trim();
-        const sku = (o.first_product_sku ?? "").trim();
+      for (const o of (ordersForSummary ?? []) as { id: string; notes: string | null }[]) {
+        let name = "";
 
-        // Extract from notes if no product name
-        if (!name && o.notes) {
+        // Extract from notes if present
+        if (o.notes) {
           name = o.notes
             .replace(/_x[0-9]+/gi, "")
             .replace(/[×x][0-9]+/g, "")
             .replace(/\s*[0-9]+$/, "")
             .trim();
         }
-        if (!name) name = sku;
         if (!name) continue;
 
-        const key = sku || name;
+        const key = name;
         if (!prodMap.has(key)) {
-          prodMap.set(key, { product_id: null, product_name: name, sku, total_quantity: 0, order_count: 0, order_ids: new Set() });
+          prodMap.set(key, { product_id: null, product_name: name, sku: "", total_quantity: 0, order_count: 0, order_ids: new Set() });
         }
         const entry = prodMap.get(key)!;
-        entry.total_quantity += (o.total_quantity ?? 1);
+        entry.total_quantity += 1;
         if (!entry.order_ids.has(o.id)) {
           entry.order_ids.add(o.id);
           entry.order_count++;
