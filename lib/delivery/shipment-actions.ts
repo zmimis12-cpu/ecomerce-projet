@@ -487,17 +487,49 @@ export async function applyDigylogStatusUpdate(params: {
 }
 
 // ── Register webhook ──────────────────────────────────────────────────────────
-export async function registerDigylogWebhook() {
+export async function registerDigylogWebhook(storeId?: string) {
   await requireRole(["super_admin","admin"]);
   const appUrl     = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const webhookUrl = `${appUrl}/api/webhooks/digylog`;
-  const client     = await createDigylogClientFromDB();
-  const result     = await client.registerWebhook(webhookUrl);
+
+  // createDigylogClientFromDB(undefined) only works if a store has
+  // is_default=true — none currently do (verified in DB), so it silently
+  // fell back to the legacy digylog_settings.token, which is empty since
+  // the multi-store migration. This caused every webhook registration
+  // attempt to fail with "Token Digylog manquant" without any visible error
+  // reaching the admin (the button just showed a generic failure).
+  let resolvedStoreId = storeId;
+  if (!resolvedStoreId) {
+    const { data: activeStore } = await supabaseAdmin
+      .from("delivery_stores")
+      .select("id")
+      .eq("is_active", true)
+      .not("api_token", "is", null)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    resolvedStoreId = (activeStore as { id: string } | null)?.id;
+  }
+
+  const client = await createDigylogClientFromDB(resolvedStoreId);
+  if (!client.hasToken()) {
+    return { ok: false, error: "Aucun store actif avec un token Digylog trouvé. Vérifiez Paramètres → Transporteurs." };
+  }
+
+  const result = await client.registerWebhook(webhookUrl);
 
   if (result.ok) {
     await supabaseAdmin.from("digylog_settings")
       .update({ webhook_url: webhookUrl } as never)
       .not("id", "is", null);
+    if (resolvedStoreId) {
+      const { data: storeRow } = await supabaseAdmin
+        .from("delivery_stores").select("metadata").eq("id", resolvedStoreId).maybeSingle();
+      const existingMeta = (storeRow as { metadata: Record<string, unknown> } | null)?.metadata ?? {};
+      await supabaseAdmin.from("delivery_stores")
+        .update({ metadata: { ...existingMeta, webhook_url: webhookUrl, webhook_registered_at: new Date().toISOString() } } as never)
+        .eq("id", resolvedStoreId);
+    }
   }
   return result;
 }

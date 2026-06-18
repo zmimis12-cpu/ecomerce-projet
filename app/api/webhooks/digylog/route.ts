@@ -81,7 +81,30 @@ async function processWebhook(params: {
 
 export async function POST(request: NextRequest) { return handle(request); }
 export async function PUT(request: NextRequest)  { return handle(request); }
-export async function GET()                       { return NextResponse.json({ status: "ok", provider: "digylog" }); }
+export async function GET(request: NextRequest) {
+  // Digylog's "key mismatch" error on PUT /webhook suggests it calls this
+  // GET endpoint to verify ownership (a common webhook-verification pattern:
+  // it sends a challenge/key param and expects it echoed back). Log every
+  // GET so we can see exactly what Digylog sends instead of guessing.
+  const url = new URL(request.url);
+  const params: Record<string, string> = {};
+  url.searchParams.forEach((v, k) => { params[k] = v; });
+  await log("verification_get", { params }, {
+    headers: Object.fromEntries(request.headers.entries()),
+  });
+
+  // If Digylog sends a challenge/key param, echo it back — standard pattern
+  // for "prove you control this URL" webhook verification.
+  const challenge = url.searchParams.get("challenge")
+    ?? url.searchParams.get("key")
+    ?? url.searchParams.get("verify_token")
+    ?? url.searchParams.get("hub.challenge");
+  if (challenge) {
+    return new NextResponse(challenge, { status: 200, headers: { "Content-Type": "text/plain" } });
+  }
+
+  return NextResponse.json({ status: "ok", provider: "digylog" });
+}
 
 async function log(status: string, payload: unknown, meta: Record<string, unknown>) {
   await supabaseAdmin.from("webhook_logs").insert({
