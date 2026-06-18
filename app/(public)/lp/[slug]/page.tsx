@@ -101,6 +101,15 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const oldPrice  = String(lp.old_price_text   ?? `${oldPriceNum.toFixed(0)} درهم`);
   const discountPct = oldPriceNum > price ? Math.round((1 - price / oldPriceNum) * 100) : 0;
   const whatsapp  = String(lp.whatsapp_number  ?? "");
+  // What customers actually need to know about the product — falls back
+  // through whatever real content exists instead of a generic empty line,
+  // since page.description is empty for most products today.
+  const aiAnalysis = (lp.ai_analysis as { main_benefit?: string; main_problem?: string } | undefined);
+  const description = page.description
+    || (lp.hero_subheadline ? String(lp.hero_subheadline) : "")
+    || aiAnalysis?.main_benefit
+    || product.description
+    || `${product.name} — جودة مضمونة وتوصيل سريع لجميع مدن المغرب.`;
   const b1 = Number(lp.bundle_1_price || price);
   const b2 = Number(lp.bundle_2_price || (price * 2 * 0.9).toFixed(2));
   const b3 = Number(lp.bundle_3_price || (price * 3 * 0.8).toFixed(2));
@@ -248,6 +257,11 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
             {/* Primary CTA */}
             <a href="#lp-form" className="lp-cta">{ctaText}</a>
+
+            {/* Product description — clear, visible explanation of what this is */}
+            <div className="lp-desc">
+              <p>{description}</p>
+            </div>
 
             {/* WhatsApp */}
             {whatsapp && (
@@ -626,6 +640,11 @@ const GLOBAL_CSS = `
     display:inline-block;width:auto;
     padding:13px 40px;margin-top:6px;
     box-shadow:none;
+  }
+  .lp-desc{
+    margin-top:16px;padding:14px 4px;
+    font-size:14.5px;line-height:1.8;color:#4b5563;
+    text-align:center;
   }
   .lp-wa{
     display:block;width:100%;text-align:center;
