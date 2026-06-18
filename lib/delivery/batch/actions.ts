@@ -1403,12 +1403,16 @@ export async function rebuildBatchProductSummary(batchId: string): Promise<void>
   const orderIds = ((batchOrders ?? []) as { order_id: string }[]).map((r) => r.order_id);
   if (!orderIds.length) return;
 
-  const { data: items } = await supabaseAdmin
+  const { data: items, error: itemsErr } = await supabaseAdmin
     .from("order_items")
-    .select("order_id, quantity, product_id, product_name, sku")
+    .select("order_id, quantity, product_id, product_name, product_sku")
     .in("order_id", orderIds);
 
-  type Item = { order_id: string; quantity: number; product_id: string | null; product_name: string | null; sku: string | null };
+  if (itemsErr) {
+    console.error(`[rebuildBatchProductSummary] order_items query failed for batch ${batchId}:`, itemsErr.message);
+  }
+
+  type Item = { order_id: string; quantity: number; product_id: string | null; product_name: string | null; product_sku: string | null };
   const itemRows = (items ?? []) as Item[];
 
   // Group by product
@@ -1417,7 +1421,7 @@ export async function rebuildBatchProductSummary(batchId: string): Promise<void>
   for (const item of itemRows) {
     const key  = item.product_id ?? item.product_name ?? "unknown";
     const name = item.product_name ?? "Produit";
-    const sku  = item.sku ?? "";
+    const sku  = item.product_sku ?? "";
 
     if (!prodMap.has(key)) {
       prodMap.set(key, { product_id: item.product_id, product_name: name, sku, total_quantity: 0, order_count: 0, order_ids: new Set() });

@@ -40,19 +40,24 @@ export type DailyBLRow = {
 };
 
 export async function getDailyBls(limit = 60): Promise<DailyBLRow[]> {
-  // First try delivery_daily_bls table
+  // 1. Load confirmed daily BL records (already generated via "Télécharger BL du jour")
+  let confirmedRows: DailyBLRow[] = [];
   try {
     const { data, error } = await supabaseAdmin
       .from("delivery_daily_bls")
       .select("*")
       .order("business_date", { ascending: false })
       .limit(limit);
-    if (!error && data && data.length > 0) {
-      return data as DailyBLRow[];
-    }
-  } catch { /* fall through */ }
+    if (!error && data) confirmedRows = data as DailyBLRow[];
+  } catch { /* fall through with empty confirmedRows */ }
 
-  // Fallback: build BL du Jour directly from orders grouped by date+store
+  const confirmedKeys = new Set(confirmedRows.map((r) => `${r.business_date}:${r.store_name}:${r.provider}`));
+
+  // 2. Always also compute pending days from orders — days/stores not yet in delivery_daily_bls.
+  //    Without this, any day already generated would mask all newer days that
+  //    haven't been generated yet (e.g. orders sent today never appearing
+  //    because an old BL exists for a previous date).
+  let computedRows: DailyBLRow[] = [];
   try {
     const { data: orders } = await supabaseAdmin
       .from("orders")
@@ -78,9 +83,12 @@ export async function getDailyBls(limit = 60): Promise<DailyBLRow[]> {
       const prov  = o.delivery_stores?.delivery_companies?.slug ?? "digylog";
       const key   = `${date}:${store}:${prov}`;
 
+      // Skip if this day/store/provider already has a confirmed BL row
+      if (confirmedKeys.has(key)) continue;
+
       if (!groups.has(key)) {
         groups.set(key, {
-          id:             key,
+          id:             `computed_${key}`,
           provider:       prov,
           store_name:     store,
           business_date:  date,
@@ -99,15 +107,15 @@ export async function getDailyBls(limit = 60): Promise<DailyBLRow[]> {
       g.total_cod += o.total_amount_mad ?? 0;
     }
 
-    // Sort by date desc + store
-    return [...groups.values()]
-      .sort((a, b) => b.business_date.localeCompare(a.business_date))
-      .slice(0, limit);
-
+    computedRows = [...groups.values()];
   } catch (e) {
-    console.error("[getDailyBls] fallback error:", e);
-    return [];
+    console.error("[getDailyBls] computed rows error:", e);
   }
+
+  // 3. Merge confirmed + computed, sort by date desc
+  return [...confirmedRows, ...computedRows]
+    .sort((a, b) => b.business_date.localeCompare(a.business_date))
+    .slice(0, limit);
 }
 
 // ── Refresh daily BL stats from orders ───────────────────────────────────────
