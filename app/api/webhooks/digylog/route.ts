@@ -33,6 +33,18 @@ async function handle(request: NextRequest) {
   // Log raw payload always
   await log("received", payload, {});
 
+  // ── Subscription handshake ──────────────────────────────────────────────
+  // Digylog calls this endpoint with {"type":"subscribe","key":"<challenge>"}
+  // to verify we control this URL before accepting it as a webhook target.
+  // It expects the same key echoed back to confirm — without this, every
+  // PUT /webhook registration attempt from our admin fails with
+  // "Webhook verification failed, key mismatch" because Digylog never
+  // got the confirmation it was waiting for.
+  if (payload?.type === "subscribe" && payload?.key) {
+    await log("subscribe_handshake", payload, { key: payload.key });
+    return NextResponse.json({ type: "subscribe", key: payload.key }, { status: 200 });
+  }
+
   // Extract tracking — Digylog may use different field names
   const tracking =
     String(payload.tracking ?? payload.num ?? payload.trackingNumber ?? payload.code ?? "").trim();
