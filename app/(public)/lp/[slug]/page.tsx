@@ -115,26 +115,21 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const b3 = Number(lp.bundle_3_price || (price * 3 * 0.8).toFixed(2));
 
   const primary   = product.images.find((i) => i.is_primary) ?? product.images[0] ?? null;
-  const gallery   = product.images.slice(0, 6);
 
   const psSection   = getSection("problem_solution");
   const benSection  = getSection("benefits");
   const revSection  = getSection("reviews");
   const faqSection  = getSection("faq");
-  const lifeSection = getSection("lifestyle");
   const formSection = getSection("order_form");
 
   type Benefit  = { icon: string; title: string; desc: string };
   type Review   = { name: string; city: string; stars: number; text: string };
   type FaqItem  = { q: string; a: string };
-  type Scenario = { icon: string; title: string; desc: string };
 
   const benefits:  Benefit[]  = (benSection?.items  as Benefit[])  ?? defaultBenefits;
   const reviews:   Review[]   = (revSection?.items  as Review[])   ?? defaultReviews;
   const faqItems:  FaqItem[]  = (faqSection?.items  as FaqItem[])  ?? defaultFaq;
-  const scenarios: Scenario[] = (lifeSection?.scenarios as Scenario[]) ?? [];
 
-  const formTitle = String(formSection?.headline ?? "اطلب الآن — الدفع عند الاستلام");
   const formNote  = String(formSection?.reassurance ?? "معلوماتك محفوظة · لا دفع مسبق · توصيل مضمون");
 
   const canonicalUrl = `${SITE_URL}/lp/${slug}`;
@@ -258,6 +253,16 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             {/* Primary CTA */}
             <a href="#lp-form" className="lp-cta">{ctaText}</a>
 
+            {/* Order form — moved directly into the hero so a customer can
+                complete a purchase without scrolling past unrelated sections.
+                This is the core change from the old multi-section layout. */}
+            <div id="lp-form" className="lp-form-inline">
+              <p className="lp-form-note green">{formNote}</p>
+              <OrderFormPublic product={product} productSlug={slug}
+                ctaText={ctaText} b1={b1} b2={b2} b3={b3}
+                cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
+            </div>
+
             {/* Product description — clear, visible explanation of what this is */}
             <div className="lp-desc">
               <p>{description}</p>
@@ -276,71 +281,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </section>
 
-        {/* ── PROBLEM ── */}
-        {psSection && (
-          <section className="lp-section lp-section--gray">
-            <div className="lp-wrap">
-              <h2 className="lp-h2">
-                {String(psSection.before_title ?? "واش كتعيش هاد المشكل؟")}
-              </h2>
-              <div className="lp-card">
-                {((psSection.before_points as string[]) ?? []).map((pt, i, arr) => (
-                  <div key={i} className={`lp-check-row ${i < arr.length - 1 ? "lp-check-row--border" : ""}`}>
-                    <span className="lp-x">✗</span>
-                    <p className="lp-check-text">{pt}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ── SOLUTION ── */}
-        {psSection && (
-          <section className="lp-section">
-            <div className="lp-wrap">
-              <h2 className="lp-h2">
-                {String(psSection.after_title ?? "الحل وصل")}
-              </h2>
-              <div className="lp-card lp-card--green">
-                {((psSection.after_points as string[]) ?? []).map((pt, i, arr) => (
-                  <div key={i} className={`lp-check-row ${i < arr.length - 1 ? "lp-check-row--border-g" : ""}`}>
-                    <span className="lp-tick">✓</span>
-                    <p className="lp-check-text lp-check-text--g">{pt}</p>
-                  </div>
-                ))}
-              </div>
-              <div style={{ textAlign:"center", marginTop:"20px" }}>
-                <a href="#lp-form" className="lp-cta" style={{ display:"inline-block",
-                  width:"auto", padding:"13px 36px", fontSize:"15px" }}>
-                  {ctaText}
-                </a>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ── LIFESTYLE SCENARIOS ── */}
-        {scenarios.length > 0 && (
-          <section className="lp-section lp-section--gray">
-            <div className="lp-wrap">
-              <h2 className="lp-h2">
-                {String(lifeSection?.title ?? "كيفاش يغير حياتك؟")}
-              </h2>
-              <div className="lp-grid-2">
-                {scenarios.map((s, i) => (
-                  <div key={i} className="lp-card lp-scenario">
-                    <span className="lp-scenario-icon">{s.icon}</span>
-                    <p className="lp-scenario-title">{s.title}</p>
-                    <p className="lp-scenario-desc">{s.desc}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ── BENEFITS ── */}
+        {/* ── BENEFITS (short) ── */}
         <section className="lp-section">
           <div className="lp-wrap">
             <h2 className="lp-h2">مميزات المنتج</h2>
@@ -358,47 +299,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </section>
 
-        {/* ── GALLERY ── */}
-        {gallery.length > 1 && (
-          <section className="lp-section lp-section--gray">
-            <div className="lp-wrap">
-              <h2 className="lp-h2" style={{ fontSize:"16px" }}>صور المنتج</h2>
-              <div className="lp-gallery">
-                {gallery.map((img) => (
-                  <div key={img.id} className="lp-gallery-item">
-                    <Image src={img.public_url} alt={product.name} fill
-                      style={{ objectFit:"cover" }} sizes="33vw" unoptimized />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ── TRUST STRIP ── */}
-        <section className="lp-trust">
-          <div className="lp-wrap">
-            <div className="lp-grid-2">
-              {[
-                { icon:"💵", t:"الدفع عند الاستلام", d:"لا دفع مسبق إطلاقاً" },
-                { icon:"🚀", t:"توصيل 2-4 أيام",     d:"لجميع مدن المغرب" },
-                { icon:"📞", t:"تأكيد هاتفي",         d:"فريقنا يتصل بك" },
-                { icon:"✓",  t:"ضمان سنة كاملة",     d:"استرجاع مجاني" },
-              ].map((item) => (
-                <div key={item.t} className="lp-trust-item">
-                  <span className="lp-trust-icon">{item.icon}</span>
-                  <div>
-                    <p className="lp-trust-title">{item.t}</p>
-                    <p className="lp-trust-desc">{item.d}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* ── REVIEWS ── */}
-        <section className="lp-section">
+        <section className="lp-section lp-section--gray">
           <div className="lp-wrap">
             <div className="lp-reviews-header">
               <h2 className="lp-h2" style={{ margin:0 }}>آراء العملاء</h2>
@@ -409,7 +311,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               </div>
             </div>
             <div className="lp-reviews">
-              {reviews.map((r, i) => (
+              {reviews.slice(0, 3).map((r, i) => (
                 <div key={i} className="lp-card lp-review">
                   <div className="lp-review-top">
                     <div className="lp-review-info">
@@ -431,55 +333,11 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </section>
 
-        {/* ── BUNDLE OFFERS ── */}
-        <section className="lp-section lp-section--green-light">
-          <div className="lp-wrap">
-            <h2 className="lp-h2">اختر عرضك</h2>
-            <div className="lp-bundles">
-              {[
-                { qty:1, label:"قطعة واحدة",  price:b1, tag:null,     pop:false },
-                { qty:2, label:"قطعتين",      price:b2,
-                  tag:`وفّر ${(b1*2-b2).toFixed(0)} درهم`, pop:true  },
-                { qty:3, label:"3 قطع — عرض عائلي", price:b3,
-                  tag:`وفّر ${(b1*3-b3).toFixed(0)} درهم`, pop:false },
-              ].map((o) => (
-                <a key={o.qty} href="#lp-form"
-                  className={`lp-bundle ${o.pop ? "lp-bundle--pop" : ""}`}>
-                  {o.pop && <span className="lp-bundle-badge">الأوفر</span>}
-                  <div className="lp-bundle-left">
-                    <span className="lp-bundle-label">{o.qty}× — {o.label}</span>
-                    {o.tag && (
-                      <span className={`lp-bundle-tag ${o.pop ? "lp-bundle-tag--pop" : ""}`}>
-                        {o.tag}
-                      </span>
-                    )}
-                  </div>
-                  <span className="lp-bundle-price">
-                    {o.price.toFixed(0)}{" "}
-                    <small>درهم</small>
-                  </span>
-                </a>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── ORDER FORM ── */}
-        <section id="lp-form" className="lp-section" style={{ paddingBottom:"40px" }}>
-          <div className="lp-wrap">
-            <h2 className="lp-h2">{formTitle}</h2>
-            <p className="lp-form-note green">{formNote}</p>
-            <OrderFormPublic product={product} productSlug={slug}
-              ctaText={ctaText} b1={b1} b2={b2} b3={b3}
-              cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
-          </div>
-        </section>
-
         {/* ── FAQ ── */}
-        <section className="lp-section lp-section--gray">
+        <section className="lp-section">
           <div className="lp-wrap">
             <h2 className="lp-h2">الأسئلة الشائعة</h2>
-            <FaqAccordion items={faqItems} />
+            <FaqAccordion items={faqItems.slice(0, 5)} />
           </div>
         </section>
 
@@ -640,6 +498,12 @@ const GLOBAL_CSS = `
     display:inline-block;width:auto;
     padding:13px 40px;margin-top:6px;
     box-shadow:none;
+  }
+  .lp-form-inline{
+    margin-top:18px;padding:18px 16px;
+    background:#fff;border-radius:16px;
+    border:1px solid #e5e7eb;
+    box-shadow:0 4px 20px rgba(0,0,0,.06);
   }
   .lp-desc{
     margin-top:16px;padding:14px 4px;
