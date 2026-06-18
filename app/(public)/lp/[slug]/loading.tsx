@@ -3,7 +3,7 @@ export default function LPLoading() {
     <div style={{
       minHeight: "100vh",
       backgroundColor: "#f9fafb",
-      fontFamily: "'Cairo', sans-serif",
+      fontFamily: "var(--font-cairo), sans-serif",
     }}>
       {/* Urgency bar skeleton */}
       <div style={{ backgroundColor: "#dc2626", height: "40px" }} />

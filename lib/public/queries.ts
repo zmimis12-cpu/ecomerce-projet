@@ -32,6 +32,7 @@ export interface PublicLandingPage {
   offer_text: string | null;
   meta_pixel_id: string | null;
   tiktok_pixel_id: string | null;
+  google_gtm_id: string | null;
   product: PublicProduct;
 }
 
@@ -42,13 +43,13 @@ export async function getLandingPage(slug: string): Promise<PublicLandingPage | 
   // Try landing_pages table first
   const { data: lp } = await supabase
     .from("landing_pages")
-    .select("id, slug, title, subtitle, description, offer_text, meta_pixel_id, tiktok_pixel_id, product_id")
+    .select("id, slug, title, subtitle, description, offer_text, meta_pixel_id, tiktok_pixel_id, google_gtm_id, product_id")
     .eq("slug", slug)
     .eq("is_active", true)
     .maybeSingle();
 
   if (lp) {
-    const page = lp as unknown as { id: string; slug: string; title: string; subtitle: string | null; description: string | null; offer_text: string | null; meta_pixel_id: string | null; tiktok_pixel_id: string | null; product_id: string };
+    const page = lp as unknown as { id: string; slug: string; title: string; subtitle: string | null; description: string | null; offer_text: string | null; meta_pixel_id: string | null; tiktok_pixel_id: string | null; google_gtm_id: string | null; product_id: string };
     const product = await getPublicProduct(page.product_id);
     if (!product) return null;
     return { ...page, product };
@@ -67,6 +68,7 @@ export async function getLandingPage(slug: string): Promise<PublicLandingPage | 
     offer_text:      null,
     meta_pixel_id:   null,
     tiktok_pixel_id: null,
+    google_gtm_id:   null,
     product,
   };
 }

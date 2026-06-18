@@ -17,7 +17,7 @@ export function FaqAccordion({ items }: { items: FaqItem[] }) {
             style={{ width:"100%", display:"flex", justifyContent:"space-between",
               alignItems:"center", padding:"14px 16px",
               background:"none", border:"none", cursor:"pointer",
-              fontFamily:"'Cairo',sans-serif", textAlign:"right", gap:"12px" }}>
+              fontFamily:"var(--font-cairo),sans-serif", textAlign:"right", gap:"12px" }}>
             <span style={{ fontSize:"clamp(13px,3.5vw,14px)", fontWeight:700,
               color:"#111827", flex:1, textAlign:"right", lineHeight:1.4 }}>
               {item.q}

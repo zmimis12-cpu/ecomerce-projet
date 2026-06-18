@@ -43,6 +43,7 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
   const [whatsapp,     setWhatsapp]     = useState(String(defaultValues?.whatsapp_number ?? ""));
   const [metaPixel,    setMetaPixel]    = useState(String(defaultValues?.meta_pixel_id  ?? ""));
   const [tiktokPixel,  setTiktokPixel]  = useState(String(defaultValues?.tiktok_pixel_id ?? ""));
+  const [googleGtm,    setGoogleGtm]    = useState(String(defaultValues?.google_gtm_id ?? ""));
   const [isActive,     setIsActive]     = useState(Boolean(defaultValues?.is_active    ?? true));
   const [b1,           setB1]           = useState<string>(String(defaultValues?.bundle_1_price ?? ""));
   const [b2,           setB2]           = useState<string>(String(defaultValues?.bundle_2_price ?? ""));
@@ -116,6 +117,7 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
           whatsapp_number:  whatsapp || undefined,
           meta_pixel_id:    metaPixel || undefined,
           tiktok_pixel_id:  tiktokPixel || undefined,
+          google_gtm_id:    googleGtm || undefined,
           template_key:     templateKey,
           sections,
           is_active:        isActive,
@@ -393,6 +395,13 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
           <Field label="TikTok Pixel ID">
             <input type="text" value={tiktokPixel} onChange={(e) => setTiktokPixel(e.target.value)}
               placeholder="ABCDE1234567890" className={inputCls(false)} />
+          </Field>
+          <Field label="Google Tag Manager ID">
+            <input type="text" value={googleGtm} onChange={(e) => setGoogleGtm(e.target.value)}
+              placeholder="GTM-XXXXXXX" className={inputCls(false)} />
+            <p className="text-xs text-muted-foreground mt-1">
+              Pour Google Ads — créez un conteneur sur tagmanager.google.com, collez son ID ici
+            </p>
           </Field>
           <div className="rounded-lg bg-secondary/30 p-3 text-xs text-muted-foreground">
             <p className="font-medium mb-1 flex items-center gap-1">

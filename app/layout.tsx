@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { headers } from "next/headers";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -20,9 +21,16 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Public landing pages (/lp/*) are entirely in Arabic — the <html> tag must
+  // reflect that for SEO and accessibility. Next.js doesn't support a second
+  // <html> per route group, so we read the pathname (forwarded by middleware)
+  // and set lang/dir dynamically here instead.
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  const isLandingPage = pathname.startsWith("/lp");
+
   return (
-    <html lang="fr" suppressHydrationWarning>
+    <html lang={isLandingPage ? "ar" : "fr"} dir={isLandingPage ? "rtl" : "ltr"} suppressHydrationWarning>
       <body className={inter.className} style={{ overflowX: "hidden" }}>
         {children}
       </body>

@@ -10,7 +10,13 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/api/public/") ||
     pathname.startsWith("/api/webhooks/")
   ) {
-    return NextResponse.next();
+    // Forward the pathname as a REQUEST header so the root layout can read it
+    // via next/headers and set <html lang="ar" dir="rtl"> for landing pages
+    // (they're entirely in Arabic) — Next.js doesn't allow a second <html> tag
+    // per route group, so this is the supported way to vary it per route.
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-pathname", pathname);
+    return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
   let supabaseResponse = NextResponse.next({ request });

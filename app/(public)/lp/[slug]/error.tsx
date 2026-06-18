@@ -18,7 +18,7 @@ export default function LPError({
       padding: "24px",
       textAlign: "center",
       backgroundColor: "#f9fafb",
-      fontFamily: "'Cairo', sans-serif",
+      fontFamily: "var(--font-cairo), sans-serif",
     }}>
       <div style={{ fontSize: "64px", marginBottom: "16px" }}>😕</div>
       <h1 style={{ fontSize: "22px", fontWeight: 900, color: "#111827", margin: "0 0 8px" }}>
@@ -38,7 +38,7 @@ export default function LPError({
           fontSize: "16px",
           fontWeight: 700,
           cursor: "pointer",
-          fontFamily: "'Cairo', sans-serif",
+          fontFamily: "var(--font-cairo), sans-serif",
         }}
       >
         حاول مجدداً

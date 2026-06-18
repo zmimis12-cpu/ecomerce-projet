@@ -61,7 +61,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   if (submitted) return (
     <div style={{ borderRadius:"16px", background:"#f0fdf4",
       border:"2px solid #bbf7d0", padding:"32px 24px",
-      textAlign:"center", fontFamily:"'Cairo',sans-serif" }}>
+      textAlign:"center", fontFamily:"var(--font-cairo),sans-serif" }}>
       <div style={{ width:"60px", height:"60px", borderRadius:"50%",
         background:"#16a34a", display:"flex", alignItems:"center",
         justifyContent:"center", margin:"0 auto 14px",
@@ -85,7 +85,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     display:"block", width:"100%", height:"48px",
     borderRadius:"12px", border:`2px solid ${err ? "#f87171" : "#e5e7eb"}`,
     background:"#fff", padding:"0 14px",
-    fontSize:"16px", fontFamily:"'Cairo',sans-serif",
+    fontSize:"16px", fontFamily:"var(--font-cairo),sans-serif",
     boxSizing:"border-box", outline:"none", color:"#111827",
     WebkitAppearance:"none", appearance:"none",
     transition:"border-color .15s",
@@ -99,7 +99,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   ) : null;
 
   return (
-    <form onSubmit={handleSubmit} style={{ fontFamily:"'Cairo',sans-serif" }}>
+    <form onSubmit={handleSubmit} style={{ fontFamily:"var(--font-cairo),sans-serif" }}>
       {/* Honeypot */}
       <input type="text" name="website" value={form.website}
         onChange={(e) => set("website", e.target.value)}
@@ -116,7 +116,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
                 alignItems:"center", padding:"12px 14px", borderRadius:"12px",
                 border:`2px solid ${bundle===b.qty ? "#16a34a" : "#e5e7eb"}`,
                 background: bundle===b.qty ? "#f0fdf4" : "#fff",
-                cursor:"pointer", fontFamily:"'Cairo',sans-serif",
+                cursor:"pointer", fontFamily:"var(--font-cairo),sans-serif",
                 transition:"border-color .15s,background .15s" }}>
               <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
                 <div style={{ width:"18px", height:"18px", borderRadius:"50%",
@@ -217,7 +217,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           color:"#fff", fontSize:"clamp(15px,4vw,17px)", fontWeight:800,
           padding:"15px 24px", borderRadius:"12px",
           border:"none", cursor: isPending ? "not-allowed" : "pointer",
-          fontFamily:"'Cairo',sans-serif", boxSizing:"border-box",
+          fontFamily:"var(--font-cairo),sans-serif", boxSizing:"border-box",
           boxShadow: isPending ? "none" : "0 3px 14px rgba(22,163,74,.28)",
           transition:"background .15s" }}>
         {isPending ? "جاري إرسال الطلب…" : `${ctaText} — ${total.toFixed(0)} درهم`}

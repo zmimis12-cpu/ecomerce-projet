@@ -106,7 +106,7 @@ export function OrderForm({ product, productSlug }: OrderFormProps) {
     backgroundColor: "white",
     padding: "0 14px",
     fontSize: "16px",           // 16px prevents iOS zoom-in on focus
-    fontFamily: "'Cairo', sans-serif",
+    fontFamily: "var(--font-cairo), sans-serif",
     boxSizing: "border-box",
     outline: "none",
     color: "#111827",
@@ -123,7 +123,7 @@ export function OrderForm({ product, productSlug }: OrderFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ fontFamily: "'Cairo', sans-serif" }}>
+    <form onSubmit={handleSubmit} style={{ fontFamily: "var(--font-cairo), sans-serif" }}>
       {/* Honeypot */}
       <input
         type="text" name="website" value={form.website}
@@ -233,7 +233,7 @@ export function OrderForm({ product, productSlug }: OrderFormProps) {
             display: "block", width: "100%", borderRadius: "14px",
             border: "2px solid #e5e7eb", backgroundColor: "white",
             padding: "12px 14px", fontSize: "16px",
-            fontFamily: "'Cairo', sans-serif",
+            fontFamily: "var(--font-cairo), sans-serif",
             boxSizing: "border-box", resize: "none", outline: "none",
             color: "#111827",
           }}
@@ -282,7 +282,7 @@ export function OrderForm({ product, productSlug }: OrderFormProps) {
           color: "white", fontSize: "20px", fontWeight: 900,
           padding: "18px 24px", borderRadius: "16px",
           border: "none", cursor: isPending ? "not-allowed" : "pointer",
-          fontFamily: "'Cairo', sans-serif",
+          fontFamily: "var(--font-cairo), sans-serif",
           boxSizing: "border-box",
           boxShadow: isPending ? "none" : "0 4px 20px rgba(22,163,74,0.35)",
           transition: "background-color 0.2s",

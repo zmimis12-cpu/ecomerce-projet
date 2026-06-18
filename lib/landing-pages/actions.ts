@@ -39,6 +39,7 @@ export async function upsertLandingPage(id: string | null, data: {
   whatsapp_number?: string;
   meta_pixel_id?: string;
   tiktok_pixel_id?: string;
+  google_gtm_id?: string;
   template_key?: string;
   sections?: unknown;
   is_active: boolean;

@@ -11,17 +11,45 @@ import type { LPSection } from "@/lib/templates";
 
 export const revalidate = 3600;
 
+const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://ecomerce-projet.vercel.app").replace(/\/$/, "");
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const page = await getLandingPage(slug);
-  if (!page) return { title: "منتج غير موجود" };
+  if (!page) return { title: "منتج غير موجود", robots: { index: false, follow: false } };
+
+  const canonicalUrl = `${SITE_URL}/lp/${slug}`;
+  const description  = page.description ?? `${page.product.name} — الدفع عند الاستلام، توصيل سريع لجميع مدن المغرب.`;
+  const image         = page.product.images[0]?.public_url;
+
   return {
     title: page.title,
-    description: page.description ?? page.product.name,
-    robots: { index: true, follow: false },
+    description,
+    alternates: {
+      canonical: canonicalUrl,
+    },
+    // index:true so Google can list the page; follow:true so it crawls
+    // internal links/category pages reachable from here — follow:false was
+    // actively hurting discovery of the rest of the catalog.
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: { index: true, follow: true, "max-image-preview": "large" },
+    },
     openGraph: {
-      title:  page.title,
-      images: page.product.images[0]?.public_url ? [page.product.images[0].public_url] : [],
+      type:        "website",
+      locale:      "ar_MA",
+      url:         canonicalUrl,
+      siteName:    "HajtekZone",
+      title:       page.title,
+      description,
+      images: image ? [{ url: image, width: 1200, height: 1200, alt: page.product.name }] : [],
+    },
+    twitter: {
+      card:        "summary_large_image",
+      title:       page.title,
+      description,
+      images: image ? [image] : [],
     },
   };
 }
@@ -69,7 +97,9 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const subline   = String(lp.hero_subheadline ?? "توصيل سريع · الدفع عند الاستلام · ضمان الجودة");
   const offerBar  = String(lp.offer_text       ?? "");
   const ctaText   = String(lp.cta_text         ?? "اطلب الآن");
-  const oldPrice  = String(lp.old_price_text   ?? `${(price * 1.3).toFixed(0)} درهم`);
+  const oldPriceNum = Number(lp.old_price_num) || price * 1.3;
+  const oldPrice  = String(lp.old_price_text   ?? `${oldPriceNum.toFixed(0)} درهم`);
+  const discountPct = oldPriceNum > price ? Math.round((1 - price / oldPriceNum) * 100) : 0;
   const whatsapp  = String(lp.whatsapp_number  ?? "");
   const b1 = Number(lp.bundle_1_price || price);
   const b2 = Number(lp.bundle_2_price || (price * 2 * 0.9).toFixed(2));
@@ -98,12 +128,66 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const formTitle = String(formSection?.headline ?? "اطلب الآن — الدفع عند الاستلام");
   const formNote  = String(formSection?.reassurance ?? "معلوماتك محفوظة · لا دفع مسبق · توصيل مضمون");
 
+  const canonicalUrl = `${SITE_URL}/lp/${slug}`;
+
+  // Structured data for Google (Product + Offer + AggregateRating).
+  // Numbers here MUST match what's visually shown on the page (4.8 / 200
+  // reviews) — Google can penalize mismatched structured data.
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: page.description ?? product.name,
+    image: product.images.map((i) => i.public_url),
+    sku: product.id,
+    offers: {
+      "@type": "Offer",
+      url: canonicalUrl,
+      priceCurrency: "MAD",
+      price: price.toFixed(2),
+      availability: "https://schema.org/InStock",
+      itemCondition: "https://schema.org/NewCondition",
+    },
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: "4.8",
+      reviewCount: "200",
+    },
+  };
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "الرئيسية", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: product.name, item: canonicalUrl },
+    ],
+  };
+
   return (
     <>
+      <script type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
+      <script type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+
+      {page.google_gtm_id && (
+        <script dangerouslySetInnerHTML={{ __html:
+          `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${page.google_gtm_id}');`
+        }} />
+      )}
+
       {page.meta_pixel_id && (
         <script dangerouslySetInnerHTML={{ __html:
           `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${page.meta_pixel_id}');fbq('track','PageView');`
         }} />
+      )}
+
+      {page.google_gtm_id && (
+        <noscript>
+          <iframe src={`https://www.googletagmanager.com/ns.html?id=${page.google_gtm_id}`}
+            height="0" width="0" style={{ display: "none", visibility: "hidden" }} />
+        </noscript>
       )}
 
       <style>{GLOBAL_CSS}</style>
@@ -114,6 +198,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         {offerBar && (
           <div className="lp-bar">{offerBar}</div>
         )}
+
 
         {/* ── HERO ── */}
         <section className="lp-hero">
@@ -136,16 +221,19 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
             {/* Hero image */}
             {primary && (
-              <div className="lp-img-wrap">
-                <Image src={primary.public_url} alt={product.name} fill
+              <div className="lp-img-wrap lp-fade-in">
+                <Image src={primary.public_url} alt={`${product.name} — اشتري الآن بسعر ${price.toFixed(0)} درهم`} fill
                   className="lp-img" priority
                   sizes="(max-width:600px) 100vw,(max-width:900px) 80vw,560px"
                   unoptimized />
+                {discountPct > 0 && (
+                  <span className="lp-discount-badge">-{discountPct}%</span>
+                )}
               </div>
             )}
 
             {/* Price row */}
-            <div className="lp-price-card">
+            <div className="lp-price-card lp-fade-in">
               <div className="lp-price-left">
                 <span className="lp-price-label">السعر</span>
                 <div className="lp-price-row">
@@ -434,7 +522,7 @@ const defaultFaq = [
 const GLOBAL_CSS = `
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
-  body{font-family:'Cairo',sans-serif;background:#f7f8fa;color:#111827;overflow-x:hidden}
+  body{font-family:var(--font-cairo),sans-serif;background:#f7f8fa;color:#111827;overflow-x:hidden}
 
   /* ── Layout ── */
   .lp-root{min-height:100vh}
@@ -485,9 +573,26 @@ const GLOBAL_CSS = `
   /* ── Hero image ── */
   .lp-img-wrap{position:relative;width:100%;aspect-ratio:1/1;
     border-radius:18px;overflow:hidden;
-    box-shadow:0 4px 24px rgba(0,0,0,.09);
+    box-shadow:0 8px 30px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.06);
     margin-bottom:18px;background:#f3f4f6;}
   .lp-img{object-fit:cover}
+  .lp-discount-badge{
+    position:absolute;top:12px;left:12px;z-index:2;
+    background:#ef4444;color:#fff;font-weight:800;
+    font-size:clamp(13px,3.5vw,15px);
+    padding:6px 12px;border-radius:9999px;
+    box-shadow:0 3px 10px rgba(239,68,68,.4);
+    font-family:var(--font-cairo),sans-serif;
+  }
+
+  /* ── Entrance animation (subtle, respects reduced motion) ── */
+  @media (prefers-reduced-motion: no-preference) {
+    .lp-fade-in{animation:lpFadeIn .5s ease-out both;}
+  }
+  @keyframes lpFadeIn{
+    from{opacity:0;transform:translateY(8px);}
+    to{opacity:1;transform:translateY(0);}
+  }
 
   /* ── Price card ── */
   .lp-price-card{display:flex;justify-content:space-between;align-items:center;
@@ -505,15 +610,17 @@ const GLOBAL_CSS = `
   /* ── CTA button ── */
   .lp-cta{
     display:block;width:100%;text-align:center;
-    background:#16a34a;color:#fff;
-    font-family:'Cairo',sans-serif;
+    background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;
+    font-family:var(--font-cairo),sans-serif;
     font-size:clamp(15px,4vw,17px);font-weight:800;
-    padding:15px 24px;border-radius:14px;
+    padding:16px 24px;border-radius:14px;
     text-decoration:none;border:none;cursor:pointer;
-    box-shadow:0 3px 14px rgba(22,163,74,.28);
-    transition:background .15s,transform .1s;
+    box-shadow:0 4px 18px rgba(22,163,74,.32),0 1px 3px rgba(22,163,74,.2);
+    transition:background .15s,transform .1s,box-shadow .15s;
   }
+  .lp-cta:hover{box-shadow:0 6px 22px rgba(22,163,74,.4),0 1px 3px rgba(22,163,74,.2);}
   .lp-cta:active{transform:scale(.98);background:#15803d}
+  .lp-cta:focus-visible{outline:3px solid #bbf7d0;outline-offset:2px;}
   .lp-cta--white{
     background:#fff;color:#16a34a;
     display:inline-block;width:auto;
@@ -523,21 +630,30 @@ const GLOBAL_CSS = `
   .lp-wa{
     display:block;width:100%;text-align:center;
     background:#25d366;color:#fff;
-    font-family:'Cairo',sans-serif;
+    font-family:var(--font-cairo),sans-serif;
     font-size:14px;font-weight:700;
     padding:12px 24px;border-radius:14px;
     text-decoration:none;margin-top:10px;
+    transition:transform .1s;
   }
+  .lp-wa:active{transform:scale(.98);}
 
   /* ── Cards ── */
   .lp-card{
     background:#fff;border-radius:14px;
     border:1px solid #e5e7eb;
-    box-shadow:0 1px 3px rgba(0,0,0,.05),0 4px 10px rgba(0,0,0,.03);
+    box-shadow:0 1px 2px rgba(0,0,0,.04),0 6px 16px rgba(0,0,0,.05);
     padding:16px 18px;
+    transition:box-shadow .2s,transform .2s;
   }
   .lp-card--green{
     background:#f0fdf4;border-color:#bbf7d0;
+  }
+  @media(hover:hover){
+    .lp-review:hover,.lp-benefit:hover,.lp-scenario:hover{
+      box-shadow:0 2px 6px rgba(0,0,0,.06),0 10px 24px rgba(0,0,0,.08);
+      transform:translateY(-2px);
+    }
   }
 
   /* ── Check rows ── */
@@ -609,7 +725,7 @@ const GLOBAL_CSS = `
     position:absolute;top:-11px;right:14px;
     background:#f59e0b;color:#fff;font-size:10px;font-weight:700;
     padding:2px 10px;border-radius:9999px;
-    font-family:'Cairo',sans-serif;
+    font-family:var(--font-cairo),sans-serif;
   }
   .lp-bundle-left{display:flex;flex-direction:column;gap:4px;}
   .lp-bundle-label{font-weight:700;font-size:clamp(12px,3.5vw,14px);color:#111827;}
@@ -647,7 +763,7 @@ const GLOBAL_CSS = `
   .lp-sticky-price small{font-size:11px;}
   .lp-sticky-btn{
     flex-shrink:0;background:#16a34a;color:#fff;
-    font-family:'Cairo',sans-serif;font-size:14px;font-weight:800;
+    font-family:var(--font-cairo),sans-serif;font-size:14px;font-weight:800;
     padding:11px 20px;border-radius:12px;text-decoration:none;
     box-shadow:0 2px 10px rgba(22,163,74,.28);
   }
