@@ -51,7 +51,16 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         };
         if (data.success) {
           setSubmitted(true);
-          if (typeof window !== "undefined") window.scrollTo({top:0,behavior:"smooth"});
+          // Conversion tracking — fires only on confirmed order creation.
+          // "Lead" (not "Purchase") since payment happens on delivery (COD),
+          // not at submission time — this is the correct Meta standard event
+          // for COD funnels and lets Meta Ads actually learn who converts.
+          if (typeof window !== "undefined") {
+            const w = window as unknown as { fbq?: (...args: unknown[]) => void; dataLayer?: unknown[] };
+            w.fbq?.("track", "Lead", { value: total, currency: "MAD", content_name: product.name });
+            w.dataLayer?.push({ event: "generate_lead", value: total, currency: "MAD", item_name: product.name });
+            window.scrollTo({top:0,behavior:"smooth"});
+          }
         } else if (data.errors) { setErrors(data.errors); }
         else { setServerError(data.error ?? "حدث خطأ. حاول مجدداً."); }
       } catch { setServerError("خطأ في الاتصال. حاول مجدداً."); }

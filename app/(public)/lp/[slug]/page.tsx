@@ -7,6 +7,7 @@ import { getLandingPage } from "@/lib/public/queries";
 import { OrderFormPublic } from "@/components/landing/order-form-public";
 import { StockCounter } from "@/components/landing/stock-counter";
 import { FaqAccordion } from "@/components/landing/faq-accordion";
+import { ProductGallery } from "@/components/landing/product-gallery";
 import type { LPSection } from "@/lib/templates";
 
 export const revalidate = 3600;
@@ -113,8 +114,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const b1 = Number(lp.bundle_1_price || price);
   const b2 = Number(lp.bundle_2_price || (price * 2 * 0.9).toFixed(2));
   const b3 = Number(lp.bundle_3_price || (price * 3 * 0.8).toFixed(2));
-
-  const primary   = product.images.find((i) => i.is_primary) ?? product.images[0] ?? null;
 
   const psSection   = getSection("problem_solution");
   const benSection  = getSection("benefits");
@@ -223,16 +222,14 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               ))}
             </div>
 
-            {/* Hero image */}
-            {primary && (
-              <div className="lp-img-wrap lp-fade-in">
-                <Image src={primary.public_url} alt={`${product.name} — اشتري الآن بسعر ${price.toFixed(0)} درهم`} fill
-                  className="lp-img" priority
-                  sizes="(max-width:600px) 100vw,(max-width:900px) 80vw,560px"
-                  unoptimized />
-                {discountPct > 0 && (
-                  <span className="lp-discount-badge">-{discountPct}%</span>
-                )}
+            {/* Gallery — multiple photos build trust for COD customers */}
+            {product.images.length > 0 && (
+              <div className="lp-fade-in">
+                <ProductGallery
+                  images={product.images}
+                  productName={product.name}
+                  discountPct={discountPct}
+                />
               </div>
             )}
 
@@ -442,12 +439,42 @@ const GLOBAL_CSS = `
     color:#15803d;font-size:11px;font-weight:600;
     padding:4px 10px;border-radius:9999px;}
 
-  /* ── Hero image ── */
-  .lp-img-wrap{position:relative;width:100%;aspect-ratio:1/1;
+  /* ── Gallery ── */
+  .lp-gallery-main{
+    position:relative;width:100%;aspect-ratio:1/1;
     border-radius:18px;overflow:hidden;
     box-shadow:0 8px 30px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.06);
-    margin-bottom:18px;background:#f3f4f6;}
-  .lp-img{object-fit:cover}
+    margin-bottom:10px;background:#f3f4f6;
+  }
+  .lp-gallery-counter{
+    position:absolute;bottom:10px;right:10px;z-index:2;
+    background:rgba(0,0,0,.45);color:#fff;
+    font-size:11px;font-weight:600;
+    padding:3px 8px;border-radius:9999px;
+  }
+  .lp-gallery-arrow{
+    position:absolute;top:50%;transform:translateY(-50%);z-index:2;
+    background:rgba(255,255,255,.85);border:none;cursor:pointer;
+    width:36px;height:36px;border-radius:50%;
+    font-size:22px;line-height:1;color:#111;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 8px rgba(0,0,0,.15);
+  }
+  .lp-gallery-arrow--prev{left:10px;}
+  .lp-gallery-arrow--next{right:10px;}
+  .lp-thumbs{
+    display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;
+    scrollbar-width:none;margin-bottom:18px;
+  }
+  .lp-thumbs::-webkit-scrollbar{display:none;}
+  .lp-thumb{
+    position:relative;flex-shrink:0;
+    width:72px;height:72px;border-radius:10px;overflow:hidden;
+    border:2px solid transparent;cursor:pointer;background:#f3f4f6;
+    transition:border-color .15s;
+  }
+  .lp-thumb--active{border-color:#16a34a;}
+  .lp-thumb:hover{border-color:#86efac;}
   .lp-discount-badge{
     position:absolute;top:12px;left:12px;z-index:2;
     background:#ef4444;color:#fff;font-weight:800;
