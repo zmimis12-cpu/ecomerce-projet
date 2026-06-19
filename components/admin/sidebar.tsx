@@ -109,7 +109,9 @@ export function AdminSidebar({ role }: { role: AppRole }) {
     if (href === "/admin/call-center") return pathname === "/admin/call-center";
     if (href === "/admin/delivery")    return pathname === "/admin/delivery";
     if (exact) return pathname === href;
-    return pathname.startsWith(href);
+    // Segment-aware: active only if exact match OR pathname continues with "/"
+    // Prevents /admin/settings from highlighting when on /admin/settings/ads
+    return pathname === href || pathname.startsWith(href + "/");
   }
 
   function isGroupActive(prefix?: string) {
