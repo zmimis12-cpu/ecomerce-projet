@@ -29,7 +29,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
   // + a font-family override scoped to this subtree via a wrapper div,
   // since we can't reach the <body> tag from a nested route group layout.
   return (
-    <div className={cairo.variable} style={{ fontFamily: "var(--font-cairo), sans-serif" }}>
+    <div className={cairo.variable} style={{ fontFamily: "var(--font-cairo), sans-serif", width: "100%", overflowX: "hidden" }}>
       {children}
     </div>
   );

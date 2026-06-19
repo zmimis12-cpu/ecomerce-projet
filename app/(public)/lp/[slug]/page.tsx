@@ -390,12 +390,12 @@ const defaultFaq = [
 // ── Global CSS — single source of truth ──────────────────────────────────────
 const GLOBAL_CSS = `
   *{box-sizing:border-box;margin:0;padding:0}
-  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
-  body{font-family:var(--font-cairo),sans-serif;background:#f7f8fa;color:#111827;overflow-x:hidden}
+  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;overflow-x:hidden}
+  body{font-family:var(--font-cairo),sans-serif;background:#f7f8fa;color:#111827;overflow-x:hidden;width:100%;position:relative}
 
   /* ── Layout ── */
-  .lp-root{min-height:100vh}
-  .lp-wrap{max-width:580px;margin:0 auto;padding:0 16px}
+  .lp-root{min-height:100vh;overflow-x:hidden;width:100%;max-width:100vw}
+  .lp-wrap{max-width:580px;margin:0 auto;padding:0 16px;width:100%;box-sizing:border-box}
 
   /* ── Typography scale ── */
   .lp-h1{
