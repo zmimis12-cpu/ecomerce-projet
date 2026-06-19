@@ -138,21 +138,21 @@ export function ProductPerformanceTable({ data }: ProductPerformanceTableProps) 
                 </span>
               </td>
 
-              {/* Ads Max Estimation — max recommended daily budget at 50% delivery */}
+              {/* Ads Max Estimation — max spend per lead at 50% delivery break-even */}
               <td className="px-3 py-2.5 font-mono whitespace-nowrap">
                 {row.ads_max_estimation > 0 ? (
-                  <span className="text-amber-600 font-semibold">{fmt(row.ads_max_estimation)}/j</span>
+                  <span className="text-amber-600 font-semibold">{fmt(row.ads_max_estimation)}</span>
                 ) : <span className="text-muted-foreground">—</span>}
               </td>
 
-              {/* Ads Max Réel — max daily budget based on real delivery rate */}
+              {/* Ads Max Réel — max spend per lead based on real delivery rate */}
               <td className="px-3 py-2.5 font-mono whitespace-nowrap">
                 {row.ads_max_real > 0 ? (
                   <span className={cn(
                     "font-semibold",
                     row.ads_max_real >= row.ads_max_estimation ? "text-green-700" : "text-red-600"
                   )}>
-                    {fmt(row.ads_max_real)}/j
+                    {fmt(row.ads_max_real)}
                   </span>
                 ) : <span className="text-muted-foreground">—</span>}
               </td>

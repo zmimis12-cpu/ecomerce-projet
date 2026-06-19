@@ -492,24 +492,24 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
 
     // Profit sans ads = what's left after ALL costs except ads
     // = sale_price - (total_cost - ads_cost) = pure margin before ad spend
-    // Example: 400 - 180 - 50 charges = 170 MAD
     const profit_sans_ads = p.sale_price_mad - (p.total_cost_mad - (p.ads_cost_mad ?? 0));
 
     // Ads Max Estimation = profit_sans_ads ÷ 4
-    // This is the max cost per lead you can afford and still be profitable.
-    // Rule: never spend more than 1/4 of your gross margin on ads per lead.
-    // Example: 170 ÷ 4 = 42.5 MAD max per day at 1 lead/day
+    // = max you can spend PER LEAD and still break even at 50% delivery
+    // (without real rate data yet — pure estimation)
     const ads_max_estimation = profit_sans_ads > 0
       ? Math.round(profit_sans_ads / 4)
       : 0;
 
-    // Ads Max Réel = same formula adjusted by real confirmation + delivery rates.
-    // When system has real data (taux confirmation, taux livraison from webhook),
-    // this recalculates the true max based on what actually converts to delivery.
-    // Formula: profit_sans_ads × taux_confirmation × taux_livraison ÷ 4
+    // Ads Max Réel = same formula but with actual confirmation + delivery rates
+    // = max you can spend PER LEAD given your real performance
+    // When real rates are known (from Digylog webhook): recalculated automatically
     const ads_max_real = profit_sans_ads > 0 && confirmation_rate > 0 && delivery_rate > 0
-      ? Math.round(profit_sans_ads * (confirmation_rate / 100) * (delivery_rate / 100) / 4 * lead_count / nbDays)
-      : ads_max_estimation; // fallback to estimation when no real data yet
+      ? Math.round(profit_sans_ads * (confirmation_rate / 100) * (delivery_rate / 100) / 4)
+      : ads_max_estimation;
+
+    // Suppress nbDays unused warning — kept for future daily budget feature
+    void nbDays;
 
     return {
       product_id: p.id, product_name: p.name, sku: p.sku,
