@@ -60,6 +60,7 @@ const ADMIN_NAV: NavGroup[] = [
     label: "Admin",
     items: [
       { href: "/admin/settings/delivery-providers", label: "Transporteurs", icon: Truck },
+      { href: "/admin/settings/ads",  label: "Publicité",   icon: BarChart3 },
       { href: "/admin/audit-logs", label: "Audit Logs",  icon: Shield   },
       { href: "/admin/settings",   label: "Paramètres",  icon: Settings },
     ],

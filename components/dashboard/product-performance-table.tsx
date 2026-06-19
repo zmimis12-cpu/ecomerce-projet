@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import Image from "next/image";
 import type { ProductPerformance } from "@/lib/dashboard/queries";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +28,8 @@ function fmt(n: number) {
 }
 
 export function ProductPerformanceTable({ data }: ProductPerformanceTableProps) {
+  const [zoomedImage, setZoomedImage] = useState<{ url: string; name: string } | null>(null);
+
   if (!data.length) {
     return (
       <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
@@ -38,7 +44,7 @@ export function ProductPerformanceTable({ data }: ProductPerformanceTableProps) 
         <thead>
           <tr className="border-b bg-secondary/30">
             {[
-              "Produit","SKU","Leads","Conf.","Livré","Retourné",
+              "Photo","Produit","SKU","Pub","Leads","Conf.","Livré","Retourné",
               "Tx Conf","Tx Livr","CA Total","CA Réel",
               "Profit Est.","Profit Réel","Marge","Statut"
             ].map((h) => (
@@ -55,10 +61,35 @@ export function ProductPerformanceTable({ data }: ProductPerformanceTableProps) 
                 "hover:bg-secondary/20 transition-colors",
                 row.performance_status === "losing" && "bg-red-50/30"
               )}>
+              <td className="px-3 py-2.5">
+                {row.image_url ? (
+                  <button
+                    type="button"
+                    onClick={() => setZoomedImage({ url: row.image_url!, name: row.product_name })}
+                    className="block w-9 h-9 rounded-md overflow-hidden border hover:opacity-80 transition-opacity relative shrink-0"
+                    aria-label={`Agrandir la photo de ${row.product_name}`}
+                  >
+                    <Image src={row.image_url} alt={row.product_name} fill className="object-cover" unoptimized />
+                  </button>
+                ) : (
+                  <div className="w-9 h-9 rounded-md bg-secondary/40 border flex items-center justify-center text-[9px] text-muted-foreground">
+                    N/A
+                  </div>
+                )}
+              </td>
               <td className="px-3 py-2.5 font-medium max-w-[160px] truncate">
                 {row.product_name}
               </td>
               <td className="px-3 py-2.5 font-mono text-muted-foreground">{row.sku}</td>
+              <td className="px-3 py-2.5 font-mono whitespace-nowrap">
+                {fmt(row.ads_cost_mad)}
+                <span className={cn(
+                  "ms-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold",
+                  row.is_real_ad_spend ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
+                )} title={row.is_real_ad_spend ? "Synchronisé depuis Meta Ads" : "Estimation manuelle"}>
+                  {row.is_real_ad_spend ? "réel" : "est."}
+                </span>
+              </td>
               <td className="px-3 py-2.5 font-mono text-center">{row.lead_count}</td>
               <td className="px-3 py-2.5 font-mono text-center">{row.confirmed_count}</td>
               <td className="px-3 py-2.5 font-mono text-center text-green-700">{row.delivered_count}</td>
@@ -106,7 +137,7 @@ export function ProductPerformanceTable({ data }: ProductPerformanceTableProps) 
         {/* Totals row */}
         <tfoot className="border-t-2 bg-secondary/20">
           <tr>
-            <td className="px-3 py-2.5 font-bold" colSpan={2}>Totaux</td>
+            <td className="px-3 py-2.5 font-bold" colSpan={4}>Totaux</td>
             <td className="px-3 py-2.5 font-bold font-mono text-center">
               {data.reduce((s, r) => s + r.lead_count, 0)}
             </td>
@@ -139,6 +170,18 @@ export function ProductPerformanceTable({ data }: ProductPerformanceTableProps) 
           </tr>
         </tfoot>
       </table>
+
+      {zoomedImage && (
+        <div
+          onClick={() => setZoomedImage(null)}
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6 cursor-zoom-out"
+        >
+          <div className="relative max-w-lg w-full aspect-square">
+            <Image src={zoomedImage.url} alt={zoomedImage.name} fill className="object-contain rounded-lg" unoptimized />
+          </div>
+          <p className="absolute bottom-8 text-white text-sm font-medium">{zoomedImage.name}</p>
+        </div>
+      )}
     </div>
   );
 }

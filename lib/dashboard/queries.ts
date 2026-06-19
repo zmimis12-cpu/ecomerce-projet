@@ -52,10 +52,12 @@ export interface ProductPerformance {
   product_id:          string;
   product_name:        string;
   sku:                 string;
+  image_url:           string | null;
   sale_price_mad:      number;
   total_cost_mad:      number;
   unit_profit:         number;
   ads_cost_mad:        number;
+  is_real_ad_spend:    boolean;
   lead_count:          number;
   confirmed_count:     number;
   delivered_count:     number;
@@ -321,11 +323,41 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
     confirmation_cost_mad: number; shipping_cost_mad: number;
   }[];
 
+  // Fetch primary image per product in one batched query
+  const { data: imgRows } = await supabase
+    .from("product_images")
+    .select("product_id, public_url, is_primary, display_order")
+    .in("product_id", ps.map((p) => p.id))
+    .order("display_order");
+  const imageByProduct = new Map<string, string>();
+  for (const img of (imgRows ?? []) as { product_id: string; public_url: string; is_primary: boolean }[]) {
+    const existing = imageByProduct.get(img.product_id);
+    if (!existing || img.is_primary) imageByProduct.set(img.product_id, img.public_url);
+  }
+
+  // Real synced ad spend (Meta/Google/TikTok) overlapping the selected
+  // period, summed across platforms. Falls back to the manual ads_cost_mad
+  // field on the product when no sync has happened yet for this period.
+  const realAdSpendByProduct = new Map<string, number>();
+  try {
+    let adSpendQ = supabase
+      .from("product_ad_spend")
+      .select("product_id, spend_mad, period_start, period_end")
+      .in("product_id", ps.map((p) => p.id));
+    if (filter) {
+      adSpendQ = adSpendQ.lte("period_start", filter.to).gte("period_end", filter.from);
+    }
+    const { data: adSpendRows } = await adSpendQ;
+    for (const row of (adSpendRows ?? []) as { product_id: string; spend_mad: number }[]) {
+      realAdSpendByProduct.set(row.product_id, (realAdSpendByProduct.get(row.product_id) ?? 0) + row.spend_mad);
+    }
+  } catch { /* table may not exist yet on older deployments — fall back silently */ }
+
   const { data: items } = await supabase
     .from("order_items")
     .select("product_id,order_id")
     .in("product_id", ps.map((p) => p.id));
-  if (!items?.length) return ps.map((p) => makeEmptyPerf(p));
+  if (!items?.length) return ps.map((p) => makeEmptyPerf(p, imageByProduct.get(p.id) ?? null, realAdSpendByProduct.get(p.id)));
 
   const orderIds = [...new Set((items as { order_id: string }[]).map((i) => i.order_id))];
 
@@ -383,10 +415,26 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
     const total_revenue    = rows.reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
     const real_revenue     = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
     const estimated_profit = rows.reduce((s, r) => s + (r.estimated_profit ?? 0), 0);
-    const real_profit      = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.real_profit_mad ?? 0), 0);
     const total_cogs       = rows.reduce((s, r) => s + (r.cogs_total ?? 0), 0);
     const total_delivery_cost = rows.reduce((s, r) => s + (r.delivery_cost_real_mad ?? 0), 0);
     const return_losses    = rows.reduce((s, r) => s + (r.return_cost_mad ?? 0), 0);
+
+    // Real ad spend from a connected platform (Meta/Google/TikTok) takes
+    // priority over the manual ads_cost_mad field on the product. The manual
+    // field was a one-time estimate; the synced value reflects what was
+    // actually spent during the selected period.
+    const realAdSpend   = realAdSpendByProduct.get(p.id);
+    const adsCostToUse  = realAdSpend ?? p.ads_cost_mad ?? 0;
+    const is_real_ad_spend = realAdSpend !== undefined;
+
+    // real_profit_mad stored on each order already nets out the product's
+    // manual ads_cost_mad at order time. When a real synced spend exists for
+    // the period, replace that estimate with the real total instead.
+    const real_profit_base = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.real_profit_mad ?? 0), 0);
+    const real_profit = is_real_ad_spend
+      ? real_profit_base + (p.ads_cost_mad ?? 0) * rows.filter((r) => r.is_paid).length - realAdSpend!
+      : real_profit_base;
+
     const real_margin_pct  = real_revenue > 0
       ? Math.round(real_profit / real_revenue * 1000) / 10 : 0;
 
@@ -397,8 +445,9 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
 
     return {
       product_id: p.id, product_name: p.name, sku: p.sku,
+      image_url: imageByProduct.get(p.id) ?? null,
       sale_price_mad: p.sale_price_mad, total_cost_mad: p.total_cost_mad,
-      unit_profit: p.estimated_profit_mad, ads_cost_mad: p.ads_cost_mad,
+      unit_profit: p.estimated_profit_mad, ads_cost_mad: adsCostToUse, is_real_ad_spend,
       lead_count, confirmed_count, delivered_count, returned_count, refused_count,
       confirmation_rate, delivery_rate, refusal_rate,
       total_revenue, real_revenue, estimated_profit, real_profit,
@@ -408,11 +457,18 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
   });
 }
 
-function makeEmptyPerf(p: { id: string; name: string; sku: string; sale_price_mad: number; total_cost_mad: number; estimated_profit_mad: number; ads_cost_mad: number }): ProductPerformance {
+function makeEmptyPerf(
+  p: { id: string; name: string; sku: string; sale_price_mad: number; total_cost_mad: number; estimated_profit_mad: number; ads_cost_mad: number },
+  imageUrl: string | null = null,
+  realAdSpend?: number
+): ProductPerformance {
   return {
     product_id: p.id, product_name: p.name, sku: p.sku,
+    image_url: imageUrl,
     sale_price_mad: p.sale_price_mad, total_cost_mad: p.total_cost_mad,
-    unit_profit: p.estimated_profit_mad, ads_cost_mad: p.ads_cost_mad,
+    unit_profit: p.estimated_profit_mad,
+    ads_cost_mad: realAdSpend ?? p.ads_cost_mad,
+    is_real_ad_spend: realAdSpend !== undefined,
     lead_count: 0, confirmed_count: 0, delivered_count: 0, returned_count: 0, refused_count: 0,
     confirmation_rate: 0, delivery_rate: 0, refusal_rate: 0,
     total_revenue: 0, real_revenue: 0, estimated_profit: 0, real_profit: 0,
