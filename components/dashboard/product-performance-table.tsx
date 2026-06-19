@@ -47,7 +47,7 @@ export function ProductPerformanceTable({ data }: ProductPerformanceTableProps) 
               "Photo","Produit","SKU","Pub","Leads","Conf.","Livré","Retourné",
               "Tx Conf","Tx Livr","CA Total","CA Réel",
               "Profit Est.","Profit Réel","Marge",
-              "Ads Total","Ads Max Est.","Ads Max Réel",
+              "Ads Total","Ads Max Est.","Ads Max Réel","ADS/O",
               "Statut"
             ].map((h) => (
               <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
@@ -157,6 +157,22 @@ export function ProductPerformanceTable({ data }: ProductPerformanceTableProps) 
                 ) : <span className="text-muted-foreground">—</span>}
               </td>
 
+              {/* ADS/O — live spend from Meta API today */}
+              <td className="px-3 py-2.5 font-mono whitespace-nowrap">
+                {row.ads_live !== null ? (
+                  <span className={cn(
+                    "font-semibold",
+                    row.ads_live > row.ads_max_real ? "text-red-600" :
+                    row.ads_live > row.ads_max_estimation ? "text-amber-600" : "text-green-700"
+                  )}>
+                    {fmt(row.ads_live)}
+                    <span className="ms-1 text-[9px] font-normal opacity-70">live</span>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground text-[10px]">non connecté</span>
+                )}
+              </td>
+
               <td className="px-3 py-2.5">
                 <StatusBadge status={row.performance_status} />
               </td>
@@ -199,7 +215,7 @@ export function ProductPerformanceTable({ data }: ProductPerformanceTableProps) 
             <td className="px-3 py-2.5 font-bold font-mono text-blue-700">
               {fmt(data.reduce((s, r) => s + r.ads_total, 0))}
             </td>
-            <td colSpan={3} /> {/* Ads Max Est + Ads Max Réel + Statut */}
+            <td colSpan={4} /> {/* Ads Max Est + Ads Max Réel + ADS/O + Statut */}
           </tr>
         </tfoot>
       </table>

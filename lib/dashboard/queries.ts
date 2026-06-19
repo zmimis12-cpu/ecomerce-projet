@@ -4,6 +4,7 @@
  * All finance data requires manager+ role — enforced by callers.
  */
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { normalizeCity, getExpectedDeliveryCost } from "@/lib/delivery/reconciliation-utils";
 
 export interface DashboardSummary {
@@ -77,8 +78,9 @@ export interface ProductPerformance {
   performance_status:  "profitable" | "losing" | "needs_review" | "no_data";
   // Ads budget analysis columns
   ads_total:           number;   // Total dépensé en pub pour ce produit (réel ou estimé)
-  ads_max_estimation:  number;   // Budget max recommandé par jour (taux livraison cible 50%)
-  ads_max_real:        number;   // Budget max réel par jour (vrai taux livraison système)
+  ads_max_estimation:  number;   // Budget max recommandé (profit_sans_ads ÷ 4)
+  ads_max_real:        number;   // Budget max réel ajusté avec vrais taux
+  ads_live:            number | null; // Spend live du jour depuis l'API (null = non connecté)
 }
 
 export interface DailyFinance {
@@ -355,7 +357,37 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
     for (const row of (adSpendRows ?? []) as { product_id: string; spend_mad: number }[]) {
       realAdSpendByProduct.set(row.product_id, (realAdSpendByProduct.get(row.product_id) ?? 0) + row.spend_mad);
     }
-  } catch { /* table may not exist yet on older deployments — fall back silently */ }
+  } catch { /* table may not exist yet — fall back silently */ }
+
+  // Live spend from Meta API — spend for today, fetched in real time.
+  // This is what powers the ADS/O (en cours) column.
+  // Only fetches when Meta credentials are configured; null otherwise.
+  const liveSpendByProduct = new Map<string, number>();
+  try {
+    const { data: metaSettings } = await supabaseAdmin
+      .from("ad_platform_settings")
+      .select("access_token, account_id, is_active")
+      .eq("platform", "meta")
+      .maybeSingle();
+
+    if (metaSettings && (metaSettings as { is_active: boolean }).is_active) {
+      const { MetaAdsClient } = await import("@/lib/ads/meta/client");
+      const { matchCampaignsToProducts } = await import("@/lib/ads/matcher");
+      const today = new Date().toISOString().slice(0, 10);
+      const client = new MetaAdsClient(
+        (metaSettings as { access_token: string }).access_token,
+        (metaSettings as { account_id: string }).account_id
+      );
+      const liveResult = await client.getCampaignSpend(today, today);
+      if (liveResult.ok && liveResult.campaigns.length > 0) {
+        const productList = ps.map((p) => ({ id: p.id, sku: p.sku, name: p.name }));
+        const { matches } = matchCampaignsToProducts(productList, liveResult.campaigns);
+        for (const m of matches) {
+          if (m.total_spend > 0) liveSpendByProduct.set(m.product_id, m.total_spend);
+        }
+      }
+    }
+  } catch { /* live fetch failed — ads_live stays null */ }
 
   const { data: items } = await supabase
     .from("order_items")
@@ -490,6 +522,7 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
       total_cogs, total_delivery_cost, return_losses, real_margin_pct,
       performance_status: performance_status as ProductPerformance["performance_status"],
       ads_total, ads_max_estimation, ads_max_real,
+      ads_live: liveSpendByProduct.get(p.id) ?? null,
     };
   });
 }
@@ -511,7 +544,7 @@ function makeEmptyPerf(
     total_revenue: 0, real_revenue: 0, estimated_profit: 0, real_profit: 0,
     total_cogs: 0, total_delivery_cost: 0, return_losses: 0, real_margin_pct: 0,
     performance_status: "no_data",
-    ads_total: 0, ads_max_estimation: 0, ads_max_real: 0,
+    ads_total: 0, ads_max_estimation: 0, ads_max_real: 0, ads_live: null,
   };
 }
 
