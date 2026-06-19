@@ -46,7 +46,9 @@ export function ProductPerformanceTable({ data }: ProductPerformanceTableProps) 
             {[
               "Photo","Produit","SKU","Pub","Leads","Conf.","Livré","Retourné",
               "Tx Conf","Tx Livr","CA Total","CA Réel",
-              "Profit Est.","Profit Réel","Marge","Statut"
+              "Profit Est.","Profit Réel","Marge",
+              "Ads Total","Ads Max Est.","Ads Max Réel",
+              "Statut"
             ].map((h) => (
               <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
                 {h}
@@ -128,6 +130,33 @@ export function ProductPerformanceTable({ data }: ProductPerformanceTableProps) 
                   {row.real_margin_pct}%
                 </span>
               </td>
+
+              {/* Ads Total — total spend on this product */}
+              <td className="px-3 py-2.5 font-mono whitespace-nowrap">
+                <span className={row.ads_total > 0 ? "text-blue-700 font-semibold" : "text-muted-foreground"}>
+                  {fmt(row.ads_total)}
+                </span>
+              </td>
+
+              {/* Ads Max Estimation — max recommended daily budget at 50% delivery */}
+              <td className="px-3 py-2.5 font-mono whitespace-nowrap">
+                {row.ads_max_estimation > 0 ? (
+                  <span className="text-amber-600 font-semibold">{fmt(row.ads_max_estimation)}/j</span>
+                ) : <span className="text-muted-foreground">—</span>}
+              </td>
+
+              {/* Ads Max Réel — max daily budget based on real delivery rate */}
+              <td className="px-3 py-2.5 font-mono whitespace-nowrap">
+                {row.ads_max_real > 0 ? (
+                  <span className={cn(
+                    "font-semibold",
+                    row.ads_max_real >= row.ads_max_estimation ? "text-green-700" : "text-red-600"
+                  )}>
+                    {fmt(row.ads_max_real)}/j
+                  </span>
+                ) : <span className="text-muted-foreground">—</span>}
+              </td>
+
               <td className="px-3 py-2.5">
                 <StatusBadge status={row.performance_status} />
               </td>
@@ -166,7 +195,11 @@ export function ProductPerformanceTable({ data }: ProductPerformanceTableProps) 
             )}>
               {fmt(data.reduce((s, r) => s + r.real_profit, 0))}
             </td>
-            <td colSpan={2} />
+            <td /> {/* Marge */}
+            <td className="px-3 py-2.5 font-bold font-mono text-blue-700">
+              {fmt(data.reduce((s, r) => s + r.ads_total, 0))}
+            </td>
+            <td colSpan={3} /> {/* Ads Max Est + Ads Max Réel + Statut */}
           </tr>
         </tfoot>
       </table>

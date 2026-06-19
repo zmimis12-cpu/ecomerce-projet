@@ -75,6 +75,10 @@ export interface ProductPerformance {
   return_losses:       number;
   real_margin_pct:     number;
   performance_status:  "profitable" | "losing" | "needs_review" | "no_data";
+  // Ads budget analysis columns
+  ads_total:           number;   // Total dépensé en pub pour ce produit (réel ou estimé)
+  ads_max_estimation:  number;   // Budget max recommandé par jour (taux livraison cible 50%)
+  ads_max_real:        number;   // Budget max réel par jour (vrai taux livraison système)
 }
 
 export interface DailyFinance {
@@ -443,6 +447,38 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
       real_profit < 0  ? "losing" :
       real_margin_pct >= 15 ? "profitable" : "needs_review";
 
+    // ── Ads budget analysis ─────────────────────────────────────────────────
+    // Number of days in the selected period (default 30 if no filter)
+    const nbDays = filter
+      ? Math.max(1, Math.round((new Date(filter.to).getTime() - new Date(filter.from).getTime()) / 86400_000) + 1)
+      : 30;
+
+    // Total ads spend for this product (real from platform API or manual estimate × leads)
+    const ads_total = is_real_ad_spend
+      ? adsCostToUse
+      : (p.ads_cost_mad ?? 0) * lead_count;
+
+    // Profit sans ads = what's left after ALL costs except ads
+    // = sale_price - (total_cost - ads_cost) = pure margin before ad spend
+    // Example: 400 - 180 - 50 charges = 170 MAD
+    const profit_sans_ads = p.sale_price_mad - (p.total_cost_mad - (p.ads_cost_mad ?? 0));
+
+    // Ads Max Estimation = profit_sans_ads ÷ 4
+    // This is the max cost per lead you can afford and still be profitable.
+    // Rule: never spend more than 1/4 of your gross margin on ads per lead.
+    // Example: 170 ÷ 4 = 42.5 MAD max per day at 1 lead/day
+    const ads_max_estimation = profit_sans_ads > 0
+      ? Math.round(profit_sans_ads / 4)
+      : 0;
+
+    // Ads Max Réel = same formula adjusted by real confirmation + delivery rates.
+    // When system has real data (taux confirmation, taux livraison from webhook),
+    // this recalculates the true max based on what actually converts to delivery.
+    // Formula: profit_sans_ads × taux_confirmation × taux_livraison ÷ 4
+    const ads_max_real = profit_sans_ads > 0 && confirmation_rate > 0 && delivery_rate > 0
+      ? Math.round(profit_sans_ads * (confirmation_rate / 100) * (delivery_rate / 100) / 4 * lead_count / nbDays)
+      : ads_max_estimation; // fallback to estimation when no real data yet
+
     return {
       product_id: p.id, product_name: p.name, sku: p.sku,
       image_url: imageByProduct.get(p.id) ?? null,
@@ -453,6 +489,7 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
       total_revenue, real_revenue, estimated_profit, real_profit,
       total_cogs, total_delivery_cost, return_losses, real_margin_pct,
       performance_status: performance_status as ProductPerformance["performance_status"],
+      ads_total, ads_max_estimation, ads_max_real,
     };
   });
 }
@@ -474,6 +511,7 @@ function makeEmptyPerf(
     total_revenue: 0, real_revenue: 0, estimated_profit: 0, real_profit: 0,
     total_cogs: 0, total_delivery_cost: 0, return_losses: 0, real_margin_pct: 0,
     performance_status: "no_data",
+    ads_total: 0, ads_max_estimation: 0, ads_max_real: 0,
   };
 }
 
