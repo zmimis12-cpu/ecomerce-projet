@@ -19,7 +19,8 @@ const ADMIN_NAV: NavGroup[] = [
     label: null,
     items: [
       { href: "/admin",          label: "Dashboard", icon: LayoutDashboard, exact: true },
-      { href: "/admin/products", label: "Produits",  icon: Package          },
+      { href: "/admin/products",          label: "Produits",          icon: Package          },
+      { href: "/admin/products/overview", label: "Vue d'ensemble",    icon: BarChart3        },
       { href: "/admin/orders",   label: "Commandes", icon: ShoppingCart     },
     ],
   },

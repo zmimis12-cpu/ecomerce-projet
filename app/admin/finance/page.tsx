@@ -5,11 +5,10 @@ import {
 } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
 import {
-  getDashboardSummary, getProductPerformance,
+  getDashboardSummary,
   getDailyFinance, getDeliveryClaims, getFinanceAnomalies,
 } from "@/lib/dashboard/queries";
 import { KpiCard } from "@/components/dashboard/kpi-card";
-import { ProductPerformanceTable } from "@/components/dashboard/product-performance-table";
 import { FinanceChart } from "@/components/dashboard/finance-chart";
 import { cn } from "@/lib/utils";
 
@@ -39,9 +38,8 @@ export default async function FinancePage({
     filter     = { from, to };
   }
 
-  const [summary, products, daily, { claims, total: claimTotal }, anomalies] = await Promise.all([
+  const [summary, daily, { claims, total: claimTotal }, anomalies] = await Promise.all([
     getDashboardSummary(filter),
-    getProductPerformance(filter),
     getDailyFinance(parseInt(period, 10) || 30),
     getDeliveryClaims(),
     getFinanceAnomalies(20),
@@ -220,16 +218,6 @@ export default async function FinancePage({
           </div>
         </section>
       )}
-
-      {/* ── PRODUCT PERFORMANCE ── */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-          Performance par Produit
-        </h2>
-        <div className="rounded-xl border bg-card overflow-hidden">
-          <ProductPerformanceTable data={products} />
-        </div>
-      </section>
 
       {/* ── DAILY TABLE ── */}
       <section className="space-y-3">
