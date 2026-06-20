@@ -112,8 +112,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     || product.description
     || `${product.name} — جودة مضمونة وتوصيل سريع لجميع مدن المغرب.`;
   const b1 = Number(lp.bundle_1_price || price);
-  const b2 = Number(lp.bundle_2_price || (price * 2 * 0.9).toFixed(2));
-  const b3 = Number(lp.bundle_3_price || (price * 3 * 0.8).toFixed(2));
+  const b2 = Number(lp.bundle_2_price || Math.round(price * 2 * 0.9));
+  const b3 = Number(lp.bundle_3_price || Math.round(price * 3 * 0.8));
 
   const psSection   = getSection("problem_solution");
   const benSection  = getSection("benefits");

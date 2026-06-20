@@ -21,14 +21,19 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     customer_address:"", notes:"", website:"",
   });
 
+  // Standard COD e-commerce bundle discounts: -10% for 2x, -20% for 3x
+  // These match the server-side calculation in /api/public/orders so prices
+  // are consistent between what the customer sees and what the order records.
+  const unitPrice = b1; // sale_price_mad
   const bundles = [
-    { qty:1, label:"1×", price:b1, note:"قطعة واحدة" },
-    { qty:2, label:"2×", price:b2,
-      note:`وفّر ${(b1*2-b2).toFixed(0)} درهم`, pop:true },
-    { qty:3, label:"3×", price:b3,
-      note:`وفّر ${(b1*3-b3).toFixed(0)} درهم` },
+    { qty:1, label:"1×", price: unitPrice,
+      note:"قطعة واحدة" },
+    { qty:2, label:"2×", price: Math.round(unitPrice * 2 * 0.90),
+      note:`وفّر ${Math.round(unitPrice * 2 * 0.10)} درهم`, pop:true },
+    { qty:3, label:"3×", price: Math.round(unitPrice * 3 * 0.80),
+      note:`وفّر ${Math.round(unitPrice * 3 * 0.20)} درهم` },
   ];
-  const total = bundles.find((b) => b.qty === bundle)?.price ?? b1;
+  const total = bundles.find((b) => b.qty === bundle)?.price ?? unitPrice;
 
   function set(key: string, val: string) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -42,8 +47,13 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
       try {
         const res = await fetch("/api/public/orders", {
           method:"POST", headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({ ...form, quantity:bundle,
-            product_id:product.id, product_slug:productSlug }),
+          body: JSON.stringify({
+            ...form,
+            quantity:     bundle,
+            bundle_price: total,   // send the bundle total so API applies correct pricing
+            product_id:   product.id,
+            product_slug: productSlug,
+          }),
         });
         const data = await res.json() as {
           success:boolean; orderNumber?:string;

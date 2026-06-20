@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     website          = "",   // honeypot
     product_id       = "",
     product_slug     = "",
+    bundle_price     = 0,    // total price for the bundle sent by the form
   } = body as Record<string, string | number>;
 
   // ── 1. Honeypot ──────────────────────────────────────────────────────────────
@@ -99,9 +100,34 @@ export async function POST(request: NextRequest) {
   const qty        = Number(quantity);
   const unitPrice  = p.sale_price_mad;
   const unitCost   = p.total_cost_mad ?? 0;
-  const subtotal   = unitPrice * qty;
-  const cogs       = unitCost * qty;
-  const estProfit  = subtotal - cogs;
+
+  // ── Bundle pricing ─────────────────────────────────────────────────────────
+  // Standard e-commerce bundle discounts: -10% for 2x, -20% for 3x
+  // The expected price is calculated server-side to avoid trusting the client.
+  // If the client sends a bundle_price that matches within 5% of the expected
+  // value, we use it. Otherwise we calculate it ourselves.
+  const BUNDLE_DISCOUNT: Record<number, number> = { 1: 0, 2: 0.10, 3: 0.20 };
+  const discount     = BUNDLE_DISCOUNT[qty] ?? 0;
+  const expectedTotal = Math.round(unitPrice * qty * (1 - discount));
+
+  // Validate client-submitted bundle_price (must be within 5% of expected and >= cost)
+  const clientBundlePrice = Number(bundle_price);
+  const minAcceptable     = unitCost * qty; // never sell below cost
+  let subtotal: number;
+
+  if (
+    clientBundlePrice > 0 &&
+    clientBundlePrice >= minAcceptable &&
+    Math.abs(clientBundlePrice - expectedTotal) / expectedTotal < 0.05
+  ) {
+    subtotal = clientBundlePrice;
+  } else {
+    // Recalculate server-side with standard discount
+    subtotal = expectedTotal;
+  }
+
+  const cogs      = unitCost * qty;
+  const estProfit = subtotal - cogs;
 
   // ── 5. Duplicate detection ────────────────────────────────────────────────────
   const since24h = new Date(Date.now() - 86400_000).toISOString();
