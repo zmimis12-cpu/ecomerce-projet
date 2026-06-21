@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 
 interface ProductImage {
@@ -19,8 +20,12 @@ interface Props {
 export function ProductGallery({ images, productName, discountPct = 0 }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [lightbox, setLightbox]       = useState(false);
+  const [mounted, setMounted]         = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
+
+  // Portal requires document to be available (client-side only)
+  useEffect(() => { setMounted(true); }, []);
 
   if (!images.length) return null;
 
@@ -130,20 +135,21 @@ export function ProductGallery({ images, productName, discountPct = 0 }: Props) 
         </div>
       )}
 
-      {/* Lightbox */}
-      {lightbox && (
+      {/* Lightbox — rendered via portal directly on document.body to escape
+          admin layout's overflow:hidden which breaks position:fixed */}
+      {lightbox && mounted && createPortal(
         <div
           onClick={() => setLightbox(false)}
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
           style={{
-            position: "fixed", inset: 0, zIndex: 100,
-            background: "rgba(0,0,0,.9)",
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(0,0,0,.92)",
             display: "flex", alignItems: "center", justifyContent: "center",
             padding: "16px", cursor: "zoom-out",
           }}
         >
-          <div style={{ position: "relative", width: "100%", maxWidth: "520px", aspectRatio: "1/1" }}>
+          <div style={{ position: "relative", width: "100%", maxWidth: "600px", aspectRatio: "1/1" }}>
             <Image src={active.public_url} alt={productName} fill style={{ objectFit: "contain" }} unoptimized />
           </div>
 
@@ -158,7 +164,7 @@ export function ProductGallery({ images, productName, discountPct = 0 }: Props) 
             }}
             aria-label="إغلاق">×</button>
 
-          {/* RTL lightbox: NEXT on LEFT */}
+          {/* NEXT on LEFT (RTL) */}
           {hasNext && (
             <button
               onClick={(e) => { e.stopPropagation(); goNext(); }}
@@ -171,7 +177,7 @@ export function ProductGallery({ images, productName, discountPct = 0 }: Props) 
             >‹</button>
           )}
 
-          {/* RTL lightbox: PREV on RIGHT */}
+          {/* PREV on RIGHT (RTL) */}
           {hasPrev && (
             <button
               onClick={(e) => { e.stopPropagation(); goPrev(); }}
@@ -183,7 +189,8 @@ export function ProductGallery({ images, productName, discountPct = 0 }: Props) 
               }}
             >›</button>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
