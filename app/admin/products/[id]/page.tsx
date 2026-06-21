@@ -12,6 +12,7 @@ import { CopyUrlButton } from "@/components/landing/copy-url-button";
 import { formatMAD } from "@/types/products";
 import { cn } from "@/lib/utils";
 import { DeleteProductButton } from "@/components/products/delete-product-button";
+import { ProductGallery } from "@/components/landing/product-gallery";
 
 export const dynamic = "force-dynamic";
 
@@ -136,17 +137,15 @@ export default async function ProductDetailPage({
                 images={product.images ?? []}
               />
             ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {(product.images ?? []).map((img) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={img.id}
-                    src={img.public_url}
-                    alt=""
-                    className="rounded-lg aspect-square object-cover w-full"
-                  />
-                ))}
-              </div>
+              <ProductGallery
+                images={(product.images ?? []).map(img => ({
+                  id: img.id,
+                  public_url: img.public_url,
+                  is_primary: img.is_primary ?? false,
+                  display_order: img.display_order ?? 0,
+                }))}
+                productName={product.name}
+              />
             )}
           </div>
         </div>
@@ -175,28 +174,23 @@ function ReadOnlyProduct({
 }: {
   product: import("@/types/products").Product;
 }) {
+  // Only public-facing info — no costs, prices, margins visible to CC agents
   const fields = [
-    { label: "Nom",           value: product.name },
-    { label: "SKU",           value: product.sku },
-    { label: "Slug",          value: product.slug ?? "—" },
-    { label: "Description",   value: product.description ?? "—" },
-    { label: "Prix de vente", value: formatMAD(product.sale_price_mad) },
-    { label: "Prix d'achat",  value: formatMAD(product.purchase_price_mad) },
-    { label: "Emballage",     value: formatMAD(product.packaging_cost_mad) },
-    { label: "Confirmation",  value: formatMAD(product.confirmation_cost_mad) },
-    { label: "Livraison",     value: formatMAD(product.shipping_cost_mad) },
-    { label: "Publicité",     value: formatMAD(product.ads_cost_mad) },
-    { label: "Autres coûts",  value: formatMAD(product.other_costs_mad) },
+    { label: "Nom",         value: product.name },
+    { label: "SKU",         value: product.sku },
+    { label: "Slug",        value: product.slug ?? "—" },
+    { label: "Description", value: product.description ?? "—" },
+    { label: "Prix",        value: formatMAD(product.sale_price_mad) },
   ];
 
   return (
     <div className="rounded-xl border bg-card p-5 space-y-3">
-      <h3 className="text-sm font-semibold">Détails du produit</h3>
+      <h3 className="text-sm font-semibold">Informations produit</h3>
       <div className="divide-y">
         {fields.map(({ label, value }) => (
-          <div key={label} className="flex items-center justify-between py-2.5">
-            <span className="text-xs text-muted-foreground">{label}</span>
-            <span className="text-sm font-medium">{value}</span>
+          <div key={label} className="flex items-start justify-between py-2.5 gap-4">
+            <span className="text-xs text-muted-foreground shrink-0">{label}</span>
+            <span className="text-sm font-medium text-right">{value}</span>
           </div>
         ))}
       </div>
