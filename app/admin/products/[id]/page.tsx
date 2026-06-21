@@ -32,7 +32,7 @@ export default async function ProductDetailPage({
 }) {
   const { id } = await params;
   const session = await requireRole([
-    "super_admin", "admin", "manager", "finance", "viewer",
+    "super_admin", "admin", "manager", "finance", "viewer", "call_center_agent",
   ]);
   const product = await getProduct(id);
   if (!product) notFound();
@@ -65,30 +65,32 @@ export default async function ProductDetailPage({
           </span>
         </div>
 
-        {/* Delete button — client component to avoid onClick in server component */}
+        {/* Delete button — only for admins */}
         {canManage && (
           <DeleteProductButton productId={id} productName={product.name} />
         )}
       </div>
 
-      {/* Header stats */}
+      {/* Header stats — hide cost/profit/margin from call center agents */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Prix de vente"   value={formatMAD(product.sale_price_mad)} />
-        <StatCard label="Coût total"      value={formatMAD(product.total_cost_mad)} />
-        <StatCard
-          label="Profit estimé"
-          value={formatMAD(profit)}
-          className={profit >= 0 ? "text-green-600" : "text-red-600"}
-        />
-        <StatCard
-          label="Marge"
-          value={`${margin.toFixed(1)}%`}
-          className={
-            margin >= 20 ? "text-green-600" :
-            margin >= 10 ? "text-amber-600" :
-            "text-red-600"
-          }
-        />
+        <StatCard label="Prix de vente" value={formatMAD(product.sale_price_mad)} />
+        {canManage && <>
+          <StatCard label="Coût total" value={formatMAD(product.total_cost_mad)} />
+          <StatCard
+            label="Profit estimé"
+            value={formatMAD(profit)}
+            className={profit >= 0 ? "text-green-600" : "text-red-600"}
+          />
+          <StatCard
+            label="Marge"
+            value={`${margin.toFixed(1)}%`}
+            className={
+              margin >= 20 ? "text-green-600" :
+              margin >= 10 ? "text-amber-600" :
+              "text-red-600"
+            }
+          />
+        </>}
       </div>
 
       {/* Landing page URL */}

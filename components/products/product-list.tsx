@@ -114,9 +114,11 @@ export function ProductList({ products, canManage }: ProductListProps) {
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Produit</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">SKU</th>
                   <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Prix vente</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Coût total</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Profit</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Marge</th>
+                  {canManage && <>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Coût total</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Profit</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Marge</th>
+                  </>}
                   <th className="text-center px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">Statut</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -178,32 +180,34 @@ export function ProductList({ products, canManage }: ProductListProps) {
                         {formatMAD(product.sale_price_mad)}
                       </td>
 
-                      <td className="px-4 py-3 text-right font-mono text-muted-foreground">
-                        {formatMAD(product.total_cost_mad)}
-                      </td>
+                      {canManage && <>
+                        <td className="px-4 py-3 text-right font-mono text-muted-foreground">
+                          {formatMAD(product.total_cost_mad)}
+                        </td>
 
-                      <td className="px-4 py-3 text-right font-mono">
-                        <span className={cn(
-                          "flex items-center justify-end gap-1",
-                          isProfit ? "text-green-600" : "text-red-600"
-                        )}>
-                          {isProfit
-                            ? <TrendingUp className="h-3 w-3" />
-                            : <TrendingDown className="h-3 w-3" />}
-                          {formatMAD(profit)}
-                        </span>
-                      </td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          <span className={cn(
+                            "flex items-center justify-end gap-1",
+                            isProfit ? "text-green-600" : "text-red-600"
+                          )}>
+                            {isProfit
+                              ? <TrendingUp className="h-3 w-3" />
+                              : <TrendingDown className="h-3 w-3" />}
+                            {formatMAD(profit)}
+                          </span>
+                        </td>
 
-                      <td className="px-4 py-3 text-right">
-                        <span className={cn(
-                          "inline-block rounded-full px-2 py-0.5 text-xs font-medium font-mono",
-                          margin >= 20 ? "bg-green-100 text-green-800" :
-                          margin >= 10 ? "bg-amber-100 text-amber-800" :
-                          "bg-red-100 text-red-800"
-                        )}>
-                          {margin.toFixed(1)}%
-                        </span>
-                      </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={cn(
+                            "inline-block rounded-full px-2 py-0.5 text-xs font-medium font-mono",
+                            margin >= 20 ? "bg-green-100 text-green-800" :
+                            margin >= 10 ? "bg-amber-100 text-amber-800" :
+                            "bg-red-100 text-red-800"
+                          )}>
+                            {margin.toFixed(1)}%
+                          </span>
+                        </td>
+                      </>}
 
                       <td className="px-4 py-3 text-center">
                         {canManage ? (
