@@ -71,21 +71,29 @@ export function ProductGallery({ images, productName, discountPct = 0 }: Props) 
     <>
       {/* Main image */}
       <div
-        className="lp-gallery-main"
         onClick={() => setLightbox(true)}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
-        style={{ cursor: "zoom-in" }}
+        style={{
+          position: "relative", width: "100%", aspectRatio: "1/1",
+          borderRadius: 18, overflow: "hidden",
+          boxShadow: "0 8px 30px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.06)",
+          marginBottom: 10, background: "#f3f4f6", cursor: "zoom-in",
+        }}
       >
         <Image
           src={active.public_url}
           alt={`${productName} — صورة ${activeIndex + 1}`}
-          fill className="lp-img" priority={activeIndex === 0} unoptimized
+          fill style={{ objectFit: "cover" }} priority={activeIndex === 0} unoptimized
           sizes="(max-width:600px) 100vw,(max-width:900px) 80vw,560px"
         />
 
         {/* Counter */}
-        <span className="lp-gallery-counter">{activeIndex + 1} / {images.length}</span>
+        <span style={{
+          position: "absolute", bottom: 10, right: 10, zIndex: 2,
+          background: "rgba(0,0,0,.45)", color: "#fff",
+          fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 9999,
+        }}>{activeIndex + 1} / {images.length}</span>
 
         {/* Discount badge */}
         {discountPct > 0 && (
@@ -97,38 +105,41 @@ export function ProductGallery({ images, productName, discountPct = 0 }: Props) 
           }}>-{discountPct}%</span>
         )}
 
-        {/* RTL: NEXT arrow on the LEFT side (‹ = go right visually = next index) */}
+        {/* NEXT arrow — LEFT side (RTL) */}
         {hasNext && (
-          <button
-            onClick={(e) => { e.stopPropagation(); goNext(); }}
-            style={{ ...arrowStyle, left: 10 }}
-            aria-label="التالي"
-          >‹</button>
+          <button onClick={(e) => { e.stopPropagation(); goNext(); }}
+            style={{ ...arrowStyle, left: 10 }} aria-label="التالي">‹</button>
         )}
 
-        {/* RTL: PREV arrow on the RIGHT side (› = go left visually = prev index) */}
+        {/* PREV arrow — RIGHT side (RTL) */}
         {hasPrev && (
-          <button
-            onClick={(e) => { e.stopPropagation(); goPrev(); }}
-            style={{ ...arrowStyle, right: 10 }}
-            aria-label="السابق"
-          >›</button>
+          <button onClick={(e) => { e.stopPropagation(); goPrev(); }}
+            style={{ ...arrowStyle, right: 10 }} aria-label="السابق">›</button>
         )}
       </div>
 
       {/* Thumbnails */}
       {images.length > 1 && (
-        <div className="lp-thumbs">
+        <div style={{
+          display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4,
+          marginBottom: 18, scrollbarWidth: "none",
+        }}>
           {images.map((img, i) => (
             <button
               key={img.id}
               onClick={() => setActiveIndex(i)}
-              className={`lp-thumb ${i === activeIndex ? "lp-thumb--active" : ""}`}
               aria-label={`صورة ${i + 1}`}
+              style={{
+                position: "relative", flexShrink: 0,
+                width: 72, height: 72, borderRadius: 10, overflow: "hidden",
+                border: `2px solid ${i === activeIndex ? "#16a34a" : "transparent"}`,
+                cursor: "pointer", background: "#f3f4f6",
+                transition: "border-color .15s", padding: 0,
+              }}
             >
               <Image
                 src={img.public_url} alt={`${productName} ${i + 1}`}
-                fill className="lp-img" unoptimized sizes="80px"
+                fill style={{ objectFit: "cover" }} unoptimized sizes="80px"
               />
             </button>
           ))}
