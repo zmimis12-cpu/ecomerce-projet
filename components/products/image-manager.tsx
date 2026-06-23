@@ -25,17 +25,23 @@ export function ImageManager({ productId, images: initialImages }: ImageManagerP
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
-    const file = files[0];
-    const fd = new FormData();
-    fd.set("file", file);
+    const fileArray = Array.from(files);
     startTransition(async () => {
-      const result = await uploadProductImage(productId, fd);
-      if (result.success && result.image) {
-        const img = result.image as unknown as ProductImage;
-        setImages((prev) => [...prev, img]);
-        showToast("Image uploadée avec succès.");
-      } else {
-        showError(result.error ?? "Erreur upload.");
+      let successCount = 0;
+      for (const file of fileArray) {
+        const fd = new FormData();
+        fd.set("file", file);
+        const result = await uploadProductImage(productId, fd);
+        if (result.success && result.image) {
+          const img = result.image as unknown as ProductImage;
+          setImages((prev) => [...prev, img]);
+          successCount++;
+        } else {
+          showError(`Erreur upload ${file.name}: ${result.error ?? "Erreur inconnue"}`);
+        }
+      }
+      if (successCount > 0) {
+        showToast(`${successCount} image${successCount > 1 ? "s" : ""} uploadée${successCount > 1 ? "s" : ""} avec succès.`);
       }
     });
   }
@@ -109,11 +115,12 @@ export function ImageManager({ productId, images: initialImages }: ImageManagerP
         <p className="text-sm font-medium">
           {isPending ? "Upload en cours…" : "Glissez une image ou cliquez pour sélectionner"}
         </p>
-        <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, WebP — Max 5MB</p>
+        <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, WebP — Max 5MB — Plusieurs photos à la fois</p>
         <input
           ref={inputRef}
           type="file"
           accept="image/jpeg,image/png,image/webp,image/avif"
+          multiple
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
