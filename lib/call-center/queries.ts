@@ -31,6 +31,7 @@ export async function getAgentStats(): Promise<AgentStats[]> {
 
   const orderRows = (orders ?? []) as unknown as OrderRow[];
   const logRows   = (callLogs ?? []) as unknown as LogRow[];
+  const commissionPerOrder = await getCommissionPerOrder();
 
   return rows.map((a): AgentStats => {
     const agentOrders = orderRows.filter((o) => o.assigned_to === a.id);
@@ -74,7 +75,7 @@ availability_status: (() => {
       fake_orders: fakeOrders,
       duplicates,
       delivered_paid: deliveredPaid,
-      commission_mad: deliveredPaid * (await getCommissionPerOrder()),
+      commission_mad: deliveredPaid * commissionPerOrder,
       confirmation_rate: callsMade === 0 ? 0 : Math.round((confirmed / callsMade) * 100),
       fake_rate: callsMade === 0 ? 0 : Math.round((fakeOrders / callsMade) * 100),
       avg_duration_sec: avgDur,
