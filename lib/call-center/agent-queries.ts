@@ -7,8 +7,8 @@ import { requireRole } from "@/lib/auth/session";
 const CC_ROLES = ["super_admin", "admin", "manager", "call_center_agent"] as const;
 
 async function getCommissionPerOrder(): Promise<number> {
-  const { data } = await supabaseAdmin.from("settings").select("cc_commission_per_order").single();
-  return Number((data as { cc_commission_per_order?: number } | null)?.cc_commission_per_order ?? 3);
+  const { data } = await supabaseAdmin.from("app_settings").select("value").eq("key", "cc_commission_per_order").maybeSingle();
+  return Number((data as { value?: string } | null)?.value ?? 3);
 }
 
 export async function getMyAssignedOrders() {

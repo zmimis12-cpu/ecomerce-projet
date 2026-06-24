@@ -6,8 +6,8 @@ type OrderRow = { assigned_to: string; status: string; call_status: string | nul
 type LogRow = { agent_id: string; disposition: string; duration_seconds: number | null };
 
 async function getCommissionPerOrder(): Promise<number> {
-  const { data } = await supabaseAdmin.from("settings").select("cc_commission_per_order").single();
-  return Number((data as { cc_commission_per_order?: number } | null)?.cc_commission_per_order ?? 3);
+  const { data } = await supabaseAdmin.from("app_settings").select("value").eq("key", "cc_commission_per_order").maybeSingle();
+  return Number((data as { value?: string } | null)?.value ?? 3);
 }
 
 export async function getAgentStats(): Promise<AgentStats[]> {
