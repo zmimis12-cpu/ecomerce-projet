@@ -108,13 +108,13 @@ export function ProductGallery({ images, productName, discountPct = 0 }: Props) 
         {/* NEXT arrow — LEFT side (RTL) */}
         {hasNext && (
           <button onClick={(e) => { e.stopPropagation(); goNext(); }}
-            style={{ ...arrowStyle, left: 10 }} aria-label="التالي">‹</button>
+            style={{ ...arrowStyle, left: 10 }} aria-label="التالي">›</button>
         )}
 
         {/* PREV arrow — RIGHT side (RTL) */}
         {hasPrev && (
           <button onClick={(e) => { e.stopPropagation(); goPrev(); }}
-            style={{ ...arrowStyle, right: 10 }} aria-label="السابق">›</button>
+            style={{ ...arrowStyle, right: 10 }} aria-label="السابق">‹</button>
         )}
       </div>
 
@@ -185,7 +185,7 @@ export function ProductGallery({ images, productName, discountPct = 0 }: Props) 
                 borderRadius: "50%", width: 48, height: 48, fontSize: 26, cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}
-            >‹</button>
+            >›</button>
           )}
 
           {/* PREV on RIGHT (RTL) */}
@@ -198,7 +198,7 @@ export function ProductGallery({ images, productName, discountPct = 0 }: Props) 
                 borderRadius: "50%", width: 48, height: 48, fontSize: 26, cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}
-            >›</button>
+            >‹</button>
           )}
         </div>,
         document.body

@@ -296,10 +296,16 @@ export class DigylogClient {
     return { ok: r.ok, error: r.error };
   }
 
-  /** Ping — GET /networks */
+  /** Ping — try /stores first, fallback to /networks */
   async testConnection(): Promise<{ ok: boolean; message: string; networks?: DigylogNetwork[] }> {
+    // Try /stores first (more permissive on some Digylog accounts)
+    const rs = await this.request<DigylogStore[]>("GET", "/stores");
+    if (rs.ok) {
+      return { ok: true, message: `Connecté — ${(rs.data ?? []).length} store(s)` };
+    }
+    // Fallback to /networks
     const r = await this.request<DigylogNetwork[]>("GET", "/networks");
-    if (!r.ok)        return { ok: false, message: r.error ?? "Échec de connexion" };
+    if (!r.ok) return { ok: false, message: r.error ?? "Échec de connexion" };
     const nets = r.data ?? [];
     if (!nets.length) return { ok: false, message: "Connexion OK mais aucun réseau disponible — vérifiez votre compte Digylog" };
     return { ok: true, message: `Connecté — ${nets.length} réseau(x)`, networks: nets };
