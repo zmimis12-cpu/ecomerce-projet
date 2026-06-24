@@ -90,6 +90,7 @@ export async function getMyCallbacks() {
 export async function recordAgentPayment(params: { agentId: string; periodStart: string; periodEnd: string; paidAmount: number; notes?: string }): Promise<{ success: boolean; error?: string }> {
   const session = await requireRole(["super_admin", "admin", "manager"]);
 
+  const COMMISSION_PER_ORDER = await getCommissionPerOrder();
   const { data: orders } = await supabaseAdmin.from("orders").select("id").eq("assigned_to", params.agentId).eq("status", "paid").gte("updated_at", `${params.periodStart}T00:00:00`).lte("updated_at", `${params.periodEnd}T23:59:59`);
   const count = (orders ?? []).length;
   const gross = count * COMMISSION_PER_ORDER;
