@@ -6,6 +6,11 @@ import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { cn } from "@/lib/utils";
 
+async function getCommissionPerOrder(): Promise<number> {
+  const { data } = await supabaseAdmin.from("settings").select("cc_commission_per_order").single();
+  return Number((data as { cc_commission_per_order?: number } | null)?.cc_commission_per_order ?? 3);
+}
+
 export const metadata: Metadata = { title: "Agent — Call Center" };
 export const dynamic = "force-dynamic";
 
@@ -56,7 +61,8 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ ag
 
   const confirmed    = logRows.filter((l) => l.disposition === "confirmed").length;
   const deliveredPaid = orderRows.filter((o) => o.status === "paid").length;
-  const commission   = deliveredPaid * 3;
+  const commissionRate = await getCommissionPerOrder();
+  const commission   = deliveredPaid * commissionRate;
 
   const availColor = {
     available: "bg-green-100 text-green-700",
@@ -110,7 +116,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ ag
         <Award className="h-6 w-6 text-emerald-600 shrink-0" />
         <div>
           <p className="font-semibold text-emerald-800">Commission totale : {commission.toFixed(2)} MAD</p>
-          <p className="text-xs text-emerald-700">{deliveredPaid} livrés × 3 MAD</p>
+          <p className="text-xs text-emerald-700">{deliveredPaid} livrés × {commissionRate} MAD</p>
         </div>
       </div>
 
