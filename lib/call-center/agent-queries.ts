@@ -5,7 +5,11 @@ import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth/session";
 
 const CC_ROLES = ["super_admin", "admin", "manager", "call_center_agent"] as const;
-const COMMISSION_PER_ORDER = 3;
+
+async function getCommissionPerOrder(): Promise<number> {
+  const { data } = await supabaseAdmin.from("settings").select("cc_commission_per_order").single();
+  return Number((data as { cc_commission_per_order?: number } | null)?.cc_commission_per_order ?? 3);
+}
 
 export async function getMyAssignedOrders() {
   const session = await requireRole([...CC_ROLES]);
@@ -50,7 +54,8 @@ export async function getMyStats() {
   const delivered = ordRows.filter((o) => ["delivered", "paid"].includes(o.status)).length;
   const returned = ordRows.filter((o) => o.status === "returned").length;
 
-  const commissionEarned = deliveredPaid * COMMISSION_PER_ORDER;
+  const commission = await getCommissionPerOrder();
+  const commissionEarned = deliveredPaid * commission;
   const confirmRate = callsMade > 0 ? Math.round((confirmed / callsMade) * 100) : 0;
   const deliveryRate = confirmed > 0 ? Math.round((delivered / confirmed) * 100) : 0;
 
@@ -63,6 +68,7 @@ export async function getMyCommissions() {
 
   const { data: deliveredOrders } = await supabaseAdmin.from("orders").select("id, order_number, total_amount_mad, updated_at").eq("assigned_to", agentId).eq("status", "paid");
   const delivered = (deliveredOrders ?? []) as { id: string; order_number: string; total_amount_mad: number; updated_at: string }[];
+  const COMMISSION_PER_ORDER = await getCommissionPerOrder();
   const totalEarned = delivered.length * COMMISSION_PER_ORDER;
 
   const { data: payments } = await supabaseAdmin.from("call_center_agent_payments").select("*").eq("agent_id", agentId).order("period_start", { ascending: false });

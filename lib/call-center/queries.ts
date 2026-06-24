@@ -5,7 +5,10 @@ type UserRow = { id: string; full_name: string; email: string; availability_stat
 type OrderRow = { assigned_to: string; status: string; call_status: string | null };
 type LogRow = { agent_id: string; disposition: string; duration_seconds: number | null };
 
-const COMMISSION_PER_ORDER = 3;
+async function getCommissionPerOrder(): Promise<number> {
+  const { data } = await supabaseAdmin.from("settings").select("cc_commission_per_order").single();
+  return Number((data as { cc_commission_per_order?: number } | null)?.cc_commission_per_order ?? 3);
+}
 
 export async function getAgentStats(): Promise<AgentStats[]> {
   // Same source as Settings → Users: public.users
@@ -71,7 +74,7 @@ availability_status: (() => {
       fake_orders: fakeOrders,
       duplicates,
       delivered_paid: deliveredPaid,
-      commission_mad: deliveredPaid * COMMISSION_PER_ORDER,
+      commission_mad: deliveredPaid * (await getCommissionPerOrder()),
       confirmation_rate: callsMade === 0 ? 0 : Math.round((confirmed / callsMade) * 100),
       fake_rate: callsMade === 0 ? 0 : Math.round((fakeOrders / callsMade) * 100),
       avg_duration_sec: avgDur,
