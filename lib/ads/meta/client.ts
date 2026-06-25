@@ -51,7 +51,7 @@ export class MetaAdsClient {
 
     const url = new URL(`${META_BASE_URL}/${this.prefixedAccountId}/insights`);
     url.searchParams.set("level", "campaign");
-    url.searchParams.set("fields", "campaign_id,campaign_name,spend,campaign_status");
+    url.searchParams.set("fields", "campaign_id,campaign_name,spend");
     url.searchParams.set("time_range", JSON.stringify({ since: dateFrom, until: dateTo }));
     url.searchParams.set("filtering", JSON.stringify([{ field: "campaign.effective_status", operator: "IN", value: ["ACTIVE", "PAUSED"] }]));
     url.searchParams.set("limit", "200");
