@@ -87,13 +87,15 @@ export async function syncMetaAdSpend(dateFrom: string, dateTo: string) {
 
   const { matches, unmatchedCampaigns } = matchCampaignsToProducts(productList, result.campaigns);
 
+  const USD_TO_MAD = 10; // 1 USD ≈ 10 MAD
+
   const rowsToUpsert = matches
     .filter((m) => m.matched_campaign_names.length > 0)
     .map((m) => ({
       product_id: m.product_id,
       platform: "meta" as const,
       matched_campaign_names: m.matched_campaign_names,
-      spend_mad: m.total_spend,
+      spend_mad: Math.round(m.total_spend * USD_TO_MAD * 100) / 100,
       period_start: dateFrom,
       period_end: dateTo,
       synced_at: new Date().toISOString(),
