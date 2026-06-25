@@ -114,4 +114,26 @@ export class MetaAdsClient {
       return { ok: false, error: e instanceof Error ? e.message : "Erreur réseau inconnue" };
     }
   }
+
+  /** List all campaigns in the account (id + name + status) */
+  async listCampaigns(): Promise<{ ok: boolean; error?: string; campaigns?: { id: string; name: string; status: string }[] }> {
+    if (!this.hasCredentials()) return { ok: false, error: "Token ou Ad Account ID Meta manquant." };
+    try {
+      const url = new URL(`${META_BASE_URL}/${this.prefixedAccountId}/campaigns`);
+      url.searchParams.set("fields", "id,name,effective_status");
+      url.searchParams.set("limit", "200");
+      url.searchParams.set("access_token", this.accessToken);
+      const res = await fetch(url.toString());
+      const json = await res.json();
+      if (!res.ok || json.error) return { ok: false, error: json?.error?.message ?? `Erreur HTTP ${res.status}` };
+      const campaigns = (json.data ?? []).map((c: { id: string; name: string; effective_status: string }) => ({
+        id: c.id,
+        name: c.name,
+        status: c.effective_status,
+      }));
+      return { ok: true, campaigns };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Erreur réseau inconnue" };
+    }
+  }
 }

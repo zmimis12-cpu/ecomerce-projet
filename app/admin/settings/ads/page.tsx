@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth/session";
 import { getAdPlatformSettings } from "@/lib/ads/actions";
 import { AdsSettingsForm } from "@/components/ads-integration/ads-settings-form";
+import { CampaignAssignment } from "@/components/ads-integration/campaign-assignment";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = { title: "Paramètres Publicité" };
 export const dynamic = "force-dynamic";
@@ -9,20 +11,21 @@ export const dynamic = "force-dynamic";
 export default async function AdsSettingsPage() {
   await requireRole(["super_admin", "admin"]);
 
-  const [metaSettings, googleSettings, tiktokSettings] = await Promise.all([
+  const [metaSettings, googleSettings, tiktokSettings, productsData] = await Promise.all([
     getAdPlatformSettings("meta"),
     getAdPlatformSettings("google"),
     getAdPlatformSettings("tiktok"),
+    supabaseAdmin.from("products").select("id, name, sku").order("name"),
   ]);
+
+  const products = (productsData.data ?? []) as { id: string; name: string; sku: string }[];
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Paramètres Publicité</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Connectez vos comptes publicitaires. Nommez chaque campagne avec le SKU
-          du produit entre crochets, ex: <code className="bg-secondary px-1 rounded">[FOAM CLEANER] Conversions</code>.
-          Le système calcule automatiquement le coût réel par produit.
+          Connectez vos comptes publicitaires. Assignez chaque campagne à un produit pour un calcul exact des dépenses.
         </p>
       </div>
 
@@ -31,6 +34,12 @@ export default async function AdsSettingsPage() {
         <AdsSettingsForm platform="google" settings={googleSettings} />
         <AdsSettingsForm platform="tiktok" settings={tiktokSettings} />
       </div>
+
+      {metaSettings?.is_active && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <CampaignAssignment products={products} />
+        </div>
+      )}
     </div>
   );
 }
