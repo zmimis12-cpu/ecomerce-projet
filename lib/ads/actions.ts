@@ -87,7 +87,9 @@ export async function syncMetaAdSpend(dateFrom: string, dateTo: string) {
 
   const { matches, unmatchedCampaigns } = matchCampaignsToProducts(productList, result.campaigns);
 
-  const USD_TO_MAD = 10; // 1 USD ≈ 10 MAD
+  // Taux USD→MAD depuis app_settings (clé: meta_usd_to_mad, défaut: 10)
+  const { data: rateRow } = await supabaseAdmin.from("app_settings").select("value").eq("key", "meta_usd_to_mad").maybeSingle();
+  const USD_TO_MAD = Number((rateRow as { value?: string } | null)?.value ?? 10);
 
   const rowsToUpsert = matches
     .filter((m) => m.matched_campaign_names.length > 0)
