@@ -137,9 +137,17 @@ export async function syncMetaAdSpend(dateFrom: string, dateTo: string) {
   }));
 
   if (rowsToUpsert.length > 0) {
+    // Supprimer d'abord pour éviter l'accumulation à chaque sync
+    await supabaseAdmin
+      .from("product_ad_spend")
+      .delete()
+      .eq("platform", "meta")
+      .gte("period_start", dateFrom)
+      .lte("period_end", dateTo);
+
     const { error: upsertErr } = await supabaseAdmin
       .from("product_ad_spend")
-      .upsert(rowsToUpsert as never, { onConflict: "product_id,platform,period_start,period_end" });
+      .insert(rowsToUpsert as never);
     if (upsertErr) {
       return { ok: false as const, error: `Échec de sauvegarde: ${upsertErr.message}` };
     }
