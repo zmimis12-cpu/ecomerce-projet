@@ -280,7 +280,20 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               </a>
             )}
 
-            <p className="lp-micro">لا دفع مسبق · فريقنا يتصل بك للتأكيد</p>
+            <div style={{display:"flex",justifyContent:"center",gap:"12px",flexWrap:"wrap",marginTop:"12px"}}>
+              <span style={{display:"flex",alignItems:"center",gap:"4px",fontSize:"12px",color:"#6b7280"}}>
+                <span style={{color:"#22c55e",fontWeight:700}}>✓</span> لا دفع مسبق
+              </span>
+              <span style={{display:"flex",alignItems:"center",gap:"4px",fontSize:"12px",color:"#6b7280"}}>
+                <span style={{color:"#22c55e",fontWeight:700}}>✓</span> توصيل مجاني
+              </span>
+              <span style={{display:"flex",alignItems:"center",gap:"4px",fontSize:"12px",color:"#6b7280"}}>
+                <span style={{color:"#22c55e",fontWeight:700}}>✓</span> ضمان سنة
+              </span>
+              <span style={{display:"flex",alignItems:"center",gap:"4px",fontSize:"12px",color:"#6b7280"}}>
+                <span style={{color:"#22c55e",fontWeight:700}}>✓</span> إرجاع مجاني
+              </span>
+            </div>
           </div>
         </section>
 
@@ -571,20 +584,17 @@ const GLOBAL_CSS = `
 
   /* ── Floating WhatsApp ── */
   .lp-wa-float{
-    position:fixed;bottom:80px;left:16px;z-index:60;
-    width:56px;height:56px;border-radius:50%;
+    position:fixed;bottom:90px;right:12px;z-index:60;
+    width:46px;height:46px;border-radius:50%;
     background:#25d366;color:#fff;
     display:flex;align-items:center;justify-content:center;
-    box-shadow:0 4px 16px rgba(37,211,102,.5);
+    box-shadow:0 2px 8px rgba(37,211,102,.4);
     text-decoration:none;
-    animation:wa-pulse 2s ease-in-out infinite;
-    transition:transform .15s;
+    opacity:0.85;
+    transition:transform .15s,opacity .15s;
   }
+  .lp-wa-float:hover{opacity:1;}
   .lp-wa-float:active{transform:scale(.92);}
-  @keyframes wa-pulse{
-    0%,100%{box-shadow:0 4px 16px rgba(37,211,102,.5);}
-    50%{box-shadow:0 4px 24px rgba(37,211,102,.8),0 0 0 8px rgba(37,211,102,.15);}
-  }
   @media(min-width:640px){
     .lp-wa-float{bottom:24px;}
   }

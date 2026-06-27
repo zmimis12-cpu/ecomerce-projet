@@ -186,11 +186,10 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
 
       {/* Address */}
       <div style={{ marginBottom:"14px" }}>
-        <label style={LBL}>العنوان التفصيلي *</label>
+        <label style={LBL}>العنوان التفصيلي <span style={{color:"#9ca3af",fontWeight:400}}>(اختياري)</span></label>
         <input type="text" value={form.customer_address}
           onChange={(e) => set("customer_address", e.target.value)}
-          placeholder="الحي، الشارع، رقم البناية..." style={INP(!!errors.customer_address)} required />
-        {ERR(errors.customer_address)}
+          placeholder="الحي، الشارع، رقم البناية..." style={INP(false)} />
       </div>
 
       {/* City */}
