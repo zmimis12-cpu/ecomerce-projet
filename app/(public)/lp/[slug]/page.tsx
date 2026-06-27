@@ -441,6 +441,7 @@ const defaultFaq = [
 // ── Global CSS — single source of truth ──────────────────────────────────────
 const GLOBAL_CSS = `
   *{box-sizing:border-box;margin:0;padding:0}
+  @keyframes lp-spin{to{transform:rotate(360deg)}}
   html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;overflow-x:hidden}
   body{font-family:var(--font-cairo),sans-serif;background:#f7f8fa;color:#111827;overflow-x:hidden;width:100%;position:relative}
 

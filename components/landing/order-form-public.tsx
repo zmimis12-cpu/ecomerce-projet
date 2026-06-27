@@ -241,7 +241,17 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           fontFamily:"var(--font-cairo),sans-serif", boxSizing:"border-box",
           boxShadow: isPending ? "none" : "0 3px 14px rgba(22,163,74,.28)",
           transition:"background .15s" }}>
-        {isPending ? "جاري إرسال الطلب…" : `${ctaText} — ${total.toFixed(0)} درهم`}
+        {isPending ? (
+          <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"10px"}}>
+            <span style={{
+              width:"18px",height:"18px",border:"3px solid rgba(255,255,255,0.3)",
+              borderTop:"3px solid #fff",borderRadius:"50%",
+              display:"inline-block",
+              animation:"lp-spin 0.7s linear infinite"
+            }} />
+            جاري إرسال طلبك…
+          </span>
+        ) : `${ctaText} — ${total.toFixed(0)} درهم`}
       </button>
 
       <p style={{ textAlign:"center", fontSize:"11px", color:"#9ca3af", marginTop:"10px" }}>
