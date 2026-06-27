@@ -8,6 +8,123 @@ import { FaqAccordion } from "@/components/landing/faq-accordion";
 import { ProductGallery } from "@/components/landing/product-gallery";
 import type { LPSection } from "@/lib/templates";
 
+// ── CSS ───────────────────────────────────────────────────────────────────────
+const CSS = `
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;overflow-x:hidden}
+  body{font-family:var(--font-cairo),sans-serif;background:#f5f5f5;color:#111;overflow-x:hidden;width:100%}
+
+  .lp-root{min-height:100vh;overflow-x:hidden;width:100%;max-width:100vw}
+  .lp-wrap{max-width:560px;margin:0 auto;padding:0 14px;width:100%;box-sizing:border-box}
+
+  /* Offer bar */
+  .lp-bar{background:#16a34a;color:#fff;text-align:center;padding:10px 16px;font-size:13px;font-weight:700;letter-spacing:.01em}
+
+  /* Hero */
+  .lp-hero{background:#fff;padding-bottom:20px}
+  .lp-brand{text-align:center;padding:12px 0 8px}
+  .lp-brand-name{font-size:20px;font-weight:900;color:#16a34a;letter-spacing:.5px}
+
+  /* Typography */
+  .lp-h1{font-size:clamp(20px,5.5vw,26px);font-weight:900;color:#111;line-height:1.3;text-align:center;margin:14px 0 10px}
+  .lp-h2{font-size:clamp(17px,4.5vw,21px);font-weight:800;color:#111;text-align:center;margin-bottom:18px;line-height:1.3}
+
+  /* Price */
+  .lp-price-row{display:flex;align-items:baseline;justify-content:center;gap:10px;margin-bottom:12px}
+  .lp-price-main{font-size:clamp(34px,9vw,44px);font-weight:900;color:#16a34a;line-height:1}
+  .lp-cur{font-size:16px;font-weight:700;color:#6b7280}
+  .lp-price-old{font-size:14px;color:#ef4444;text-decoration:line-through;font-weight:600}
+
+  /* Demand badges */
+  .lp-demand-row{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .lp-badge-demand{background:#fef3c7;color:#92400e;font-size:12px;font-weight:700;padding:5px 12px;border-radius:9999px;border:1px solid #fde68a}
+  .lp-badge-stock{background:#f0fdf4;color:#15803d;font-size:12px;font-weight:700;padding:5px 12px;border-radius:9999px;border:1px solid #bbf7d0}
+
+  /* CTA */
+  .lp-cta{display:block;width:100%;text-align:center;font-family:var(--font-cairo),sans-serif;font-size:clamp(16px,4.5vw,19px);font-weight:900;padding:17px 24px;border-radius:14px;text-decoration:none;border:none;cursor:pointer;transition:transform .1s,box-shadow .15s}
+  .lp-cta--main{background:linear-gradient(135deg,#22c55e,#15803d);color:#fff;box-shadow:0 6px 22px rgba(22,163,74,.4);margin-bottom:14px}
+  .lp-cta--main:active{transform:scale(.98)}
+  .lp-cta--white{background:#fff;color:#16a34a;border:2px solid #16a34a;display:inline-block;width:auto;padding:13px 36px;margin-top:8px}
+
+  /* Trust row */
+  .lp-trust-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+  .lp-trust-item{display:flex;align-items:center;gap:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:10px 12px}
+  .lp-trust-item span{font-size:20px;flex-shrink:0}
+  .lp-trust-title{font-size:12px;font-weight:700;color:#111;margin-bottom:1px}
+  .lp-trust-sub{font-size:10px;color:#6b7280}
+
+  /* Sections */
+  .lp-section{background:#fff;margin-top:8px;padding:24px 0}
+  .lp-section--gray{background:#f9fafb}
+
+  /* Benefits */
+  .lp-benefits-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .lp-benefit-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:14px;padding:16px 12px;text-align:center}
+  .lp-benefit-icon{font-size:28px;display:block;margin-bottom:8px}
+  .lp-benefit-title{font-size:13px;font-weight:700;color:#111;margin-bottom:4px}
+  .lp-benefit-desc{font-size:11px;color:#6b7280;line-height:1.4}
+
+  /* Description */
+  .lp-desc-text{font-size:14px;line-height:1.8;color:#374151;text-align:center}
+
+  /* Reviews */
+  .lp-reviews-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+  .lp-rating{display:flex;align-items:center;gap:5px}
+  .lp-stars{color:#f59e0b;letter-spacing:-1px}
+  .lp-rating-num{font-weight:900;font-size:15px}
+  .lp-rating-count{color:#9ca3af;font-size:11px}
+  .lp-reviews{display:flex;flex-direction:column;gap:10px}
+  .lp-review-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+  .lp-review-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+  .lp-review-info{display:flex;align-items:center;gap:10px}
+  .lp-avatar{width:38px;height:38px;border-radius:50%;background:#16a34a;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0}
+  .lp-review-name{font-weight:700;color:#111;font-size:13px;margin-bottom:2px}
+  .lp-review-city{color:#9ca3af;font-size:11px}
+  .lp-review-text{color:#374151;font-size:13px;line-height:1.65;margin-bottom:8px}
+  .lp-verified{color:#16a34a;font-size:11px;font-weight:600}
+
+  /* Urgency banner */
+  .lp-urgency-banner{background:#111;padding:18px 0;margin-top:8px}
+  .lp-urgency-text{color:#fbbf24;font-size:clamp(15px,4vw,18px);font-weight:900;margin-bottom:6px}
+  .lp-urgency-sub{color:#fff;font-size:13px;font-weight:600}
+
+  /* Form */
+  .lp-form-box{background:#fff;border:2px dashed #16a34a;border-radius:18px;padding:20px 16px}
+  .lp-form-title{font-size:clamp(17px,4.5vw,20px);font-weight:900;color:#111;text-align:center;margin-bottom:6px}
+  .lp-form-sub{font-size:12px;color:#16a34a;font-weight:600;text-align:center;margin-bottom:16px}
+  .lp-form-note{font-size:12px;color:#6b7280;text-align:center;margin-bottom:12px}
+
+  /* Final */
+  .lp-final{background:#16a34a;margin-top:8px;padding:28px 0}
+  .lp-final-title{color:#fff;font-size:clamp(18px,4.5vw,22px);font-weight:900;margin-bottom:6px}
+  .lp-final-sub{color:rgba(255,255,255,.85);font-size:13px;margin-bottom:18px}
+
+  /* Footer */
+  .lp-footer{background:#111;padding:16px;text-align:center;color:#6b7280;font-size:11px;margin-bottom:70px}
+
+  /* Sticky */
+  .lp-sticky{position:fixed;bottom:0;left:0;right:0;z-index:50;background:#fff;border-top:1px solid #e5e7eb;padding:10px 16px 14px;box-shadow:0 -4px 16px rgba(0,0,0,.1)}
+  .lp-sticky-inner{display:flex;align-items:center;gap:12px;max-width:560px;margin:0 auto}
+  .lp-sticky-info{flex:1;min-width:0}
+  .lp-sticky-name{font-weight:700;font-size:11px;color:#111;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lp-sticky-price{font-size:18px;font-weight:900;color:#16a34a;line-height:1.1}
+  .lp-sticky-price small{font-size:11px}
+  .lp-sticky-btn{flex-shrink:0;background:#16a34a;color:#fff;font-family:var(--font-cairo),sans-serif;font-size:13px;font-weight:800;padding:11px 16px;border-radius:12px;text-decoration:none;box-shadow:0 2px 10px rgba(22,163,74,.3)}
+
+  /* WhatsApp float */
+  .lp-wa-float{position:fixed;bottom:90px;right:12px;z-index:60;width:46px;height:46px;border-radius:50%;background:#25d366;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(37,211,102,.5);text-decoration:none;opacity:.9;transition:opacity .15s}
+  .lp-wa-float:hover{opacity:1}
+
+  @media(min-width:640px){
+    .lp-sticky{display:none!important}
+    .lp-footer{margin-bottom:0}
+    .lp-h1{font-size:28px}
+    .lp-section,.lp-section--gray{padding:36px 0}
+  }
+`;
+
+
 export const revalidate = 3600;
 
 const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://ecomerce-projet.vercel.app").replace(/\/$/, "");
@@ -339,119 +456,3 @@ const defaultFaq = [
   { q: "هل هناك ضمان؟", a: "نعم، ضمان سنة كاملة مع دعم فني على واتساب." },
   { q: "هل يتوفر في مدينتي؟", a: "نعم، نوصل لجميع مدن المغرب بدون استثناء." },
 ];
-
-// ── CSS ───────────────────────────────────────────────────────────────────────
-const CSS = `
-
-  *{box-sizing:border-box;margin:0;padding:0}
-  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;overflow-x:hidden}
-  body{font-family:var(--font-cairo),sans-serif;background:#f5f5f5;color:#111;overflow-x:hidden;width:100%}
-
-  .lp-root{min-height:100vh;overflow-x:hidden;width:100%;max-width:100vw}
-  .lp-wrap{max-width:560px;margin:0 auto;padding:0 14px;width:100%;box-sizing:border-box}
-
-  /* Offer bar */
-  .lp-bar{background:#16a34a;color:#fff;text-align:center;padding:10px 16px;font-size:13px;font-weight:700;letter-spacing:.01em}
-
-  /* Hero */
-  .lp-hero{background:#fff;padding-bottom:20px}
-  .lp-brand{text-align:center;padding:12px 0 8px}
-  .lp-brand-name{font-size:20px;font-weight:900;color:#16a34a;letter-spacing:.5px}
-
-  /* Typography */
-  .lp-h1{font-size:clamp(20px,5.5vw,26px);font-weight:900;color:#111;line-height:1.3;text-align:center;margin:14px 0 10px}
-  .lp-h2{font-size:clamp(17px,4.5vw,21px);font-weight:800;color:#111;text-align:center;margin-bottom:18px;line-height:1.3}
-
-  /* Price */
-  .lp-price-row{display:flex;align-items:baseline;justify-content:center;gap:10px;margin-bottom:12px}
-  .lp-price-main{font-size:clamp(34px,9vw,44px);font-weight:900;color:#16a34a;line-height:1}
-  .lp-cur{font-size:16px;font-weight:700;color:#6b7280}
-  .lp-price-old{font-size:14px;color:#ef4444;text-decoration:line-through;font-weight:600}
-
-  /* Demand badges */
-  .lp-demand-row{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:16px}
-  .lp-badge-demand{background:#fef3c7;color:#92400e;font-size:12px;font-weight:700;padding:5px 12px;border-radius:9999px;border:1px solid #fde68a}
-  .lp-badge-stock{background:#f0fdf4;color:#15803d;font-size:12px;font-weight:700;padding:5px 12px;border-radius:9999px;border:1px solid #bbf7d0}
-
-  /* CTA */
-  .lp-cta{display:block;width:100%;text-align:center;font-family:var(--font-cairo),sans-serif;font-size:clamp(16px,4.5vw,19px);font-weight:900;padding:17px 24px;border-radius:14px;text-decoration:none;border:none;cursor:pointer;transition:transform .1s,box-shadow .15s}
-  .lp-cta--main{background:linear-gradient(135deg,#22c55e,#15803d);color:#fff;box-shadow:0 6px 22px rgba(22,163,74,.4);margin-bottom:14px}
-  .lp-cta--main:active{transform:scale(.98)}
-  .lp-cta--white{background:#fff;color:#16a34a;border:2px solid #16a34a;display:inline-block;width:auto;padding:13px 36px;margin-top:8px}
-
-  /* Trust row */
-  .lp-trust-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
-  .lp-trust-item{display:flex;align-items:center;gap:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:10px 12px}
-  .lp-trust-item span{font-size:20px;flex-shrink:0}
-  .lp-trust-title{font-size:12px;font-weight:700;color:#111;margin-bottom:1px}
-  .lp-trust-sub{font-size:10px;color:#6b7280}
-
-  /* Sections */
-  .lp-section{background:#fff;margin-top:8px;padding:24px 0}
-  .lp-section--gray{background:#f9fafb}
-
-  /* Benefits */
-  .lp-benefits-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .lp-benefit-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:14px;padding:16px 12px;text-align:center}
-  .lp-benefit-icon{font-size:28px;display:block;margin-bottom:8px}
-  .lp-benefit-title{font-size:13px;font-weight:700;color:#111;margin-bottom:4px}
-  .lp-benefit-desc{font-size:11px;color:#6b7280;line-height:1.4}
-
-  /* Description */
-  .lp-desc-text{font-size:14px;line-height:1.8;color:#374151;text-align:center}
-
-  /* Reviews */
-  .lp-reviews-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
-  .lp-rating{display:flex;align-items:center;gap:5px}
-  .lp-stars{color:#f59e0b;letter-spacing:-1px}
-  .lp-rating-num{font-weight:900;font-size:15px}
-  .lp-rating-count{color:#9ca3af;font-size:11px}
-  .lp-reviews{display:flex;flex-direction:column;gap:10px}
-  .lp-review-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
-  .lp-review-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
-  .lp-review-info{display:flex;align-items:center;gap:10px}
-  .lp-avatar{width:38px;height:38px;border-radius:50%;background:#16a34a;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0}
-  .lp-review-name{font-weight:700;color:#111;font-size:13px;margin-bottom:2px}
-  .lp-review-city{color:#9ca3af;font-size:11px}
-  .lp-review-text{color:#374151;font-size:13px;line-height:1.65;margin-bottom:8px}
-  .lp-verified{color:#16a34a;font-size:11px;font-weight:600}
-
-  /* Urgency banner */
-  .lp-urgency-banner{background:#111;padding:18px 0;margin-top:8px}
-  .lp-urgency-text{color:#fbbf24;font-size:clamp(15px,4vw,18px);font-weight:900;margin-bottom:6px}
-  .lp-urgency-sub{color:#fff;font-size:13px;font-weight:600}
-
-  /* Form */
-  .lp-form-box{background:#fff;border:2px dashed #16a34a;border-radius:18px;padding:20px 16px}
-  .lp-form-title{font-size:clamp(17px,4.5vw,20px);font-weight:900;color:#111;text-align:center;margin-bottom:6px}
-  .lp-form-sub{font-size:12px;color:#16a34a;font-weight:600;text-align:center;margin-bottom:16px}
-  .lp-form-note{font-size:12px;color:#6b7280;text-align:center;margin-bottom:12px}
-
-  /* Final */
-  .lp-final{background:#16a34a;margin-top:8px;padding:28px 0}
-  .lp-final-title{color:#fff;font-size:clamp(18px,4.5vw,22px);font-weight:900;margin-bottom:6px}
-  .lp-final-sub{color:rgba(255,255,255,.85);font-size:13px;margin-bottom:18px}
-
-  /* Footer */
-  .lp-footer{background:#111;padding:16px;text-align:center;color:#6b7280;font-size:11px;margin-bottom:70px}
-
-  /* Sticky */
-  .lp-sticky{position:fixed;bottom:0;left:0;right:0;z-index:50;background:#fff;border-top:1px solid #e5e7eb;padding:10px 16px 14px;box-shadow:0 -4px 16px rgba(0,0,0,.1)}
-  .lp-sticky-inner{display:flex;align-items:center;gap:12px;max-width:560px;margin:0 auto}
-  .lp-sticky-info{flex:1;min-width:0}
-  .lp-sticky-name{font-weight:700;font-size:11px;color:#111;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .lp-sticky-price{font-size:18px;font-weight:900;color:#16a34a;line-height:1.1}
-  .lp-sticky-price small{font-size:11px}
-  .lp-sticky-btn{flex-shrink:0;background:#16a34a;color:#fff;font-family:var(--font-cairo),sans-serif;font-size:13px;font-weight:800;padding:11px 16px;border-radius:12px;text-decoration:none;box-shadow:0 2px 10px rgba(22,163,74,.3)}
-
-  /* WhatsApp float */
-  .lp-wa-float{position:fixed;bottom:90px;right:12px;z-index:60;width:46px;height:46px;border-radius:50%;background:#25d366;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(37,211,102,.5);text-decoration:none;opacity:.9;transition:opacity .15s}
-  .lp-wa-float:hover{opacity:1}
-
-  @media(min-width:640px){
-    .lp-sticky{display:none!important}
-    .lp-footer{margin-bottom:0}
-    .lp-h1{font-size:28px}
-    .lp-section,.lp-section--gray{padding:36px 0}
-  }
-`
