@@ -186,6 +186,25 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </section>
 
+        {/* ── ORDER FORM — directly after hero for max conversion ── */}
+        <section className="lp-section" id="lp-form">
+          <div className="lp-wrap">
+            <div className="lp-form-box">
+              <p className="lp-form-title">🛒 أدخل معلوماتك للطلب</p>
+              <p className="lp-form-sub">🔒 معلوماتك آمنة 100% — سنتصل بك لتأكيد الطلب</p>
+              {formNote && <p className="lp-form-note">{formNote}</p>}
+              <OrderFormPublic
+                product={product}
+                productSlug={slug}
+                ctaText={ctaText}
+                b1={b1} b2={b2} b3={b3}
+                unitLabel={unitLabel}
+                cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES}
+              />
+            </div>
+          </div>
+        </section>
+
         {/* ── BENEFITS ── */}
         <section className="lp-section">
           <div className="lp-wrap">
@@ -257,25 +276,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <div className="lp-wrap">
             <h2 className="lp-h2">الأسئلة الشائعة</h2>
             <FaqAccordion items={faqItems.slice(0, 5)} />
-          </div>
-        </section>
-
-        {/* ── ORDER FORM ── */}
-        <section className="lp-section" id="lp-form">
-          <div className="lp-wrap">
-            <div className="lp-form-box">
-              <p className="lp-form-title">🛒 أدخل معلوماتك للطلب</p>
-              <p className="lp-form-sub">🔒 معلوماتك آمنة 100% — سنتصل بك لتأكيد الطلب</p>
-              {formNote && <p className="lp-form-note">{formNote}</p>}
-              <OrderFormPublic
-                product={product}
-                productSlug={slug}
-                ctaText={ctaText}
-                b1={b1} b2={b2} b3={b3}
-                unitLabel={unitLabel}
-                cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES}
-              />
-            </div>
           </div>
         </section>
 
