@@ -111,8 +111,9 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       <link rel="preconnect" href="https://www.googletagmanager.com" />
       <script dangerouslySetInnerHTML={{ __html: `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","xdkdb6hzdf");` }} />
 
-      <style>{CSS}</style>
+      
 
+      <><style>{CSS}</style>
       <div className="lp-root" dir="rtl" lang="ar">
 
         {/* ── OFFER BAR ── */}
@@ -341,6 +342,7 @@ const defaultFaq = [
 
 // ── CSS ───────────────────────────────────────────────────────────────────────
 const CSS = `
+
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;overflow-x:hidden}
   body{font-family:var(--font-cairo),sans-serif;background:#f5f5f5;color:#111;overflow-x:hidden;width:100%}
@@ -452,4 +454,4 @@ const CSS = `
     .lp-h1{font-size:28px}
     .lp-section,.lp-section--gray{padding:36px 0}
   }
-`;
+`
