@@ -260,6 +260,22 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                 complete a purchase without scrolling past unrelated sections.
                 This is the core change from the old multi-section layout. */}
             <div id="lp-form" className="lp-form-inline">
+              {/* Trust header above form */}
+              <div style={{
+                background:"linear-gradient(135deg,#f0fdf4,#dcfce7)",
+                border:"1.5px solid #86efac",
+                borderRadius:"12px",
+                padding:"12px 16px",
+                marginBottom:"14px",
+                textAlign:"center"
+              }}>
+                <p style={{fontSize:"15px",fontWeight:700,color:"#15803d",marginBottom:"4px"}}>
+                  أدخل معلوماتك — سنتصل بك خلال دقائق ✓
+                </p>
+                <p style={{fontSize:"12px",color:"#166534"}}>
+                  🔒 معلوماتك آمنة 100% — لا حاجة لبطاقة بنكية
+                </p>
+              </div>
               <p className="lp-form-note green">{formNote}</p>
               <OrderFormPublic product={product} productSlug={slug}
                 ctaText={ctaText} b1={b1} b2={b2} b3={b3}
