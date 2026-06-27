@@ -6,11 +6,11 @@ interface Props {
   product: PublicProduct;
   productSlug: string;
   ctaText?: string;
-  b1: number; b2: number; b3: number;
+  b1: number; b2: number; b3: number; unitLabel?: string;
   cities?: string[];
 }
 
-export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, cities = FALLBACK_CITIES }: Props) {
+export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, unitLabel = "", cities = FALLBACK_CITIES }: Props) {
   const [isPending, startTransition] = useTransition();
   const [submitted, setSubmitted]    = useState(false);
   const [errors, setErrors]          = useState<Record<string, string>>({});
@@ -25,12 +25,15 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   // These match the server-side calculation in /api/public/orders so prices
   // are consistent between what the customer sees and what the order records.
   const unitPrice = b1; // sale_price_mad
+  // If unitLabel is set (e.g. "10 قطع"), show 10/20/30 pcs labels
+  const hasUnitLabel = unitLabel && unitLabel.trim().length > 0;
+  const unitNum = hasUnitLabel ? parseInt(unitLabel.replace(/[^0-9]/g, "")) || 1 : 1;
   const bundles = [
-    { qty:1, label:"1×", price: unitPrice,
-      note:"قطعة واحدة" },
-    { qty:2, label:"2×", price: Math.round(unitPrice * 2 * 0.90),
+    { qty:1, label: hasUnitLabel ? `${unitNum * 1} ${unitLabel.replace(/[0-9]/g, "").trim()}` : "1×", price: unitPrice,
+      note: hasUnitLabel ? `${unitNum} قطعة` : "قطعة واحدة" },
+    { qty:2, label: hasUnitLabel ? `${unitNum * 2} ${unitLabel.replace(/[0-9]/g, "").trim()}` : "2×", price: Math.round(unitPrice * 2 * 0.90),
       note:`وفّر ${Math.round(unitPrice * 2 * 0.10)} درهم`, pop:true },
-    { qty:3, label:"3×", price: Math.round(unitPrice * 3 * 0.80),
+    { qty:3, label: hasUnitLabel ? `${unitNum * 3} ${unitLabel.replace(/[0-9]/g, "").trim()}` : "3×", price: Math.round(unitPrice * 3 * 0.80),
       note:`وفّر ${Math.round(unitPrice * 3 * 0.20)} درهم` },
   ];
   const total = bundles.find((b) => b.qty === bundle)?.price ?? unitPrice;

@@ -114,6 +114,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const b1 = Number(lp.bundle_1_price || price);
   const b2 = Number(lp.bundle_2_price || Math.round(price * 2 * 0.9));
   const b3 = Number(lp.bundle_3_price || Math.round(price * 3 * 0.8));
+  const unitLabel = String((lp as { unit_label?: string }).unit_label ?? "");
 
   const psSection   = getSection("problem_solution");
   const benSection  = getSection("benefits");
@@ -278,7 +279,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               </div>
               <p className="lp-form-note green">{formNote}</p>
               <OrderFormPublic product={product} productSlug={slug}
-                ctaText={ctaText} b1={b1} b2={b2} b3={b3}
+                ctaText={ctaText} b1={b1} b2={b2} b3={b3} unitLabel={unitLabel}
                 cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
             </div>
 
