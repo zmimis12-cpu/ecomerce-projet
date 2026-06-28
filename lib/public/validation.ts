@@ -62,11 +62,11 @@ export function validateOrderInput(
     errors.customer_city = "المدينة مطلوبة";
   }
 
-  // 5. Address
-  const address = input.customer_address.trim();
-  if (!address || address.length < 5) {
-    errors.customer_address = "العنوان مطلوب (5 أحرف على الأقل)";
-  }
+  // 5. Address — optional for COD
+  // const address = input.customer_address.trim();
+  // if (!address || address.length < 5) {
+  //   errors.customer_address = "العنوان مطلوب (5 أحرف على الأقل)";
+  // }
 
   // 6. Quantity
   const qty = Number(input.quantity);
