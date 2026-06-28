@@ -15,6 +15,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   const [submitted, setSubmitted]    = useState(false);
   const [errors, setErrors]          = useState<Record<string, string>>({});
   const [serverError, setServerError]= useState("");
+  const [citySearch, setCitySearch]  = useState("");
   const [bundle, setBundle]          = useState(1);
   const [form, setForm] = useState({
     customer_name:"", customer_phone:"", customer_city:"",
@@ -195,15 +196,37 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           placeholder="الحي، الشارع، رقم البناية..." style={INP(false)} />
       </div>
 
-      {/* City */}
+      {/* City — searchable */}
       <div style={{ marginBottom:"14px" }}>
         <label style={LBL}>المدينة *</label>
-        <select value={form.customer_city}
-          onChange={(e) => set("customer_city", e.target.value)}
-          style={INP(!!errors.customer_city)} required>
-          <option value="">اختر مدينتك</option>
-          {cities.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <input
+          type="text"
+          value={citySearch || form.customer_city}
+          onChange={(e) => {
+            setCitySearch(e.target.value);
+            set("customer_city", "");
+          }}
+          onFocus={() => setCitySearch("")}
+          placeholder="ابحث عن مدينتك..."
+          style={INP(!!errors.customer_city)}
+          autoComplete="off"
+          list="lp-cities-list"
+        />
+        <datalist id="lp-cities-list">
+          {cities
+            .filter((c) => !citySearch || c.toLowerCase().includes(citySearch.toLowerCase()))
+            .map((c) => (
+              <option key={c} value={c} onClick={() => { set("customer_city", c); setCitySearch(""); }} />
+            ))}
+        </datalist>
+        <input type="hidden" name="customer_city_hidden"
+          ref={(el) => {
+            if (el && citySearch) {
+              const match = cities.find(c => c.toLowerCase() === citySearch.toLowerCase());
+              if (match) { set("customer_city", match); setCitySearch(match); }
+            }
+          }}
+        />
         {ERR(errors.customer_city)}
       </div>
 
