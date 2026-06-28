@@ -196,37 +196,37 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           placeholder="الحي، الشارع، رقم البناية..." style={INP(false)} />
       </div>
 
-      {/* City — searchable */}
-      <div style={{ marginBottom:"14px" }}>
+      {/* City — searchable custom dropdown */}
+      <div style={{ marginBottom:"14px", position:"relative" }}>
         <label style={LBL}>المدينة *</label>
         <input
           type="text"
-          value={citySearch || form.customer_city}
-          onChange={(e) => {
-            setCitySearch(e.target.value);
-            set("customer_city", "");
-          }}
-          onFocus={() => setCitySearch("")}
-          placeholder="ابحث عن مدينتك..."
+          value={citySearch}
+          onChange={(e) => { setCitySearch(e.target.value); set("customer_city", ""); }}
+          placeholder={form.customer_city || "ابحث عن مدينتك..."}
           style={INP(!!errors.customer_city)}
           autoComplete="off"
-          list="lp-cities-list"
         />
-        <datalist id="lp-cities-list">
-          {cities
-            .filter((c) => !citySearch || c.toLowerCase().includes(citySearch.toLowerCase()))
-            .map((c) => (
-              <option key={c} value={c} onClick={() => { set("customer_city", c); setCitySearch(""); }} />
-            ))}
-        </datalist>
-        <input type="hidden" name="customer_city_hidden"
-          ref={(el) => {
-            if (el && citySearch) {
-              const match = cities.find(c => c.toLowerCase() === citySearch.toLowerCase());
-              if (match) { set("customer_city", match); setCitySearch(match); }
-            }
-          }}
-        />
+        {citySearch.trim().length > 0 && (
+          <div style={{
+            position:"absolute", top:"100%", left:0, right:0, zIndex:100,
+            background:"#fff", border:"1px solid #d1d5db", borderRadius:"10px",
+            maxHeight:"200px", overflowY:"auto", boxShadow:"0 4px 12px rgba(0,0,0,.12)"
+          }}>
+            {cities
+              .filter((c) => c.toLowerCase().includes(citySearch.toLowerCase()))
+              .slice(0, 20)
+              .map((c) => (
+                <div key={c}
+                  onMouseDown={() => { set("customer_city", c); setCitySearch(""); }}
+                  style={{ padding:"10px 14px", cursor:"pointer", fontSize:"14px", borderBottom:"1px solid #f3f4f6" }}
+                >{c}</div>
+              ))}
+            {cities.filter((c) => c.toLowerCase().includes(citySearch.toLowerCase())).length === 0 && (
+              <div style={{ padding:"10px 14px", color:"#9ca3af", fontSize:"13px" }}>لا توجد نتائج</div>
+            )}
+          </div>
+        )}
         {ERR(errors.customer_city)}
       </div>
 
