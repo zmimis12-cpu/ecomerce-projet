@@ -146,6 +146,9 @@ export default async function AdminDashboardPage({
               <KpiCard label="À Collecter"     value={mad(summary.pending_collection)}
                 icon={AlertTriangle} variant="amber"
                 sub="Livrées non payées" />
+              <KpiCard label="Net à Recevoir"   value={mad((summary as {net_a_recevoir?:number}).net_a_recevoir ?? 0)}
+                icon={AlertTriangle} variant="green"
+                sub="Après frais livraison (Casa 20 / Autres 35)" />
               <KpiCard label="Profit Estimé"   value={mad(summary.estimated_profit)}
                 icon={TrendingUp} />
               <KpiCard label="Profit Réel"     value={mad(summary.real_profit)}

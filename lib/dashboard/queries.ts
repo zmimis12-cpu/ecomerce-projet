@@ -175,6 +175,15 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     .filter((r) => DELIVERED_STATUSES.has(r.status) && !r.is_paid)
     .reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
 
+  // Net à recevoir = montant collecté - frais livraison (20 MAD Casa, 35 MAD autres villes)
+  const net_a_recevoir = rows
+    .filter((r) => DELIVERED_STATUSES.has(r.status) && !r.is_paid)
+    .reduce((s, r) => {
+      const city = (r.customer_city ?? "").toLowerCase();
+      const livFee = city.includes("casablanca") || city.includes("casa") || city === "الدار البيضاء" ? 20 : 35;
+      return s + (r.total_amount_mad ?? 0) - livFee;
+    }, 0);
+
   // Delivery margin: +10 MAD for each Casa order
   let total_delivery_margin = 0;
   let total_delivery_overcharge = 0;
@@ -209,7 +218,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     delivered_count, paid_count, returned_count, refused_count,
     no_answer_count, cancelled_count,
     estimated_revenue, real_revenue, estimated_profit, real_profit,
-    total_cogs, total_delivery_cost, total_return_losses, pending_collection,
+    total_cogs, total_delivery_cost, total_return_losses, pending_collection, net_a_recevoir,
     confirmation_rate, delivery_rate,
     total_delivery_margin, total_delivery_overcharge, casa_orders_count,
     net_margin_pct, roi,
