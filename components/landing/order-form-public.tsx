@@ -48,11 +48,13 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     e.preventDefault();
     setServerError("");
 
-    // Client-side validation
+    // Client-side validation — resolve city from search if not yet selected
+    const resolvedCity = form.customer_city.trim() ||
+      (citySearch.trim() ? (cities.find(c => c.toLowerCase().includes(citySearch.toLowerCase())) ?? "") : "");
     const clientErrors: Record<string, string> = {};
     if (!form.customer_name.trim()) clientErrors.customer_name = "الاسم مطلوب";
     if (!form.customer_phone.trim()) clientErrors.customer_phone = "رقم الهاتف مطلوب";
-    if (!form.customer_city.trim()) clientErrors.customer_city = "المدينة مطلوبة";
+    if (!resolvedCity) clientErrors.customer_city = "المدينة مطلوبة";
     if (Object.keys(clientErrors).length > 0) { setErrors(clientErrors); return; }
 
     startTransition(async () => {
@@ -61,6 +63,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           method:"POST", headers:{"Content-Type":"application/json"},
           body: JSON.stringify({
             ...form,
+            customer_city: resolvedCity,
             quantity:     bundle,
             bundle_price: total,   // send the bundle total so API applies correct pricing
             product_id:   product.id,
