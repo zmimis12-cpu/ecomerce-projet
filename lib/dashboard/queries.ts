@@ -26,6 +26,7 @@ export interface DashboardSummary {
   total_delivery_cost:    number;
   total_return_losses:    number;
   pending_collection:     number;
+  net_a_recevoir:         number;
   confirmation_rate:      number;
   delivery_rate:          number;
   // New real finance fields
