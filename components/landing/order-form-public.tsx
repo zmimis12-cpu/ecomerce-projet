@@ -47,6 +47,14 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setServerError("");
+
+    // Client-side validation
+    const clientErrors: Record<string, string> = {};
+    if (!form.customer_name.trim()) clientErrors.customer_name = "الاسم مطلوب";
+    if (!form.customer_phone.trim()) clientErrors.customer_phone = "رقم الهاتف مطلوب";
+    if (!form.customer_city.trim()) clientErrors.customer_city = "المدينة مطلوبة";
+    if (Object.keys(clientErrors).length > 0) { setErrors(clientErrors); return; }
+
     startTransition(async () => {
       try {
         const res = await fetch("/api/public/orders", {
@@ -203,6 +211,16 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           type="text"
           value={citySearch}
           onChange={(e) => { setCitySearch(e.target.value); set("customer_city", ""); }}
+          onBlur={() => {
+            // Auto-select if exact match
+            const match = cities.find(c => c.toLowerCase() === citySearch.toLowerCase());
+            if (match) { set("customer_city", match); setCitySearch(""); }
+            else if (!form.customer_city && citySearch) {
+              // Try partial match - take first result
+              const partial = cities.find(c => c.toLowerCase().includes(citySearch.toLowerCase()));
+              if (partial) { set("customer_city", partial); setCitySearch(""); }
+            }
+          }}
           placeholder={form.customer_city || "ابحث عن مدينتك..."}
           style={INP(!!errors.customer_city)}
           autoComplete="off"
