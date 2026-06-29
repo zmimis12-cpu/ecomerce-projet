@@ -319,7 +319,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         </section>
 
         {/* ── PROBLEM → SOLUTION — dynamic from DB or AI analysis ── */}
-        {(psSection?.problems?.length || psSection?.solutions?.length) ? (
+        {((psSection?.problems as unknown[])?.length || (psSection?.solutions as unknown[])?.length) ? (
         <section className="lp-section">
           <div className="lp-wrap">
             <h2 className="lp-h2">{psSection?.problem_title ?? "هل سئمت من هذا؟ 😔"}</h2>
