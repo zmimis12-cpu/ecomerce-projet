@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { FALLBACK_CITIES } from "@/components/landing/order-form-public";
 import { getLandingPage } from "@/lib/public/queries";
 import { OrderFormPublic } from "@/components/landing/order-form-public";
+import { StickyBar } from "@/components/landing/sticky-bar";
 import { FloatingNotification } from "@/components/landing/floating-notification";
 import { ExitPopup } from "@/components/landing/exit-popup";
 import { StockCounter } from "@/components/landing/stock-counter";
@@ -396,18 +397,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <p>جميع الحقوق محفوظة © {new Date().getFullYear()}</p>
         </footer>
 
-        {/* ── STICKY BAR (mobile) ── */}
-        <div className="lp-sticky">
-          <div className="lp-sticky-inner">
-            <div className="lp-sticky-info">
-              <p className="lp-sticky-name">{product.name}</p>
-              <p className="lp-sticky-price">
-                {price.toFixed(0)} <small>درهم</small>
-              </p>
-            </div>
-            <a href="#lp-form" className="lp-sticky-btn">{ctaText}</a>
-          </div>
-        </div>
+        {/* ── STICKY BAR (mobile) — hidden when form is in view ── */}
+        <StickyBar productName={product.name} price={price} ctaText={ctaText} />
 
         {/* ── FLOATING NOTIFICATION ── */}
         <FloatingNotification />
