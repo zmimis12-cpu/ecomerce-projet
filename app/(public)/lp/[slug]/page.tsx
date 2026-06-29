@@ -186,7 +186,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
       {page.meta_pixel_id?.trim() && (
         <script dangerouslySetInnerHTML={{ __html:
-          `window.addEventListener('load',function(){!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${page.meta_pixel_id.trim()}');fbq('track','PageView');});`
+          `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${page.meta_pixel_id.trim()}');fbq('track','PageView');`
         }} />
       )}
       <link rel="preconnect" href="https://connect.facebook.net" />
@@ -278,16 +278,13 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             {/* Order form — moved directly into the hero so a customer can
                 complete a purchase without scrolling past unrelated sections.
                 This is the core change from the old multi-section layout. */}
-            <div id="lp-form" className="lp-form-inline">
+            <div id="lp-form" className="lp-form-inline" style={{border:"2px solid #16a34a",background:"#fff"}}>
+              <p style={{textAlign:"center",fontSize:"15px",fontWeight:900,color:"#111",marginBottom:"4px"}}>🛒 أدخل معلوماتك للطلب</p>
+              <p style={{textAlign:"center",fontSize:"12px",color:"#16a34a",fontWeight:600,marginBottom:"16px"}}>🔒 معلوماتك آمنة — سنتصل بك لتأكيد الطلب</p>
               <p className="lp-form-note green">{formNote}</p>
               <OrderFormPublic product={product} productSlug={slug}
                 ctaText={ctaText} b1={b1} b2={b2} b3={b3} unitLabel={unitLabel}
                 cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
-            </div>
-
-            {/* Product description — clear, visible explanation of what this is */}
-            <div className="lp-desc">
-              <p>{description}</p>
             </div>
 
             {/* WhatsApp */}
@@ -321,27 +318,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </section>
 
-        {/* ── POURQUOI NOUS ── */}
-        <section className="lp-section">
-          <div className="lp-wrap">
-            <h2 className="lp-h2">لماذا تختار متجرنا؟</h2>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"}}>
-              {[
-                { icon:"🏆", title:"+500 عميل راضي", desc:"آلاف الطلبات الناجحة في المغرب" },
-                { icon:"🚚", title:"توصيل لكل المدن", desc:"24-48 ساعة في الدار البيضاء والرباط" },
-                { icon:"💳", title:"الدفع عند الاستلام", desc:"لا دفع مسبق، ادفع عند وصول طلبك" },
-                { icon:"🔄", title:"إرجاع مجاني", desc:"7 أيام لإرجاع المنتج بدون أي شرط" },
-              ].map((item, i) => (
-                <div key={i} style={{background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:"14px",padding:"14px 12px",textAlign:"center"}}>
-                  <span style={{fontSize:"28px",display:"block",marginBottom:"6px"}}>{item.icon}</span>
-                  <p style={{fontSize:"12px",fontWeight:700,color:"#111",marginBottom:"3px"}}>{item.title}</p>
-                  <p style={{fontSize:"10px",color:"#6b7280",lineHeight:1.4}}>{item.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* ── PROBLEM → SOLUTION ── */}
         <section className="lp-section">
           <div className="lp-wrap">
@@ -364,6 +340,27 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               ))}
             </div>
             <a href="#lp-form" className="lp-cta">👉 اطلب الآن بالدفع عند الاستلام</a>
+          </div>
+        </section>
+
+        {/* ── POURQUOI NOUS ── */}
+        <section className="lp-section">
+          <div className="lp-wrap">
+            <h2 className="lp-h2">لماذا تختار متجرنا؟</h2>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"}}>
+              {[
+                { icon:"🏆", title:"+500 عميل راضي", desc:"آلاف الطلبات الناجحة في المغرب" },
+                { icon:"🚚", title:"توصيل لكل المدن", desc:"24-48 ساعة في الدار البيضاء والرباط" },
+                { icon:"💳", title:"الدفع عند الاستلام", desc:"لا دفع مسبق، ادفع عند وصول طلبك" },
+                { icon:"🔄", title:"إرجاع مجاني", desc:"7 أيام لإرجاع المنتج بدون أي شرط" },
+              ].map((item, i) => (
+                <div key={i} style={{background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:"14px",padding:"14px 12px",textAlign:"center"}}>
+                  <span style={{fontSize:"28px",display:"block",marginBottom:"6px"}}>{item.icon}</span>
+                  <p style={{fontSize:"12px",fontWeight:700,color:"#111",marginBottom:"3px"}}>{item.title}</p>
+                  <p style={{fontSize:"10px",color:"#6b7280",lineHeight:1.4}}>{item.desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -413,9 +410,9 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         {/* ── FINAL CTA ── */}
         <section className="lp-final">
           <div className="lp-wrap" style={{ textAlign:"center" }}>
-            <p className="lp-final-title">ما تخليش الفرصة تفوتك</p>
-            <p className="lp-final-sub">الكمية محدودة · الدفع عند الاستلام · توصيل مجاني</p>
-            <a href="#lp-form" className="lp-cta lp-cta--white">اطلب الآن</a>
+            <p className="lp-final-title">🔥 اطلب الآن قبل نفاد المخزون</p>
+            <p className="lp-final-sub">الدفع عند الاستلام · توصيل مجاني · ضمان سنة كاملة</p>
+            <a href="#lp-form" className="lp-cta lp-cta--white">👉 اطلب الآن — الدفع عند الاستلام</a>
           </div>
         </section>
 
@@ -642,14 +639,9 @@ const GLOBAL_CSS = `
     display:flex;align-items:center;justify-content:center;
     box-shadow:0 4px 16px rgba(37,211,102,.5);
     text-decoration:none;
-    animation:wa-pulse 2s ease-in-out infinite;
     transition:transform .15s;
   }
   .lp-wa-float:active{transform:scale(.92);}
-  @keyframes wa-pulse{
-    0%,100%{box-shadow:0 4px 16px rgba(37,211,102,.5);}
-    50%{box-shadow:0 4px 24px rgba(37,211,102,.8),0 0 0 8px rgba(37,211,102,.15);}
-  }
   @media(min-width:640px){
     .lp-wa-float{bottom:24px;}
   }
