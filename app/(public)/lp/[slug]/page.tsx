@@ -224,7 +224,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
             {/* Trust badges */}
             <div className="lp-badges">
-              {["الدفع عند الاستلام","توصيل سريع","ضمان سنة"].map((b) => (
+              {["✅ دفع عند الاستلام","🚚 توصيل مجاني","🛡️ ضمان سنة","📞 تأكيد هاتفي"].map((b) => (
                 <span key={b} className="lp-badge">{b}</span>
               ))}
             </div>
@@ -342,6 +342,31 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </section>
 
+        {/* ── PROBLEM → SOLUTION ── */}
+        <section className="lp-section">
+          <div className="lp-wrap">
+            <h2 className="lp-h2">هل سئمت من هذا؟ 😔</h2>
+            <div style={{display:"flex",flexDirection:"column",gap:"8px",marginBottom:"20px"}}>
+              {["شاشة الهاتف صغيرة وتتعب عيناك 📱","التلفاز القديم لا يعطي تجربة حقيقية 📺","السينما غالية وبعيدة 🎭"].map((p,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:"10px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:"10px",padding:"12px 14px"}}>
+                  <span>❌</span>
+                  <p style={{fontSize:"13px",color:"#991b1b",fontWeight:600}}>{p}</p>
+                </div>
+              ))}
+            </div>
+            <h3 style={{fontSize:"17px",fontWeight:900,color:"#16a34a",textAlign:"center",marginBottom:"12px"}}>✅ الحل: بروجيتور HY300 PRO</h3>
+            <div style={{display:"flex",flexDirection:"column",gap:"8px",marginBottom:"20px"}}>
+              {["صورة ضخمة حتى 200 بوصة في بيتك 🎬","WiFi مدمج — Netflix وYouTube بدون كابلات 📡","خفيف ومحمول — سينما في أي مكان 🏠"].map((s,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:"10px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:"10px",padding:"12px 14px"}}>
+                  <span>✅</span>
+                  <p style={{fontSize:"13px",color:"#15803d",fontWeight:600}}>{s}</p>
+                </div>
+              ))}
+            </div>
+            <a href="#lp-form" className="lp-cta">👉 اطلب الآن بالدفع عند الاستلام</a>
+          </div>
+        </section>
+
         {/* ── REVIEWS ── */}
         <section className="lp-section lp-section--gray">
           <div className="lp-wrap">
@@ -354,24 +379,25 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               </div>
             </div>
             <div className="lp-reviews">
-              {reviews.slice(0, 5).map((r, i) => (
+              {reviews.slice(0, 5).map((r, i) => {
+                const colors = ["#16a34a","#2563eb","#dc2626","#9333ea","#ea580c"];
+                return (
                 <div key={i} className="lp-card lp-review">
                   <div className="lp-review-top">
                     <div className="lp-review-info">
-                      <span className="lp-avatar">{r.name.charAt(0)}</span>
+                      <div style={{width:"40px",height:"40px",borderRadius:"50%",background:colors[i%colors.length],color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:"16px",flexShrink:0}}>{r.name.charAt(0)}</div>
                       <div>
                         <p className="lp-review-name">{r.name}</p>
-                        <p className="lp-review-city">{r.city}</p>
+                        <p className="lp-review-city">📍 {r.city}</p>
+                        <span style={{fontSize:"10px",background:"#dcfce7",color:"#15803d",fontWeight:700,padding:"1px 6px",borderRadius:"9999px"}}>✓ مشتري موثق</span>
                       </div>
                     </div>
-                    <span className="lp-stars" style={{ fontSize:"12px" }}>
-                      {"★".repeat(r.stars ?? 5)}
-                    </span>
+                    <div style={{color:"#f59e0b",fontSize:"13px"}}>{"★".repeat(r.stars ?? 5)}</div>
                   </div>
                   <p className="lp-review-text">{r.text}</p>
-                  <span className="lp-verified">مشتري موثق</span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
