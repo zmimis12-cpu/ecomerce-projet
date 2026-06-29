@@ -116,24 +116,25 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   );
 
   const INP = (err: boolean): React.CSSProperties => ({
-    display:"block", width:"100%", height:"48px",
-    borderRadius:"12px", border:`2px solid ${err ? "#f87171" : "#e5e7eb"}`,
-    background:"#fff", padding:"0 14px",
+    display:"block", width:"100%", height:"54px",
+    borderRadius:"14px", border:`2px solid ${err ? "#f87171" : "#16a34a"}`,
+    background:"#fff", padding:"0 16px",
     fontSize:"16px", fontFamily:"var(--font-cairo),sans-serif",
     boxSizing:"border-box", outline:"none", color:"#111827",
     WebkitAppearance:"none", appearance:"none",
     transition:"border-color .15s",
+    boxShadow:"0 1px 4px rgba(0,0,0,.06)",
   });
   const LBL: React.CSSProperties = {
-    display:"block", fontSize:"13px", fontWeight:700,
-    color:"#374151", marginBottom:"5px",
+    display:"block", fontSize:"14px", fontWeight:700,
+    color:"#111827", marginBottom:"7px",
   };
   const ERR = (msg: string) => msg ? (
     <p style={{ color:"#ef4444", fontSize:"11px", marginTop:"3px" }}>{msg}</p>
   ) : null;
 
   return (
-    <form onSubmit={handleSubmit} style={{ fontFamily:"var(--font-cairo),sans-serif" }}>
+    <form onSubmit={handleSubmit} style={{ fontFamily:"var(--font-cairo),sans-serif", background:"#fff", borderRadius:"16px", padding:"20px 16px", border:"2px dashed #16a34a" }}>
       {/* Honeypot */}
       <input type="text" name="website" value={form.website}
         onChange={(e) => set("website", e.target.value)}

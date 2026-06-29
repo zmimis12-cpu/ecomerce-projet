@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { createPortal } from "react-dom";
+// import { createPortal } from "react-dom";
 import Image from "next/image";
 
 interface ProductImage {
@@ -19,7 +19,6 @@ interface Props {
 
 export function ProductGallery({ images, productName, discountPct = 0 }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [lightbox, setLightbox]       = useState(false);
   const [mounted, setMounted]         = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -71,7 +70,6 @@ export function ProductGallery({ images, productName, discountPct = 0 }: Props) 
     <>
       {/* Main image */}
       <div
-        onClick={() => setLightbox(true)}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
         style={{
@@ -146,63 +144,6 @@ export function ProductGallery({ images, productName, discountPct = 0 }: Props) 
         </div>
       )}
 
-      {/* Lightbox — rendered via portal directly on document.body to escape
-          admin layout's overflow:hidden which breaks position:fixed */}
-      {lightbox && mounted && createPortal(
-        <div
-          onClick={() => setLightbox(false)}
-          onTouchStart={onTouchStart}
-          onTouchEnd={onTouchEnd}
-          style={{
-            position: "fixed", inset: 0, zIndex: 9999,
-            background: "rgba(0,0,0,.92)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: "16px", cursor: "zoom-out",
-          }}
-        >
-          <div style={{ position: "relative", width: "100%", maxWidth: "600px", aspectRatio: "1/1" }}>
-            <Image src={active.public_url} alt={productName} fill style={{ objectFit: "contain" }} unoptimized />
-          </div>
-
-          {/* Close */}
-          <button onClick={(e) => { e.stopPropagation(); setLightbox(false); }}
-            style={{
-              position: "absolute", top: 16, right: 16,
-              background: "rgba(255,255,255,.2)", border: "none",
-              color: "#fff", borderRadius: "50%", width: 40, height: 40,
-              fontSize: 22, cursor: "pointer", display: "flex",
-              alignItems: "center", justifyContent: "center",
-            }}
-            aria-label="إغلاق">×</button>
-
-          {/* NEXT on LEFT (RTL) */}
-          {hasNext && (
-            <button
-              onClick={(e) => { e.stopPropagation(); goNext(); }}
-              style={{
-                position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
-                background: "rgba(255,255,255,.2)", border: "none", color: "#fff",
-                borderRadius: "50%", width: 48, height: 48, fontSize: 26, cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}
-            >›</button>
-          )}
-
-          {/* PREV on RIGHT (RTL) */}
-          {hasPrev && (
-            <button
-              onClick={(e) => { e.stopPropagation(); goPrev(); }}
-              style={{
-                position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
-                background: "rgba(255,255,255,.2)", border: "none", color: "#fff",
-                borderRadius: "50%", width: 48, height: 48, fontSize: 26, cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}
-            >‹</button>
-          )}
-        </div>,
-        document.body
-      )}
     </>
   );
 }
