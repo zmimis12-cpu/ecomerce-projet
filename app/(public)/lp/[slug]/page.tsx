@@ -320,6 +320,27 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </section>
 
+        {/* ── POURQUOI NOUS ── */}
+        <section className="lp-section">
+          <div className="lp-wrap">
+            <h2 className="lp-h2">لماذا تختار متجرنا؟</h2>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"}}>
+              {[
+                { icon:"🏆", title:"+500 عميل راضي", desc:"آلاف الطلبات الناجحة في المغرب" },
+                { icon:"🚚", title:"توصيل لكل المدن", desc:"24-48 ساعة في الدار البيضاء والرباط" },
+                { icon:"💳", title:"الدفع عند الاستلام", desc:"لا دفع مسبق، ادفع عند وصول طلبك" },
+                { icon:"🔄", title:"إرجاع مجاني", desc:"7 أيام لإرجاع المنتج بدون أي شرط" },
+              ].map((item, i) => (
+                <div key={i} style={{background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:"14px",padding:"14px 12px",textAlign:"center"}}>
+                  <span style={{fontSize:"28px",display:"block",marginBottom:"6px"}}>{item.icon}</span>
+                  <p style={{fontSize:"12px",fontWeight:700,color:"#111",marginBottom:"3px"}}>{item.title}</p>
+                  <p style={{fontSize:"10px",color:"#6b7280",lineHeight:1.4}}>{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* ── REVIEWS ── */}
         <section className="lp-section lp-section--gray">
           <div className="lp-wrap">
@@ -332,7 +353,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               </div>
             </div>
             <div className="lp-reviews">
-              {reviews.slice(0, 3).map((r, i) => (
+              {reviews.slice(0, 5).map((r, i) => (
                 <div key={i} className="lp-card lp-review">
                   <div className="lp-review-top">
                     <div className="lp-review-info">
@@ -415,21 +436,24 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 const defaultBenefits = [
-  { icon:"✓", title:"جودة ممتازة",  desc:"مضمون ومعتمد" },
-  { icon:"✓", title:"توصيل سريع",   desc:"2-4 أيام عمل" },
-  { icon:"✓", title:"دعم مستمر",    desc:"فريقنا متاح" },
-  { icon:"✓", title:"ضمان سنة",     desc:"استرجاع مجاني" },
+  { icon:"🎬", title:"جودة 4K ممتازة",      desc:"صورة واضحة وحادة على أي جدار في أي غرفة" },
+  { icon:"📡", title:"WiFi و HDMI",          desc:"متوافق مع Netflix وYouTube وجميع الأجهزة" },
+  { icon:"🔊", title:"صوت داخلي قوي",       desc:"تجربة سينمائية كاملة بدون سماعات إضافية" },
+  { icon:"🏠", title:"للمنزل والسفر",        desc:"خفيف وسهل الحمل — سينما في أي مكان" },
 ];
 const defaultReviews = [
-  { name:"محمد أمين",     city:"الدار البيضاء", stars:5, text:"منتج ممتاز، توصل في يومين. الجودة فاقت توقعاتي تماماً." },
-  { name:"فاطمة الزهراء", city:"مراكش",          stars:5, text:"جربته وما ندمت. الدفع عند الاستلام راحني كثير." },
-  { name:"يوسف المرابط",  city:"الرباط",          stars:5, text:"أنصح به — قيمة حقيقية بسعر معقول." },
+  { name:"محمد أمين",     city:"الدار البيضاء", stars:5, text:"والله شريت هذا البروجيتور وما ندمت! الصورة واضحة جداً وكبيرة، ولاد الدار كلهم فرحو. التوصيل جا في يومين فقط. نوصي بيه بصح." },
+  { name:"فاطمة الزهراء", city:"مراكش",          stars:5, text:"كنت خايفة نطلب من الأنترنت، ولكن الدفع عند الاستلام راحني. المنتج وصل سليم وكاين في كيس مزيان. الجودة ممتازة بالسعر هذا." },
+  { name:"يوسف المرابط",  city:"الرباط",          stars:5, text:"شريت واحد لدارنا وواحد لأخوياتي هدية. التوصيل سريع والخدمة ممتازة. البروجيتور كيشتغل مزيان مع Netflix وYouTube." },
+  { name:"سمية الراضي",   city:"فاس",             stars:5, text:"أحسن شراء درته هاد العام! الشاشة كبيرة ومزيانة، الأطفال فرحو بزاف. نوصي بيه لكل واحد." },
+  { name:"عبد الرحيم",    city:"أكادير",          stars:5, text:"خدمة الزبناء ردو علي بسرعة وشرحو لي كيفاش نخدم البروجيتور. المنتج تام بصح وبسعر معقول جداً." },
 ];
 const defaultFaq = [
-  { q:"كيف يتم التوصيل؟",      a:"خلال 2-4 أيام لجميع مدن المغرب." },
-  { q:"هل يمكن إرجاع المنتج؟", a:"نعم، إرجاع مجاني خلال 7 أيام." },
-  { q:"كيف يتم الدفع؟",        a:"الدفع عند الاستلام — لا دفع مسبق." },
-  { q:"هل هناك ضمان؟",         a:"نعم، ضمان سنة كاملة مع دعم فني." },
+  { q:"كيف يتم الدفع؟",              a:"الدفع عند الاستلام فقط — تدفع نقداً للمندوب عند استلام الطرد. لا دفع مسبق، لا بطاقة بنكية." },
+  { q:"متى يصل الطلب؟",             a:"التوصيل خلال 24-48 ساعة في الدار البيضاء والرباط، و2-4 أيام لباقي المدن. مجاناً لجميع مدن المغرب." },
+  { q:"هل يمكن فتح الطرد عند الاستلام؟", a:"نعم، يمكنك فتح الطرد والتحقق من المنتج قبل الدفع. إذا لم يعجبك يمكنك إرجاعه مجاناً." },
+  { q:"هل يوجد ضمان؟",              a:"نعم، ضمان سنة كاملة. في حالة أي مشكل نستبدل المنتج مجاناً أو نسترجع المبلغ كاملاً." },
+  { q:"كيف أتواصل معكم؟",           a:"يمكنك التواصل معنا عبر واتساب أو الاتصال المباشر. فريقنا متاح 7 أيام في الأسبوع." },
 ];
 
 // ── Global CSS — single source of truth ──────────────────────────────────────
