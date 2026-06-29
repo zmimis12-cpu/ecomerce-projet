@@ -318,21 +318,22 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </section>
 
-        {/* ── PROBLEM → SOLUTION ── */}
+        {/* ── PROBLEM → SOLUTION — dynamic from DB or AI analysis ── */}
+        {(psSection?.problems?.length || psSection?.solutions?.length) ? (
         <section className="lp-section">
           <div className="lp-wrap">
-            <h2 className="lp-h2">هل سئمت من هذا؟ 😔</h2>
+            <h2 className="lp-h2">{psSection?.problem_title ?? "هل سئمت من هذا؟ 😔"}</h2>
             <div style={{display:"flex",flexDirection:"column",gap:"8px",marginBottom:"20px"}}>
-              {["شاشة الهاتف صغيرة وتتعب عيناك 📱","التلفاز القديم لا يعطي تجربة حقيقية 📺","السينما غالية وبعيدة 🎭"].map((p,i)=>(
+              {((psSection?.problems as string[]) ?? []).map((p,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:"10px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:"10px",padding:"12px 14px"}}>
                   <span>❌</span>
                   <p style={{fontSize:"13px",color:"#991b1b",fontWeight:600}}>{p}</p>
                 </div>
               ))}
             </div>
-            <h3 style={{fontSize:"17px",fontWeight:900,color:"#16a34a",textAlign:"center",marginBottom:"12px"}}>✅ الحل: بروجيتور HY300 PRO</h3>
+            <h3 style={{fontSize:"17px",fontWeight:900,color:"#16a34a",textAlign:"center",marginBottom:"12px"}}>✅ {psSection?.solution_title ?? `الحل: ${product.name}`}</h3>
             <div style={{display:"flex",flexDirection:"column",gap:"8px",marginBottom:"20px"}}>
-              {["صورة ضخمة حتى 200 بوصة في بيتك 🎬","WiFi مدمج — Netflix وYouTube بدون كابلات 📡","خفيف ومحمول — سينما في أي مكان 🏠"].map((s,i)=>(
+              {((psSection?.solutions as string[]) ?? []).map((s,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:"10px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:"10px",padding:"12px 14px"}}>
                   <span>✅</span>
                   <p style={{fontSize:"13px",color:"#15803d",fontWeight:600}}>{s}</p>
@@ -342,6 +343,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             <a href="#lp-form" className="lp-cta">👉 اطلب الآن بالدفع عند الاستلام</a>
           </div>
         </section>
+        ) : null}
 
         {/* ── POURQUOI NOUS ── */}
         <section className="lp-section">
@@ -349,9 +351,9 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             <h2 className="lp-h2">لماذا تختار متجرنا؟</h2>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"}}>
               {[
-                { icon:"🏆", title:"+500 عميل راضي", desc:"آلاف الطلبات الناجحة في المغرب" },
+                { icon:"🏆", title:"+500 عميل راضي", desc:"آلاف الطلبات الناجحة في جميع مدن المغرب" },
                 { icon:"🚚", title:"توصيل لكل المدن", desc:"24-48 ساعة في الدار البيضاء والرباط" },
-                { icon:"💳", title:"الدفع عند الاستلام", desc:"لا دفع مسبق، ادفع عند وصول طلبك" },
+                { icon:"💳", title:"الدفع عند الاستلام", desc:"لا دفع مسبق — ادفع فقط عند وصول طلبك" },
                 { icon:"🔄", title:"إرجاع مجاني", desc:"7 أيام لإرجاع المنتج بدون أي شرط" },
               ].map((item, i) => (
                 <div key={i} style={{background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:"14px",padding:"14px 12px",textAlign:"center"}}>
