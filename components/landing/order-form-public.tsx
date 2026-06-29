@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import type { PublicProduct } from "@/lib/public/queries";
 
 interface Props {
@@ -16,6 +16,12 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   const [errors, setErrors]          = useState<Record<string, string>>({});
   const [serverError, setServerError]= useState("");
   const [citySearch, setCitySearch]  = useState("");
+  const [countdown, setCountdown]    = useState(15 * 60); // 15 minutes
+
+  useEffect(() => {
+    const t = setInterval(() => setCountdown(c => c > 0 ? c - 1 : 0), 1000);
+    return () => clearInterval(t);
+  }, []);
   const [bundle, setBundle]          = useState(1);
   const [form, setForm] = useState({
     customer_name:"", customer_phone:"", customer_city:"",
@@ -276,6 +282,13 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           {serverError}
         </div>
       )}
+
+      {/* Countdown urgency */}
+      <div style={{textAlign:"center",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:"10px",padding:"8px 12px",marginBottom:"12px"}}>
+        <p style={{fontSize:"12px",color:"#991b1b",fontWeight:700}}>
+          ⏰ هذا العرض ينتهي خلال: {String(Math.floor(countdown/60)).padStart(2,"0")}:{String(countdown%60).padStart(2,"0")}
+        </p>
+      </div>
 
       <button type="submit" disabled={isPending}
         style={{ display:"block", width:"100%",

@@ -5,6 +5,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { FALLBACK_CITIES } from "@/components/landing/order-form-public";
 import { getLandingPage } from "@/lib/public/queries";
 import { OrderFormPublic } from "@/components/landing/order-form-public";
+import { FloatingNotification } from "@/components/landing/floating-notification";
+import { ExitPopup } from "@/components/landing/exit-popup";
 import { StockCounter } from "@/components/landing/stock-counter";
 import { FaqAccordion } from "@/components/landing/faq-accordion";
 import { ProductGallery } from "@/components/landing/product-gallery";
@@ -251,6 +253,24 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               <StockCounter />
             </div>
 
+            {/* Social proof counter */}
+            <div style={{textAlign:"center",margin:"8px 0",padding:"8px 16px",background:"#fefce8",borderRadius:"10px",border:"1px solid #fde68a"}}>
+              <p style={{fontSize:"13px",fontWeight:700,color:"#92400e"}}>
+                🔥 أكثر من <strong>500 عميل</strong> طلبوا هذا المنتج هذا الشهر
+              </p>
+            </div>
+
+            {/* Progress bar stock */}
+            <div style={{margin:"8px 0"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}>
+                <span style={{fontSize:"12px",fontWeight:700,color:"#dc2626"}}>⚠️ بقي 8 قطع فقط في المخزون!</span>
+                <span style={{fontSize:"11px",color:"#6b7280"}}>92% مباعة</span>
+              </div>
+              <div style={{background:"#e5e7eb",borderRadius:"9999px",height:"8px",overflow:"hidden"}}>
+                <div style={{background:"linear-gradient(90deg,#16a34a,#22c55e)",width:"92%",height:"100%",borderRadius:"9999px"}} />
+              </div>
+            </div>
+
             {/* Primary CTA */}
             <a href="#lp-form" className="lp-cta">{ctaText}</a>
 
@@ -271,7 +291,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
             {/* WhatsApp */}
             {whatsapp && (
-              <a href={`https://wa.me/${whatsapp.replace(/\+/g,"")}`}
+              <a href={`https://wa.me/${whatsapp.replace(/\+/g,"")}?text=${encodeURIComponent(`مرحبا، أريد الاستفسار عن: ${product.name} — ${price.toFixed(0)} درهم`)}`}
                 target="_blank" rel="noopener noreferrer"
                 className="lp-wa">
                 واتساب — تواصل معنا
@@ -368,10 +388,16 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </div>
 
+        {/* ── FLOATING NOTIFICATION ── */}
+        <FloatingNotification />
+
+        {/* ── EXIT INTENT POPUP ── */}
+        <ExitPopup price={price} />
+
         {/* ── FLOATING WHATSAPP BUTTON ── */}
         {whatsapp && (
           <a
-            href={`https://wa.me/${whatsapp.replace(/\+/g,"")}?text=${encodeURIComponent("مرحبا، أريد الاستفسار عن المنتج")}`}
+            href={`https://wa.me/${whatsapp.replace(/\+/g,"")}?text=${encodeURIComponent(`مرحبا، أريد الاستفسار عن: ${product.name} — ${price.toFixed(0)} درهم`)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="lp-wa-float"
