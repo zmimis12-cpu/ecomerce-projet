@@ -16,6 +16,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   const [errors, setErrors]          = useState<Record<string, string>>({});
   const [serverError, setServerError]= useState("");
   const [citySearch, setCitySearch]  = useState("");
+  const [showAddress, setShowAddress] = useState(false);
   const [countdown, setCountdown]    = useState(15 * 60); // 15 minutes
 
   useEffect(() => {
@@ -38,10 +39,10 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   const bundles = [
     { qty:1, label: hasUnitLabel ? `${unitNum * 1} ${unitLabel.replace(/[0-9]/g, "").trim()}` : "1×", price: unitPrice,
       note: hasUnitLabel ? `${unitNum} قطعة` : "قطعة واحدة" },
-    { qty:2, label: hasUnitLabel ? `${unitNum * 2} ${unitLabel.replace(/[0-9]/g, "").trim()}` : "2×", price: Math.round(unitPrice * 2 * 0.90),
-      note:`وفّر ${Math.round(unitPrice * 2 * 0.10)} درهم`, pop:true },
-    { qty:3, label: hasUnitLabel ? `${unitNum * 3} ${unitLabel.replace(/[0-9]/g, "").trim()}` : "3×", price: Math.round(unitPrice * 3 * 0.80),
-      note:`وفّر ${Math.round(unitPrice * 3 * 0.20)} درهم` },
+    { qty:2, label: hasUnitLabel ? `${unitNum * 2} ${unitLabel.replace(/[0-9]/g, "").trim()}` : "2×", price: b2 || Math.round(unitPrice * 2 * 0.90),
+      note:`وفّر ${Math.round(unitPrice * 2 - (b2 || Math.round(unitPrice * 2 * 0.90)))} درهم`, pop:true },
+    { qty:3, label: hasUnitLabel ? `${unitNum * 3} ${unitLabel.replace(/[0-9]/g, "").trim()}` : "3×", price: b3 || Math.round(unitPrice * 3 * 0.80),
+      note:`وفّر ${Math.round(unitPrice * 3 - (b3 || Math.round(unitPrice * 3 * 0.80)))} درهم` },
   ];
   const total = bundles.find((b) => b.qty === bundle)?.price ?? unitPrice;
 
@@ -206,13 +207,20 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         {ERR(errors.customer_phone)}
       </div>
 
-      {/* Address */}
-      <div style={{ marginBottom:"14px" }}>
-        <label style={LBL}>العنوان التفصيلي <span style={{color:"#9ca3af",fontWeight:400}}>(اختياري)</span></label>
-        <input type="text" value={form.customer_address}
-          onChange={(e) => set("customer_address", e.target.value)}
-          placeholder="الحي، الشارع، رقم البناية..." style={INP(false)} />
-      </div>
+      {/* Address — collapsed by default to reduce form length */}
+      {showAddress ? (
+        <div style={{ marginBottom:"14px" }}>
+          <label style={LBL}>العنوان التفصيلي <span style={{color:"#9ca3af",fontWeight:400}}>(اختياري)</span></label>
+          <input type="text" value={form.customer_address}
+            onChange={(e) => set("customer_address", e.target.value)}
+            placeholder="الحي، الشارع، رقم البناية..." style={INP(false)} />
+        </div>
+      ) : (
+        <button type="button" onClick={() => setShowAddress(true)}
+          style={{display:"block",width:"100%",textAlign:"center",background:"none",border:"1px dashed #d1d5db",borderRadius:"10px",padding:"8px",fontSize:"12px",color:"#9ca3af",cursor:"pointer",marginBottom:"14px"}}>
+          + إضافة عنوان تفصيلي (اختياري)
+        </button>
+      )}
 
       {/* City — searchable custom dropdown */}
       <div style={{ marginBottom:"14px", position:"relative" }}>
