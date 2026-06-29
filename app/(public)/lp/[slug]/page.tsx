@@ -322,7 +322,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         {((psSection?.problems as unknown[])?.length || (psSection?.solutions as unknown[])?.length) ? (
         <section className="lp-section">
           <div className="lp-wrap">
-            <h2 className="lp-h2">{psSection?.problem_title ?? "هل سئمت من هذا؟ 😔"}</h2>
+            <h2 className="lp-h2">{String(psSection?.problem_title ?? "هل سئمت من هذا؟ 😔")}</h2>
             <div style={{display:"flex",flexDirection:"column",gap:"8px",marginBottom:"20px"}}>
               {((psSection?.problems as string[]) ?? []).map((p,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:"10px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:"10px",padding:"12px 14px"}}>
@@ -331,7 +331,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                 </div>
               ))}
             </div>
-            <h3 style={{fontSize:"17px",fontWeight:900,color:"#16a34a",textAlign:"center",marginBottom:"12px"}}>✅ {psSection?.solution_title ?? `الحل: ${product.name}`}</h3>
+            <h3 style={{fontSize:"17px",fontWeight:900,color:"#16a34a",textAlign:"center",marginBottom:"12px"}}>✅ {String(psSection?.solution_title ?? `الحل: ${product.name}`)}</h3>
             <div style={{display:"flex",flexDirection:"column",gap:"8px",marginBottom:"20px"}}>
               {((psSection?.solutions as string[]) ?? []).map((s,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:"10px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:"10px",padding:"12px 14px"}}>
