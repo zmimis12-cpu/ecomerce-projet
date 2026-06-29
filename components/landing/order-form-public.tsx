@@ -292,17 +292,23 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
 
       <button type="submit" disabled={isPending}
         style={{ display:"block", width:"100%",
-          background: isPending ? "#9ca3af" : "#16a34a",
-          color:"#fff", fontSize:"clamp(15px,4vw,17px)", fontWeight:800,
-          padding:"15px 24px", borderRadius:"12px",
+          background: isPending ? "#9ca3af" : "linear-gradient(135deg,#16a34a,#15803d)",
+          color:"#fff", fontSize:"clamp(17px,4.5vw,20px)", fontWeight:900,
+          padding:"18px 24px", borderRadius:"14px",
           border:"none", cursor: isPending ? "not-allowed" : "pointer",
           fontFamily:"var(--font-cairo),sans-serif", boxSizing:"border-box",
-          boxShadow: isPending ? "none" : "0 3px 14px rgba(22,163,74,.28)",
+          boxShadow: isPending ? "none" : "0 6px 20px rgba(22,163,74,.4)",
+          letterSpacing:"0.02em",
           transition:"background .15s" }}>
-        {isPending ? "⏳ جاري إرسال طلبك…" : `${ctaText} — ${total.toFixed(0)} درهم`}
+        {isPending ? "⏳ جاري إرسال طلبك…" : `🛒 ${ctaText} — ${total.toFixed(0)} درهم`}
       </button>
 
-      <p style={{ textAlign:"center", fontSize:"11px", color:"#9ca3af", marginTop:"10px" }}>
+      <div style={{display:"flex",justifyContent:"center",gap:"14px",flexWrap:"wrap",marginTop:"12px",marginBottom:"6px"}}>
+        <span style={{fontSize:"11px",color:"#16a34a",fontWeight:700}}>✅ دفع عند الاستلام</span>
+        <span style={{fontSize:"11px",color:"#16a34a",fontWeight:700}}>🚚 توصيل مجاني</span>
+        <span style={{fontSize:"11px",color:"#16a34a",fontWeight:700}}>🔒 100% آمن</span>
+      </div>
+      <p style={{ textAlign:"center", fontSize:"11px", color:"#9ca3af", marginTop:"4px" }}>
         بياناتك محفوظة وآمنة · الدفع عند الاستلام فقط
       </p>
     </form>

@@ -24,14 +24,17 @@ export function FloatingNotification() {
 
   useEffect(() => {
     if (!visible) return;
-    // Hide after 4 seconds, show next after 2 more
-    const hide = setTimeout(() => setVisible(false), 4000);
-    const next = setTimeout(() => {
-      setCurrent(c => (c + 1) % NOTIFICATIONS.length);
-      setVisible(true);
-    }, 7000);
-    return () => { clearTimeout(hide); clearTimeout(next); };
-  }, [visible, current]);
+    // Hide after 4 seconds
+    const hide = setTimeout(() => {
+      setVisible(false);
+      // After hiding, rotate to next and show again after 5 seconds
+      setTimeout(() => {
+        setCurrent(c => (c + 1) % NOTIFICATIONS.length);
+        setVisible(true);
+      }, 5000);
+    }, 4000);
+    return () => clearTimeout(hide);
+  }, [visible]);
 
   if (!visible) return null;
 
