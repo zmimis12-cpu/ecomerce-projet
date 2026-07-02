@@ -5,9 +5,6 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { FALLBACK_CITIES } from "@/components/landing/order-form-public";
 import { getLandingPage } from "@/lib/public/queries";
 import { OrderFormPublic } from "@/components/landing/order-form-public";
-import { StickyBar } from "@/components/landing/sticky-bar";
-import { FloatingNotification } from "@/components/landing/floating-notification";
-import { ExitPopup } from "@/components/landing/exit-popup";
 import { StockCounter } from "@/components/landing/stock-counter";
 import { FaqAccordion } from "@/components/landing/faq-accordion";
 import { ProductGallery } from "@/components/landing/product-gallery";
@@ -117,7 +114,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const b1 = Number(lp.bundle_1_price || price);
   const b2 = Number(lp.bundle_2_price || Math.round(price * 2 * 0.9));
   const b3 = Number(lp.bundle_3_price || Math.round(price * 3 * 0.8));
-  const unitLabel = String((lp as { unit_label?: string }).unit_label ?? "");
 
   const psSection   = getSection("problem_solution");
   const benSection  = getSection("benefits");
@@ -186,7 +182,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
       {page.meta_pixel_id?.trim() && (
         <script dangerouslySetInnerHTML={{ __html:
-          `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${page.meta_pixel_id.trim()}');fbq('track','PageView');`
+          `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${page.meta_pixel_id.trim()}',{autoConfig:true});fbq('track','PageView');`
         }} />
       )}
       <link rel="preconnect" href="https://connect.facebook.net" />
@@ -224,7 +220,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
             {/* Trust badges */}
             <div className="lp-badges">
-              {["✅ دفع عند الاستلام","🚚 توصيل مجاني","🛡️ ضمان سنة","📞 تأكيد هاتفي"].map((b) => (
+              {["الدفع عند الاستلام","توصيل سريع","ضمان سنة"].map((b) => (
                 <span key={b} className="lp-badge">{b}</span>
               ))}
             </div>
@@ -254,42 +250,27 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               <StockCounter />
             </div>
 
-            {/* Social proof counter */}
-            <div style={{textAlign:"center",margin:"8px 0",padding:"8px 16px",background:"#fefce8",borderRadius:"10px",border:"1px solid #fde68a"}}>
-              <p style={{fontSize:"13px",fontWeight:700,color:"#92400e"}}>
-                🔥 أكثر من <strong>500 عميل</strong> طلبوا هذا المنتج هذا الشهر
-              </p>
-            </div>
-
-            {/* Progress bar stock */}
-            <div style={{margin:"8px 0"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}>
-                <span style={{fontSize:"12px",fontWeight:700,color:"#dc2626"}}>⚠️ بقي 8 قطع فقط في المخزون!</span>
-                <span style={{fontSize:"11px",color:"#6b7280"}}>92% مباعة</span>
-              </div>
-              <div style={{background:"#e5e7eb",borderRadius:"9999px",height:"8px",overflow:"hidden"}}>
-                <div style={{background:"linear-gradient(90deg,#16a34a,#22c55e)",width:"92%",height:"100%",borderRadius:"9999px"}} />
-              </div>
-            </div>
-
             {/* Primary CTA */}
             <a href="#lp-form" className="lp-cta">{ctaText}</a>
 
             {/* Order form — moved directly into the hero so a customer can
                 complete a purchase without scrolling past unrelated sections.
                 This is the core change from the old multi-section layout. */}
-            <div id="lp-form" className="lp-form-inline" style={{border:"2px solid #16a34a",background:"#fff"}}>
-              <p style={{textAlign:"center",fontSize:"15px",fontWeight:900,color:"#111",marginBottom:"4px"}}>🛒 أدخل معلوماتك للطلب</p>
-              <p style={{textAlign:"center",fontSize:"12px",color:"#16a34a",fontWeight:600,marginBottom:"16px"}}>🔒 معلوماتك آمنة — سنتصل بك لتأكيد الطلب</p>
+            <div id="lp-form" className="lp-form-inline">
               <p className="lp-form-note green">{formNote}</p>
               <OrderFormPublic product={product} productSlug={slug}
-                ctaText={ctaText} b1={b1} b2={b2} b3={b3} unitLabel={unitLabel}
+                ctaText={ctaText} b1={b1} b2={b2} b3={b3}
                 cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
+            </div>
+
+            {/* Product description — clear, visible explanation of what this is */}
+            <div className="lp-desc">
+              <p>{description}</p>
             </div>
 
             {/* WhatsApp */}
             {whatsapp && (
-              <a href={`https://wa.me/${whatsapp.replace(/\+/g,"")}?text=${encodeURIComponent(`مرحبا، أريد الاستفسار عن: ${product.name} — ${price.toFixed(0)} درهم`)}`}
+              <a href={`https://wa.me/${whatsapp.replace(/\+/g,"")}`}
                 target="_blank" rel="noopener noreferrer"
                 className="lp-wa">
                 واتساب — تواصل معنا
@@ -318,54 +299,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </section>
 
-        {/* ── PROBLEM → SOLUTION — dynamic from DB or AI analysis ── */}
-        {((psSection?.problems as unknown[])?.length || (psSection?.solutions as unknown[])?.length) ? (
-        <section className="lp-section">
-          <div className="lp-wrap">
-            <h2 className="lp-h2">{String(psSection?.problem_title ?? "هل سئمت من هذا؟ 😔")}</h2>
-            <div style={{display:"flex",flexDirection:"column",gap:"8px",marginBottom:"20px"}}>
-              {((psSection?.problems as string[]) ?? []).map((p,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:"10px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:"10px",padding:"12px 14px"}}>
-                  <span>❌</span>
-                  <p style={{fontSize:"13px",color:"#991b1b",fontWeight:600}}>{p}</p>
-                </div>
-              ))}
-            </div>
-            <h3 style={{fontSize:"17px",fontWeight:900,color:"#16a34a",textAlign:"center",marginBottom:"12px"}}>✅ {String(psSection?.solution_title ?? `الحل: ${product.name}`)}</h3>
-            <div style={{display:"flex",flexDirection:"column",gap:"8px",marginBottom:"20px"}}>
-              {((psSection?.solutions as string[]) ?? []).map((s,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:"10px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:"10px",padding:"12px 14px"}}>
-                  <span>✅</span>
-                  <p style={{fontSize:"13px",color:"#15803d",fontWeight:600}}>{s}</p>
-                </div>
-              ))}
-            </div>
-            <a href="#lp-form" className="lp-cta">👉 اطلب الآن بالدفع عند الاستلام</a>
-          </div>
-        </section>
-        ) : null}
-
-        {/* ── POURQUOI NOUS ── */}
-        <section className="lp-section">
-          <div className="lp-wrap">
-            <h2 className="lp-h2">لماذا تختار متجرنا؟</h2>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"}}>
-              {[
-                { icon:"🏆", title:"+500 عميل راضي", desc:"آلاف الطلبات الناجحة في جميع مدن المغرب" },
-                { icon:"🚚", title:"توصيل لكل المدن", desc:"24-48 ساعة في الدار البيضاء والرباط" },
-                { icon:"💳", title:"الدفع عند الاستلام", desc:"لا دفع مسبق — ادفع فقط عند وصول طلبك" },
-                { icon:"🔄", title:"إرجاع مجاني", desc:"7 أيام لإرجاع المنتج بدون أي شرط" },
-              ].map((item, i) => (
-                <div key={i} style={{background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:"14px",padding:"14px 12px",textAlign:"center"}}>
-                  <span style={{fontSize:"28px",display:"block",marginBottom:"6px"}}>{item.icon}</span>
-                  <p style={{fontSize:"12px",fontWeight:700,color:"#111",marginBottom:"3px"}}>{item.title}</p>
-                  <p style={{fontSize:"10px",color:"#6b7280",lineHeight:1.4}}>{item.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* ── REVIEWS ── */}
         <section className="lp-section lp-section--gray">
           <div className="lp-wrap">
@@ -378,25 +311,24 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               </div>
             </div>
             <div className="lp-reviews">
-              {reviews.slice(0, 5).map((r, i) => {
-                const colors = ["#16a34a","#2563eb","#dc2626","#9333ea","#ea580c"];
-                return (
+              {reviews.slice(0, 3).map((r, i) => (
                 <div key={i} className="lp-card lp-review">
                   <div className="lp-review-top">
                     <div className="lp-review-info">
-                      <div style={{width:"40px",height:"40px",borderRadius:"50%",background:colors[i%colors.length],color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:"16px",flexShrink:0}}>{r.name.charAt(0)}</div>
+                      <span className="lp-avatar">{r.name.charAt(0)}</span>
                       <div>
                         <p className="lp-review-name">{r.name}</p>
-                        <p className="lp-review-city">📍 {r.city}</p>
-                        <span style={{fontSize:"10px",background:"#dcfce7",color:"#15803d",fontWeight:700,padding:"1px 6px",borderRadius:"9999px"}}>✓ مشتري موثق</span>
+                        <p className="lp-review-city">{r.city}</p>
                       </div>
                     </div>
-                    <div style={{color:"#f59e0b",fontSize:"13px"}}>{"★".repeat(r.stars ?? 5)}</div>
+                    <span className="lp-stars" style={{ fontSize:"12px" }}>
+                      {"★".repeat(r.stars ?? 5)}
+                    </span>
                   </div>
                   <p className="lp-review-text">{r.text}</p>
+                  <span className="lp-verified">مشتري موثق</span>
                 </div>
-                );
-              })}
+              ))}
             </div>
           </div>
         </section>
@@ -412,9 +344,9 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         {/* ── FINAL CTA ── */}
         <section className="lp-final">
           <div className="lp-wrap" style={{ textAlign:"center" }}>
-            <p className="lp-final-title">🔥 اطلب الآن قبل نفاد المخزون</p>
-            <p className="lp-final-sub">الدفع عند الاستلام · توصيل مجاني · ضمان سنة كاملة</p>
-            <a href="#lp-form" className="lp-cta lp-cta--white">👉 اطلب الآن — الدفع عند الاستلام</a>
+            <p className="lp-final-title">ما تخليش الفرصة تفوتك</p>
+            <p className="lp-final-sub">الكمية محدودة · الدفع عند الاستلام · توصيل مجاني</p>
+            <a href="#lp-form" className="lp-cta lp-cta--white">اطلب الآن</a>
           </div>
         </section>
 
@@ -422,19 +354,23 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <p>جميع الحقوق محفوظة © {new Date().getFullYear()}</p>
         </footer>
 
-        {/* ── STICKY BAR (mobile) — hidden when form is in view ── */}
-        <StickyBar productName={product.name} price={price} ctaText={ctaText} />
-
-        {/* ── FLOATING NOTIFICATION ── */}
-        <FloatingNotification />
-
-        {/* ── EXIT INTENT POPUP ── */}
-        <ExitPopup price={price} />
+        {/* ── STICKY BAR (mobile) ── */}
+        <div className="lp-sticky">
+          <div className="lp-sticky-inner">
+            <div className="lp-sticky-info">
+              <p className="lp-sticky-name">{product.name}</p>
+              <p className="lp-sticky-price">
+                {price.toFixed(0)} <small>درهم</small>
+              </p>
+            </div>
+            <a href="#lp-form" className="lp-sticky-btn">{ctaText}</a>
+          </div>
+        </div>
 
         {/* ── FLOATING WHATSAPP BUTTON ── */}
         {whatsapp && (
           <a
-            href={`https://wa.me/${whatsapp.replace(/\+/g,"")}?text=${encodeURIComponent(`مرحبا، أريد الاستفسار عن: ${product.name} — ${price.toFixed(0)} درهم`)}`}
+            href={`https://wa.me/${whatsapp.replace(/\+/g,"")}?text=${encodeURIComponent("مرحبا، أريد الاستفسار عن المنتج")}`}
             target="_blank"
             rel="noopener noreferrer"
             className="lp-wa-float"
@@ -452,24 +388,21 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 const defaultBenefits = [
-  { icon:"🎬", title:"جودة 4K ممتازة",      desc:"صورة واضحة وحادة على أي جدار في أي غرفة" },
-  { icon:"📡", title:"WiFi و HDMI",          desc:"متوافق مع Netflix وYouTube وجميع الأجهزة" },
-  { icon:"🔊", title:"صوت داخلي قوي",       desc:"تجربة سينمائية كاملة بدون سماعات إضافية" },
-  { icon:"🏠", title:"للمنزل والسفر",        desc:"خفيف وسهل الحمل — سينما في أي مكان" },
+  { icon:"✓", title:"جودة ممتازة",  desc:"مضمون ومعتمد" },
+  { icon:"✓", title:"توصيل سريع",   desc:"2-4 أيام عمل" },
+  { icon:"✓", title:"دعم مستمر",    desc:"فريقنا متاح" },
+  { icon:"✓", title:"ضمان سنة",     desc:"استرجاع مجاني" },
 ];
 const defaultReviews = [
-  { name:"محمد أمين",     city:"الدار البيضاء", stars:5, text:"والله شريت هذا البروجيتور وما ندمت! الصورة واضحة جداً وكبيرة، ولاد الدار كلهم فرحو. التوصيل جا في يومين فقط. نوصي بيه بصح." },
-  { name:"فاطمة الزهراء", city:"مراكش",          stars:5, text:"كنت خايفة نطلب من الأنترنت، ولكن الدفع عند الاستلام راحني. المنتج وصل سليم وكاين في كيس مزيان. الجودة ممتازة بالسعر هذا." },
-  { name:"يوسف المرابط",  city:"الرباط",          stars:5, text:"شريت واحد لدارنا وواحد لأخوياتي هدية. التوصيل سريع والخدمة ممتازة. البروجيتور كيشتغل مزيان مع Netflix وYouTube." },
-  { name:"سمية الراضي",   city:"فاس",             stars:5, text:"أحسن شراء درته هاد العام! الشاشة كبيرة ومزيانة، الأطفال فرحو بزاف. نوصي بيه لكل واحد." },
-  { name:"عبد الرحيم",    city:"أكادير",          stars:5, text:"خدمة الزبناء ردو علي بسرعة وشرحو لي كيفاش نخدم البروجيتور. المنتج تام بصح وبسعر معقول جداً." },
+  { name:"محمد أمين",     city:"الدار البيضاء", stars:5, text:"منتج ممتاز، توصل في يومين. الجودة فاقت توقعاتي تماماً." },
+  { name:"فاطمة الزهراء", city:"مراكش",          stars:5, text:"جربته وما ندمت. الدفع عند الاستلام راحني كثير." },
+  { name:"يوسف المرابط",  city:"الرباط",          stars:5, text:"أنصح به — قيمة حقيقية بسعر معقول." },
 ];
 const defaultFaq = [
-  { q:"كيف يتم الدفع؟",              a:"الدفع عند الاستلام فقط — تدفع نقداً للمندوب عند استلام الطرد. لا دفع مسبق، لا بطاقة بنكية." },
-  { q:"متى يصل الطلب؟",             a:"التوصيل خلال 24-48 ساعة في الدار البيضاء والرباط، و2-4 أيام لباقي المدن. مجاناً لجميع مدن المغرب." },
-  { q:"هل يمكن فتح الطرد عند الاستلام؟", a:"نعم، يمكنك فتح الطرد والتحقق من المنتج قبل الدفع. إذا لم يعجبك يمكنك إرجاعه مجاناً." },
-  { q:"هل يوجد ضمان؟",              a:"نعم، ضمان سنة كاملة. في حالة أي مشكل نستبدل المنتج مجاناً أو نسترجع المبلغ كاملاً." },
-  { q:"كيف أتواصل معكم؟",           a:"يمكنك التواصل معنا عبر واتساب أو الاتصال المباشر. فريقنا متاح 7 أيام في الأسبوع." },
+  { q:"كيف يتم التوصيل؟",      a:"خلال 2-4 أيام لجميع مدن المغرب." },
+  { q:"هل يمكن إرجاع المنتج؟", a:"نعم، إرجاع مجاني خلال 7 أيام." },
+  { q:"كيف يتم الدفع؟",        a:"الدفع عند الاستلام — لا دفع مسبق." },
+  { q:"هل هناك ضمان؟",         a:"نعم، ضمان سنة كاملة مع دعم فني." },
 ];
 
 // ── Global CSS — single source of truth ──────────────────────────────────────
@@ -641,9 +574,14 @@ const GLOBAL_CSS = `
     display:flex;align-items:center;justify-content:center;
     box-shadow:0 4px 16px rgba(37,211,102,.5);
     text-decoration:none;
+    animation:wa-pulse 2s ease-in-out infinite;
     transition:transform .15s;
   }
   .lp-wa-float:active{transform:scale(.92);}
+  @keyframes wa-pulse{
+    0%,100%{box-shadow:0 4px 16px rgba(37,211,102,.5);}
+    50%{box-shadow:0 4px 24px rgba(37,211,102,.8),0 0 0 8px rgba(37,211,102,.15);}
+  }
   @media(min-width:640px){
     .lp-wa-float{bottom:24px;}
   }
