@@ -15,6 +15,8 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   const [submitted, setSubmitted]    = useState(false);
   const [errors, setErrors]          = useState<Record<string, string>>({});
   const [serverError, setServerError]= useState("");
+  const [citySearch, setCitySearch]  = useState("");
+  const [cityOpen, setCityOpen]      = useState(false);
   const [bundle, setBundle]          = useState(1);
   const [form, setForm] = useState({
     customer_name:"", customer_phone:"", customer_city:"",
@@ -28,10 +30,10 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   const bundles = [
     { qty:1, label:"1×", price: unitPrice,
       note:"قطعة واحدة" },
-    { qty:2, label:"2×", price: Math.round(unitPrice * 2 * 0.90),
-      note:`وفّر ${Math.round(unitPrice * 2 * 0.10)} درهم`, pop:true },
-    { qty:3, label:"3×", price: Math.round(unitPrice * 3 * 0.80),
-      note:`وفّر ${Math.round(unitPrice * 3 * 0.20)} درهم` },
+    { qty:2, label:"2×", price: b2 || Math.round(unitPrice * 2 * 0.90),
+      note:`وفّر ${Math.round(unitPrice * 2 - (b2 || Math.round(unitPrice * 2 * 0.90)))} درهم`, pop:true },
+    { qty:3, label:"3×", price: b3 || Math.round(unitPrice * 3 * 0.80),
+      note:`وفّر ${Math.round(unitPrice * 3 - (b3 || Math.round(unitPrice * 3 * 0.80)))} درهم` },
   ];
   const total = bundles.find((b) => b.qty === bundle)?.price ?? unitPrice;
 
@@ -43,6 +45,13 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setServerError("");
+    // Validate city
+    const newErrors: Record<string, string> = {};
+    if (!form.customer_name.trim()) newErrors.customer_name = "الاسم مطلوب";
+    if (!form.customer_phone.trim()) newErrors.customer_phone = "رقم الهاتف مطلوب";
+    if (!form.customer_city.trim()) newErrors.customer_city = "المدينة مطلوبة";
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+
     startTransition(async () => {
       try {
         const res = await fetch("/api/public/orders", {
@@ -202,15 +211,59 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         {ERR(errors.customer_address)}
       </div>
 
-      {/* City */}
-      <div style={{ marginBottom:"14px" }}>
+      {/* City — custom searchable dropdown */}
+      <div style={{ marginBottom:"14px", position:"relative" }}>
         <label style={LBL}>المدينة *</label>
-        <select value={form.customer_city}
-          onChange={(e) => set("customer_city", e.target.value)}
-          style={INP(!!errors.customer_city)} required>
-          <option value="">اختر مدينتك</option>
-          {cities.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <div
+          onClick={() => setCityOpen(o => !o)}
+          style={{...INP(!!errors.customer_city), display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer", height:"54px", padding:"0 14px"}}
+        >
+          <span style={{color: form.customer_city ? "#111827" : "#9ca3af"}}>
+            {form.customer_city || "اختر مدينتك"}
+          </span>
+          <span style={{fontSize:"12px", color:"#9ca3af"}}>▼</span>
+        </div>
+        {cityOpen && (
+          <div style={{
+            position:"absolute", top:"100%", left:0, right:0, zIndex:200,
+            background:"#fff", border:"2px solid #16a34a", borderRadius:"12px",
+            boxShadow:"0 8px 24px rgba(0,0,0,.15)", overflow:"hidden",
+          }}>
+            <div style={{padding:"8px"}}>
+              <input
+                type="text"
+                value={citySearch}
+                onChange={(e) => setCitySearch(e.target.value)}
+                placeholder="ابحث عن مدينتك..."
+                autoFocus
+                style={{
+                  width:"100%", height:"40px", border:"1px solid #e5e7eb",
+                  borderRadius:"8px", padding:"0 12px", fontSize:"14px",
+                  fontFamily:"var(--font-cairo),sans-serif", outline:"none",
+                  boxSizing:"border-box",
+                }}
+              />
+            </div>
+            <div style={{maxHeight:"200px", overflowY:"auto"}}>
+              {cities
+                .filter(c => !citySearch || c.toLowerCase().includes(citySearch.toLowerCase()) || c.includes(citySearch))
+                .map(c => (
+                  <div key={c}
+                    onMouseDown={(e) => { e.preventDefault(); set("customer_city", c); setCityOpen(false); setCitySearch(""); }}
+                    style={{
+                      padding:"10px 16px", cursor:"pointer", fontSize:"14px",
+                      fontFamily:"var(--font-cairo),sans-serif",
+                      borderBottom:"1px solid #f3f4f6",
+                      background: form.customer_city === c ? "#f0fdf4" : "#fff",
+                      color: form.customer_city === c ? "#16a34a" : "#111",
+                      fontWeight: form.customer_city === c ? 700 : 400,
+                    }}
+                  >{c}</div>
+                ))
+              }
+            </div>
+          </div>
+        )}
         {ERR(errors.customer_city)}
       </div>
 
