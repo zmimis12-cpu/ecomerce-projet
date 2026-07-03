@@ -8,14 +8,16 @@ interface Props {
   ctaText?: string;
   b1: number; b2: number; b3: number;
   cities?: string[];
+  variants?: {name:string; options:string}[];
 }
 
-export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, cities = FALLBACK_CITIES }: Props) {
+export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, cities = FALLBACK_CITIES, variants = [] }: Props) {
   const [isPending, startTransition] = useTransition();
   const [submitted, setSubmitted]    = useState(false);
   const [errors, setErrors]          = useState<Record<string, string>>({});
   const [serverError, setServerError]= useState("");
   const [citySearch, setCitySearch]  = useState("");
+  const [selectedVariants, setSelectedVariants] = useState<Record<string,string>>({});
   const [cityOpen, setCityOpen]      = useState(false);
   const [bundle, setBundle]          = useState(1);
   const [form, setForm] = useState({
@@ -60,6 +62,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
             ...form,
             quantity:     bundle,
             bundle_price: total,   // send the bundle total so API applies correct pricing
+            variants:     selectedVariants,
             product_id:   product.id,
             product_slug: productSlug,
           }),
@@ -183,6 +186,32 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           ))}
         </div>
       </div>
+
+      {/* Variants — only show if configured in LP builder */}
+      {variants.length > 0 && variants.map((v, vi) => (
+        <div key={vi} style={{marginBottom:"14px"}}>
+          <label style={LBL}>{v.name} *</label>
+          <div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
+            {v.options.split(",").map(opt => opt.trim()).filter(Boolean).map((opt, oi) => (
+              <button
+                key={oi}
+                type="button"
+                onClick={() => setSelectedVariants(prev => ({...prev, [v.name]: opt}))}
+                style={{
+                  padding:"8px 16px",borderRadius:"10px",border:"2px solid",
+                  borderColor: selectedVariants[v.name] === opt ? "#16a34a" : "#e5e7eb",
+                  background: selectedVariants[v.name] === opt ? "#f0fdf4" : "#fff",
+                  color: selectedVariants[v.name] === opt ? "#16a34a" : "#374151",
+                  fontWeight: selectedVariants[v.name] === opt ? 700 : 400,
+                  fontSize:"14px",cursor:"pointer",
+                  fontFamily:"var(--font-cairo),sans-serif",
+                  transition:"all .15s",
+                }}
+              >{opt}</button>
+            ))}
+          </div>
+        </div>
+      ))}
 
       {/* Name */}
       <div style={{ marginBottom:"14px" }}>
