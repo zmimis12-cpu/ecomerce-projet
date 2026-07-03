@@ -47,6 +47,7 @@ export async function upsertLandingPage(id: string | null, data: {
   bundle_2_price?: number | null;
   bundle_3_price?: number | null;
   ai_analysis?: unknown;
+  customer_photos?: string[];
 }) {
   await requireRole([...MANAGER_ROLES]);
   const supabase = await createClient();

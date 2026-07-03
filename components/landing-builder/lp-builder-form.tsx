@@ -299,18 +299,48 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
           </Card>
 
           <Card title="Photos clients (optionnel)">
-            <Field label="URLs des photos clients (une par ligne)">
-              <textarea
-                value={customerPhotos}
-                onChange={(e) => setCustomerPhotos(e.target.value)}
-                placeholder={"https://...photo1.jpg\nhttps://...photo2.jpg\nhttps://...photo3.jpg\nhttps://...photo4.jpg"}
-                rows={5}
-                className={inputCls(false)}
-                style={{resize:"vertical", fontFamily:"monospace", fontSize:"12px"}}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Ajoutez les URLs des photos de vos clients (depuis Supabase Storage). Minimum 4 photos recommandées.
-              </p>
+            <Field label="Uploader des photos clients">
+              <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={async (e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    for (const file of files) {
+                      const ext = file.name.split(".").pop();
+                      const name = `customer-photos/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+                      const { createClient } = await import("@/lib/supabase/client");
+                      const supabase = createClient();
+                      const { data, error } = await supabase.storage.from("product-images").upload(name, file, { upsert: true });
+                      if (!error && data) {
+                        const { data: urlData } = supabase.storage.from("product-images").getPublicUrl(data.path);
+                        setCustomerPhotos(prev => prev ? prev + "\n" + urlData.publicUrl : urlData.publicUrl);
+                      }
+                    }
+                    e.target.value = "";
+                  }}
+                  className={inputCls(false)}
+                  style={{padding:"8px"}}
+                />
+                {customerPhotos && (
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"6px"}}>
+                    {customerPhotos.split("\n").filter(Boolean).map((url, i) => (
+                      <div key={i} style={{position:"relative",aspectRatio:"1",borderRadius:"8px",overflow:"hidden",background:"#f3f4f6"}}>
+                        <img src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} />
+                        <button
+                          type="button"
+                          onClick={() => setCustomerPhotos(prev => prev.split("\n").filter((_, j) => j !== i).join("\n"))}
+                          style={{position:"absolute",top:"2px",right:"2px",background:"rgba(0,0,0,.6)",color:"#fff",border:"none",borderRadius:"50%",width:"20px",height:"20px",cursor:"pointer",fontSize:"12px",display:"flex",alignItems:"center",justifyContent:"center"}}
+                        >×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Sélectionnez plusieurs photos de vos clients. Elles seront uploadées automatiquement.
+                </p>
+              </div>
             </Field>
           </Card>
         </div>
