@@ -112,6 +112,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     || product.description
     || `${product.name} — جودة مضمونة وتوصيل سريع لجميع مدن المغرب.`;
   const b1 = Number(lp.bundle_1_price || price);
+  const customerPhotos = (lp.customer_photos as string[] | undefined) ?? [];
   const b2 = Number(lp.bundle_2_price || Math.round(price * 2 * 0.9));
   const b3 = Number(lp.bundle_3_price || Math.round(price * 3 * 0.8));
 
@@ -380,12 +381,12 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             <h2 className="lp-h2">صور من زبنائنا 📸</h2>
             <p style={{textAlign:"center",fontSize:"13px",color:"#6b7280",marginBottom:"16px"}}>أكثر من 1500 عميل جرب المنتج</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}}>
-              {[
+              {(customerPhotos.length > 0 ? customerPhotos : [
                 "https://via.placeholder.com/300x300/dcfce7/15803d?text=صورة+العميل+1",
                 "https://via.placeholder.com/300x300/dbeafe/1d4ed8?text=صورة+العميل+2",
                 "https://via.placeholder.com/300x300/fce7f3/9d174d?text=صورة+العميل+3",
                 "https://via.placeholder.com/300x300/fef3c7/92400e?text=صورة+العميل+4",
-              ].map((src, i) => (
+              ]).map((src, i) => (
                 <div key={i} style={{borderRadius:"12px",overflow:"hidden",aspectRatio:"1",background:"#f3f4f6"}}>
                   <img src={src} alt={`عميل ${i+1}`} loading="lazy" style={{width:"100%",height:"100%",objectFit:"cover"}} />
                 </div>

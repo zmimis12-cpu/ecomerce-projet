@@ -49,6 +49,9 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
   const [b2,           setB2]           = useState<string>(String(defaultValues?.bundle_2_price ?? ""));
   const [b3,           setB3]           = useState<string>(String(defaultValues?.bundle_3_price ?? ""));
   const [aiAnalysis,   setAiAnalysis]   = useState<Record<string, string> | null>(null);
+  const [customerPhotos, setCustomerPhotos] = useState<string>(
+    ((defaultValues?.customer_photos as string[]) ?? []).join("\n")
+  );
   const [sections,     setSections]     = useState<LPSection[]>(
     (defaultValues?.sections as LPSection[]) ?? buildDefaultSections(templateKey)
   );
@@ -115,6 +118,7 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
           stock_text:       stockText,
           cta_text:         ctaText,
           whatsapp_number:  whatsapp || undefined,
+          customer_photos:  customerPhotos ? customerPhotos.split("\n").map(s => s.trim()).filter(Boolean) : [],
           meta_pixel_id:    metaPixel.trim() || undefined,
           tiktok_pixel_id:  tiktokPixel.trim() || undefined,
           google_gtm_id:    googleGtm.trim() || undefined,
@@ -291,6 +295,22 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
                   placeholder="+212600000000" className={inputCls(false)} />
               </div>
               <p className="text-xs text-muted-foreground mt-1">Un bouton WhatsApp sera ajouté à la page.</p>
+            </Field>
+          </Card>
+
+          <Card title="Photos clients (optionnel)">
+            <Field label="URLs des photos clients (une par ligne)">
+              <textarea
+                value={customerPhotos}
+                onChange={(e) => setCustomerPhotos(e.target.value)}
+                placeholder={"https://...photo1.jpg\nhttps://...photo2.jpg\nhttps://...photo3.jpg\nhttps://...photo4.jpg"}
+                rows={5}
+                className={inputCls(false)}
+                style={{resize:"vertical", fontFamily:"monospace", fontSize:"12px"}}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Ajoutez les URLs des photos de vos clients (depuis Supabase Storage). Minimum 4 photos recommandées.
+              </p>
             </Field>
           </Card>
         </div>
