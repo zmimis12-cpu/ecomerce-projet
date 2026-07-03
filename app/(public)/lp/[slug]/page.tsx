@@ -113,6 +113,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     || `${product.name} — جودة مضمونة وتوصيل سريع لجميع مدن المغرب.`;
   const b1 = Number(lp.bundle_1_price || price);
   const customerPhotos = (lp.customer_photos as string[] | undefined) ?? [];
+  type LPVariant = { name: string; options: string };
+  const variants = (lp.variants as LPVariant[] | undefined)?.filter(v => v.name && v.options) ?? [];
   const b2 = Number(lp.bundle_2_price || Math.round(price * 2 * 0.9));
   const b3 = Number(lp.bundle_3_price || Math.round(price * 3 * 0.8));
 
@@ -261,6 +263,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               <p className="lp-form-note green">{formNote}</p>
               <OrderFormPublic product={product} productSlug={slug}
                 ctaText={ctaText} b1={b1} b2={b2} b3={b3}
+                variants={variants}
                 cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
             </div>
 
@@ -375,26 +378,22 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </section>
 
-        {/* ── CUSTOMER PHOTOS ── easy to replace: just add image URLs to the array ── */}
+        {/* ── CUSTOMER PHOTOS — only show if real photos configured ── */}
+        {customerPhotos.length > 0 && (
         <section className="lp-section">
           <div className="lp-wrap">
             <h2 className="lp-h2">صور من زبنائنا 📸</h2>
             <p style={{textAlign:"center",fontSize:"13px",color:"#6b7280",marginBottom:"16px"}}>أكثر من 1500 عميل جرب المنتج</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}}>
-              {(customerPhotos.length > 0 ? customerPhotos : [
-                "https://via.placeholder.com/300x300/dcfce7/15803d?text=صورة+العميل+1",
-                "https://via.placeholder.com/300x300/dbeafe/1d4ed8?text=صورة+العميل+2",
-                "https://via.placeholder.com/300x300/fce7f3/9d174d?text=صورة+العميل+3",
-                "https://via.placeholder.com/300x300/fef3c7/92400e?text=صورة+العميل+4",
-              ]).map((src, i) => (
+              {customerPhotos.map((src, i) => (
                 <div key={i} style={{borderRadius:"12px",overflow:"hidden",aspectRatio:"1",background:"#f3f4f6"}}>
                   <img src={src} alt={`عميل ${i+1}`} loading="lazy" style={{width:"100%",height:"100%",objectFit:"cover"}} />
                 </div>
               ))}
             </div>
-            <p style={{textAlign:"center",fontSize:"11px",color:"#9ca3af",marginTop:"10px"}}>— استبدل هذه الصور بصور عملائك الحقيقيين —</p>
           </div>
         </section>
+        )}
 
         {/* ── CTA MIDDLE ── */}
         <section style={{background:"linear-gradient(135deg,#16a34a,#15803d)",padding:"24px 0"}}>
