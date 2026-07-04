@@ -271,7 +271,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
             {/* WhatsApp */}
             {whatsapp && (
-              <a href={`https://wa.me/${whatsapp.replace(/\+/g,"")}`}
+              <a href={`https://wa.me/${whatsapp.replace(/\+/g,"")}?text=${encodeURIComponent(`مرحبا 👋\nأريد الاستفسار عن المنتج التالي:\n\n🛒 المنتج: ${product.name}\n💰 السعر: ${price.toFixed(0)} درهم\n📦 الدفع عند الاستلام`)}`}
                 target="_blank" rel="noopener noreferrer"
                 className="lp-wa">
                 واتساب — تواصل معنا
@@ -387,7 +387,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         {/* ── FLOATING WHATSAPP BUTTON ── */}
         {whatsapp && (
           <a
-            href={`https://wa.me/${whatsapp.replace(/\+/g,"")}?text=${encodeURIComponent("مرحبا، أريد الاستفسار عن المنتج")}`}
+            href={`https://wa.me/${whatsapp.replace(/\+/g,"")}?text=${encodeURIComponent(`مرحبا 👋\nأريد الاستفسار عن المنتج التالي:\n\n🛒 المنتج: ${product.name}\n💰 السعر: ${price.toFixed(0)} درهم\n📦 الدفع عند الاستلام`)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="lp-wa-float"
