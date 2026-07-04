@@ -59,14 +59,14 @@ export function parseDigylogCsv(csvText: string): DigylogInvoiceRow[] {
 
     rows.push({
       tracking_number: tracking.toUpperCase(),
-      invoice_status:  get(["statut", "status", "etat", "état"]) || "livré",
-      cod_amount:      num(["cod", "montant_cod", "prix", "price", "montant_client"]),
-      delivery_fee:    num(["frais", "fee", "cout", "coût", "livraison_fee", "delivery"]),
+      invoice_status:  get(["cash_status", "statut", "status", "etat", "état", "situation_cash"]) || "livré",
+      cod_amount:      num(["price", "prix", "cod", "montant_cod", "montant_client", "recovered_amount"]),
+      delivery_fee:    num(["fees", "u.p", "frais", "fee", "cout", "coût", "livraison_fee", "delivery"]),
       return_fee:      num(["retour", "return", "frais_retour"]),
-      amount_paid:     num(["payé", "paye", "net", "montant_net", "paiement", "paid"]),
-      bl_number:       get(["bl", "bon_livraison", "bl_number"]),
-      order_number:    get(["commande", "order", "num_commande", "reference"]),
-      city:            get(["ville", "city", "destination"]),
+      amount_paid:     num(["cash_paid", "payé", "paye", "net", "montant_net", "paiement", "paid"]),
+      bl_number:       get(["invoice", "bl", "bon_livraison", "bl_number"]),
+      order_number:    get(["order", "commande", "num_commande", "reference"]),
+      city:            get(["city", "ville", "destination"]),
     });
   }
 
