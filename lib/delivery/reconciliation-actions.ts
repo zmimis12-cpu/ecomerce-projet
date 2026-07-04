@@ -156,7 +156,7 @@ export async function importDigylogInvoice(params: ImportInvoiceParams): Promise
   }
 
   // ── Auto-mark orders as paid when Cash Status = "Versés" ──
-  const paidDate = data.invoiceDate ?? new Date().toISOString().slice(0, 10);
+  const paidDate = params.invoiceDate ?? new Date().toISOString().slice(0, 10);
   let markedPaid = 0;
   for (const row of rows) {
     const status = (row.invoice_status ?? "").toLowerCase();
