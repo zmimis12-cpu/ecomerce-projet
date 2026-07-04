@@ -52,6 +52,7 @@ export async function importDigylogInvoice(params: ImportInvoiceParams): Promise
   success: boolean;
   invoiceId?: string;
   imported?: number;
+  markedPaid?: number;
   error?: string;
 }> {
   await requireRole([...MANAGER]);
