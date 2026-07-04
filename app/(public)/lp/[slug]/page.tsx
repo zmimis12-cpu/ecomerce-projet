@@ -113,6 +113,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     || `${product.name} — جودة مضمونة وتوصيل سريع لجميع مدن المغرب.`;
   const b1 = Number(lp.bundle_1_price || price);
   const b2 = Number(lp.bundle_2_price || Math.round(price * 2 * 0.9));
+  const customerPhotos = (lp.customer_photos as string[] | undefined) ?? [];
   const b3 = Number(lp.bundle_3_price || Math.round(price * 3 * 0.8));
 
   const psSection   = getSection("problem_solution");
@@ -340,6 +341,22 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             <FaqAccordion items={faqItems.slice(0, 5)} />
           </div>
         </section>
+
+        {/* ── CUSTOMER PHOTOS — only if configured ── */}
+        {customerPhotos.length > 0 && (
+          <section style={{background:"#fff",marginTop:"8px",padding:"26px 0"}}>
+            <div style={{maxWidth:"580px",margin:"0 auto",padding:"0 16px"}}>
+              <h2 style={{fontSize:"clamp(17px,4vw,22px)",fontWeight:800,color:"#111827",textAlign:"center",marginBottom:"16px"}}>صور من زبنائنا 📸</h2>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}}>
+                {customerPhotos.map((src, i) => (
+                  <div key={i} style={{borderRadius:"12px",overflow:"hidden",aspectRatio:"1",background:"#f3f4f6"}}>
+                    <img src={src} alt={`عميل ${i+1}`} loading="lazy" style={{width:"100%",height:"100%",objectFit:"cover"}} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* ── FINAL CTA ── */}
         <section className="lp-final">
