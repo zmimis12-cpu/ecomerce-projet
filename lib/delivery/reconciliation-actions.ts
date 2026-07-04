@@ -154,8 +154,29 @@ export async function importDigylogInvoice(params: ImportInvoiceParams): Promise
     await supabaseAdmin.from("delivery_invoice_items").insert(items.slice(i, i + 50) as never);
   }
 
+  // ── Auto-mark orders as paid when Cash Status = "Versés" ──
+  const paidDate = data.invoiceDate ?? new Date().toISOString().slice(0, 10);
+  let markedPaid = 0;
+  for (const row of rows) {
+    const status = (row.invoice_status ?? "").toLowerCase();
+    if (!status.includes("vers")) continue; // only "Versés"
+
+    const trackingKey = row.tracking_number.toUpperCase();
+    const order = orderMap.get(trackingKey);
+    if (!order) continue;
+
+    await supabaseAdmin.from("orders").update({
+      is_paid:        true,
+      paid_at:        new Date(paidDate).toISOString(),
+      payment_status: "paid",
+      status:         "paid",
+    } as never).eq("id", order.id);
+    markedPaid++;
+  }
+
   revalidatePath("/admin/delivery/invoices");
-  return { success: true, invoiceId, imported: items.length };
+  revalidatePath("/admin");
+  return { success: true, invoiceId, imported: items.length, markedPaid };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
