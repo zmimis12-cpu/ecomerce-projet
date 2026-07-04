@@ -84,7 +84,8 @@ export function mapDigylogStatus(
   } else {
     // Label fallback
     const l = label.toLowerCase();
-    if (/livr[eé]/i.test(l))           internal = "delivered";
+    if (/vers[eé]/i.test(l))            internal = "paid";     // Versés = payé
+    else if (/livr[eé]/i.test(l))      internal = "delivered";
     else if (/pay[eé]/i.test(l))        internal = "paid";
     else if (/retour/i.test(l))         internal = "returned";
     else if (/refus/i.test(l))          internal = "refused_delivery";

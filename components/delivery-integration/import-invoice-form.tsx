@@ -22,6 +22,29 @@ export function ImportInvoiceForm({ onSuccess }: { onSuccess?: () => void }) {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Handle Excel files
+    if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        try {
+          const XLSX = await import("xlsx");
+          const data = new Uint8Array(ev.target?.result as ArrayBuffer);
+          const wb = XLSX.read(data, { type: "array" });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const csv = XLSX.utils.sheet_to_csv(ws, { FS: ";" });
+          setCsvText(csv);
+          const rows = parseDigylogCsv(csv);
+          setPreview(rows.length);
+        } catch {
+          setMsg({ ok: false, text: "Erreur lecture Excel. Essayez CSV." });
+        }
+      };
+      reader.readAsArrayBuffer(file);
+      return;
+    }
+
+    // Handle CSV
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
@@ -105,7 +128,7 @@ export function ImportInvoiceForm({ onSuccess }: { onSuccess?: () => void }) {
         <label className="flex items-center gap-2 cursor-pointer rounded-lg border-2 border-dashed px-4 py-3 hover:bg-secondary/20 transition-colors text-sm text-muted-foreground">
           <Upload className="h-4 w-4 shrink-0" />
           <span>Cliquez pour uploader un fichier CSV</span>
-          <input type="file" accept=".csv,.txt" className="hidden" onChange={handleFileChange} />
+          <input type="file" accept=".csv,.txt,.xlsx,.xls" className="hidden" onChange={handleFileChange} />
         </label>
       </div>
 
