@@ -92,9 +92,9 @@ export function ProfitabilityClient({ summary, products }: Props) {
   useEffect(() => {
     if (!chartRef.current) return;
     const loadChart = () => {
-    // @ts-expect-error
+    // @ts-expect-error -- Chart.js loaded dynamically
     if (window.Chart) {
-      // @ts-expect-error
+      // @ts-expect-error -- Chart.js loaded dynamically
       if (chartInst.current) chartInst.current.destroy();
       const chartRevs: number[] = [];
       const chartProfits: number[] = [];
@@ -112,7 +112,7 @@ export function ProfitabilityClient({ summary, products }: Props) {
         chartProfits.push(ppr);
         chartLabels.push(b.toLocaleString());
       });
-      // @ts-expect-error
+      // @ts-expect-error -- Chart.js loaded dynamically
       chartInst.current = new window.Chart(chartRef.current, {
         type: "bar",
         data: {
@@ -133,7 +133,7 @@ export function ProfitabilityClient({ summary, products }: Props) {
         },
       });
     }};
-    // @ts-expect-error
+    // @ts-expect-error -- Chart.js loaded dynamically
     if (window.Chart) { loadChart(); }
     else {
       const s = document.createElement("script");
