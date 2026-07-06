@@ -91,6 +91,7 @@ export function ProfitabilityClient({ summary, products }: Props) {
 
   useEffect(() => {
     if (!chartRef.current) return;
+    const loadChart = () => {
     // @ts-ignore
     if (window.Chart) {
       // @ts-ignore
@@ -131,8 +132,16 @@ export function ProfitabilityClient({ summary, products }: Props) {
           },
         },
       });
+    }};
+    // @ts-ignore
+    if (window.Chart) { loadChart(); }
+    else {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
+      s.onload = loadChart;
+      document.head.appendChild(s);
     }
-  });
+  }, [ads, leads, confirmed, shipped, delivered, returned, sell, buy, charges, delivFee, retFee, confFee]);
 
   const InputField = ({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) => (
     <div className="flex flex-col gap-1">
@@ -340,7 +349,6 @@ export function ProfitabilityClient({ summary, products }: Props) {
         </div>
       </div>
 
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" async></script>
     </div>
   );
 }
