@@ -79,8 +79,9 @@ export interface ProductPerformance {
   performance_status:  "profitable" | "losing" | "needs_review" | "no_data";
   // Ads budget analysis columns
   ads_total:           number;   // Total dépensé en pub pour ce produit (réel ou estimé)
-  ads_max_estimation:  number;   // Budget max recommandé (profit_sans_ads ÷ 4)
+  ads_max_estimation:  number;   // Budget max estimé (marge × taux_conf × taux_livr)
   ads_max_real:        number;   // Budget max réel ajusté avec vrais taux
+  cost_per_delivered:  number;   // Coût ads par commande livrée
   ads_live:            number | null; // Spend live du jour depuis l'API (null = non connecté)
 }
 
@@ -399,23 +400,33 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
     }
   } catch { /* live fetch failed — ads_live stays null */ }
 
+  // Fix: filter orders by period FIRST, then get items for those orders only
+  // This prevents counting all-time orders when a date filter is active
+  let ordPeriodQ = supabase
+    .from("orders")
+    .select("id,status,is_paid,total_amount_mad,estimated_profit,real_profit_mad,cogs_total,delivery_cost_real_mad,return_cost_mad")
+    .neq("status", "cancelled");
+  if (filter) {
+    ordPeriodQ = ordPeriodQ.gte("created_at", filter.from).lte("created_at", filter.to + "T23:59:59");
+  }
+  const { data: periodOrders } = await ordPeriodQ;
+  const periodOrderIds = ((periodOrders ?? []) as { id: string }[]).map((o) => o.id);
+  if (!periodOrderIds.length) return ps.map((p) => makeEmptyPerf(p, imageByProduct.get(p.id) ?? null, realAdSpendByProduct.get(p.id)));
+
   const { data: items } = await supabase
     .from("order_items")
     .select("product_id,order_id")
-    .in("product_id", ps.map((p) => p.id));
+    .in("product_id", ps.map((p) => p.id))
+    .in("order_id", periodOrderIds.slice(0, 500));
   if (!items?.length) return ps.map((p) => makeEmptyPerf(p, imageByProduct.get(p.id) ?? null, realAdSpendByProduct.get(p.id)));
 
   const orderIds = [...new Set((items as { order_id: string }[]).map((i) => i.order_id))];
 
-  let ordQ = supabase
+  const ordQ = supabase
     .from("orders")
     .select("id,status,is_paid,total_amount_mad,estimated_profit,real_profit_mad,cogs_total,delivery_cost_real_mad,return_cost_mad")
     .in("id", orderIds)
     .neq("status", "cancelled");
-
-  if (filter) {
-    ordQ = ordQ.gte("created_at", filter.from).lte("created_at", filter.to + "T23:59:59");
-  }
 
   const { data: orders } = await ordQ;
   type OrderRow = {
@@ -502,21 +513,21 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
 
     // Profit sans ads = what's left after ALL costs except ads
     // = sale_price - (total_cost - ads_cost) = pure margin before ad spend
-    const profit_sans_ads = p.sale_price_mad - (p.total_cost_mad - (p.ads_cost_mad ?? 0));
-
-    // Ads Max Estimation = profit_sans_ads ÷ 4
-    // = max you can spend PER LEAD and still break even at 50% delivery
-    // (without real rate data yet — pure estimation)
-    const ads_max_estimation = profit_sans_ads > 0
-      ? Math.round(profit_sans_ads / 4)
+    // ADS MAX ESTIMÉ = (prix_vente - prix_achat - charges) ÷ 4
+    // Marge sans ads = sale_price - total_cost (sans la part ads déjà dans total_cost)
+    const marge_sans_ads = p.sale_price_mad - (p.total_cost_mad - (p.ads_cost_mad ?? 0));
+    const ads_max_estimation = marge_sans_ads > 0
+      ? Math.round(marge_sans_ads / 4)
       : 0;
 
-    // Ads Max Réel = same formula but with actual confirmation + delivery rates
-    // = max you can spend PER LEAD given your real performance
-    // When real rates are known (from Digylog webhook): recalculated automatically
-    const ads_max_real = profit_sans_ads > 0 && confirmation_rate > 0 && delivery_rate > 0
-      ? Math.round(profit_sans_ads * (confirmation_rate / 100) * (delivery_rate / 100) / 4)
-      : ads_max_estimation;
+    // ADS MAX RÉEL = total ads Meta dépensés ÷ nombre livré
+    // = coût réel en ads pour chaque commande livrée
+    const ads_max_real = delivered_count > 0 && adsCostToUse > 0
+      ? Math.round(adsCostToUse / delivered_count)
+      : 0;
+
+    // COÛT PAR LIVRÉ = même que ads_max_real
+    const cost_per_delivered = ads_max_real;
 
     // Suppress nbDays unused warning — kept for future daily budget feature
     void nbDays;
@@ -531,7 +542,7 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
       total_revenue, real_revenue, estimated_profit, real_profit,
       total_cogs, total_delivery_cost, return_losses, real_margin_pct,
       performance_status: performance_status as ProductPerformance["performance_status"],
-      ads_total, ads_max_estimation, ads_max_real,
+      ads_total, ads_max_estimation, ads_max_real, cost_per_delivered,
       ads_live: liveSpendByProduct.get(p.id) ?? null,
     };
   });
