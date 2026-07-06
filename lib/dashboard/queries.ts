@@ -565,7 +565,7 @@ function makeEmptyPerf(
     total_revenue: 0, real_revenue: 0, estimated_profit: 0, real_profit: 0,
     total_cogs: 0, total_delivery_cost: 0, return_losses: 0, real_margin_pct: 0,
     performance_status: "no_data",
-    ads_total: 0, ads_max_estimation: 0, ads_max_real: 0, ads_live: null,
+    ads_total: 0, ads_max_estimation: 0, ads_max_real: 0, cost_per_delivered: 0, ads_live: null,
   };
 }
 
