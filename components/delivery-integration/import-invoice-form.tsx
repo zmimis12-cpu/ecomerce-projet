@@ -140,7 +140,7 @@ export function ImportInvoiceForm({ onSuccess }: { onSuccess?: () => void }) {
         <textarea
           value={csvText}
           onChange={(e) => handleCsvChange(e.target.value)}
-          placeholder={"tracking;statut;cod;frais;retour;net;ville\nS07EC98BC;livré;260;25;0;235;Casablanca"}
+          placeholder={"tracking;statut;cod;frais;retour;net;ville\nS07EC98BC;livré;260;20;0;240;Casablanca"}
           rows={6}
           className="w-full rounded-lg border bg-background px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ring resize-none"
         />

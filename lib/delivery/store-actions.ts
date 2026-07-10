@@ -43,7 +43,7 @@ export async function createDeliveryStore(
         api_base_url:      data.apiBaseUrl?.trim() || null,
         google_sheet_id:   data.googleSheetId?.trim() || null,
         google_sheet_name: data.googleSheetName?.trim() || null,
-        delivery_fee_mad:  data.deliveryFeeMad ?? 25,
+        delivery_fee_mad:  data.deliveryFeeMad ?? 20,
         is_active:         data.isActive,
         is_default:        data.isDefault,
         metadata:          {

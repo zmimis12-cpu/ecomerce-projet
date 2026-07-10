@@ -136,7 +136,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
               Surcharge frais Digylog détectée : {mad(totalFeeOvercharge)}
             </p>
             <p className="text-xs text-orange-700 mt-0.5">
-              Des commandes Casablanca ont été facturées 35 MAD au lieu de 25 MAD. Montant à réclamer à Digylog.
+              Des commandes Casablanca ont été facturées 35 MAD au lieu de 20 MAD. Montant à réclamer à Digylog.
             </p>
           </div>
         </div>
@@ -175,7 +175,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                     <td className="px-3 py-2.5">
                       <span className="block">{item.normalizedCity || "—"}</span>
                       {item.normalizedCity === "Casablanca" && (
-                        <span className="text-[9px] text-emerald-600 font-semibold">Casa 25 MAD</span>
+                        <span className="text-[9px] text-emerald-600 font-semibold">Casa 20 MAD</span>
                       )}
                     </td>
                     <td className="px-3 py-2.5 font-mono">{item.codSystem !== null ? mad(item.codSystem) : "—"}</td>

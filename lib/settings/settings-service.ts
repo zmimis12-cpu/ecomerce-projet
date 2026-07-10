@@ -3,7 +3,7 @@
  * lib/settings/settings-service.ts
  * Centralized settings access.
  * Usage:
- *   const fee = await getSetting<number>("delivery_fee_casa", 25);
+ *   const fee = await getSetting<number>("delivery_fee_casa", 20);
  *   await setSetting("delivery_fee_casa", 20);
  */
 import { revalidatePath } from "next/cache";
@@ -107,7 +107,7 @@ export async function setSettings(settings: Record<string, unknown>): Promise<{ 
 export async function getDeliverySettings() {
   const s = await getSettingsByCategory("delivery");
   return {
-    deliveryFeeCasa:   Number(s.delivery_fee_casa   ?? 25),
+    deliveryFeeCasa:   Number(s.delivery_fee_casa   ?? 20),
     deliveryFeeOther:  Number(s.delivery_fee_other  ?? 35),
     deliveryFeeClient: Number(s.delivery_fee_client ?? 35),
     returnFeeDefault:  Number(s.return_fee_default  ?? 35),

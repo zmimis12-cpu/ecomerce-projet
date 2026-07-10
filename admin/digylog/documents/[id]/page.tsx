@@ -135,7 +135,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
                     <td className="px-3 py-2 font-mono">{row.orders?.order_number ?? <span className="text-red-500">Non trouvé</span>}</td>
                     <td className="px-3 py-2">
                       <span className="block">{normCity || "—"}</span>
-                      {normCity === "Casablanca" && <span className="text-[9px] text-emerald-600 font-semibold">25 MAD</span>}
+                      {normCity === "Casablanca" && <span className="text-[9px] text-emerald-600 font-semibold">20 MAD</span>}
                     </td>
                     <td className="px-3 py-2 font-mono">{row.orders ? mad(row.orders.total_amount_mad) : "—"}</td>
                     <td className={cn("px-3 py-2 font-mono", row.orders && Math.abs((row.cod_amount_mad ?? 0) - row.orders.total_amount_mad) > 0.5 && "text-red-600 font-bold")}>

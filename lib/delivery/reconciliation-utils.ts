@@ -17,7 +17,7 @@ export function normalizeCity(city: string): string {
 }
 
 export function getExpectedDeliveryCost(city: string): number {
-  return normalizeCity(city) === "Casablanca" ? 25 : 35;
+  return normalizeCity(city) === "Casablanca" ? 20 : 35;
 }
 
 export interface DigylogInvoiceRow {

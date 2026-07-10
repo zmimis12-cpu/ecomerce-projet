@@ -99,7 +99,7 @@ function StoreCard({ store, onEdit }: { store: DeliveryStoreRow; onEdit: () => v
           <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground flex-wrap">
             <span>{company?.name ?? "—"}</span>
             <span>·</span>
-            <span>{store.delivery_fee_mad ?? 25} MAD</span>
+            <span>{store.delivery_fee_mad ?? 20} MAD</span>
             <span>·</span>
             {hasSheet
               ? <span className="text-green-600 flex items-center gap-1"><Check className="h-3 w-3" />Sheet</span>
@@ -184,7 +184,7 @@ function WizardModal({ store, companies, onClose }: {
     apiBaseUrl:        store?.api_base_url ?? "",
     googleSheetId:     store?.google_sheet_id ?? "",
     googleSheetName:   store?.google_sheet_name ?? "",
-    deliveryFeeMad:    store?.delivery_fee_mad ?? 25,
+    deliveryFeeMad:    store?.delivery_fee_mad ?? 20,
     isActive:          store?.is_active ?? true,
     isDefault:         store?.is_default ?? false,
     clientName:        String(meta.client_name ?? ""),
@@ -226,7 +226,7 @@ function WizardModal({ store, companies, onClose }: {
             placeholder="ex: Hajtekzone, Afrizone…" className="field-input" autoFocus />
         </Field>
         <Field label="Frais livraison (MAD)">
-          <input type="number" value={form.deliveryFeeMad ?? 25}
+          <input type="number" value={form.deliveryFeeMad ?? 20}
             onChange={e => set("deliveryFeeMad", parseFloat(e.target.value) || 0)}
             className="field-input" />
         </Field>

@@ -109,7 +109,7 @@ export function ImportDocumentForm({ onSuccess }: { onSuccess?: () => void }) {
       <div>
         <label className="text-xs text-muted-foreground font-medium block mb-1">Ou coller le contenu CSV</label>
         <textarea value={csvText} onChange={(e) => handleCsvChange(e.target.value)}
-          placeholder={"tracking;cod;frais;retour;net;ville;statut\nS07EC98BC;260;25;0;235;Casablanca;livré"}
+          placeholder={"tracking;cod;frais;retour;net;ville;statut\nS07EC98BC;260;20;0;240;Casablanca;livré"}
           rows={5}
           className="w-full rounded-lg border bg-background px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
         {preview > 0 && <p className="text-xs text-emerald-600 mt-1 font-medium">✓ {preview} ligne(s) détectée(s)</p>}

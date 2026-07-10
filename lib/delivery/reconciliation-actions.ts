@@ -10,10 +10,10 @@
  * 4. Detect mismatches: fee overcharge, missing tracking, COD mismatch, etc.
  *
  * Delivery fee rule:
- *   Casablanca → expected cost = 25 MAD
+ *   Casablanca → expected cost = 20 MAD
  *   Other cities → expected cost = 35 MAD
  *   Client always pays 35 MAD (never changes).
- *   deliveryMargin = 35 - expectedCost  (+10 for Casa, 0 for others).
+ *   deliveryMargin = 35 - expectedCost  (+15 for Casa, 0 for others).
  */
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/session";

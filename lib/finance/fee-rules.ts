@@ -2,7 +2,7 @@
  * lib/finance/fee-rules.ts
  *
  * Dynamic shipping fee rules engine.
- * Replaces hardcoded Casa=25/Other=35 logic.
+ * Replaces hardcoded Casa=20/Other=35 logic.
  * Rules loaded from DB, cached in memory per request.
  */
 
@@ -80,7 +80,7 @@ export async function getShippingFees(
   // Fallback if no rules in DB
   const isCasa = isKnownCasablanca(cityNorm);
   return {
-    shippingFee:    isCasa ? 25 : 35,
+    shippingFee:    isCasa ? 20 : 35,
     returnFee:      isCasa ? 15 : 20,
     fulfillmentFee: 0,
     isCasablanca:   isCasa,
@@ -98,7 +98,7 @@ export function isKnownCasablanca(city: string): boolean {
 
 export function getShippingFeeSync(city: string): { shippingFee: number; returnFee: number; isCasablanca: boolean } {
   const isCasa = isKnownCasablanca(city);
-  return { shippingFee: isCasa ? 25 : 35, returnFee: isCasa ? 15 : 20, isCasablanca: isCasa };
+  return { shippingFee: isCasa ? 20 : 35, returnFee: isCasa ? 15 : 20, isCasablanca: isCasa };
 }
 
 // ─── Expected payout calculation ──────────────────────────────────────────────

@@ -194,7 +194,7 @@ async function reconcileDigylog(params: {
     const expNet  = cod - expFee;
 
     // Issue: Casablanca overcharged
-    if (isCasablanca(city) && actFee > 25) {
+    if (isCasablanca(city) && actFee > 20) {
       issues.push({
         orderId:     order.id,
         tracking:    order.delivery_tracking_number,
@@ -207,7 +207,7 @@ async function reconcileDigylog(params: {
         expectedNet: expNet,
         issueType:   "casa_overcharged",
         severity:    "warning",
-        description: `Casablanca: frais attendus 25 MAD, facturés ${actFee} MAD. Écart: ${actFee - 25} MAD.`,
+        description: `Casablanca: frais attendus 20 MAD, facturés ${actFee} MAD. Écart: ${actFee - 20} MAD.`,
       });
     }
 
