@@ -184,7 +184,7 @@ export async function updateOrderStatus(
     // ex: marquée payée à tort). "exchanged" est exclu car l'argent de la
     // 1ère commande reste acquis même après échange.
     updatePayload.is_paid        = false;
-    updatePayload.payment_status = "pending";
+    updatePayload.payment_status = "unpaid";
     updatePayload.paid_at        = null;
   }
 
