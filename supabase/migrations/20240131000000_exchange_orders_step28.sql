@@ -18,6 +18,19 @@ ALTER TABLE orphan_webhooks
 
 -- 4. Contrainte unique nécessaire pour l'upsert onConflict("tracking_number")
 --    (dédupe les webhooks répétés sur le même tracking orphelin)
+
+-- 4a. Nettoyer les doublons existants — on garde la ligne la plus récente par tracking
+DELETE FROM orphan_webhooks a
+USING orphan_webhooks b
+WHERE a.tracking_number = b.tracking_number
+  AND a.created_at < b.created_at;
+
+-- 4b. Sécurité: s'il reste des doublons avec created_at identique, garder un seul via ctid
+DELETE FROM orphan_webhooks a
+USING orphan_webhooks b
+WHERE a.tracking_number = b.tracking_number
+  AND a.ctid < b.ctid;
+
 DO $$
 BEGIN
   IF NOT EXISTS (
