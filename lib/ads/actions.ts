@@ -137,13 +137,16 @@ export async function syncMetaAdSpend(dateFrom: string, dateTo: string) {
   }));
 
   if (rowsToUpsert.length > 0) {
-    // Supprimer d'abord pour éviter l'accumulation à chaque sync
+    // Supprimer TOUTE ligne dont la période chevauche [dateFrom, dateTo] —
+    // pas juste les lignes strictement incluses dedans. Sinon un resync avec
+    // une fenêtre glissante (ex: "hier à aujourd'hui" chaque jour) laisse les
+    // anciennes lignes qui chevauchent partiellement → double comptage cumulatif.
     await supabaseAdmin
       .from("product_ad_spend")
       .delete()
       .eq("platform", "meta")
-      .gte("period_start", dateFrom)
-      .lte("period_end", dateTo);
+      .lte("period_start", dateTo)
+      .gte("period_end", dateFrom);
 
     const { error: upsertErr } = await supabaseAdmin
       .from("product_ad_spend")
