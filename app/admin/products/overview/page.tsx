@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth/session";
-import { getProductPerformance, type DateFilter } from "@/lib/dashboard/queries";
+import { getProductPerformance, getAdSpendByPlatform, type DateFilter } from "@/lib/dashboard/queries";
 import { ProductPerformanceTable } from "@/components/dashboard/product-performance-table";
+import { AdSpendByPlatform } from "@/components/dashboard/ad-spend-by-platform";
 import { ProductsFilterBar } from "@/components/products/products-filter-bar";
 
 export const metadata: Metadata = { title: "Vue d'ensemble Produits" };
@@ -32,7 +33,10 @@ export default async function ProductsOverviewPage({ searchParams }: Props) {
   }
 
   const filter: DateFilter = { from, to };
-  const products = await getProductPerformance(filter);
+  const [products, adSpend] = await Promise.all([
+    getProductPerformance(filter),
+    getAdSpendByPlatform(filter),
+  ]);
 
   return (
     <div className="space-y-5">
@@ -44,6 +48,8 @@ export default async function ProductsOverviewPage({ searchParams }: Props) {
       </div>
 
       <ProductsFilterBar activePeriod={params.period ?? "30"} from={from} to={to} />
+
+      <AdSpendByPlatform rows={adSpend.rows} grandTotal={adSpend.grand_total} />
 
       <div className="rounded-xl border bg-card overflow-hidden">
         <ProductPerformanceTable data={products} />

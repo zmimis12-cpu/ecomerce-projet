@@ -123,7 +123,66 @@ export interface DateFilter {
   providerId?: string;
 }
 
-// ── Dashboard summary ──────────────────────────────────────────────────────────
+// ── Ad spend breakdown by platform (Meta/TikTok/Google/Non attribué) ────────
+export interface AdSpendPlatformRow {
+  platform: string;
+  label: string;
+  matched_mad: number;    // attribué à un produit
+  unmatched_mad: number;  // pas attribué (campagne sans SKU/assignation)
+  total_mad: number;
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  meta: "Meta", tiktok: "TikTok", google: "Google Ads", other: "Autre",
+};
+
+export async function getAdSpendByPlatform(filter?: DateFilter): Promise<{
+  rows: AdSpendPlatformRow[];
+  grand_total: number;
+}> {
+  let matchedQ   = supabaseAdmin.from("product_ad_spend").select("platform, spend_mad");
+  let unmatchedQ = supabaseAdmin.from("unmatched_ad_spend").select("platform, spend_mad");
+  let manualQ    = supabaseAdmin.from("manual_ad_spend").select("platform, amount_mad");
+  if (filter) {
+    matchedQ   = matchedQ.gte("period_start", filter.from).lte("period_end", filter.to);
+    unmatchedQ = unmatchedQ.gte("period_start", filter.from).lte("period_end", filter.to);
+    manualQ    = manualQ.gte("spend_date", filter.from).lte("spend_date", filter.to);
+  }
+  const [{ data: matchedRows }, { data: unmatchedRows }, { data: manualRows }] =
+    await Promise.all([matchedQ, unmatchedQ, manualQ]);
+
+  const byPlatform = new Map<string, { matched: number; unmatched: number }>();
+  const bump = (platform: string, key: "matched" | "unmatched", amount: number) => {
+    const cur = byPlatform.get(platform) ?? { matched: 0, unmatched: 0 };
+    cur[key] += amount;
+    byPlatform.set(platform, cur);
+  };
+  for (const r of (matchedRows ?? []) as { platform: string; spend_mad: number }[]) {
+    bump(r.platform, "matched", r.spend_mad ?? 0);
+  }
+  for (const r of (unmatchedRows ?? []) as { platform: string; spend_mad: number }[]) {
+    bump(r.platform, "unmatched", r.spend_mad ?? 0);
+  }
+  for (const r of (manualRows ?? []) as { platform: string; amount_mad: number }[]) {
+    bump(r.platform, "matched", r.amount_mad ?? 0); // saisie manuelle = pas de notion de produit, comptée comme "attribuée" au global plateforme
+  }
+
+  const rows: AdSpendPlatformRow[] = [...byPlatform.entries()]
+    .map(([platform, v]) => ({
+      platform,
+      label: PLATFORM_LABELS[platform] ?? platform,
+      matched_mad:   Math.round(v.matched * 100) / 100,
+      unmatched_mad: Math.round(v.unmatched * 100) / 100,
+      total_mad:     Math.round((v.matched + v.unmatched) * 100) / 100,
+    }))
+    .sort((a, b) => b.total_mad - a.total_mad);
+
+  const grand_total = Math.round(rows.reduce((s, r) => s + r.total_mad, 0) * 100) / 100;
+
+  return { rows, grand_total };
+}
+
+
 export async function getDashboardSummary(filter?: DateFilter): Promise<DashboardSummary> {
   const supabase = await createClient();
 

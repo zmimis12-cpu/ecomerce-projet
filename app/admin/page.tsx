@@ -6,13 +6,14 @@ import {
 import { requireRole } from "@/lib/auth/session";
 import { hasRole } from "@/lib/auth/roles";
 import {
-  getDashboardSummary, getProductPerformance, getDailyFinance,
+  getDashboardSummary, getProductPerformance, getDailyFinance, getAdSpendByPlatform,
 } from "@/lib/dashboard/queries";
 import { KpiCard, RateBadge } from "@/components/dashboard/kpi-card";
 import { StoreFilter } from "@/components/shared/store-filter";
 import { getStoreOptions } from "@/lib/delivery/store-filter-helper";
 import { ProductPerformanceTable } from "@/components/dashboard/product-performance-table";
 import { FinanceChart } from "@/components/dashboard/finance-chart";
+import { AdSpendByPlatform } from "@/components/dashboard/ad-spend-by-platform";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -34,11 +35,12 @@ export default async function AdminDashboardPage({
   const storeId        = sp.store || undefined;
   const filter         = storeId ? { from: "2020-01-01", to: "2099-12-31", storeId } : undefined;
 
-  const [summary, products, daily, storeOptions] = await Promise.all([
+  const [summary, products, daily, storeOptions, adSpendByPlatform] = await Promise.all([
     canSeeFinance ? getDashboardSummary(filter) : null,
     canSeeFinance ? getProductPerformance(filter) : null,
     canSeeFinance ? getDailyFinance(14, storeId) : null,
     getStoreOptions(),
+    canSeeFinance ? getAdSpendByPlatform(filter) : null,
   ]);
 
   // ── Store filter indicator for title
@@ -168,6 +170,9 @@ export default async function AdminDashboardPage({
               <KpiCard label="Pertes Retours"  value={mad(summary.total_return_losses)}
                 icon={RotateCcw} variant="red" />
             </div>
+            {adSpendByPlatform && adSpendByPlatform.rows.length > 0 && (
+              <AdSpendByPlatform rows={adSpendByPlatform.rows} grandTotal={adSpendByPlatform.grand_total} />
+            )}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <KpiCard label="COGS"            value={mad(summary.total_cogs)}   />
               <KpiCard label="Coût Livraison"  value={mad(summary.total_delivery_cost)} icon={Truck} />
