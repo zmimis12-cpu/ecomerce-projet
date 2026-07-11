@@ -392,11 +392,13 @@ export async function applyDigylogStatusUpdate(params: {
 
   // ── Orphan webhook — tracking not found in our system ─────────────────────
   if (!orderId) {
-    console.warn("DIGYLOG WEBHOOK ORPHAN", { tracking, externalStatus, idStatus });
-    await supabaseAdmin.from("orphan_webhooks").insert({
-      tracking_number: tracking,
-      raw_payload:     rawPayload,
-    } as never).then(() => {}, () => {});
+    const looksLikeExchange = tracking.toUpperCase().startsWith("EC");
+    console.warn("DIGYLOG WEBHOOK ORPHAN", { tracking, externalStatus, idStatus, looksLikeExchange });
+    await supabaseAdmin.from("orphan_webhooks").upsert({
+      tracking_number:      tracking,
+      raw_payload:          rawPayload,
+      looks_like_exchange:  looksLikeExchange,
+    } as never, { onConflict: "tracking_number" }).then(() => {}, () => {});
     return;
   }
 

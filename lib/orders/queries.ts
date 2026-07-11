@@ -22,7 +22,8 @@ const ORDER_DETAIL_FIELDS = `
   status, payment_status, payment_method,
   assigned_to, confirmed_by, confirmed_at,
   notes, internal_notes, delivery_tracking_number, sync_error, import_source,
-  source, is_duplicate, duplicate_of, created_at, updated_at
+  source, is_duplicate, duplicate_of, is_exchange, exchange_of_order_id,
+  created_at, updated_at
 `;
 
 export interface OrderFilters {

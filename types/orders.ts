@@ -18,7 +18,8 @@ export type OrderStatus =
   | "partially_returned"
   | "in_transit"
   | "refused_delivery"
-  | "not_sent";               // Created in Digylog but not sent yet (Non envoyée)
+  | "not_sent"                // Created in Digylog but not sent yet (Non envoyée)
+  | "exchanged";              // Livrée puis remplacée par un échange (nouveau tracking EC...)
 
 export interface OrderItem {
   id: string;
@@ -88,6 +89,10 @@ export interface Order {
   // Duplicate detection
   is_duplicate: boolean;
   duplicate_of: string | null;
+
+  // Exchange (échange Digylog)
+  is_exchange: boolean;
+  exchange_of_order_id: string | null;
 
   created_at: string;
   updated_at: string;
@@ -161,6 +166,7 @@ export const STATUS_LABELS: Record<OrderStatus, string> = {
   pending:          "En attente",
   shipped:          "Expédié",
   partially_returned: "Partiellement retourné",
+  exchanged:        "Échangé",
 };
 
 export const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string; dot: string }> = {
@@ -180,6 +186,7 @@ export const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string; dot:
   partially_returned:{ bg:"bg-amber-50",  text: "text-amber-700", dot: "bg-amber-400" },
   in_transit:        { bg: "bg-blue-50",   text: "text-blue-700",  dot: "bg-blue-500" },
   refused_delivery:  { bg: "bg-red-50",    text: "text-red-700",   dot: "bg-red-500" },
+  exchanged:         { bg: "bg-violet-50", text: "text-violet-700",dot: "bg-violet-500" },
 };
 
 // Which statuses a call_center_agent can set
@@ -195,9 +202,10 @@ export const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   no_answer:        ["confirmed", "refused", "cancelled"],
   processing:       ["sent_to_delivery", "cancelled"],
   sent_to_delivery: ["delivered", "returned", "cancelled"],
-  delivered:        ["paid", "returned"],
-  paid:             [],
+  delivered:        ["paid", "returned", "exchanged"],
+  paid:             ["exchanged"],
   returned:         [],
+  exchanged:        [],
   cancelled:        [],
   pending:          ["confirmed", "cancelled"],
   shipped:          ["delivered", "returned"],

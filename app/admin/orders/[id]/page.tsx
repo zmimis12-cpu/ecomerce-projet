@@ -4,10 +4,12 @@ import { notFound } from "next/navigation";
 import { ChevronLeft, Calendar, Hash, Globe, Pencil } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
 import { getOrder, getAgents } from "@/lib/orders/queries";
+import { getProducts } from "@/lib/products/queries";
 import { StatusBadge } from "@/components/orders/status-badge";
 import { StatusUpdater } from "@/components/orders/status-updater";
 import { AgentAssigner } from "@/components/orders/agent-assigner";
 import { TrackingEditor } from "@/components/orders/tracking-editor";
+import { ExchangeDialog } from "@/components/orders/exchange-dialog";
 import { DeleteOrderButton } from "@/components/orders/delete-order-button";
 import { hasRole } from "@/lib/auth/roles";
 import { DuplicateBadge } from "@/components/orders/duplicate-badge";
@@ -37,8 +39,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // Agent can't see order not assigned to them
   if (isAgent && order.assigned_to !== session.authId) notFound();
 
-  const agents = canManage ? await getAgents() : [];
-  const profit = order.estimated_profit ?? 0;
+  const agents      = canManage ? await getAgents() : [];
+  const allProducts = canManage ? await getProducts() : [];
+  const profit      = order.estimated_profit ?? 0;
+  const canExchange = canManage && ["delivered", "paid"].includes(order.status) && !order.is_exchange;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -156,6 +160,14 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <StatusUpdater orderId={id} currentStatus={order.status} isAgent={isAgent} />
             ) : (
               <StatusBadge status={order.status} />
+            )}
+            {canExchange && (
+              <ExchangeDialog
+                orderId={id}
+                orderNumber={order.order_number}
+                currentQuantity={order.items?.[0]?.quantity ?? 1}
+                products={allProducts.map((p) => ({ id: p.id, name: p.name, sku: p.sku }))}
+              />
             )}
           </div>
 
