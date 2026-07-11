@@ -1,31 +1,32 @@
 "use server";
 /**
  * lib/orders/exchange-actions.ts
- * Gestion des échanges Digylog (EC-tracking).
+ * Gestion des échanges Digylog.
  *
  * Flow réel:
- * 1. Client livré a un problème → admin génère l'échange dans Digylog (manuel,
- *    bouton "Générer échange" côté Digylog) → Digylog donne un nouveau tracking
- *    préfixé "EC" (ex: EC S15683FAC).
- * 2. Admin colle ce tracking ici avec createExchange() → on crée une NOUVELLE
- *    commande liée (même produit ou produit différent), on marque l'ancienne
- *    "exchanged" (pas "returned" — ne fausse pas les stats de retour).
- * 3. Le prochain webhook Digylog sur ce tracking EC matchera normalement la
- *    nouvelle commande (plus d'orphelin).
+ * 1. Client livré a un problème → échange généré côté Digylog (manuel ou
+ *    auto-détecté depuis le webhook) → nouveau tracking (même format qu'un
+ *    tracking normal — le badge "EC" dans l'UI Digylog n'en fait PAS partie).
+ * 2. On crée une NOUVELLE commande liée (même produit ou produit différent).
+ *    L'argent de la 1ère commande reste acquis — le client ne paie que les
+ *    frais de livraison (ou un montant négocié) sur le nouveau colis.
+ * 3. L'ancienne commande passe "exchanged" (pas "returned" — ne fausse pas
+ *    les stats de retour).
  */
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/session";
+import { getExpectedDeliveryCost } from "@/lib/delivery/reconciliation-utils";
 
 const MANAGER = ["super_admin", "admin", "manager"] as const;
 
 export interface CreateExchangeParams {
   originalOrderId: string;
-  exchangeTracking: string;      // tracking EC... donné par Digylog
+  exchangeTracking: string;      // tracking donné par Digylog (sans le badge "EC")
   mode: "same_product" | "new_product";
   productId?: string;            // requis si mode = new_product
   quantity?: number;             // défaut: garde la quantité d'origine (same_product) ou 1 (new_product)
-  codAmountOverride?: number;    // contre-remboursement du nouveau colis si différent du calcul auto
+  codAmountOverride?: number;    // contre-remboursement du nouveau colis si différent du défaut (frais de livraison)
   notes?: string;
 }
 
@@ -36,13 +37,25 @@ export async function createExchange(params: CreateExchangeParams): Promise<{
   error?: string;
 }> {
   const session = await requireRole([...MANAGER]);
+  return performExchange(params, session.authId);
+}
 
+/**
+ * Coeur de la logique d'échange, sans vérification de rôle — utilisable
+ * depuis une server action UI (createExchange, avec session) ou depuis le
+ * webhook Digylog en auto-détection (actorId = null, système).
+ */
+export async function performExchange(
+  params: CreateExchangeParams,
+  actorId: string | null
+): Promise<{
+  success: boolean;
+  newOrderId?: string;
+  newOrderNumber?: string;
+  error?: string;
+}> {
   const tracking = params.exchangeTracking.trim().toUpperCase();
   if (!tracking) return { success: false, error: "Tracking d'échange requis." };
-  // Note: Digylog affiche un badge "EC" à côté du tracking dans son UI pour
-  // signaler un échange, mais ce badge ne fait PAS partie du tracking réel.
-  // Ne jamais préfixer/altérer le tracking collé — le webhook renverra le
-  // tracking brut tel que Digylog l'a généré (ex: "S0618116R").
 
   // 1. Vérifier que ce tracking n'est pas déjà utilisé
   const { data: dup } = await supabaseAdmin
@@ -119,9 +132,14 @@ export async function createExchange(params: CreateExchangeParams): Promise<{
     }];
   }
 
-  const subtotal  = newItems.reduce((s, it) => s + it.unit_price * it.quantity * (1 - it.discount_pct / 100), 0);
-  const cogs      = newItems.reduce((s, it) => s + it.unit_cost_mad * it.quantity, 0);
-  const codAmount = params.codAmountOverride ?? subtotal;
+  const productValue = newItems.reduce((s, it) => s + it.unit_price * it.quantity * (1 - it.discount_pct / 100), 0);
+  const cogs          = newItems.reduce((s, it) => s + it.unit_cost_mad * it.quantity, 0);
+  // L'argent de la 1ère commande reste acquis. Le client ne paie, sur le
+  // nouveau colis, que les frais de livraison (ou un montant négocié) —
+  // jamais le prix plein du produit. Défaut = frais de livraison de la
+  // commande d'origine, sinon calculé depuis la ville.
+  const defaultCod = o.delivery_client_fee || getExpectedDeliveryCost(o.customer_city) || 35;
+  const codAmount  = params.codAmountOverride ?? defaultCod;
 
   // 5. Créer la nouvelle commande (order_number auto-généré par trigger)
   const { data: newOrder, error: newErr } = await supabaseAdmin
@@ -134,13 +152,13 @@ export async function createExchange(params: CreateExchangeParams): Promise<{
       customer_region:          o.customer_region,
       customer_country:         o.customer_country ?? "MA",
       status:                   "sent_to_delivery",
-      subtotal,
+      subtotal:                 codAmount,
       shipping_charge:          o.shipping_charge ?? 0,
       discount_amount:          0,
       cogs_total:               cogs,
       source:                   o.source,
       assigned_to:              o.assigned_to,
-      notes:                    params.notes ?? `Échange de la commande ${o.order_number}.`,
+      notes:                    params.notes ?? `Échange de la commande ${o.order_number} (valeur produit: ${productValue} MAD, COD collecté: ${codAmount} MAD).`,
       import_source:            "exchange",
       is_exchange:              true,
       exchange_of_order_id:     o.id,
@@ -200,14 +218,14 @@ export async function createExchange(params: CreateExchangeParams): Promise<{
       order_id:    o.id,
       from_status: o.status,
       to_status:   "exchanged",
-      changed_by:  session.authId,
+      changed_by:  actorId,
       notes:       `Échangée → nouvelle commande ${newOrderNumber} (tracking ${tracking}).`,
     },
     {
       order_id:    newOrderId,
       from_status: null,
       to_status:   "sent_to_delivery",
-      changed_by:  session.authId,
+      changed_by:  actorId,
       notes:       `Créée par échange de ${o.order_number}.`,
     },
   ] as never);
@@ -220,9 +238,6 @@ export async function createExchange(params: CreateExchangeParams): Promise<{
     .maybeSingle();
   if (orphan) {
     const orph = orphan as { id: string; raw_payload: unknown };
-    // On ne rejoue pas le webhook automatiquement ici — l'admin peut relancer
-    // une synchro manuelle sur la commande si besoin. On nettoie juste l'entrée
-    // orpheline pour ne pas polluer l'écran "Échanges non liés".
     await supabaseAdmin.from("orphan_webhooks").delete().eq("id", orph.id);
   }
 
@@ -232,4 +247,66 @@ export async function createExchange(params: CreateExchangeParams): Promise<{
   revalidatePath("/admin/delivery");
 
   return { success: true, newOrderId, newOrderNumber };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auto-détection: appelée par le webhook Digylog quand un tracking orphelin
+// arrive. On interroge Digylog pour ce tracking (GET /order/:tracking/infos),
+// on essaie de retrouver le client par téléphone parmi les commandes
+// livrées/payées récentes. Si UN SEUL match trouvé → échange auto-créé
+// (même produit, COD = frais de livraison). Sinon on laisse l'admin lier
+// manuellement via "Générer échange".
+// ─────────────────────────────────────────────────────────────────────────────
+export async function tryAutoDetectExchange(tracking: string): Promise<{
+  linked: boolean;
+  reason: string;
+  newOrderNumber?: string;
+}> {
+  const { createDigylogClientFromDB } = await import("@/lib/delivery/digylog/client");
+  const { normalizePhone } = await import("@/lib/delivery/phone-utils");
+
+  const client = await createDigylogClientFromDB();
+  if (!client.hasToken()) return { linked: false, reason: "Token Digylog manquant." };
+
+  const info = await client.getOrderInfos(tracking);
+  if (!info) return { linked: false, reason: "Digylog n'a pas retourné d'infos pour ce tracking." };
+
+  console.log("DIGYLOG ORDER INFO (auto-detect exchange)", { tracking, info });
+
+  // Digylog ne documente pas un nom de champ fixe pour le téléphone — on
+  // essaie les variantes courantes observées sur leurs endpoints.
+  const rawPhone = (info.phone ?? info.telephone ?? info.clientPhone ?? info.customerPhone ?? info.tel) as string | undefined;
+  if (!rawPhone) return { linked: false, reason: "Téléphone client introuvable dans la réponse Digylog." };
+
+  const phone = normalizePhone(String(rawPhone));
+
+  const { data: candidates } = await supabaseAdmin
+    .from("orders")
+    .select("id, order_number, customer_phone, status, delivered_at")
+    .in("status", ["delivered", "paid"])
+    .eq("is_exchange", false)
+    .order("delivered_at", { ascending: false })
+    .limit(500);
+
+  type Cand = { id: string; order_number: string; customer_phone: string; status: string; delivered_at: string | null };
+  const matches = ((candidates ?? []) as Cand[]).filter((c) => normalizePhone(c.customer_phone) === phone);
+
+  if (matches.length === 0) {
+    return { linked: false, reason: `Aucune commande livrée/payée trouvée pour le téléphone ${phone}.` };
+  }
+  if (matches.length > 1) {
+    return { linked: false, reason: `${matches.length} commandes possibles pour ${phone} — lien ambigu, à faire manuellement.` };
+  }
+
+  const match = matches[0];
+  const res = await performExchange({
+    originalOrderId:  match.id,
+    exchangeTracking: tracking,
+    mode:             "same_product",
+    notes:            `Échange auto-détecté depuis le webhook Digylog (tracking ${tracking}) — à vérifier.`,
+  }, null);
+
+  if (!res.success) return { linked: false, reason: res.error ?? "Erreur lors de la création auto." };
+
+  return { linked: true, reason: `Lié automatiquement à ${match.order_number}.`, newOrderNumber: res.newOrderNumber };
 }

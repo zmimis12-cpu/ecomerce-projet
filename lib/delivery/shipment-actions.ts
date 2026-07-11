@@ -11,19 +11,11 @@ import { getDeliveryClient } from "@/lib/delivery/client-factory";
 import { createDigylogClientFromDB } from "@/lib/delivery/digylog/client";
 import { mapDigylogStatus } from "./digylog/status-map";
 import { createAuditLog, auditStatusChange } from "@/lib/audit/audit-logger";
+import { normalizePhone } from "@/lib/delivery/phone-utils";
 
 const MANAGER = ["super_admin","admin","manager"] as const;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-/** Normalize Moroccan phone to exactly 10 digits starting with 0 */
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("212") && digits.length === 12) return "0" + digits.slice(3);
-  if (digits.startsWith("0")   && digits.length === 10) return digits;
-  // pad/truncate to 10
-  return ("0" + digits).slice(-10).padStart(10, "0");
-}
 
 async function getDigylogSettings() {
   const { data } = await supabaseAdmin
@@ -394,12 +386,18 @@ export async function applyDigylogStatusUpdate(params: {
   if (!orderId) {
     // Note: le badge "EC" visible dans l'UI Digylog n'est PAS présent dans le
     // tracking réel — impossible de deviner "c'est un échange" depuis le
-    // tracking seul. Tout orphelin doit être vérifié manuellement (échange
-    // non encore lié via "Générer échange", ou vraie commande manquante).
-    console.warn("DIGYLOG WEBHOOK ORPHAN", { tracking, externalStatus, idStatus });
+    // tracking seul. On tente une auto-détection via l'API Digylog (téléphone
+    // client) avant de considérer le webhook comme orphelin.
+    const { tryAutoDetectExchange } = await import("@/lib/orders/exchange-actions");
+    const auto = await tryAutoDetectExchange(tracking);
+    console.log("DIGYLOG AUTO-DETECT EXCHANGE", { tracking, ...auto });
+
+    if (auto.linked) return; // commande créée, orphelin nettoyé dans performExchange
+
+    console.warn("DIGYLOG WEBHOOK ORPHAN", { tracking, externalStatus, idStatus, autoDetectReason: auto.reason });
     await supabaseAdmin.from("orphan_webhooks").upsert({
       tracking_number: tracking,
-      raw_payload:      rawPayload,
+      raw_payload:      { ...rawPayload, _autoDetectReason: auto.reason },
     } as never, { onConflict: "tracking_number" }).then(() => {}, () => {});
     return;
   }

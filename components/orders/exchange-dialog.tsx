@@ -124,8 +124,9 @@ export function ExchangeDialog({ orderId, orderNumber, currentQuantity, products
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Contre-remb. (MAD)</label>
             <input type="number" value={codOverride} onChange={(e) => setCodOverride(e.target.value)}
-              placeholder="auto" disabled={isPending}
+              placeholder="0" disabled={isPending}
               className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50" />
+            <p className="text-[11px] text-muted-foreground">Ce que Digylog doit collecter au client (souvent 0 — il a déjà payé).</p>
           </div>
         </div>
 
