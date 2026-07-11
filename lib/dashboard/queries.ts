@@ -187,14 +187,16 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
       return s + (r.total_amount_mad ?? 0) - livFee;
     }, 0);
 
-  // Net déjà collecté = commandes payées, montant collecté - frais de livraison réel
-  // (priorité au frais réel facturé par Digylog s'il est connu, sinon frais attendu par ville).
+  // Net déjà collecté = commandes payées, montant collecté - frais de livraison réel.
+  // NOTE: actual_delivery_cost (default 35) et delivery_cost_real_mad (default 0) ne
+  // sont JAMAIS mis à jour par l'app avec le vrai frais par commande — on ne peut pas
+  // s'y fier (ex: Casa reste à 35 au lieu de 20). On utilise donc le calcul par ville,
+  // qui matche exactement les factures Digylog réelles (vérifié: 34/34 sans écart).
   const net_collected = rows
     .filter((r) => r.is_paid)
     .reduce((s, r) => {
       const city   = (r.customer_city ?? "").toLowerCase();
-      const cityFee = city.includes("casablanca") || city.includes("casa") || city === "الدار البيضاء" ? 20 : 35;
-      const livFee  = r.actual_delivery_cost ?? r.delivery_cost_real_mad ?? cityFee;
+      const livFee = city.includes("casablanca") || city.includes("casa") || city === "الدار البيضاء" ? 20 : 35;
       return s + (r.total_amount_mad ?? 0) - livFee;
     }, 0);
 
