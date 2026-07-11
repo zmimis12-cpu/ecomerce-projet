@@ -172,6 +172,21 @@ export async function updateOrderStatus(
     updatePayload.confirmed_by = session.authId;
     updatePayload.confirmed_at = new Date().toISOString();
   }
+  // Garder is_paid/payment_status synchronisés avec le statut — sinon un
+  // retour manuel "Payé → Livré" ne fait rien sur les vrais montants collectés
+  // et fausse le dashboard (Net Collecté, CA Réel Collecté, etc.).
+  if (newStatus === "paid") {
+    updatePayload.is_paid        = true;
+    updatePayload.payment_status = "paid";
+    updatePayload.paid_at        = new Date().toISOString();
+  } else if (currentStatus === "paid" && newStatus !== "exchanged") {
+    // On repasse une commande de "payé" à autre chose (correction manuelle,
+    // ex: marquée payée à tort). "exchanged" est exclu car l'argent de la
+    // 1ère commande reste acquis même après échange.
+    updatePayload.is_paid        = false;
+    updatePayload.payment_status = "pending";
+    updatePayload.paid_at        = null;
+  }
 
   const { error } = await supabase
     .from("orders")
