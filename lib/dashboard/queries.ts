@@ -28,6 +28,8 @@ export interface DashboardSummary {
   pending_collection:     number;
   net_a_recevoir:         number;
   net_collected:          number;  // Argent déjà collecté par Digylog, net des frais de livraison
+  total_ads_spend:        number;  // Meta (réel, synced) + TikTok/Google/autre (saisie manuelle)
+  real_profit_net_ads:    number;  // real_profit - total_ads_spend = vrai profit final
   confirmation_rate:      number;
   delivery_rate:          number;
   // New real finance fields
@@ -229,13 +231,26 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   const roi = total_cogs > 0
     ? Math.round(real_profit / total_cogs * 1000) / 10 : 0;
 
+  // ── Total dépensé en pub (Meta réel via sync + TikTok/Google/autre saisie manuelle) ──
+  let metaQ   = supabaseAdmin.from("product_ad_spend").select("spend_mad");
+  let manualQ = supabaseAdmin.from("manual_ad_spend").select("amount_mad");
+  if (filter) {
+    metaQ   = metaQ.gte("period_start", filter.from).lte("period_end", filter.to);
+    manualQ = manualQ.gte("spend_date", filter.from).lte("spend_date", filter.to);
+  }
+  const [{ data: metaSpendRows }, { data: manualSpendRows }] = await Promise.all([metaQ, manualQ]);
+  const metaSpendTotal   = ((metaSpendRows ?? []) as { spend_mad: number }[]).reduce((s, r) => s + (r.spend_mad ?? 0), 0);
+  const manualSpendTotal = ((manualSpendRows ?? []) as { amount_mad: number }[]).reduce((s, r) => s + (r.amount_mad ?? 0), 0);
+  const total_ads_spend     = Math.round((metaSpendTotal + manualSpendTotal) * 100) / 100;
+  const real_profit_net_ads = Math.round((real_profit - total_ads_spend) * 100) / 100;
+
   return {
     total_leads, confirmed_count, sent_to_delivery_count, in_transit_count,
     delivered_count, paid_count, returned_count, refused_count,
     no_answer_count, cancelled_count,
     estimated_revenue, real_revenue, estimated_profit, real_profit,
     total_cogs, total_delivery_cost, total_return_losses, pending_collection, net_a_recevoir,
-    net_collected,
+    net_collected, total_ads_spend, real_profit_net_ads,
     confirmation_rate, delivery_rate,
     total_delivery_margin, total_delivery_overcharge, casa_orders_count,
     net_margin_pct, roi,

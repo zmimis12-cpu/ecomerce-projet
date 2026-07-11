@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth/session";
 import { getAdPlatformSettings } from "@/lib/ads/actions";
+import { listManualAdSpend } from "@/lib/ads/manual-actions";
 import { AdsSettingsForm } from "@/components/ads-integration/ads-settings-form";
 import { CampaignAssignment } from "@/components/ads-integration/campaign-assignment";
+import { ManualAdSpendForm } from "@/components/ads-integration/manual-ad-spend-form";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = { title: "Paramètres Publicité" };
@@ -11,11 +13,12 @@ export const dynamic = "force-dynamic";
 export default async function AdsSettingsPage() {
   await requireRole(["super_admin", "admin"]);
 
-  const [metaSettings, googleSettings, tiktokSettings, productsData] = await Promise.all([
+  const [metaSettings, googleSettings, tiktokSettings, productsData, manualEntries] = await Promise.all([
     getAdPlatformSettings("meta"),
     getAdPlatformSettings("google"),
     getAdPlatformSettings("tiktok"),
     supabaseAdmin.from("products").select("id, name, sku").order("name"),
+    listManualAdSpend(),
   ]);
 
   const products = (productsData.data ?? []) as { id: string; name: string; sku: string }[];
@@ -40,6 +43,8 @@ export default async function AdsSettingsPage() {
           <CampaignAssignment products={products} />
         </div>
       )}
+
+      <ManualAdSpendForm entries={manualEntries} />
     </div>
   );
 }

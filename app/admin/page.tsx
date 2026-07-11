@@ -157,7 +157,14 @@ export default async function AdminDashboardPage({
               <KpiCard label="Profit Réel"     value={mad(summary.real_profit)}
                 variant={summary.real_profit >= 0 ? "green" : "red"}
                 icon={TrendingUp} highlight
-                sub="Basé sur commandes payées" />
+                sub="Basé sur commandes payées (avant pub)" />
+              <KpiCard label="Total Pub"       value={mad((summary as {total_ads_spend?:number}).total_ads_spend ?? 0)}
+                icon={AlertTriangle} variant="red"
+                sub="Meta (réel) + TikTok/Google (saisie manuelle)" />
+              <KpiCard label="Profit Net Final" value={mad((summary as {real_profit_net_ads?:number}).real_profit_net_ads ?? 0)}
+                variant={((summary as {real_profit_net_ads?:number}).real_profit_net_ads ?? 0) >= 0 ? "green" : "red"}
+                icon={TrendingUp} highlight
+                sub="Profit Réel - Total Pub (Meta+TikTok+Google)" />
               <KpiCard label="Pertes Retours"  value={mad(summary.total_return_losses)}
                 icon={RotateCcw} variant="red" />
             </div>
