@@ -27,6 +27,7 @@ export interface DashboardSummary {
   total_return_losses:    number;
   pending_collection:     number;
   net_a_recevoir:         number;
+  net_collected:          number;  // Argent déjà collecté par Digylog, net des frais de livraison
   confirmation_rate:      number;
   delivery_rate:          number;
   // New real finance fields
@@ -186,6 +187,17 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
       return s + (r.total_amount_mad ?? 0) - livFee;
     }, 0);
 
+  // Net déjà collecté = commandes payées, montant collecté - frais de livraison réel
+  // (priorité au frais réel facturé par Digylog s'il est connu, sinon frais attendu par ville).
+  const net_collected = rows
+    .filter((r) => r.is_paid)
+    .reduce((s, r) => {
+      const city   = (r.customer_city ?? "").toLowerCase();
+      const cityFee = city.includes("casablanca") || city.includes("casa") || city === "الدار البيضاء" ? 20 : 35;
+      const livFee  = r.actual_delivery_cost ?? r.delivery_cost_real_mad ?? cityFee;
+      return s + (r.total_amount_mad ?? 0) - livFee;
+    }, 0);
+
   // Delivery margin: +10 MAD for each Casa order
   let total_delivery_margin = 0;
   let total_delivery_overcharge = 0;
@@ -221,6 +233,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     no_answer_count, cancelled_count,
     estimated_revenue, real_revenue, estimated_profit, real_profit,
     total_cogs, total_delivery_cost, total_return_losses, pending_collection, net_a_recevoir,
+    net_collected,
     confirmation_rate, delivery_rate,
     total_delivery_margin, total_delivery_overcharge, casa_orders_count,
     net_margin_pct, roi,

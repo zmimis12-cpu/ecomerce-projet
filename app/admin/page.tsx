@@ -149,6 +149,9 @@ export default async function AdminDashboardPage({
               <KpiCard label="Net à Recevoir"   value={mad((summary as {net_a_recevoir?:number}).net_a_recevoir ?? 0)}
                 icon={AlertTriangle} variant="green"
                 sub="Après frais livraison (Casa 20 / Autres 35)" />
+              <KpiCard label="Net Collecté"     value={mad((summary as {net_collected?:number}).net_collected ?? 0)}
+                icon={TrendingUp} variant="green" highlight
+                sub="Payé par Digylog, net des frais de livraison" />
               <KpiCard label="Profit Estimé"   value={mad(summary.estimated_profit)}
                 icon={TrendingUp} />
               <KpiCard label="Profit Réel"     value={mad(summary.real_profit)}
