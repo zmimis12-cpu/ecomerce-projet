@@ -231,17 +231,21 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   const roi = total_cogs > 0
     ? Math.round(real_profit / total_cogs * 1000) / 10 : 0;
 
-  // ── Total dépensé en pub (Meta réel via sync + TikTok/Google/autre saisie manuelle) ──
-  let metaQ   = supabaseAdmin.from("product_ad_spend").select("spend_mad");
-  let manualQ = supabaseAdmin.from("manual_ad_spend").select("amount_mad");
+  // ── Total dépensé en pub (Meta réel via sync + non-matché + TikTok/Google manuel) ──
+  let metaQ      = supabaseAdmin.from("product_ad_spend").select("spend_mad");
+  let unmatchedQ = supabaseAdmin.from("unmatched_ad_spend").select("spend_mad");
+  let manualQ    = supabaseAdmin.from("manual_ad_spend").select("amount_mad");
   if (filter) {
-    metaQ   = metaQ.gte("period_start", filter.from).lte("period_end", filter.to);
-    manualQ = manualQ.gte("spend_date", filter.from).lte("spend_date", filter.to);
+    metaQ      = metaQ.gte("period_start", filter.from).lte("period_end", filter.to);
+    unmatchedQ = unmatchedQ.gte("period_start", filter.from).lte("period_end", filter.to);
+    manualQ    = manualQ.gte("spend_date", filter.from).lte("spend_date", filter.to);
   }
-  const [{ data: metaSpendRows }, { data: manualSpendRows }] = await Promise.all([metaQ, manualQ]);
-  const metaSpendTotal   = ((metaSpendRows ?? []) as { spend_mad: number }[]).reduce((s, r) => s + (r.spend_mad ?? 0), 0);
-  const manualSpendTotal = ((manualSpendRows ?? []) as { amount_mad: number }[]).reduce((s, r) => s + (r.amount_mad ?? 0), 0);
-  const total_ads_spend     = Math.round((metaSpendTotal + manualSpendTotal) * 100) / 100;
+  const [{ data: metaSpendRows }, { data: unmatchedSpendRows }, { data: manualSpendRows }] =
+    await Promise.all([metaQ, unmatchedQ, manualQ]);
+  const metaSpendTotal      = ((metaSpendRows ?? []) as { spend_mad: number }[]).reduce((s, r) => s + (r.spend_mad ?? 0), 0);
+  const unmatchedSpendTotal = ((unmatchedSpendRows ?? []) as { spend_mad: number }[]).reduce((s, r) => s + (r.spend_mad ?? 0), 0);
+  const manualSpendTotal    = ((manualSpendRows ?? []) as { amount_mad: number }[]).reduce((s, r) => s + (r.amount_mad ?? 0), 0);
+  const total_ads_spend     = Math.round((metaSpendTotal + unmatchedSpendTotal + manualSpendTotal) * 100) / 100;
   const real_profit_net_ads = Math.round((real_profit - total_ads_spend) * 100) / 100;
 
   return {

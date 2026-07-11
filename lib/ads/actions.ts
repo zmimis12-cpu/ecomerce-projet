@@ -122,6 +122,13 @@ export async function syncMetaAdSpend(dateFrom: string, dateTo: string) {
     spendByProduct.set(match.product_id, existing);
   }
 
+  // Campagnes qui n'ont matché AUCUN produit (ni assignation manuelle, ni SKU) —
+  // leur dépense existe bien chez Meta et doit compter dans le total global,
+  // même si on ne peut pas l'attribuer à un produit précis.
+  const matchedNames = new Set(matches.flatMap((m) => m.matched_campaign_names));
+  const unmatchedCampaigns = unassignedCampaigns.filter((c) => !matchedNames.has(c.campaign_name));
+  const unmatchedSpendUsd = unmatchedCampaigns.reduce((s, c) => s + c.spend, 0);
+
   // Taux USD→MAD depuis app_settings (clé: meta_usd_to_mad, défaut: 10)
   const { data: rateRow } = await supabaseAdmin.from("app_settings").select("value").eq("key", "meta_usd_to_mad").maybeSingle();
   const USD_TO_MAD = Number((rateRow as { value?: string } | null)?.value ?? 10);
@@ -154,6 +161,25 @@ export async function syncMetaAdSpend(dateFrom: string, dateTo: string) {
     if (upsertErr) {
       return { ok: false as const, error: `Échec de sauvegarde: ${upsertErr.message}` };
     }
+  }
+
+  // Sauvegarder la dépense non-matchée (même si 0, pour effacer une éventuelle
+  // ancienne valeur si toutes les campagnes sont maintenant matchées).
+  await supabaseAdmin
+    .from("unmatched_ad_spend")
+    .delete()
+    .eq("platform", "meta")
+    .lte("period_start", dateTo)
+    .gte("period_end", dateFrom);
+
+  if (unmatchedSpendUsd > 0) {
+    await supabaseAdmin.from("unmatched_ad_spend").insert({
+      platform:               "meta",
+      matched_campaign_names: unmatchedCampaigns.map((c) => c.campaign_name),
+      spend_mad:              Math.round(unmatchedSpendUsd * USD_TO_MAD * 100) / 100,
+      period_start:           dateFrom,
+      period_end:             dateTo,
+    } as never);
   }
 
   await supabaseAdmin.from("ad_platform_settings").update({

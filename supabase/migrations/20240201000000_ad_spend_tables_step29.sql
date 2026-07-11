@@ -71,3 +71,21 @@ CREATE INDEX IF NOT EXISTS idx_mas_platform ON manual_ad_spend(platform);
 ALTER TABLE manual_ad_spend ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "mas_auth" ON manual_ad_spend;
 CREATE POLICY "mas_auth" ON manual_ad_spend FOR ALL USING (auth.uid() IS NOT NULL);
+
+-- 5. Dépense pub NON attribuée à un produit (campagnes sans SKU reconnu ni
+--    assignation manuelle). Sans cette table, ce montant disparaissait du
+--    total — "Total Pub" du dashboard sous-estimait la vraie dépense.
+CREATE TABLE IF NOT EXISTS unmatched_ad_spend (
+  id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  platform                TEXT NOT NULL,
+  matched_campaign_names  TEXT[] NOT NULL DEFAULT '{}',
+  spend_mad               NUMERIC(12,2) NOT NULL DEFAULT 0,
+  period_start            DATE NOT NULL,
+  period_end              DATE NOT NULL,
+  synced_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_uas_platform ON unmatched_ad_spend(platform);
+CREATE INDEX IF NOT EXISTS idx_uas_period ON unmatched_ad_spend(period_start, period_end);
+ALTER TABLE unmatched_ad_spend ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "uas_auth" ON unmatched_ad_spend;
+CREATE POLICY "uas_auth" ON unmatched_ad_spend FOR ALL USING (auth.uid() IS NOT NULL);
