@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, PhoneCall,
   Truck, Layers, FileSpreadsheet, FileText, FolderOpen,
   ScanLine, RotateCcw, BarChart3, Globe, Settings,
-  Shield, Phone, Award, Users, ListOrdered,
+  Shield, Phone, Award, Users, ListOrdered, CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/lib/settings/users-constants";
@@ -55,6 +55,7 @@ const ADMIN_NAV: NavGroup[] = [
       { href: "/admin/finance",                    label: "Finance",          icon: BarChart3 },
       { href: "/admin/finance/reconciliation", label: "Réconciliation",   icon: Shield },
       { href: "/admin/profitability",           label: "Rentabilité",      icon: BarChart3 },
+      { href: "/admin/expenses",                label: "Dépenses & Cartes", icon: CreditCard },
       { href: "/admin/landing-pages", label: "Landing Pages", icon: Globe     },
     ],
   },
