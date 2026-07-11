@@ -39,9 +39,10 @@ export async function createExchange(params: CreateExchangeParams): Promise<{
 
   const tracking = params.exchangeTracking.trim().toUpperCase();
   if (!tracking) return { success: false, error: "Tracking d'échange requis." };
-  if (!tracking.startsWith("EC")) {
-    return { success: false, error: `Tracking "${tracking}" ne ressemble pas à un tracking d'échange Digylog (préfixe attendu: EC).` };
-  }
+  // Note: Digylog affiche un badge "EC" à côté du tracking dans son UI pour
+  // signaler un échange, mais ce badge ne fait PAS partie du tracking réel.
+  // Ne jamais préfixer/altérer le tracking collé — le webhook renverra le
+  // tracking brut tel que Digylog l'a généré (ex: "S0618116R").
 
   // 1. Vérifier que ce tracking n'est pas déjà utilisé
   const { data: dup } = await supabaseAdmin

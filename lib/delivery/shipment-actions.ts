@@ -392,12 +392,14 @@ export async function applyDigylogStatusUpdate(params: {
 
   // ── Orphan webhook — tracking not found in our system ─────────────────────
   if (!orderId) {
-    const looksLikeExchange = tracking.toUpperCase().startsWith("EC");
-    console.warn("DIGYLOG WEBHOOK ORPHAN", { tracking, externalStatus, idStatus, looksLikeExchange });
+    // Note: le badge "EC" visible dans l'UI Digylog n'est PAS présent dans le
+    // tracking réel — impossible de deviner "c'est un échange" depuis le
+    // tracking seul. Tout orphelin doit être vérifié manuellement (échange
+    // non encore lié via "Générer échange", ou vraie commande manquante).
+    console.warn("DIGYLOG WEBHOOK ORPHAN", { tracking, externalStatus, idStatus });
     await supabaseAdmin.from("orphan_webhooks").upsert({
-      tracking_number:      tracking,
-      raw_payload:          rawPayload,
-      looks_like_exchange:  looksLikeExchange,
+      tracking_number: tracking,
+      raw_payload:      rawPayload,
     } as never, { onConflict: "tracking_number" }).then(() => {}, () => {});
     return;
   }

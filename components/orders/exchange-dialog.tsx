@@ -75,13 +75,13 @@ export function ExchangeDialog({ orderId, orderNumber, currentQuantity, products
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Colle ici le tracking d&apos;échange donné par Digylog (préfixe <span className="font-mono">EC</span>) après avoir cliqué &quot;Générer échange&quot; côté Digylog.
+          Colle ici le tracking réel donné par Digylog après avoir cliqué &quot;Générer échange&quot; (visible sur l&apos;étiquette/BL — le badge <span className="font-mono">EC</span> affiché dans la liste Digylog n&apos;en fait pas partie, ne le tape pas).
         </p>
 
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tracking échange Digylog</label>
           <input type="text" value={tracking} onChange={(e) => setTracking(e.target.value.toUpperCase())}
-            placeholder="EC S15683FAC" disabled={isPending}
+            placeholder="S0618116R" disabled={isPending}
             className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50" />
         </div>
 
