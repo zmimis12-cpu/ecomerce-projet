@@ -156,11 +156,14 @@ export async function importDigylogInvoice(params: ImportInvoiceParams): Promise
   }
 
   // ── Auto-mark orders as paid when Cash Status = "Versés" ──
+  // ATTENTION: "en cours de versement" contient aussi la sous-chaîne "vers" —
+  // il faut exclure explicitement ce statut (pas encore réellement transféré).
   const paidDate = params.invoiceDate ?? new Date().toISOString().slice(0, 10);
   let markedPaid = 0;
   for (const row of rows) {
     const status = (row.invoice_status ?? "").toLowerCase();
-    if (!status.includes("vers")) continue; // only "Versés"
+    const isReallyPaid = status.includes("vers") && !status.includes("en cours");
+    if (!isReallyPaid) continue; // only "Versés" — pas "En cours de versement"
 
     const trackingKey = row.tracking_number.toUpperCase();
     const order = orderMap.get(trackingKey);
