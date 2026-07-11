@@ -158,7 +158,7 @@ export async function uploadProductImage(
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from("product-images")
-    .upload(path, buffer, { contentType: file.type, upsert: false });
+    .upload(path, buffer, { contentType: file.type, upsert: false, cacheControl: "31536000" });
 
   if (uploadError) {
     return { success: false, error: uploadError.message };

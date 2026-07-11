@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
         pathname: "/storage/v1/object/public/**",
       },
     ],
+    // Filenames are unique (timestamp+random), content never changes for a given URL
+    // → cache 1 an côté Vercel pour arrêter de re-fetch Supabase Storage à chaque requête.
+    minimumCacheTTL: 31536000,
   },
   experimental: {
     serverActions: {
