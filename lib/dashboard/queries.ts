@@ -312,25 +312,14 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   const total_ads_spend     = Math.round((metaSpendTotal + unmatchedSpendTotal + manualSpendTotal) * 100) / 100;
   const real_profit_net_ads = Math.round((real_profit - total_ads_spend) * 100) / 100;
 
-  // ── Commissions call center (agents) sur les commandes payées de la période ──
-  const paidRowsByAgent = new Map<string, number>();
-  for (const r of rows) {
-    if (r.status === "paid" && r.is_paid && r.assigned_to) {
-      paidRowsByAgent.set(r.assigned_to, (paidRowsByAgent.get(r.assigned_to) ?? 0) + 1);
-    }
-  }
-  let total_call_center_cost = 0;
-  if (paidRowsByAgent.size > 0) {
-    const { data: agentRates } = await supabaseAdmin
-      .from("cc_agents")
-      .select("id, commission")
-      .in("id", [...paidRowsByAgent.keys()]);
-    const rateById = new Map(((agentRates ?? []) as { id: string; commission: number }[]).map((a) => [a.id, a.commission ?? 3]));
-    for (const [agentId, count] of paidRowsByAgent) {
-      total_call_center_cost += count * (rateById.get(agentId) ?? 3);
-    }
-  }
-  total_call_center_cost = Math.round(total_call_center_cost * 100) / 100;
+  // ── Commissions call center: réglage GLOBAL (app_settings.cc_commission_per_order),
+  // même valeur que celle configurée dans Réglages — PAS le champ per-agent cc_agents.commission
+  // qui n'est jamais rempli et retombe sur un défaut trompeur.
+  const paidOrdersCount = rows.filter((r) => r.status === "paid" && r.is_paid).length;
+  const { data: commissionSetting } = await supabaseAdmin
+    .from("app_settings").select("value").eq("key", "cc_commission_per_order").maybeSingle();
+  const commissionPerOrder = Number((commissionSetting as { value?: string } | null)?.value ?? 3);
+  const total_call_center_cost = Math.round(paidOrdersCount * commissionPerOrder * 100) / 100;
 
   // Autres charges (domaine, abonnements... table expenses) — affichées à part,
   // frais généraux business, PAS déduites du profit par commande (pas liées à une vente précise).
