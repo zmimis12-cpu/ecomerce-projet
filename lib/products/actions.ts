@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { uploadToR2, deleteFromR2 } from "@/lib/storage/r2-client";
 import { requireRole } from "@/lib/auth/session";
 import { isSkuTaken, isSlugTaken } from "./queries";
 
@@ -156,19 +157,13 @@ export async function uploadProductImage(
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
-  const { error: uploadError } = await supabaseAdmin.storage
-    .from("product-images")
-    .upload(path, buffer, { contentType: file.type, upsert: false, cacheControl: "31536000" });
-
-  if (uploadError) {
-    return { success: false, error: uploadError.message };
+  let publicUrl: string;
+  try {
+    const result = await uploadToR2(path, buffer, file.type);
+    publicUrl = result.publicUrl;
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Échec de l'upload vers R2." };
   }
-
-  const { data: urlData } = supabaseAdmin.storage
-    .from("product-images")
-    .getPublicUrl(path);
-
-  const publicUrl = urlData.publicUrl;
 
   // Check if this is the first image (make it primary)
   const supabase = await createClient();
@@ -195,7 +190,7 @@ export async function uploadProductImage(
 
   if (dbError) {
     // Clean up orphan from storage
-    await supabaseAdmin.storage.from("product-images").remove([path]);
+    await deleteFromR2(path);
     return { success: false, error: dbError.message };
   }
 
@@ -231,7 +226,7 @@ export async function deleteProductImage(productId: string, imageId: string, sto
   await requireRole([...MANAGER_ROLES]);
 
   // Remove from storage
-  await supabaseAdmin.storage.from("product-images").remove([storagePath]);
+  await deleteFromR2(storagePath);
 
   // Remove from DB
   const supabase = await createClient();
