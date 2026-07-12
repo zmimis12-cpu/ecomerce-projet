@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import {
   ShoppingCart, CheckCircle, Truck, RotateCcw,
   DollarSign, TrendingUp, AlertTriangle, Send, Package,
+  PhoneCall, CreditCard,
 } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
 import { hasRole } from "@/lib/auth/roles";
@@ -163,10 +164,16 @@ export default async function AdminDashboardPage({
               <KpiCard label="Total Pub"       value={mad((summary as {total_ads_spend?:number}).total_ads_spend ?? 0)}
                 icon={AlertTriangle} variant="red"
                 sub="Meta (réel) + TikTok/Google (saisie manuelle)" />
-              <KpiCard label="Profit Net Final" value={mad((summary as {real_profit_net_ads?:number}).real_profit_net_ads ?? 0)}
-                variant={((summary as {real_profit_net_ads?:number}).real_profit_net_ads ?? 0) >= 0 ? "green" : "red"}
+              <KpiCard label="Call Center"     value={mad((summary as {total_call_center_cost?:number}).total_call_center_cost ?? 0)}
+                icon={PhoneCall} variant="red"
+                sub="Commissions agents (commandes payées)" />
+              <KpiCard label="Autres Charges"  value={mad((summary as {total_other_expenses?:number}).total_other_expenses ?? 0)}
+                icon={CreditCard} variant="red"
+                sub="Domaine, abonnements... (Dépenses & Cartes)" />
+              <KpiCard label="Profit Net Final" value={mad((summary as {true_final_profit?:number}).true_final_profit ?? 0)}
+                variant={((summary as {true_final_profit?:number}).true_final_profit ?? 0) >= 0 ? "green" : "red"}
                 icon={TrendingUp} highlight
-                sub="Profit Réel - Total Pub (Meta+TikTok+Google)" />
+                sub="Profit Réel - Pub - Call Center - Autres charges" />
               <KpiCard label="Pertes Retours"  value={mad(summary.total_return_losses)}
                 icon={RotateCcw} variant="red" />
             </div>

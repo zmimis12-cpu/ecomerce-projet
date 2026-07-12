@@ -29,7 +29,10 @@ export interface DashboardSummary {
   net_a_recevoir:         number;
   net_collected:          number;  // Argent déjà collecté par Digylog, net des frais de livraison
   total_ads_spend:        number;  // Meta (réel, synced) + TikTok/Google/autre (saisie manuelle)
-  real_profit_net_ads:    number;  // real_profit - total_ads_spend = vrai profit final
+  real_profit_net_ads:    number;  // real_profit - total_ads_spend
+  total_call_center_cost: number;  // commissions agents sur commandes payées de la période
+  total_other_expenses:   number;  // domaine, abonnements, etc. (table expenses)
+  true_final_profit:      number;  // real_profit - pub - call center - autres charges = LE vrai profit
   confirmation_rate:      number;
   delivery_rate:          number;
   // New real finance fields
@@ -192,6 +195,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
       "status","is_paid","total_amount_mad","estimated_profit",
       "real_profit_mad","cogs_total","delivery_cost_real_mad","return_cost_mad",
       "customer_city","expected_delivery_cost","delivery_margin","actual_delivery_cost",
+      "assigned_to",
     ].join(","))
     .neq("status", "cancelled");
 
@@ -212,6 +216,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     expected_delivery_cost: number | null;
     delivery_margin: number | null;
     actual_delivery_cost: number | null;
+    assigned_to: string | null;
   }[];
 
   const CONFIRMED_STATUSES = new Set(["confirmed","sent_to_delivery","in_transit","delivered","paid"]);
@@ -307,6 +312,38 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   const total_ads_spend     = Math.round((metaSpendTotal + unmatchedSpendTotal + manualSpendTotal) * 100) / 100;
   const real_profit_net_ads = Math.round((real_profit - total_ads_spend) * 100) / 100;
 
+  // ── Commissions call center (agents) sur les commandes payées de la période ──
+  const paidRowsByAgent = new Map<string, number>();
+  for (const r of rows) {
+    if (r.status === "paid" && r.is_paid && r.assigned_to) {
+      paidRowsByAgent.set(r.assigned_to, (paidRowsByAgent.get(r.assigned_to) ?? 0) + 1);
+    }
+  }
+  let total_call_center_cost = 0;
+  if (paidRowsByAgent.size > 0) {
+    const { data: agentRates } = await supabaseAdmin
+      .from("cc_agents")
+      .select("id, commission")
+      .in("id", [...paidRowsByAgent.keys()]);
+    const rateById = new Map(((agentRates ?? []) as { id: string; commission: number }[]).map((a) => [a.id, a.commission ?? 3]));
+    for (const [agentId, count] of paidRowsByAgent) {
+      total_call_center_cost += count * (rateById.get(agentId) ?? 3);
+    }
+  }
+  total_call_center_cost = Math.round(total_call_center_cost * 100) / 100;
+
+  // ── Autres charges (domaine, abonnements, etc. — table expenses) ──
+  let expensesQ = supabaseAdmin.from("expenses").select("amount_mad");
+  if (filter) expensesQ = expensesQ.gte("expense_date", filter.from).lte("expense_date", filter.to);
+  const { data: expenseRows } = await expensesQ;
+  const total_other_expenses = Math.round(
+    ((expenseRows ?? []) as { amount_mad: number }[]).reduce((s, e) => s + (e.amount_mad ?? 0), 0) * 100
+  ) / 100;
+
+  const true_final_profit = Math.round(
+    (real_profit - total_ads_spend - total_call_center_cost - total_other_expenses) * 100
+  ) / 100;
+
   return {
     total_leads, confirmed_count, sent_to_delivery_count, in_transit_count,
     delivered_count, paid_count, returned_count, refused_count,
@@ -314,6 +351,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     estimated_revenue, real_revenue, estimated_profit, real_profit,
     total_cogs, total_delivery_cost, total_return_losses, pending_collection, net_a_recevoir,
     net_collected, total_ads_spend, real_profit_net_ads,
+    total_call_center_cost, total_other_expenses, true_final_profit,
     confirmation_rate, delivery_rate,
     total_delivery_margin, total_delivery_overcharge, casa_orders_count,
     net_margin_pct, roi,
