@@ -332,7 +332,8 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   }
   total_call_center_cost = Math.round(total_call_center_cost * 100) / 100;
 
-  // ── Autres charges (domaine, abonnements, etc. — table expenses) ──
+  // Autres charges (domaine, abonnements... table expenses) — affichées à part,
+  // frais généraux business, PAS déduites du profit par commande (pas liées à une vente précise).
   let expensesQ = supabaseAdmin.from("expenses").select("amount_mad");
   if (filter) expensesQ = expensesQ.gte("expense_date", filter.from).lte("expense_date", filter.to);
   const { data: expenseRows } = await expensesQ;
@@ -341,7 +342,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   ) / 100;
 
   const true_final_profit = Math.round(
-    (real_profit - total_ads_spend - total_call_center_cost - total_other_expenses) * 100
+    (real_profit - total_ads_spend - total_call_center_cost) * 100
   ) / 100;
 
   return {

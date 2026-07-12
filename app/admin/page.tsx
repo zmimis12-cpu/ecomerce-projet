@@ -169,11 +169,11 @@ export default async function AdminDashboardPage({
                 sub="Commissions agents (commandes payées)" />
               <KpiCard label="Autres Charges"  value={mad((summary as {total_other_expenses?:number}).total_other_expenses ?? 0)}
                 icon={CreditCard} variant="red"
-                sub="Domaine, abonnements... (Dépenses & Cartes)" />
+                sub="Frais généraux (Dépenses & Cartes) — informatif, pas déduit ci-dessus" />
               <KpiCard label="Profit Net Final" value={mad((summary as {true_final_profit?:number}).true_final_profit ?? 0)}
                 variant={((summary as {true_final_profit?:number}).true_final_profit ?? 0) >= 0 ? "green" : "red"}
                 icon={TrendingUp} highlight
-                sub="Profit Réel - Pub - Call Center - Autres charges" />
+                sub="Profit Réel - Pub - Call Center" />
               <KpiCard label="Pertes Retours"  value={mad(summary.total_return_losses)}
                 icon={RotateCcw} variant="red" />
             </div>
