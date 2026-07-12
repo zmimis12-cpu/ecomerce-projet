@@ -35,10 +35,14 @@ export function ExpensesManager({
   const [cardLast4, setCardLast4] = useState("");
   const [cardColor, setCardColor] = useState(CARD_COLORS[0]);
 
+  const [cardError, setCardError] = useState<string | null>(null);
+
   function submitCard() {
     if (!cardLabel.trim()) return;
+    setCardError(null);
     startTransition(async () => {
-      await addBankCard({ label: cardLabel, last4: cardLast4 || undefined, color: cardColor });
+      const res = await addBankCard({ label: cardLabel, last4: cardLast4 || undefined, color: cardColor });
+      if (!res.success) { setCardError(res.error ?? "Erreur inconnue."); return; }
       setCardLabel(""); setCardLast4(""); setShowAddCard(false);
       router.refresh();
     });
@@ -90,6 +94,7 @@ export function ExpensesManager({
               Annuler
             </button>
           </div>
+          {cardError && <p className="text-xs text-red-600 bg-red-50 rounded-md px-3 py-2">{cardError}</p>}
         </div>
       )}
 
