@@ -6,6 +6,8 @@ import { requireRole } from "@/lib/auth/session";
 import { getProduct } from "@/lib/products/queries";
 import { ProductForm } from "@/components/products/product-form";
 import { ImageManager } from "@/components/products/image-manager";
+import { WhatsAppMediaManager } from "@/components/whatsapp/whatsapp-media-manager";
+import { listProductWhatsAppMedia } from "@/lib/whatsapp/actions";
 import { updateProduct } from "@/lib/products/actions";
 import { hasRole } from "@/lib/auth/roles";
 import { CopyUrlButton } from "@/components/landing/copy-url-button";
@@ -39,6 +41,7 @@ export default async function ProductDetailPage({
   if (!product) notFound();
 
   const canManage = hasRole(session.role, ["super_admin", "admin", "manager"]);
+  const whatsappMedia = canManage ? await listProductWhatsAppMedia(id) : [];
 
   async function handleUpdate(formData: FormData) {
     "use server";
@@ -73,10 +76,11 @@ export default async function ProductDetailPage({
       </div>
 
       {/* Header stats — hide cost/profit/margin from call center agents */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <StatCard label="Prix de vente" value={formatMAD(product.sale_price_mad)} />
         {canManage && <>
-          <StatCard label="Coût total" value={formatMAD(product.total_cost_mad)} />
+          <StatCard label="COGS (commandes)" value={formatMAD(product.total_cost_mad)} />
+          <StatCard label="Coût complet (pricing)" value={formatMAD(product.full_estimated_cost_mad ?? product.total_cost_mad)} />
           <StatCard
             label="Profit estimé"
             value={formatMAD(profit)}
@@ -148,6 +152,9 @@ export default async function ProductDetailPage({
               />
             )}
           </div>
+          {canManage && (
+            <WhatsAppMediaManager productId={product.id} initialMedia={whatsappMedia as never} />
+          )}
         </div>
       </div>
     </div>

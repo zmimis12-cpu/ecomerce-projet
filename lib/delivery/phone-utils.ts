@@ -11,3 +11,9 @@ export function normalizePhone(phone: string): string {
   // pad/truncate to 10
   return ("0" + digits).slice(-10).padStart(10, "0");
 }
+
+/** Convert local Moroccan phone (0XXXXXXXXX) to international format (+212XXXXXXXXX) for WhatsApp/Twilio */
+export function toInternationalMorocco(phone: string): string {
+  const local = normalizePhone(phone);
+  return "+212" + local.slice(1);
+}

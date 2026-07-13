@@ -211,6 +211,10 @@ export async function POST(request: NextRequest) {
   // ── 9. Log rate limit entry ───────────────────────────────────────────────────
   await recordRequest(ip);
 
+  // ── 9b. Envoi WhatsApp de confirmation (best-effort, ne bloque jamais la réponse client) ──
+  const { sendOrderConfirmationWhatsApp } = await import("@/lib/whatsapp/actions");
+  await sendOrderConfirmationWhatsApp(orderId);
+
   // ── 10. Increment landing page order counter (non-blocking) ───────────────────
   if (pslug) {
     supabaseAdmin.rpc("increment_lp_orders" as never, { p_slug: pslug } as never).then(() => {}, () => {});

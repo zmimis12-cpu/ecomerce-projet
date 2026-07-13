@@ -129,6 +129,11 @@ export async function createOrder(formData: FormData) {
   } as never);
 
   revalidatePath("/admin/orders");
+
+  // Best-effort — ne bloque jamais la création si WhatsApp échoue/pas configuré
+  const { sendOrderConfirmationWhatsApp } = await import("@/lib/whatsapp/actions");
+  await sendOrderConfirmationWhatsApp(orderId);
+
   return { success: true, orderId, orderNumber: (order as { order_number: string }).order_number, isDuplicate: dupCheck.isDuplicate, duplicateOfNumber: dupCheck.existingOrderNumber };
 }
 
