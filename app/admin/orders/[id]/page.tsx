@@ -11,6 +11,7 @@ import { AgentAssigner } from "@/components/orders/agent-assigner";
 import { TrackingEditor } from "@/components/orders/tracking-editor";
 import { ExchangeDialog } from "@/components/orders/exchange-dialog";
 import { ResendWhatsAppButton } from "@/components/whatsapp/resend-whatsapp-button";
+import { ManualWhatsAppPanel } from "@/components/whatsapp/manual-whatsapp-panel";
 import { DeleteOrderButton } from "@/components/orders/delete-order-button";
 import { hasRole } from "@/lib/auth/roles";
 import { DuplicateBadge } from "@/components/orders/duplicate-badge";
@@ -171,6 +172,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               />
             )}
             {canManage && <ResendWhatsAppButton orderId={id} />}
+            {canManage && <ManualWhatsAppPanel orderId={id} />}
           </div>
 
           {/* Agent assignment */}

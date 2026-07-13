@@ -36,6 +36,62 @@ function toMetaFormat(phone: string): string {
 }
 
 /**
+ * Génère le lien wa.me (clic-to-chat manuel) + la liste des médias produit,
+ * SANS passer par l'API Meta — aucune restriction "numéro non autorisé",
+ * aucun risque de ban, marche avec n'importe quel client dès aujourd'hui.
+ * L'agent clique le lien (ouvre WhatsApp avec le texte pré-rempli), envoie,
+ * puis transfère manuellement les photos/vidéos affichées juste en dessous.
+ */
+export async function generateManualWhatsAppConfirmation(orderId: string): Promise<{
+  success: boolean;
+  waLink?: string;
+  message?: string;
+  media?: { media_url: string; media_type: string }[];
+  error?: string;
+}> {
+  await requireRole([...MANAGER]);
+
+  const settings = await getSettings();
+  const template = settings?.message_template ??
+    "السلام عليكم {name} 🌸\nتوصلنا بالطلب ديالك ديال {product} بثمن {price}درهم.\nبغينا غير نأكدو معاك المعلومات:\n📍 المدينة: {city}\n🏠 العنوان: {address}\nواش هاد المعلومات صحيحة؟";
+
+  const { data: order } = await supabaseAdmin
+    .from("orders")
+    .select("id, customer_name, customer_phone, customer_city, customer_address")
+    .eq("id", orderId)
+    .single();
+  if (!order) return { success: false, error: "Commande introuvable." };
+  const o = order as { id: string; customer_name: string; customer_phone: string; customer_city: string; customer_address: string };
+
+  const { data: items } = await supabaseAdmin
+    .from("order_items")
+    .select("product_id, product_name, unit_price, quantity")
+    .eq("order_id", orderId);
+  const firstItem = (items ?? [])[0] as { product_id: string; product_name: string; unit_price: number; quantity: number } | undefined;
+  if (!firstItem) return { success: false, error: "Commande sans articles." };
+
+  const totalPrice = firstItem.unit_price * firstItem.quantity;
+  const message = fillTemplate(template, {
+    name:    o.customer_name,
+    product: firstItem.product_name,
+    price:   String(totalPrice),
+    city:    o.customer_city,
+    address: o.customer_address,
+  });
+
+  const phone = toMetaFormat(o.customer_phone);
+  const waLink = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+
+  const { data: media } = await supabaseAdmin
+    .from("product_whatsapp_media")
+    .select("media_url, media_type")
+    .eq("product_id", firstItem.product_id)
+    .order("display_order");
+
+  return { success: true, waLink, message, media: (media ?? []) as { media_url: string; media_type: string }[] };
+}
+
+/**
  * Appelée automatiquement à la création d'une commande (voir lib/orders/actions.ts)
  * ET manuellement via le bouton "Renvoyer confirmation WhatsApp" sur une commande existante.
  * Best-effort: ne bloque jamais la création de commande si WhatsApp échoue.
