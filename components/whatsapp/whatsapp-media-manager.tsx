@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, Trash2, Video, Image as ImageIcon } from "lucide-react";
 import { addProductWhatsAppMedia, deleteProductWhatsAppMedia } from "@/lib/whatsapp/actions";
@@ -14,28 +14,42 @@ interface Media {
 }
 
 export function WhatsAppMediaManager({ productId, initialMedia }: { productId: string; initialMedia: Media[] }) {
-  const [media, setMedia] = useState(initialMedia);
+  // On se resynchronise sur initialMedia à chaque re-render serveur (après
+  // router.refresh()) — sans ça, la state locale reste figée sur l'ancienne
+  // liste et rien ne semble apparaître après upload.
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  useEffect(() => { setDeletedIds(new Set()); }, [initialMedia]);
+  const media = initialMedia.filter((m) => !deletedIds.has(m.id));
+
   const [isPending, startTransition] = useTransition();
+  const [uploadingCount, setUploadingCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
     setError(null);
-    const formData = new FormData();
-    formData.append("file", file);
+    setUploadingCount(files.length);
+
     startTransition(async () => {
-      const res = await addProductWhatsAppMedia(productId, formData);
-      if (!res.success) { setError(res.error ?? "Erreur upload."); return; }
+      const errors: string[] = [];
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await addProductWhatsAppMedia(productId, formData);
+        if (!res.success) errors.push(`${file.name}: ${res.error ?? "erreur inconnue"}`);
+      }
+      setUploadingCount(0);
+      if (errors.length > 0) setError(errors.join(" | "));
       router.refresh();
     });
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   function remove(id: string, storagePath: string | null) {
-    setMedia((m) => m.filter((x) => x.id !== id));
+    setDeletedIds((prev) => new Set(prev).add(id));
     startTransition(async () => {
       await deleteProductWhatsAppMedia(id, storagePath);
       router.refresh();
@@ -53,20 +67,18 @@ export function WhatsAppMediaManager({ productId, initialMedia }: { productId: s
 
       <label className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 py-4 text-sm text-muted-foreground cursor-pointer hover:border-gray-400">
         <Upload className="h-4 w-4" />
-        {isPending ? "Envoi..." : "Ajouter une photo ou vidéo"}
-        <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleUpload} disabled={isPending} className="hidden" />
+        {isPending ? `Envoi... (${uploadingCount})` : "Ajouter des photos/vidéos (plusieurs à la fois)"}
+        <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple onChange={handleUpload} disabled={isPending} className="hidden" />
       </label>
 
-      {error && <p className="text-xs text-red-600 bg-red-50 rounded-md px-3 py-2">{error}</p>}
+      {error && <p className="text-xs text-red-600 bg-red-50 rounded-md px-3 py-2 whitespace-pre-wrap">{error}</p>}
 
       {media.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {media.map((m) => (
             <div key={m.id} className="relative group rounded-lg overflow-hidden border aspect-square bg-gray-50">
               {m.media_type === "video" ? (
-                <div className="flex items-center justify-center h-full">
-                  <Video className="h-6 w-6 text-muted-foreground" />
-                </div>
+                <video src={m.media_url} className="w-full h-full object-cover" muted />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={m.media_url} alt="" className="w-full h-full object-cover" />
