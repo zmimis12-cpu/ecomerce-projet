@@ -37,14 +37,17 @@ function toMetaFormat(phone: string): string {
 }
 
 /**
- * Appelée automatiquement à la création d'une commande (voir lib/orders/actions.ts).
+ * Appelée automatiquement à la création d'une commande (voir lib/orders/actions.ts)
+ * ET manuellement via le bouton "Renvoyer confirmation WhatsApp" sur une commande existante.
  * Best-effort: ne bloque jamais la création de commande si WhatsApp échoue.
  */
-export async function sendOrderConfirmationWhatsApp(orderId: string): Promise<void> {
+export async function sendOrderConfirmationWhatsApp(orderId: string): Promise<{
+  sent: boolean; reason?: string; error?: string;
+}> {
   try {
     const settings = await getSettings();
     if (!settings || !settings.is_active || !settings.access_token || !settings.phone_number_id) {
-      return; // pas configuré / désactivé — silencieux, pas une erreur bloquante
+      return { sent: false, reason: "WhatsApp non configuré ou désactivé (voir Réglages)." };
     }
 
     const { data: order } = await supabaseAdmin
@@ -52,7 +55,7 @@ export async function sendOrderConfirmationWhatsApp(orderId: string): Promise<vo
       .select("id, customer_name, customer_phone, customer_city, customer_address")
       .eq("id", orderId)
       .single();
-    if (!order) return;
+    if (!order) return { sent: false, reason: "Commande introuvable." };
     const o = order as { id: string; customer_name: string; customer_phone: string; customer_city: string; customer_address: string };
 
     const { data: items } = await supabaseAdmin
@@ -60,7 +63,7 @@ export async function sendOrderConfirmationWhatsApp(orderId: string): Promise<vo
       .select("product_id, product_name, unit_price, quantity")
       .eq("order_id", orderId);
     const firstItem = (items ?? [])[0] as { product_id: string; product_name: string; unit_price: number; quantity: number } | undefined;
-    if (!firstItem) return;
+    if (!firstItem) return { sent: false, reason: "Commande sans articles." };
 
     const totalPrice = firstItem.unit_price * firstItem.quantity;
     const phone = toMetaFormat(o.customer_phone);
@@ -80,7 +83,7 @@ export async function sendOrderConfirmationWhatsApp(orderId: string): Promise<vo
       status: textRes.ok ? "sent" : "failed", error: textRes.error ?? null,
     } as never);
 
-    if (!textRes.ok) return; // pas la peine d'envoyer les médias si le texte a échoué
+    if (!textRes.ok) return { sent: false, error: textRes.error }; // pas la peine d'envoyer les médias si le texte a échoué
 
     // Envoi des photos/vidéos "preuve produit" liées à ce produit
     const { data: media } = await supabaseAdmin
@@ -89,17 +92,30 @@ export async function sendOrderConfirmationWhatsApp(orderId: string): Promise<vo
       .eq("product_id", firstItem.product_id)
       .order("display_order");
 
+    let mediaFailed: string | undefined;
     for (const m of (media ?? []) as { media_url: string; media_type: string }[]) {
       const mediaRes = await sendWhatsAppMedia(creds, phone, m.media_url, m.media_type === "video" ? "video" : "image");
       await supabaseAdmin.from("whatsapp_message_log").insert({
         order_id: orderId, phone, message_type: "media",
         status: mediaRes.ok ? "sent" : "failed", error: mediaRes.error ?? null,
       } as never);
+      if (!mediaRes.ok) mediaFailed = mediaRes.error;
     }
+
+    return mediaFailed
+      ? { sent: true, reason: `Texte envoyé, mais un média a échoué: ${mediaFailed}` }
+      : { sent: true };
   } catch (e) {
     // Best-effort total — on log juste, jamais de throw (ne doit jamais casser la création de commande)
     console.error("[whatsapp] sendOrderConfirmationWhatsApp failed:", e);
+    return { sent: false, error: e instanceof Error ? e.message : "Erreur inconnue." };
   }
+}
+
+/** Wrapper avec vérification de rôle — pour le bouton manuel "Renvoyer" sur une commande existante */
+export async function resendOrderConfirmationWhatsApp(orderId: string) {
+  await requireRole([...MANAGER]);
+  return sendOrderConfirmationWhatsApp(orderId);
 }
 
 // ── Réglages ──────────────────────────────────────────────────────────────────
