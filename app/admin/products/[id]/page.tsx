@@ -80,7 +80,7 @@ export default async function ProductDetailPage({
         <StatCard label="Prix de vente" value={formatMAD(product.sale_price_mad)} />
         {canManage && <>
           <StatCard label="COGS (commandes)" value={formatMAD(product.total_cost_mad)} />
-          <StatCard label="Coût complet (pricing)" value={formatMAD(product.full_estimated_cost_mad ?? product.total_cost_mad)} />
+          <StatCard label="Coût complet (pricing)" value={formatMAD((product as unknown as { full_estimated_cost_mad?: number }).full_estimated_cost_mad ?? product.total_cost_mad)} />
           <StatCard
             label="Profit estimé"
             value={formatMAD(profit)}
