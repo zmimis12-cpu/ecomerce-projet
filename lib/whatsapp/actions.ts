@@ -9,7 +9,6 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/session";
 import { toInternationalMorocco } from "@/lib/delivery/phone-utils";
 import { sendWhatsAppText, sendWhatsAppMedia, type MetaCreds } from "@/lib/whatsapp/meta-client";
-import { uploadToR2, deleteFromR2 } from "@/lib/storage/r2-client";
 
 const MANAGER = ["super_admin", "admin", "manager"] as const;
 
@@ -181,19 +180,20 @@ export async function addProductWhatsAppMedia(productId: string, formData: FormD
   const path = `whatsapp-media/${productId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  let publicUrl: string;
-  try {
-    const result = await uploadToR2(path, buffer, file.type);
-    publicUrl = result.publicUrl;
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Échec upload R2." };
+  const { error: uploadError } = await supabaseAdmin.storage
+    .from("whatsapp-media")
+    .upload(path, buffer, { contentType: file.type, upsert: false, cacheControl: "31536000" });
+  if (uploadError) {
+    return { success: false, error: `Échec upload: ${uploadError.message}` };
   }
+  const { data: urlData } = supabaseAdmin.storage.from("whatsapp-media").getPublicUrl(path);
+  const publicUrl = urlData.publicUrl;
 
   const { error } = await supabaseAdmin.from("product_whatsapp_media").insert({
     product_id: productId, media_url: publicUrl, media_type: isVideo ? "video" : "image",
     storage_path: path,
   } as never);
-  if (error) { await deleteFromR2(path); return { success: false, error: error.message }; }
+  if (error) { await supabaseAdmin.storage.from("whatsapp-media").remove([path]); return { success: false, error: error.message }; }
 
   revalidatePath(`/admin/products/${productId}`);
   return { success: true };
@@ -201,7 +201,7 @@ export async function addProductWhatsAppMedia(productId: string, formData: FormD
 
 export async function deleteProductWhatsAppMedia(id: string, storagePath: string | null): Promise<{ success: boolean; error?: string }> {
   await requireRole([...MANAGER]);
-  if (storagePath) await deleteFromR2(storagePath);
+  if (storagePath) await supabaseAdmin.storage.from("whatsapp-media").remove([storagePath]);
   const { error } = await supabaseAdmin.from("product_whatsapp_media").delete().eq("id", id);
   if (error) return { success: false, error: error.message };
   return { success: true };
