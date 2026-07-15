@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { LandingPageToggle } from "@/components/landing/landing-page-toggle";
 import { CopyUrlButton } from "@/components/landing/copy-url-button";
+import { BackfillSectionsButton } from "@/components/landing/backfill-sections-button";
 import { Plus, ExternalLink, BarChart3 } from "lucide-react";
 
 export const metadata: Metadata = { title: "Landing Pages" };
@@ -43,10 +44,13 @@ export default async function LandingPagesPage() {
             Pages de vente publiques. Créez, activez et partagez le lien dans vos pubs.
           </p>
         </div>
-        <Link href="/admin/landing-pages/new"
-          className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
-          <Plus className="h-4 w-4" /> Nouvelle page
-        </Link>
+        <div className="flex items-center gap-2">
+          <BackfillSectionsButton />
+          <Link href="/admin/landing-pages/new"
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
+            <Plus className="h-4 w-4" /> Nouvelle page
+          </Link>
+        </div>
       </div>
 
       {/* Quick create cards */}

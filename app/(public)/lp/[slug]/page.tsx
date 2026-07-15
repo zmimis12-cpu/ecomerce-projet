@@ -117,6 +117,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const b3 = Number(lp.bundle_3_price || Math.round(price * 3 * 0.8));
 
   const psSection   = getSection("problem_solution");
+  const statsSection= getSection("stats_bar");
   const benSection  = getSection("benefits");
   const howSection  = getSection("how_to_use");
   const gtySection  = getSection("guarantees");
@@ -283,6 +284,22 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             <p className="lp-micro">لا دفع مسبق · فريقنا يتصل بك للتأكيد</p>
           </div>
         </section>
+
+        {/* ── STATS BAR ── */}
+        {!!statsSection && Array.isArray(statsSection.items) && (
+          <section className="lp-section lp-stats-section">
+            <div className="lp-wrap">
+              <div className="lp-stats-grid">
+                {(statsSection.items as { percent: string; label: string }[]).map((s, i) => (
+                  <div key={i} className="lp-stat">
+                    <span className="lp-stat-num">{s.percent}</span>
+                    <p className="lp-stat-label">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* ── BENEFITS (short) ── */}
         <section className="lp-section">
@@ -679,6 +696,13 @@ const GLOBAL_CSS = `
   .lp-step-num{display:flex;align-items:center;justify-content:center;width:32px;height:32px;margin:0 auto 10px;border-radius:9999px;background:#111827;color:#fff;font-weight:800;font-size:14px;}
   .lp-step-title{font-weight:700;color:#111827;font-size:clamp(13px,3.5vw,14px);margin-bottom:4px;}
   .lp-step-desc{color:#6b7280;font-size:clamp(11px,3vw,12px);line-height:1.5;}
+
+  /* ── Stats bar ── */
+  .lp-stats-section{padding:20px 0!important;background:#111827;}
+  .lp-stats-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+  .lp-stat{text-align:center;padding:8px 4px;}
+  .lp-stat-num{display:block;font-weight:800;font-size:clamp(18px,5.5vw,28px);color:#fff;margin-bottom:4px;}
+  .lp-stat-label{color:#9ca3af;font-size:clamp(9px,2.6vw,12px);line-height:1.3;}
 
   /* ── Scenario cards ── */
   .lp-scenario{text-align:center;padding:16px 12px;}

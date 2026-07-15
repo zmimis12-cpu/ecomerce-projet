@@ -9,6 +9,47 @@ import type { TemplateKey } from "@/lib/templates";
 
 const MANAGER_ROLES = ["super_admin", "admin", "manager"] as const;
 
+// ─── Bulk: rafraîchir les sections (how_to_use, guarantees, stats_bar) sur ────
+// ─── toutes les LP existantes SANS toucher au reste (prix, hero, whatsapp) ────
+export async function backfillSectionsOnAllLandingPages(): Promise<{
+  success: boolean; updated: number; failed: number; error?: string;
+}> {
+  await requireRole([...MANAGER_ROLES]);
+
+  const { data: pages, error } = await supabaseAdmin
+    .from("landing_pages")
+    .select("id, product_id, template_key");
+  if (error) return { success: false, updated: 0, failed: 0, error: error.message };
+
+  let updated = 0, failed = 0;
+
+  for (const lp of (pages ?? []) as { id: string; product_id: string; template_key: TemplateKey }[]) {
+    try {
+      const { data: product } = await supabaseAdmin
+        .from("products")
+        .select("id, name, description, sale_price_mad, sku")
+        .eq("id", lp.product_id)
+        .single();
+      if (!product) { failed++; continue; }
+
+      const p = product as unknown as { id: string; name: string; description: string | null; sale_price_mad: number; sku: string };
+      const generated = await generateLandingPageContent(p, lp.template_key);
+
+      const { error: updErr } = await supabaseAdmin
+        .from("landing_pages")
+        .update({ sections: generated.sections, updated_at: new Date().toISOString() } as never)
+        .eq("id", lp.id);
+      if (updErr) { failed++; continue; }
+      updated++;
+    } catch {
+      failed++;
+    }
+  }
+
+  revalidatePath("/admin/landing-pages");
+  return { success: true, updated, failed };
+}
+
 // ─── Toggle active ─────────────────────────────────────────────────────────────
 export async function toggleLandingPage(id: string, isActive: boolean) {
   await requireRole([...MANAGER_ROLES]);
