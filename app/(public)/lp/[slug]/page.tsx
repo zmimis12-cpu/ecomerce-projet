@@ -6,6 +6,7 @@ import { FALLBACK_CITIES } from "@/components/landing/order-form-public";
 import { getLandingPage } from "@/lib/public/queries";
 import { OrderFormPublic } from "@/components/landing/order-form-public";
 import { StockCounter } from "@/components/landing/stock-counter";
+import { CountdownTimer } from "@/components/landing/countdown-timer";
 import { FaqAccordion } from "@/components/landing/faq-accordion";
 import { ProductGallery } from "@/components/landing/product-gallery";
 import type { LPSection } from "@/lib/templates";
@@ -120,6 +121,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const statsSection= getSection("stats_bar");
   const benSection  = getSection("benefits");
   const howSection  = getSection("how_to_use");
+  const cmpSection  = getSection("comparison_table");
+  const suitSection = getSection("suitable_for");
   const gtySection  = getSection("guarantees");
   const revSection  = getSection("reviews");
   const faqSection  = getSection("faq");
@@ -337,6 +340,46 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </section>
         )}
 
+        {/* ── SUITABLE FOR (audience icons) ── */}
+        {!!suitSection && Array.isArray(suitSection.items) && (
+          <section className="lp-section">
+            <div className="lp-wrap">
+              <h2 className="lp-h2">{String(suitSection.title ?? "مناسب للجميع")}</h2>
+              <div className="lp-suitable-grid">
+                {(suitSection.items as { icon: string; label: string }[]).map((s, i) => (
+                  <div key={i} className="lp-suitable-item">
+                    <span className="lp-suitable-icon">{s.icon}</span>
+                    <p className="lp-suitable-label">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ── COMPARISON TABLE ── */}
+        {!!cmpSection && Array.isArray(cmpSection.rows) && (
+          <section className="lp-section lp-section--gray">
+            <div className="lp-wrap">
+              <h2 className="lp-h2">{String(cmpSection.title ?? "لماذا منتجنا هو الأفضل؟")}</h2>
+              <div className="lp-cmp-table">
+                <div className="lp-cmp-row lp-cmp-head">
+                  <span></span>
+                  <span className="lp-cmp-ours">{String(cmpSection.ours_label ?? "منتجنا")}</span>
+                  <span className="lp-cmp-theirs">{String(cmpSection.theirs_label ?? "الحلول العادية")}</span>
+                </div>
+                {(cmpSection.rows as { feature: string; ours: boolean; theirs: boolean }[]).map((r, i) => (
+                  <div key={i} className="lp-cmp-row">
+                    <span className="lp-cmp-feature">{r.feature}</span>
+                    <span className="lp-cmp-check">{r.ours ? "✅" : "—"}</span>
+                    <span className="lp-cmp-check">{r.theirs ? "✅" : "❌"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* ── GUARANTEES ── */}
         {!!gtySection && Array.isArray(gtySection.items) && (
           <section className="lp-section">
@@ -420,6 +463,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <div className="lp-wrap" style={{ textAlign:"center" }}>
             <p className="lp-final-title">ما تخليش الفرصة تفوتك</p>
             <p className="lp-final-sub">الكمية محدودة · الدفع عند الاستلام · توصيل مجاني</p>
+            <CountdownTimer />
             <a href="#lp-form" className="lp-cta lp-cta--white">اطلب الآن</a>
           </div>
         </section>
@@ -703,6 +747,30 @@ const GLOBAL_CSS = `
   .lp-stat{text-align:center;padding:8px 4px;}
   .lp-stat-num{display:block;font-weight:800;font-size:clamp(18px,5.5vw,28px);color:#fff;margin-bottom:4px;}
   .lp-stat-label{color:#9ca3af;font-size:clamp(9px,2.6vw,12px);line-height:1.3;}
+
+  /* ── Suitable for (audience icons) ── */
+  .lp-suitable-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .lp-suitable-item{text-align:center;padding:12px 6px;}
+  .lp-suitable-icon{display:block;font-size:28px;margin-bottom:6px;}
+  .lp-suitable-label{color:#374151;font-size:clamp(10px,2.8vw,12px);font-weight:600;line-height:1.3;}
+
+  /* ── Comparison table ── */
+  .lp-cmp-table{border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;background:#fff;}
+  .lp-cmp-row{display:grid;grid-template-columns:1.4fr 1fr 1fr;align-items:center;padding:10px 8px;border-bottom:1px solid #f3f4f6;}
+  .lp-cmp-row:last-child{border-bottom:none;}
+  .lp-cmp-head{background:#f9fafb;font-weight:700;font-size:clamp(11px,3vw,12px);}
+  .lp-cmp-ours{color:#059669;text-align:center;}
+  .lp-cmp-theirs{color:#6b7280;text-align:center;}
+  .lp-cmp-feature{font-size:clamp(11px,3vw,12px);color:#111827;font-weight:600;}
+  .lp-cmp-check{text-align:center;font-size:14px;}
+
+  /* ── Countdown timer ── */
+  .lp-countdown{margin:16px 0;}
+  .lp-countdown-label{font-size:clamp(11px,3vw,13px);opacity:0.85;margin-bottom:8px;}
+  .lp-countdown-boxes{display:flex;justify-content:center;gap:8px;}
+  .lp-countdown-box{background:rgba(255,255,255,0.15);border-radius:10px;padding:8px 12px;min-width:56px;text-align:center;}
+  .lp-countdown-num{display:block;font-weight:800;font-size:clamp(18px,5vw,24px);}
+  .lp-countdown-unit{font-size:10px;opacity:0.8;}
 
   /* ── Scenario cards ── */
   .lp-scenario{text-align:center;padding:16px 12px;}

@@ -33,6 +33,9 @@ export type SectionType =
   | "how_to_use"
   | "guarantees"
   | "stats_bar"
+  | "comparison_table"
+  | "suitable_for"
+  | "before_after"
   | "reviews"
   | "faq"
   | "order_form";
@@ -58,10 +61,10 @@ export interface LandingPageData {
 
 /** Default section order per template */
 const TEMPLATE_SECTIONS: Record<TemplateKey, SectionType[]> = {
-  gadget_viral:         ["hero", "stats_bar", "benefits", "how_to_use", "gallery", "guarantees", "reviews", "faq", "order_form"],
-  problem_solution_cod: ["hero", "stats_bar", "problem_solution", "benefits", "how_to_use", "gallery", "guarantees", "reviews", "faq", "order_form"],
-  beauty_health:        ["hero", "stats_bar", "benefits", "how_to_use", "guarantees", "reviews", "faq", "order_form"],
-  home_family:          ["hero", "stats_bar", "benefits", "how_to_use", "gallery", "guarantees", "reviews", "order_form"],
+  gadget_viral:         ["hero", "stats_bar", "benefits", "how_to_use", "suitable_for", "gallery", "before_after", "comparison_table", "guarantees", "reviews", "faq", "order_form"],
+  problem_solution_cod: ["hero", "stats_bar", "problem_solution", "benefits", "how_to_use", "suitable_for", "gallery", "before_after", "comparison_table", "guarantees", "reviews", "faq", "order_form"],
+  beauty_health:        ["hero", "stats_bar", "benefits", "how_to_use", "suitable_for", "before_after", "comparison_table", "guarantees", "reviews", "faq", "order_form"],
+  home_family:          ["hero", "stats_bar", "benefits", "how_to_use", "suitable_for", "gallery", "comparison_table", "guarantees", "reviews", "order_form"],
 };
 
 export function getTemplateSections(key: TemplateKey): SectionType[] {

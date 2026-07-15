@@ -150,6 +150,37 @@ function buildSections(
         { percent: "24/48h", label: "مدة التوصيل" },
       ],
     },
+    comparison_table: {
+      type: "comparison_table", enabled: true,
+      title: "لماذا منتجنا هو الأفضل؟",
+      ours_label: "منتجنا",
+      theirs_label: "الحلول العادية",
+      rows: [
+        { feature: c.benefits[0]?.title ?? "جودة عالية", ours: true, theirs: false },
+        { feature: "ضمان استبدال",              ours: true, theirs: false },
+        { feature: "الدفع عند الاستلام",         ours: true, theirs: false },
+        { feature: "دعم بعد البيع",              ours: true, theirs: false },
+        { feature: "سعر مناسب مقابل الجودة",     ours: true, theirs: false },
+      ],
+    },
+    suitable_for: {
+      type: "suitable_for", enabled: true,
+      title: "مناسب للجميع",
+      items: [
+        { icon: "💼", label: "الموظفين وأصحاب الأعمال" },
+        { icon: "🏠", label: "ربات البيوت" },
+        { icon: "👴", label: "كبار السن" },
+        { icon: "🏋️", label: "الرياضيين" },
+        { icon: "🎓", label: "الطلبة" },
+        { icon: "👨‍👩‍👧", label: a.target_audience || "كل أفراد العائلة" },
+      ],
+    },
+    before_after: {
+      type: "before_after", enabled: true,
+      title: "نتائج حقيقية من الاستخدام",
+      before_label: "قبل الاستخدام",
+      after_label: "بعد الاستخدام",
+    },
     gallery: { type: "gallery", enabled: true },
     reviews: {
       type: "reviews", enabled: true,
@@ -169,10 +200,10 @@ function buildSections(
   };
 
   const orders: Record<TemplateKey, string[]> = {
-    gadget_viral:         ["hero","stats_bar","problem","lifestyle","benefits","how_to_use","gallery","guarantees","reviews","faq","order_form"],
-    problem_solution_cod: ["hero","stats_bar","problem","benefits","how_to_use","gallery","guarantees","reviews","faq","order_form"],
-    beauty_health:        ["hero","stats_bar","problem","benefits","how_to_use","guarantees","lifestyle","reviews","faq","order_form"],
-    home_family:          ["hero","stats_bar","benefits","how_to_use","lifestyle","gallery","guarantees","reviews","order_form"],
+    gadget_viral:         ["hero","stats_bar","problem","suitable_for","lifestyle","benefits","how_to_use","gallery","before_after","comparison_table","guarantees","reviews","faq","order_form"],
+    problem_solution_cod: ["hero","stats_bar","problem","suitable_for","benefits","how_to_use","gallery","before_after","comparison_table","guarantees","reviews","faq","order_form"],
+    beauty_health:        ["hero","stats_bar","problem","suitable_for","benefits","how_to_use","before_after","comparison_table","guarantees","lifestyle","reviews","faq","order_form"],
+    home_family:          ["hero","stats_bar","suitable_for","benefits","how_to_use","lifestyle","gallery","comparison_table","guarantees","reviews","order_form"],
   };
 
   return (orders[templateKey] ?? orders.gadget_viral)
