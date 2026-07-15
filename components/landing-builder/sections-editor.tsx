@@ -182,6 +182,99 @@ function SectionFields({ section, idx, onField, onListItem }: {
         </div>
       );
 
+    case "how_to_use": {
+      const steps = (section.steps as { number: number; title: string; desc: string }[]) ?? [];
+      return (
+        <div className="space-y-3">
+          {ta("title", "عنوان القسم")}
+          {steps.map((s, i) => (
+            <div key={i} className="grid grid-cols-2 gap-2 items-start rounded-lg bg-secondary/20 p-2">
+              <input value={s.title} onChange={(e) => onListItem(idx, "steps", i, "title", e.target.value)}
+                placeholder={`عنوان الخطوة ${s.number}`} className="h-9 rounded-md border border-input bg-background px-2 text-sm" dir="auto" />
+              <input value={s.desc} onChange={(e) => onListItem(idx, "steps", i, "desc", e.target.value)}
+                placeholder="الوصف" className="h-9 rounded-md border border-input bg-background px-2 text-sm" dir="auto" />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    case "guarantees": {
+      const items = (section.items as { icon: string; title: string; desc: string }[]) ?? [];
+      return (
+        <div className="space-y-3">
+          {ta("title", "عنوان القسم")}
+          {items.map((item, i) => (
+            <div key={i} className="grid grid-cols-3 gap-2 items-start">
+              <input value={item.icon} onChange={(e) => onListItem(idx, "items", i, "icon", e.target.value)}
+                className="h-9 rounded-md border border-input bg-background px-2 text-center text-lg" />
+              <input value={item.title} onChange={(e) => onListItem(idx, "items", i, "title", e.target.value)}
+                placeholder="عنوان" className="h-9 rounded-md border border-input bg-background px-2 text-sm" dir="auto" />
+              <input value={item.desc} onChange={(e) => onListItem(idx, "items", i, "desc", e.target.value)}
+                placeholder="وصف" className="h-9 rounded-md border border-input bg-background px-2 text-sm" dir="auto" />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    case "stats_bar": {
+      const items = (section.items as { percent: string; label: string }[]) ?? [];
+      return (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">أرقام الثقة ({items.length})</p>
+          {items.map((item, i) => (
+            <div key={i} className="grid grid-cols-2 gap-2 items-start">
+              <input value={item.percent} onChange={(e) => onListItem(idx, "items", i, "percent", e.target.value)}
+                placeholder="98%" className="h-9 rounded-md border border-input bg-background px-2 text-sm" />
+              <input value={item.label} onChange={(e) => onListItem(idx, "items", i, "label", e.target.value)}
+                placeholder="وصف الرقم" className="h-9 rounded-md border border-input bg-background px-2 text-sm" dir="auto" />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    case "suitable_for": {
+      const items = (section.items as { icon: string; label: string }[]) ?? [];
+      return (
+        <div className="space-y-3">
+          {ta("title", "عنوان القسم")}
+          {items.map((item, i) => (
+            <div key={i} className="grid grid-cols-2 gap-2 items-start">
+              <input value={item.icon} onChange={(e) => onListItem(idx, "items", i, "icon", e.target.value)}
+                className="h-9 rounded-md border border-input bg-background px-2 text-center text-lg" />
+              <input value={item.label} onChange={(e) => onListItem(idx, "items", i, "label", e.target.value)}
+                placeholder="الفئة المستهدفة" className="h-9 rounded-md border border-input bg-background px-2 text-sm" dir="auto" />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    case "comparison_table": {
+      const rows = (section.rows as { feature: string; ours: boolean; theirs: boolean }[]) ?? [];
+      return (
+        <div className="space-y-3">
+          {ta("title", "عنوان القسم")}
+          {ta("ours_label", "تسمية منتجنا")}
+          {ta("theirs_label", "تسمية الحلول العادية")}
+          {rows.map((r, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input value={r.feature} onChange={(e) => onListItem(idx, "rows", i, "feature", e.target.value)}
+                placeholder="الميزة" className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm" dir="auto" />
+              <label className="flex items-center gap-1 text-xs">
+                <input type="checkbox" checked={r.ours} onChange={(e) => onListItem(idx, "rows", i, "ours", e.target.checked as never)} /> نحن
+              </label>
+              <label className="flex items-center gap-1 text-xs">
+                <input type="checkbox" checked={r.theirs} onChange={(e) => onListItem(idx, "rows", i, "theirs", e.target.checked as never)} /> عادي
+              </label>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
     default:
       return <p className="text-xs text-muted-foreground">Section auto-générée.</p>;
   }
