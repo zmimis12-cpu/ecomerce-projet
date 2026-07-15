@@ -109,13 +109,36 @@ function SectionFields({ section, idx, onField, onListItem }: {
         </div>
       );
 
-    case "problem_solution":
+    case "problem_solution": {
+      const beforePoints = (section.before_points as string[]) ?? [];
+      const afterPoints  = (section.after_points as string[]) ?? [];
+      const setPoint = (key: "before_points" | "after_points", list: string[], i: number, val: string) => {
+        const updated = list.map((p, j) => (j === i ? val : p));
+        onField(idx, key, updated);
+      };
       return (
         <div className="space-y-3">
           {ta("before_title", "عنوان قبل (المشكلة)")}
-          {ta("after_title",  "عنوان بعد (الحل)")}
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">نقاط المشكل (✕)</p>
+            {beforePoints.map((p, i) => (
+              <input key={i} value={p}
+                onChange={(e) => setPoint("before_points", beforePoints, i, e.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" dir="auto" />
+            ))}
+          </div>
+          {ta("after_title", "عنوان بعد (الحل)")}
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">نقاط الحل (✓)</p>
+            {afterPoints.map((p, i) => (
+              <input key={i} value={p}
+                onChange={(e) => setPoint("after_points", afterPoints, i, e.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" dir="auto" />
+            ))}
+          </div>
         </div>
       );
+    }
 
     case "benefits": {
       const items = (section.items as { icon: string; title: string; desc: string }[]) ?? [];
