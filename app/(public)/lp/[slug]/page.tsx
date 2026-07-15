@@ -288,6 +288,33 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </section>
 
+        {/* ── WHY THE PROBLEM EXISTS / WHY THIS SOLVES IT ── */}
+        {!!psSection && Array.isArray(psSection.before_points) && Array.isArray(psSection.after_points) && (
+          <section className="lp-section lp-story">
+            <div className="lp-wrap">
+              <div className="lp-story-col lp-story-before">
+                <span className="lp-story-tag lp-story-tag--red">المشكل</span>
+                <h2 className="lp-h2" style={{marginTop:8}}>{String(psSection.before_title ?? "")}</h2>
+                <ul className="lp-story-list">
+                  {(psSection.before_points as string[]).map((p, i) => (
+                    <li key={i} className="lp-story-item lp-story-item--red">{p}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="lp-story-arrow">←</div>
+              <div className="lp-story-col lp-story-after">
+                <span className="lp-story-tag lp-story-tag--green">الحل</span>
+                <h2 className="lp-h2" style={{marginTop:8}}>{String(psSection.after_title ?? "")}</h2>
+                <ul className="lp-story-list">
+                  {(psSection.after_points as string[]).map((p, i) => (
+                    <li key={i} className="lp-story-item lp-story-item--green">{p}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* ── STATS BAR ── */}
         {!!statsSection && Array.isArray(statsSection.items) && (
           <section className="lp-section lp-stats-section">
@@ -712,6 +739,22 @@ const GLOBAL_CSS = `
     padding:16px 18px;
     transition:box-shadow .2s,transform .2s;
   }
+
+  /* ── Story (why problem / why solution) ── */
+  .lp-story{padding:32px 0!important;}
+  .lp-story .lp-wrap{display:flex;flex-direction:column;gap:20px;}
+  .lp-story-col{background:#fff;border-radius:16px;padding:20px;border:1px solid #e5e7eb;}
+  .lp-story-before{border-color:#fecaca;background:#fef2f2;}
+  .lp-story-after{border-color:#bbf7d0;background:#f0fdf4;}
+  .lp-story-arrow{display:none;}
+  .lp-story-tag{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:9999px;}
+  .lp-story-tag--red{background:#fecaca;color:#991b1b;}
+  .lp-story-tag--green{background:#bbf7d0;color:#166534;}
+  .lp-story-list{list-style:none;padding:0;margin:12px 0 0;display:flex;flex-direction:column;gap:8px;}
+  .lp-story-item{font-size:clamp(12px,3.2vw,13px);line-height:1.6;padding-right:20px;position:relative;color:#374151;}
+  .lp-story-item--red::before{content:"✕";position:absolute;right:0;color:#dc2626;font-weight:800;}
+  .lp-story-item--green::before{content:"✓";position:absolute;right:0;color:#16a34a;font-weight:800;}
+
   .lp-card--green{
     background:#f0fdf4;border-color:#bbf7d0;
   }
@@ -888,5 +931,7 @@ const GLOBAL_CSS = `
     .lp-wrap{max-width:640px}
     .lp-img-wrap{max-width:520px;margin-left:auto;margin-right:auto;}
     .lp-price-card{max-width:520px;margin-left:auto;margin-right:auto;margin-bottom:18px;}
+    .lp-story .lp-wrap{flex-direction:row;max-width:900px;align-items:stretch;}
+    .lp-story-col{flex:1;}
   }
 `;
