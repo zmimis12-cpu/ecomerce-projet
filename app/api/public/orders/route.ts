@@ -8,7 +8,7 @@
  *  4. Duplicate detection (same phone + product + 24h)
  *  5. Service role never exposed to client
  */
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse, after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { validateOrderInput, isHoneypotTriggered } from "@/lib/public/validation";
 import { checkRateLimit, recordRequest, getClientIp, hashIp } from "@/lib/public/rate-limit";
@@ -211,9 +211,14 @@ export async function POST(request: NextRequest) {
   // ── 9. Log rate limit entry ───────────────────────────────────────────────────
   await recordRequest(ip);
 
-  // ── 9b. Envoi WhatsApp de confirmation (best-effort, ne bloque jamais la réponse client) ──
-  const { sendOrderConfirmationWhatsApp } = await import("@/lib/whatsapp/actions");
-  await sendOrderConfirmationWhatsApp(orderId);
+  // ── 9b. Envoi WhatsApp de confirmation — EN ARRIÈRE-PLAN, ne bloque plus
+  // jamais la réponse au client. Avant: `await` ici faisait attendre le
+  // client 5-7s (parfois plus, en cas de lenteur/échec Meta API) avant de
+  // voir le message de remerciement.
+  after(async () => {
+    const { sendOrderConfirmationWhatsApp } = await import("@/lib/whatsapp/actions");
+    await sendOrderConfirmationWhatsApp(orderId);
+  });
 
   // ── 10. Increment landing page order counter (non-blocking) ───────────────────
   if (pslug) {
