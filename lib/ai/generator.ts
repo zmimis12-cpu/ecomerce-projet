@@ -123,6 +123,25 @@ function buildSections(
       type: "benefits", enabled: true,
       items: c.benefits,
     },
+    how_to_use: {
+      type: "how_to_use", enabled: true,
+      title: `كيفاش تستعمل ${name}`,
+      steps: [
+        { number: 1, title: "افتح العبوة", desc: "التغليف آمن ومحكم — تفتح وتلقى المنتج جاهز للاستعمال مباشرة." },
+        { number: 2, title: "اتبع التعليمات", desc: "خطوات بسيطة موضحة معاك، ما محتاجش خبرة سابقة." },
+        { number: 3, title: "استمتع بالنتيجة", desc: "من أول استعمال غادي تحس بالفرق — مضمون." },
+      ],
+    },
+    guarantees: {
+      type: "guarantees", enabled: true,
+      title: "ليه تثق فينا؟",
+      items: [
+        { icon: "💵", title: "الدفع عند الاستلام", desc: "ما تخلصش حتى توصلك السلعة" },
+        { icon: "🚚", title: "توصيل سريع", desc: "2 إلى 4 أيام لكل المدن" },
+        { icon: "🛡️", title: "ضمان الجودة", desc: "منتج مفحوص قبل الشحن" },
+        { icon: "📞", title: "دعم هاتفي", desc: "فريقنا معاك قبل وبعد الطلب" },
+      ],
+    },
     gallery: { type: "gallery", enabled: true },
     reviews: {
       type: "reviews", enabled: true,
@@ -142,10 +161,10 @@ function buildSections(
   };
 
   const orders: Record<TemplateKey, string[]> = {
-    gadget_viral:         ["hero","problem","lifestyle","benefits","gallery","reviews","faq","order_form"],
-    problem_solution_cod: ["hero","problem","benefits","gallery","reviews","faq","order_form"],
-    beauty_health:        ["hero","problem","benefits","lifestyle","reviews","faq","order_form"],
-    home_family:          ["hero","benefits","lifestyle","gallery","reviews","order_form"],
+    gadget_viral:         ["hero","problem","lifestyle","benefits","how_to_use","gallery","guarantees","reviews","faq","order_form"],
+    problem_solution_cod: ["hero","problem","benefits","how_to_use","gallery","guarantees","reviews","faq","order_form"],
+    beauty_health:        ["hero","problem","benefits","how_to_use","guarantees","lifestyle","reviews","faq","order_form"],
+    home_family:          ["hero","benefits","how_to_use","lifestyle","gallery","guarantees","reviews","order_form"],
   };
 
   return (orders[templateKey] ?? orders.gadget_viral)

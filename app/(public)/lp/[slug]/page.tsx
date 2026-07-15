@@ -118,6 +118,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
   const psSection   = getSection("problem_solution");
   const benSection  = getSection("benefits");
+  const howSection  = getSection("how_to_use");
+  const gtySection  = getSection("guarantees");
   const revSection  = getSection("reviews");
   const faqSection  = getSection("faq");
   const formSection = getSection("order_form");
@@ -299,6 +301,44 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             </div>
           </div>
         </section>
+
+        {/* ── HOW TO USE (3 steps) ── */}
+        {!!howSection && Array.isArray(howSection.steps) && (
+          <section className="lp-section lp-section--gray">
+            <div className="lp-wrap">
+              <h2 className="lp-h2">{String(howSection.title ?? "كيفاش تستعمل المنتج")}</h2>
+              <div className="lp-grid-3">
+                {(howSection.steps as { number: number; title: string; desc: string }[]).map((s, i) => (
+                  <div key={i} className="lp-card lp-step">
+                    <span className="lp-step-num">{s.number}</span>
+                    <p className="lp-step-title">{s.title}</p>
+                    <p className="lp-step-desc">{s.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ── GUARANTEES ── */}
+        {!!gtySection && Array.isArray(gtySection.items) && (
+          <section className="lp-section">
+            <div className="lp-wrap">
+              <h2 className="lp-h2">{String(gtySection.title ?? "ليه تثق فينا؟")}</h2>
+              <div className="lp-grid-2">
+                {(gtySection.items as { icon: string; title: string; desc: string }[]).map((g, i) => (
+                  <div key={i} className="lp-card lp-benefit">
+                    <span className="lp-benefit-icon">{g.icon}</span>
+                    <div>
+                      <p className="lp-benefit-title">{g.title}</p>
+                      <p className="lp-benefit-desc">{g.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* ── REVIEWS ── */}
         <section className="lp-section lp-section--gray">
@@ -632,6 +672,13 @@ const GLOBAL_CSS = `
 
   /* ── Grid ── */
   .lp-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .lp-grid-3{display:grid;grid-template-columns:1fr;gap:10px;}
+
+  /* ── Steps (how_to_use) ── */
+  .lp-step{text-align:center;padding:20px 14px;}
+  .lp-step-num{display:flex;align-items:center;justify-content:center;width:32px;height:32px;margin:0 auto 10px;border-radius:9999px;background:#111827;color:#fff;font-weight:800;font-size:14px;}
+  .lp-step-title{font-weight:700;color:#111827;font-size:clamp(13px,3.5vw,14px);margin-bottom:4px;}
+  .lp-step-desc{color:#6b7280;font-size:clamp(11px,3vw,12px);line-height:1.5;}
 
   /* ── Scenario cards ── */
   .lp-scenario{text-align:center;padding:16px 12px;}
@@ -742,6 +789,7 @@ const GLOBAL_CSS = `
     .lp-section,.lp-section--gray,.lp-section--green-light{padding:36px 0}
     .lp-hero{padding-bottom:36px}
     .lp-grid-2{gap:14px}
+    .lp-grid-3{grid-template-columns:1fr 1fr 1fr;gap:14px}
     .lp-card{padding:20px}
   }
   @media(min-width:900px){

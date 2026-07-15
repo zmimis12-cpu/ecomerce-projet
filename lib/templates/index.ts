@@ -30,6 +30,8 @@ export type SectionType =
   | "lifestyle"
   | "gallery"
   | "benefits"
+  | "how_to_use"
+  | "guarantees"
   | "reviews"
   | "faq"
   | "order_form";
@@ -55,10 +57,10 @@ export interface LandingPageData {
 
 /** Default section order per template */
 const TEMPLATE_SECTIONS: Record<TemplateKey, SectionType[]> = {
-  gadget_viral:         ["hero", "benefits", "gallery", "reviews", "faq", "order_form"],
-  problem_solution_cod: ["hero", "problem_solution", "benefits", "gallery", "reviews", "faq", "order_form"],
-  beauty_health:        ["hero", "benefits", "reviews", "faq", "order_form"],
-  home_family:          ["hero", "benefits", "gallery", "reviews", "order_form"],
+  gadget_viral:         ["hero", "benefits", "how_to_use", "gallery", "guarantees", "reviews", "faq", "order_form"],
+  problem_solution_cod: ["hero", "problem_solution", "benefits", "how_to_use", "gallery", "guarantees", "reviews", "faq", "order_form"],
+  beauty_health:        ["hero", "benefits", "how_to_use", "guarantees", "reviews", "faq", "order_form"],
+  home_family:          ["hero", "benefits", "how_to_use", "gallery", "guarantees", "reviews", "order_form"],
 };
 
 export function getTemplateSections(key: TemplateKey): SectionType[] {
