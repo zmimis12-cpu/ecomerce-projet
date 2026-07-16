@@ -295,6 +295,10 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               <div className="lp-story-col lp-story-before">
                 <span className="lp-story-tag lp-story-tag--red">المشكل</span>
                 <h2 className="lp-h2" style={{marginTop:8}}>{String(psSection.before_title ?? "")}</h2>
+                {!!psSection.before_image && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={String(psSection.before_image)} alt="" className="lp-story-img" />
+                )}
                 <ul className="lp-story-list">
                   {(psSection.before_points as string[]).map((p, i) => (
                     <li key={i} className="lp-story-item lp-story-item--red">{p}</li>
@@ -305,6 +309,10 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               <div className="lp-story-col lp-story-after">
                 <span className="lp-story-tag lp-story-tag--green">الحل</span>
                 <h2 className="lp-h2" style={{marginTop:8}}>{String(psSection.after_title ?? "")}</h2>
+                {!!psSection.after_image && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={String(psSection.after_image)} alt="" className="lp-story-img" />
+                )}
                 <ul className="lp-story-list">
                   {(psSection.after_points as string[]).map((p, i) => (
                     <li key={i} className="lp-story-item lp-story-item--green">{p}</li>
@@ -355,9 +363,14 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             <div className="lp-wrap">
               <h2 className="lp-h2">{String(howSection.title ?? "كيفاش تستعمل المنتج")}</h2>
               <div className="lp-grid-3">
-                {(howSection.steps as { number: number; title: string; desc: string }[]).map((s, i) => (
+                {(howSection.steps as { number: number; title: string; desc: string; image_url?: string }[]).map((s, i) => (
                   <div key={i} className="lp-card lp-step">
-                    <span className="lp-step-num">{s.number}</span>
+                    {s.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={s.image_url} alt="" className="lp-step-img" />
+                    ) : (
+                      <span className="lp-step-num">{s.number}</span>
+                    )}
                     <p className="lp-step-title">{s.title}</p>
                     <p className="lp-step-desc">{s.desc}</p>
                   </div>
@@ -754,6 +767,9 @@ const GLOBAL_CSS = `
   .lp-story-item{font-size:clamp(12px,3.2vw,13px);line-height:1.6;padding-right:20px;position:relative;color:#374151;}
   .lp-story-item--red::before{content:"✕";position:absolute;right:0;color:#dc2626;font-weight:800;}
   .lp-story-item--green::before{content:"✓";position:absolute;right:0;color:#16a34a;font-weight:800;}
+  .lp-story-img{width:100%;border-radius:12px;margin:8px 0;object-fit:cover;max-height:160px;}
+
+  .lp-step-img{width:56px;height:56px;border-radius:12px;object-fit:cover;margin:0 auto 8px;display:block;}
 
   .lp-card--green{
     background:#f0fdf4;border-color:#bbf7d0;

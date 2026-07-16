@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { LPSection } from "@/lib/templates";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp, Eye, EyeOff } from "lucide-react";
+import { SectionImagePicker } from "./section-image-picker";
 
 interface SectionsEditorProps {
   sections: LPSection[];
@@ -119,6 +120,8 @@ function SectionFields({ section, idx, onField, onListItem }: {
       return (
         <div className="space-y-3">
           {ta("before_title", "عنوان قبل (المشكلة)")}
+          <SectionImagePicker value={section.before_image as string | undefined}
+            onChange={(url) => onField(idx, "before_image", url)} label="صورة المشكلة (قبل)" />
           <div className="space-y-1.5">
             <p className="text-xs text-muted-foreground">نقاط المشكل (✕)</p>
             {beforePoints.map((p, i) => (
@@ -128,6 +131,8 @@ function SectionFields({ section, idx, onField, onListItem }: {
             ))}
           </div>
           {ta("after_title", "عنوان بعد (الحل)")}
+          <SectionImagePicker value={section.after_image as string | undefined}
+            onChange={(url) => onField(idx, "after_image", url)} label="صورة الحل (بعد)" />
           <div className="space-y-1.5">
             <p className="text-xs text-muted-foreground">نقاط الحل (✓)</p>
             {afterPoints.map((p, i) => (
@@ -216,6 +221,10 @@ function SectionFields({ section, idx, onField, onListItem }: {
                 placeholder={`عنوان الخطوة ${s.number}`} className="h-9 rounded-md border border-input bg-background px-2 text-sm" dir="auto" />
               <input value={s.desc} onChange={(e) => onListItem(idx, "steps", i, "desc", e.target.value)}
                 placeholder="الوصف" className="h-9 rounded-md border border-input bg-background px-2 text-sm" dir="auto" />
+              <div className="col-span-2">
+                <SectionImagePicker value={(s as unknown as { image_url?: string }).image_url}
+                  onChange={(url) => onListItem(idx, "steps", i, "image_url", url)} label={`صورة/GIF للخطوة ${s.number}`} />
+              </div>
             </div>
           ))}
         </div>
