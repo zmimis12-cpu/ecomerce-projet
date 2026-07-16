@@ -2,6 +2,12 @@
 import { useState, useTransition, useRef } from "react";
 import type { PublicProduct } from "@/lib/public/queries";
 
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 interface Props {
   product: PublicProduct;
   productSlug: string;
@@ -78,6 +84,9 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
             variants:     selectedVariants,
             product_id:   product.id,
             product_slug: productSlug,
+            meta_pixel_id: pixelId ?? null,
+            meta_fbp: getCookie("_fbp"),
+            meta_fbc: getCookie("_fbc"),
           }),
         });
         const data = await res.json() as {

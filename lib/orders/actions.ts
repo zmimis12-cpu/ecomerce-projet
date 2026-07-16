@@ -212,6 +212,13 @@ export async function updateOrderStatus(
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath("/admin/orders");
 
+  // ── Meta Purchase (Conversions API) — envoyé au vrai moment de conversion ──
+  // (commande payée), pas à la création. Ne bloque jamais la réponse admin,
+  // et ne se déclenche qu'une fois (meta_purchase_sent).
+  if (newStatus === "paid") {
+    sendMetaPurchaseIfNeeded(orderId).catch((e) => console.error("[meta-purchase]", e));
+  }
+
   // Trigger Google Sheets sync — mark pending first, then sync in background
   if (newStatus === "confirmed" || newStatus === "returned") {
     // Mark as pending immediately so we can detect failures
@@ -405,4 +412,53 @@ export async function deleteOrder(orderId: string) {
 
   revalidatePath("/admin/orders");
   redirect("/admin/orders");
+}
+
+// ─── Meta Purchase server-side (Conversions API) ────────────────────────────────
+export async function sendMetaPurchaseIfNeeded(orderId: string): Promise<void> {
+  const supabaseAdmin = (await import("@/lib/supabase/admin")).supabaseAdmin;
+
+  const { data: order } = await supabaseAdmin
+    .from("orders")
+    .select("id, customer_phone, customer_city, total_amount_mad, meta_pixel_id, meta_fbp, meta_fbc, meta_client_ip, meta_client_ua, meta_purchase_sent")
+    .eq("id", orderId)
+    .single();
+  if (!order) return;
+  const o = order as {
+    id: string; customer_phone: string; customer_city: string; total_amount_mad: number;
+    meta_pixel_id: string | null; meta_fbp: string | null; meta_fbc: string | null;
+    meta_client_ip: string | null; meta_client_ua: string | null; meta_purchase_sent: boolean;
+  };
+
+  if (o.meta_purchase_sent) return;       // déjà envoyé, jamais 2 fois
+  if (!o.meta_pixel_id) return;           // commande créée avant l'ajout du tracking, ou pixel non configuré
+
+  const { data: settings } = await supabaseAdmin
+    .from("ad_platform_settings")
+    .select("access_token, is_active")
+    .eq("platform", "meta")
+    .maybeSingle();
+  const s = settings as { access_token: string; is_active: boolean } | null;
+  if (!s?.access_token || !s.is_active) return;
+
+  const { sendMetaPurchaseEvent } = await import("@/lib/meta/conversions-api");
+  const res = await sendMetaPurchaseEvent({
+    pixelId: o.meta_pixel_id,
+    accessToken: s.access_token,
+    value: o.total_amount_mad,
+    currency: "MAD",
+    phone: o.customer_phone,
+    city: o.customer_city,
+    fbp: o.meta_fbp,
+    fbc: o.meta_fbc,
+    clientIp: o.meta_client_ip,
+    clientUserAgent: o.meta_client_ua,
+    eventId: o.id,
+  });
+
+  if (res.ok) {
+    await supabaseAdmin.from("orders").update({ meta_purchase_sent: true } as never).eq("id", o.id);
+  } else {
+    console.error("[meta-purchase] failed:", res.error);
+  }
 }

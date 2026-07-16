@@ -184,6 +184,11 @@ export async function POST(request: NextRequest) {
       user_agent:        request.headers.get("user-agent")?.slice(0, 255) ?? null,
       is_duplicate:      isDuplicate,
       duplicate_of:      duplicateOfId,
+      meta_pixel_id:     typeof body.meta_pixel_id === "string" ? body.meta_pixel_id : null,
+      meta_fbp:          typeof body.meta_fbp === "string" ? body.meta_fbp : null,
+      meta_fbc:          typeof body.meta_fbc === "string" ? body.meta_fbc : null,
+      meta_client_ip:    ip,
+      meta_client_ua:    request.headers.get("user-agent")?.slice(0, 255) ?? null,
     } as never)
     .select("id, order_number")
     .single();
