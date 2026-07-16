@@ -5,6 +5,7 @@ import { upsertLandingPage } from "@/lib/landing-pages/actions";
 import { AIGenerateButton } from "./ai-generate-button";
 import { SmartGenerateButton } from "./smart-generate-button";
 import { SectionsEditor } from "./sections-editor";
+import { SectionImagePicker } from "./section-image-picker";
 import { TEMPLATE_LABELS, TEMPLATE_DESCRIPTIONS, buildDefaultSections } from "@/lib/templates";
 import type { TemplateKey, LPSection } from "@/lib/templates";
 import type { GeneratedContent } from "@/lib/ai/generator";
@@ -36,6 +37,9 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
   const [offerText,    setOfferText]    = useState(String(defaultValues?.offer_text    ?? ""));
   const [heroHeadline, setHeroHeadline] = useState(String(defaultValues?.hero_headline ?? ""));
   const [heroSub,      setHeroSub]      = useState(String(defaultValues?.hero_subheadline ?? ""));
+  const [heroImage,    setHeroImage]    = useState<string | undefined>(defaultValues?.hero_image as string | undefined);
+  const [storeLogoUrl, setStoreLogoUrl] = useState<string | undefined>(defaultValues?.store_logo_url as string | undefined);
+  const [storeName,    setStoreName]    = useState(String(defaultValues?.store_name ?? ""));
   const [priceText,    setPriceText]    = useState(String(defaultValues?.price_text    ?? ""));
   const [oldPrice,     setOldPrice]     = useState(String(defaultValues?.old_price_text ?? ""));
   const [stockText,    setStockText]    = useState(String(defaultValues?.stock_text    ?? ""));
@@ -113,6 +117,9 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
           offer_text:       offerText,
           hero_headline:    heroHeadline,
           hero_subheadline: heroSub,
+          hero_image:       heroImage,
+          store_logo_url:   storeLogoUrl,
+          store_name:       storeName,
           price_text:       priceText,
           old_price_text:   oldPrice,
           stock_text:       stockText,
@@ -418,6 +425,19 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
                   placeholder={ph} dir="auto" className={inputCls(false)} />
               </Field>
             ))}
+            <Field label="صورة Hero (بانر تسويقي، اختياري)">
+              <SectionImagePicker value={heroImage} onChange={setHeroImage} label="" />
+            </Field>
+          </Card>
+
+          <Card title="العلامة التجارية (الثقة)">
+            <Field label="اسم المتجر">
+              <input type="text" value={storeName} onChange={(e) => setStoreName(e.target.value)}
+                placeholder="HajtekZone" dir="auto" className={inputCls(false)} />
+            </Field>
+            <Field label="شعار المتجر (Logo)">
+              <SectionImagePicker value={storeLogoUrl} onChange={setStoreLogoUrl} label="" />
+            </Field>
           </Card>
         </div>
       )}

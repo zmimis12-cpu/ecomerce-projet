@@ -99,6 +99,9 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const subline   = String(lp.hero_subheadline ?? "توصيل سريع · الدفع عند الاستلام · ضمان الجودة");
   const offerBar  = String(lp.offer_text       ?? "");
   const ctaText   = String(lp.cta_text         ?? "اطلب الآن");
+  const storeName    = lp.store_name as string | null;
+  const storeLogoUrl = lp.store_logo_url as string | null;
+  const heroImage    = lp.hero_image as string | null;
   const oldPriceNum = Number(lp.old_price_num) || price * 1.3;
   const oldPrice  = String(lp.old_price_text   ?? `${oldPriceNum.toFixed(0)} درهم`);
   const discountPct = oldPriceNum > price ? Math.round((1 - price / oldPriceNum) * 100) : 0;
@@ -207,6 +210,17 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
       <div className="lp-root" dir="rtl" lang="ar">
 
+        {/* ── STORE BRANDING (confiance client) ── */}
+        {(storeLogoUrl || storeName) && (
+          <div className="lp-store-brand">
+            {storeLogoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={storeLogoUrl} alt={storeName ?? ""} className="lp-store-logo" />
+            )}
+            {storeName && <span className="lp-store-name">{storeName}</span>}
+          </div>
+        )}
+
         {/* ── OFFER BAR ── */}
         {offerBar && (
           <div className="lp-bar">{offerBar}</div>
@@ -231,6 +245,12 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                 <span key={b} className="lp-badge">{b}</span>
               ))}
             </div>
+
+            {/* Hero image (bannière marketing optionnelle, différente de la galerie produit) */}
+            {heroImage && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={heroImage} alt={headline} className="lp-hero-banner" />
+            )}
 
             {/* Gallery — multiple photos build trust for COD customers */}
             {product.images.length > 0 && (
@@ -606,6 +626,15 @@ const GLOBAL_CSS = `
   .lp-bar{background:#111827;color:#fff;text-align:center;
     padding:9px 16px;font-size:13px;font-weight:600;
     letter-spacing:.01em;}
+
+  /* ── Store branding (confiance) ── */
+  .lp-store-brand{display:flex;align-items:center;justify-content:center;gap:8px;
+    padding:10px 16px;background:#fff;border-bottom:1px solid #f1f5f9;}
+  .lp-store-logo{width:28px;height:28px;border-radius:50%;object-fit:cover;}
+  .lp-store-name{font-weight:800;font-size:13px;color:#111827;}
+
+  /* ── Hero banner (image marketing optionnelle) ── */
+  .lp-hero-banner{width:100%;border-radius:16px;margin-bottom:14px;display:block;}
 
   /* ── Badges ── */
   .lp-badges{display:flex;justify-content:center;flex-wrap:wrap;
