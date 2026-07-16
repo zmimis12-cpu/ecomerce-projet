@@ -2,8 +2,13 @@
 
 import { useState, useTransition, useRef } from "react";
 import { Upload, X, Image as ImageIcon } from "lucide-react";
-import { uploadSectionMedia } from "@/lib/landing-pages/actions";
+import { createClient } from "@/lib/supabase/client";
 
+// Upload DIRECT navigateur → Supabase Storage (jamais via un Server Action).
+// Vercel plafonne le corps des requêtes serveur à ~4.5MB — un GIF dépasse
+// souvent cette limite (erreur 413). En uploadant directement depuis le
+// navigateur avec la clé anon (RLS: authentifié uniquement), on contourne
+// complètement cette limite de plateforme.
 export function SectionImagePicker({
   value, onChange, label,
 }: { value: string | undefined; onChange: (url: string) => void; label: string }) {
@@ -15,13 +20,37 @@ export function SectionImagePicker({
     const file = e.target.files?.[0];
     if (!file) return;
     setError(null);
-    const formData = new FormData();
-    formData.append("file", file);
+
+    // Garde-fou taille (bucket lp-media, limite raisonnable pour un GIF/image de section)
+    const MAX_MB = 15;
+    if (file.size > MAX_MB * 1024 * 1024) {
+      setError(`الملف كبير بزاف (الحد الأقصى ${MAX_MB}MB).`);
+      return;
+    }
+
     startTransition(async () => {
-      const res = await uploadSectionMedia(formData);
-      if (!res.success || !res.url) { setError(res.error ?? "Erreur upload."); return; }
-      onChange(res.url);
+      try {
+        const supabase = createClient();
+        const isGif = file.type === "image/gif";
+        const ext = file.name.split(".").pop() || (isGif ? "gif" : "jpg");
+        const path = `sections/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("lp-media")
+          .upload(path, file, { contentType: file.type, upsert: false, cacheControl: "31536000" });
+
+        if (uploadError) {
+          setError(uploadError.message || "فشل الرفع.");
+          return;
+        }
+
+        const { data: urlData } = supabase.storage.from("lp-media").getPublicUrl(path);
+        onChange(urlData.publicUrl);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "خطأ غير معروف.");
+      }
     });
+
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
