@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useRef } from "react";
-import { uploadProductImage, setPrimaryImage, deleteProductImage } from "@/lib/products/actions";
+import { uploadProductImage, setPrimaryImage, deleteProductImage, reorderProductImages } from "@/lib/products/actions";
 import { cn } from "@/lib/utils";
 import type { ProductImage } from "@/types/products";
 import { Star, Trash2, Upload, ImageIcon, ZoomIn } from "lucide-react";
@@ -18,7 +18,28 @@ export function ImageManager({ productId, images: initialImages }: ImageManagerP
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [dragImgId, setDragImgId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  function handleDragStart(imageId: string) { setDragImgId(imageId); }
+
+  function handleDropOnImage(targetId: string) {
+    if (!dragImgId || dragImgId === targetId) { setDragImgId(null); return; }
+    setImages((prev) => {
+      const fromIdx = prev.findIndex((i) => i.id === dragImgId);
+      const toIdx   = prev.findIndex((i) => i.id === targetId);
+      if (fromIdx === -1 || toIdx === -1) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      // Persister le nouvel ordre en base (best-effort, ne bloque pas l'UI)
+      reorderProductImages(productId, next.map((i) => i.id)).then((res) => {
+        if (!res.success) showError(res.error ?? "Erreur réorganisation.");
+      });
+      return next;
+    });
+    setDragImgId(null);
+  }
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
   function showError(msg: string) { setError(msg); setTimeout(() => setError(null), 5000); }
@@ -133,13 +154,20 @@ export function ImageManager({ productId, images: initialImages }: ImageManagerP
           <p className="text-sm text-muted-foreground">Aucune image</p>
         </div>
       ) : (
+        <>
+        <p className="text-xs text-muted-foreground">↕️ Glissez une image sur une autre pour changer l&apos;ordre.</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {images.map((img) => (
             <div
               key={img.id}
+              draggable
+              onDragStart={() => handleDragStart(img.id)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); handleDropOnImage(img.id); }}
               className={cn(
-                "relative group rounded-lg overflow-hidden border-2 aspect-square bg-secondary/20",
-                img.is_primary ? "border-primary" : "border-transparent"
+                "relative group rounded-lg overflow-hidden border-2 aspect-square bg-secondary/20 cursor-grab active:cursor-grabbing",
+                img.is_primary ? "border-primary" : "border-transparent",
+                dragImgId === img.id && "opacity-40"
               )}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -193,6 +221,7 @@ export function ImageManager({ productId, images: initialImages }: ImageManagerP
             </div>
           ))}
         </div>
+        </>
       )}
     </div>
   );

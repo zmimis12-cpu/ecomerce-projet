@@ -226,6 +226,23 @@ export async function setPrimaryImage(productId: string, imageId: string) {
   return { success: true };
 }
 
+// ─── Reorder images (glisser-déposer) ──────────────────────────────────────────
+export async function reorderProductImages(productId: string, orderedImageIds: string[]) {
+  await requireRole([...MANAGER_ROLES]);
+  const supabase = await createClient();
+
+  const results = await Promise.all(
+    orderedImageIds.map((imageId, index) =>
+      supabase.from("product_images").update({ display_order: index } as never).eq("id", imageId)
+    )
+  );
+  const firstError = results.find((r) => r.error)?.error;
+  if (firstError) return { success: false, error: firstError.message };
+
+  revalidatePath(`/admin/products/${productId}`);
+  return { success: true };
+}
+
 // ─── Delete image ──────────────────────────────────────────────────────────────
 export async function deleteProductImage(productId: string, imageId: string, storagePath: string) {
   await requireRole([...MANAGER_ROLES]);
