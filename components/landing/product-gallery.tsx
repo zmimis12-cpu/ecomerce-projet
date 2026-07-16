@@ -51,9 +51,9 @@ export function ProductGallery({ images, productName, discountPct = 0 }: Props) 
     const dy = e.changedTouches[0].clientY - touchStartY.current;
     // Only handle horizontal swipes (dx > dy means horizontal intent)
     if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
-    // Swipe LEFT (dx < 0) → go to next image
-    // Swipe RIGHT (dx > 0) → go to previous image
-    if (dx < 0) goNext(); else goPrev();
+    // Swipe RIGHT (dx > 0) → go to next image
+    // Swipe LEFT (dx < 0) → go to previous image
+    if (dx > 0) goNext(); else goPrev();
     touchStartX.current = null;
     touchStartY.current = null;
   }
