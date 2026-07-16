@@ -192,7 +192,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
       {page.meta_pixel_id?.trim() && (
         <script dangerouslySetInnerHTML={{ __html:
-          `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${page.meta_pixel_id.trim()}',{autoConfig:true});fbq('track','PageView');`
+          `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${page.meta_pixel_id.trim()}',{autoConfig:true});fbq('track','PageView');fbq('track','ViewContent',{content_name:'${product.name.replace(/'/g, "\\'")}',content_ids:['${product.id}'],content_type:'product',value:${price},currency:'MAD'});`
         }} />
       )}
       <link rel="preconnect" href="https://connect.facebook.net" />
@@ -287,6 +287,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               <p className="lp-form-note green">{formNote}</p>
               <OrderFormPublic product={product} productSlug={slug}
                 ctaText={ctaText} b1={b1} b2={b2} b3={b3}
+                pixelId={page.meta_pixel_id?.trim() || undefined}
                 cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
             </div>
 

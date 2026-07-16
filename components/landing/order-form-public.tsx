@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import type { PublicProduct } from "@/lib/public/queries";
 
 interface Props {
@@ -9,9 +9,10 @@ interface Props {
   b1: number; b2: number; b3: number;
   cities?: string[];
   variants?: {name:string; options:string}[];
+  pixelId?: string;
 }
 
-export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, cities = FALLBACK_CITIES, variants = [] }: Props) {
+export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, cities = FALLBACK_CITIES, variants = [], pixelId }: Props) {
   const [isPending, startTransition] = useTransition();
   const [submitted, setSubmitted]    = useState(false);
   const [errors, setErrors]          = useState<Record<string, string>>({});
@@ -20,10 +21,21 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   const [selectedVariants, setSelectedVariants] = useState<Record<string,string>>({});
   const [cityOpen, setCityOpen]      = useState(false);
   const [bundle, setBundle]          = useState(1);
+  const hasFiredInitiateCheckout = useRef(false);
   const [form, setForm] = useState({
     customer_name:"", customer_phone:"", customer_city:"",
     customer_address:"", notes:"", website:"",
   });
+
+  // InitiateCheckout — se déclenche une seule fois, à la première interaction
+  // réelle avec le formulaire (pas au chargement de la page, ça c'est ViewContent).
+  function trackInitiateCheckoutOnce() {
+    if (hasFiredInitiateCheckout.current) return;
+    hasFiredInitiateCheckout.current = true;
+    if (typeof window === "undefined") return;
+    const w = window as unknown as { fbq?: (...args: unknown[]) => void };
+    w.fbq?.("track", "InitiateCheckout", { value: b1, currency: "MAD", content_name: product.name });
+  }
 
   // Standard COD e-commerce bundle discounts: -10% for 2x, -20% for 3x
   // These match the server-side calculation in /api/public/orders so prices
@@ -40,6 +52,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   const total = bundles.find((b) => b.qty === bundle)?.price ?? unitPrice;
 
   function set(key: string, val: string) {
+    if (key !== "website") trackInitiateCheckoutOnce(); // ignore le honeypot anti-bot
     setForm((f) => ({ ...f, [key]: val }));
     setErrors((e) => { const n={...e}; delete n[key]; return n; });
   }
@@ -81,13 +94,15 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
             const w = window as unknown as { fbq?: (...args: unknown[]) => void; dataLayer?: unknown[] };
             // Advanced matching — hash phone for better Meta attribution
             const phone = form.customer_phone.replace(/\s/g, "");
-            w.fbq?.("init", undefined as unknown as string, {
-              ph: phone,
-              fn: form.customer_name.split(" ")[0] ?? "",
-              ln: form.customer_name.split(" ").slice(1).join(" ") ?? "",
-              ct: form.customer_city,
-              country: "MA",
-            } as unknown as string);
+            if (pixelId) {
+              w.fbq?.("init", pixelId, {
+                ph: phone,
+                fn: form.customer_name.split(" ")[0] ?? "",
+                ln: form.customer_name.split(" ").slice(1).join(" ") ?? "",
+                ct: form.customer_city,
+                country: "MA",
+              });
+            }
             w.fbq?.("track", "Lead", { value: total, currency: "MAD", content_name: product.name });
             w.dataLayer?.push({ event: "generate_lead", value: total, currency: "MAD", item_name: product.name });
             window.scrollTo({top:0,behavior:"smooth"});
