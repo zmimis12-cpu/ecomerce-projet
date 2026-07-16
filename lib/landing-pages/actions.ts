@@ -9,6 +9,30 @@ import type { TemplateKey } from "@/lib/templates";
 
 const MANAGER_ROLES = ["super_admin", "admin", "manager"] as const;
 
+// ─── Upload d'image/GIF pour une section de landing page (how_to_use, ────────
+// ─── problem_solution, etc.) — stocké dans le bucket dédié lp-media ─────────
+export async function uploadSectionMedia(formData: FormData): Promise<{
+  success: boolean; url?: string; error?: string;
+}> {
+  await requireRole([...MANAGER_ROLES]);
+
+  const file = formData.get("file") as File | null;
+  if (!file || file.size === 0) return { success: false, error: "Fichier requis." };
+
+  const isGif = file.type === "image/gif";
+  const ext = file.name.split(".").pop() || (isGif ? "gif" : "jpg");
+  const path = `sections/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const { error: uploadError } = await supabaseAdmin.storage
+    .from("lp-media")
+    .upload(path, buffer, { contentType: file.type, upsert: false, cacheControl: "31536000" });
+  if (uploadError) return { success: false, error: uploadError.message };
+
+  const { data: urlData } = supabaseAdmin.storage.from("lp-media").getPublicUrl(path);
+  return { success: true, url: urlData.publicUrl };
+}
+
 // ─── Bulk: rafraîchir les sections (how_to_use, guarantees, stats_bar) sur ────
 // ─── toutes les LP existantes SANS toucher au reste (prix, hero, whatsapp) ────
 export async function backfillSectionsOnAllLandingPages(): Promise<{
