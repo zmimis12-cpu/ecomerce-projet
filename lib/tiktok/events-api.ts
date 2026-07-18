@@ -28,7 +28,9 @@ export async function sendTikTokCompletePayment(input: TikTokPurchaseInput): Pro
   const url = "https://business-api.tiktok.com/open_api/v1.3/event/track/";
 
   const userData: Record<string, unknown> = {
-    phone: [sha256(toInternationalMorocco(input.phone).replace("+", ""))],
+    // TikTok exige le format E.164 AVEC le "+" avant hachage (contrairement
+    // à Meta qui exige le numéro SANS le "+") — bug trouvé en test réel.
+    phone: [sha256(toInternationalMorocco(input.phone))],
   };
   if (input.ttp) userData.ttp = input.ttp;
   if (input.clientIp) userData.ip = input.clientIp;
