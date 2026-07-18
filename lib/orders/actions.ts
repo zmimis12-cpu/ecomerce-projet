@@ -420,12 +420,12 @@ export async function sendMetaPurchaseIfNeeded(orderId: string): Promise<void> {
 
   const { data: order } = await supabaseAdmin
     .from("orders")
-    .select("id, customer_phone, customer_city, total_amount_mad, meta_pixel_id, meta_fbp, meta_fbc, meta_client_ip, meta_client_ua, meta_purchase_sent")
+    .select("id, customer_name, customer_phone, customer_city, total_amount_mad, meta_pixel_id, meta_fbp, meta_fbc, meta_client_ip, meta_client_ua, meta_purchase_sent")
     .eq("id", orderId)
     .single();
   if (!order) return;
   const o = order as {
-    id: string; customer_phone: string; customer_city: string; total_amount_mad: number;
+    id: string; customer_name: string; customer_phone: string; customer_city: string; total_amount_mad: number;
     meta_pixel_id: string | null; meta_fbp: string | null; meta_fbc: string | null;
     meta_client_ip: string | null; meta_client_ua: string | null; meta_purchase_sent: boolean;
   };
@@ -449,6 +449,7 @@ export async function sendMetaPurchaseIfNeeded(orderId: string): Promise<void> {
     currency: "MAD",
     phone: o.customer_phone,
     city: o.customer_city,
+    fullName: o.customer_name,
     fbp: o.meta_fbp,
     fbc: o.meta_fbc,
     clientIp: o.meta_client_ip,

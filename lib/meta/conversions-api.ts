@@ -5,9 +5,18 @@
  * Réutilise le token déjà stocké pour le sync Meta Ads (ad_platform_settings).
  */
 import crypto from "crypto";
+import { toInternationalMorocco } from "@/lib/delivery/phone-utils";
 
 function sha256(value: string): string {
   return crypto.createHash("sha256").update(value.trim().toLowerCase()).digest("hex");
+}
+
+/** Meta exige: minuscule, sans accents, sans espaces/ponctuation, alphabet romain */
+function normalizeForMeta(value: string): string {
+  return value
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // strip accents (é→e, etc.)
+    .toLowerCase()
+    .replace(/[^a-z]/g, ""); // garde uniquement les lettres
 }
 
 export interface PurchaseEventInput {
@@ -17,6 +26,7 @@ export interface PurchaseEventInput {
   currency: string;
   phone: string;          // sera hashé (SHA-256), jamais envoyé en clair
   city: string;
+  fullName?: string;      // prénom + nom — améliore le score de matching Meta
   country?: string;       // défaut "ma"
   fbp?: string | null;
   fbc?: string | null;
@@ -29,10 +39,16 @@ export async function sendMetaPurchaseEvent(input: PurchaseEventInput): Promise<
   const url = `https://graph.facebook.com/v21.0/${input.pixelId}/events?access_token=${encodeURIComponent(input.accessToken)}`;
 
   const userData: Record<string, unknown> = {
-    ph: [sha256(input.phone.replace(/\D/g, ""))],
-    ct: [sha256(input.city)],
+    ph: [sha256(toInternationalMorocco(input.phone).replace("+", ""))],
+    ct: [sha256(normalizeForMeta(input.city))],
     country: [sha256(input.country ?? "ma")],
+    external_id: [sha256(input.eventId)],
   };
+  if (input.fullName?.trim()) {
+    const parts = input.fullName.trim().split(/\s+/);
+    userData.fn = [sha256(normalizeForMeta(parts[0]))];
+    if (parts.length > 1) userData.ln = [sha256(normalizeForMeta(parts.slice(1).join(" ")))];
+  }
   if (input.fbp) userData.fbp = input.fbp;
   if (input.fbc) userData.fbc = input.fbc;
   if (input.clientIp) userData.client_ip_address = input.clientIp;

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition, useRef } from "react";
 import type { PublicProduct } from "@/lib/public/queries";
+import { toInternationalMorocco } from "@/lib/delivery/phone-utils";
 
 function getCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
@@ -101,15 +102,17 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           // for COD funnels and lets Meta Ads actually learn who converts.
           if (typeof window !== "undefined") {
             const w = window as unknown as { fbq?: (...args: unknown[]) => void; dataLayer?: unknown[] };
-            // Advanced matching — hash phone for better Meta attribution
-            const phone = form.customer_phone.replace(/\s/g, "");
+            // Advanced matching — pixel.js hashes these client-side automatically.
+            // Le téléphone doit être au format international (212XXXXXXXXX),
+            // pas local (0XXXXXXXXX), sinon Meta ne peut pas matcher.
+            const phone = toInternationalMorocco(form.customer_phone).replace("+", "");
             if (pixelId) {
               w.fbq?.("init", pixelId, {
                 ph: phone,
                 fn: form.customer_name.split(" ")[0] ?? "",
                 ln: form.customer_name.split(" ").slice(1).join(" ") ?? "",
                 ct: form.customer_city,
-                country: "MA",
+                country: "ma",
               });
             }
             w.fbq?.("track", "Lead", { value: total, currency: "MAD", content_name: product.name });
