@@ -189,6 +189,11 @@ export async function POST(request: NextRequest) {
       meta_fbc:          typeof body.meta_fbc === "string" ? body.meta_fbc : null,
       meta_client_ip:    ip,
       meta_client_ua:    request.headers.get("user-agent")?.slice(0, 255) ?? null,
+      tiktok_pixel_id:   typeof body.tiktok_pixel_id === "string" ? body.tiktok_pixel_id : null,
+      tiktok_ttp:        typeof body.tiktok_ttp === "string" ? body.tiktok_ttp : null,
+      tiktok_ttclid:     typeof body.tiktok_ttclid === "string" ? body.tiktok_ttclid : null,
+      tiktok_client_ip:  ip,
+      tiktok_client_ua:  request.headers.get("user-agent")?.slice(0, 255) ?? null,
     } as never)
     .select("id, order_number")
     .single();

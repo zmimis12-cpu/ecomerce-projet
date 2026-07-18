@@ -17,9 +17,10 @@ interface Props {
   cities?: string[];
   variants?: {name:string; options:string}[];
   pixelId?: string;
+  tiktokPixelId?: string;
 }
 
-export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, cities = FALLBACK_CITIES, variants = [], pixelId }: Props) {
+export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId }: Props) {
   const [isPending, startTransition] = useTransition();
   const [submitted, setSubmitted]    = useState(false);
   const [errors, setErrors]          = useState<Record<string, string>>({});
@@ -40,8 +41,9 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     if (hasFiredInitiateCheckout.current) return;
     hasFiredInitiateCheckout.current = true;
     if (typeof window === "undefined") return;
-    const w = window as unknown as { fbq?: (...args: unknown[]) => void };
+    const w = window as unknown as { fbq?: (...args: unknown[]) => void; ttq?: { track: (...args: unknown[]) => void } };
     w.fbq?.("track", "InitiateCheckout", { value: b1, currency: "MAD", content_name: product.name });
+    w.ttq?.track("InitiateCheckout", { value: b1, currency: "MAD", content_id: product.id, content_name: product.name });
   }
 
   // Standard COD e-commerce bundle discounts: -10% for 2x, -20% for 3x
@@ -88,6 +90,9 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
             meta_pixel_id: pixelId ?? null,
             meta_fbp: getCookie("_fbp"),
             meta_fbc: getCookie("_fbc"),
+            tiktok_pixel_id: tiktokPixelId ?? null,
+            tiktok_ttp: getCookie("_ttp"),
+            tiktok_ttclid: new URLSearchParams(window.location.search).get("ttclid"),
           }),
         });
         const data = await res.json() as {
@@ -116,6 +121,10 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
               });
             }
             w.fbq?.("track", "Lead", { value: total, currency: "MAD", content_name: product.name });
+
+            const wt = window as unknown as { ttq?: { identify: (...args: unknown[]) => void; track: (...args: unknown[]) => void } };
+            wt.ttq?.identify({ phone_number: phone });
+            wt.ttq?.track("SubmitForm", { value: total, currency: "MAD", content_id: product.id, content_name: product.name });
             w.dataLayer?.push({ event: "generate_lead", value: total, currency: "MAD", item_name: product.name });
             window.scrollTo({top:0,behavior:"smooth"});
           }

@@ -217,6 +217,7 @@ export async function updateOrderStatus(
   // et ne se déclenche qu'une fois (meta_purchase_sent).
   if (newStatus === "paid") {
     sendMetaPurchaseIfNeeded(orderId).catch((e) => console.error("[meta-purchase]", e));
+    sendTikTokPurchaseIfNeeded(orderId).catch((e) => console.error("[tiktok-purchase]", e));
   }
 
   // Trigger Google Sheets sync — mark pending first, then sync in background
@@ -461,5 +462,53 @@ export async function sendMetaPurchaseIfNeeded(orderId: string): Promise<void> {
     await supabaseAdmin.from("orders").update({ meta_purchase_sent: true } as never).eq("id", o.id);
   } else {
     console.error("[meta-purchase] failed:", res.error);
+  }
+}
+
+// ─── TikTok CompletePayment server-side (Events API) ────────────────────────────
+export async function sendTikTokPurchaseIfNeeded(orderId: string): Promise<void> {
+  const supabaseAdmin = (await import("@/lib/supabase/admin")).supabaseAdmin;
+
+  const { data: order } = await supabaseAdmin
+    .from("orders")
+    .select("id, customer_phone, total_amount_mad, tiktok_pixel_id, tiktok_ttp, tiktok_ttclid, tiktok_client_ip, tiktok_client_ua, tiktok_purchase_sent")
+    .eq("id", orderId)
+    .single();
+  if (!order) return;
+  const o = order as {
+    id: string; customer_phone: string; total_amount_mad: number;
+    tiktok_pixel_id: string | null; tiktok_ttp: string | null; tiktok_ttclid: string | null;
+    tiktok_client_ip: string | null; tiktok_client_ua: string | null; tiktok_purchase_sent: boolean;
+  };
+
+  if (o.tiktok_purchase_sent) return;
+  if (!o.tiktok_pixel_id) return;
+
+  const { data: settings } = await supabaseAdmin
+    .from("ad_platform_settings")
+    .select("access_token, is_active")
+    .eq("platform", "tiktok")
+    .maybeSingle();
+  const s = settings as { access_token: string; is_active: boolean } | null;
+  if (!s?.access_token || !s.is_active) return;
+
+  const { sendTikTokCompletePayment } = await import("@/lib/tiktok/events-api");
+  const res = await sendTikTokCompletePayment({
+    pixelId: o.tiktok_pixel_id,
+    accessToken: s.access_token,
+    value: o.total_amount_mad,
+    currency: "MAD",
+    phone: o.customer_phone,
+    ttp: o.tiktok_ttp,
+    ttclid: o.tiktok_ttclid,
+    clientIp: o.tiktok_client_ip,
+    clientUserAgent: o.tiktok_client_ua,
+    eventId: o.id,
+  });
+
+  if (res.ok) {
+    await supabaseAdmin.from("orders").update({ tiktok_purchase_sent: true } as never).eq("id", o.id);
+  } else {
+    console.error("[tiktok-purchase] failed:", res.error);
   }
 }
