@@ -18,6 +18,8 @@ export interface DashboardSummary {
   refused_count:          number;
   no_answer_count:        number;
   cancelled_count:        number;
+  cancelled_after_confirm: number; // Annulés après avoir été confirmés (pour le taux d'annulation)
+  shipped_count:           number; // Expédiés (envoyés à la livraison, quelle que soit la suite)
   estimated_revenue:      number;
   real_revenue:           number;
   estimated_profit:       number;
@@ -33,8 +35,11 @@ export interface DashboardSummary {
   total_call_center_cost: number;  // commissions agents sur commandes payées de la période
   total_other_expenses:   number;  // domaine, abonnements, etc. (table expenses)
   true_final_profit:      number;  // real_profit - pub - call center - autres charges = LE vrai profit
-  confirmation_rate:      number;
-  delivery_rate:          number;
+  confirmation_rate:      number;  // Confirmés / Leads
+  cancellation_rate:      number;  // Annulés après confirmation / Confirmés
+  shipping_rate:          number;  // Expédiés / Confirmés
+  delivery_rate:          number;  // Livrés / Expédiés
+  return_rate:            number;  // Retours / Expédiés
   // New real finance fields
   total_delivery_margin:  number;  // +10 MAD per Casa order
   total_delivery_overcharge: number; // Digylog overcharged us
@@ -68,12 +73,16 @@ export interface ProductPerformance {
   is_real_ad_spend:    boolean;
   lead_count:          number;
   confirmed_count:     number;
+  cancelled_after_confirm: number;
+  shipped_count:       number;
   delivered_count:     number;
   returned_count:      number;
   refused_count:       number;
-  confirmation_rate:   number;
-  delivery_rate:       number;
-  refusal_rate:        number;
+  confirmation_rate:   number;  // Confirmés / Leads
+  cancellation_rate:   number;  // Annulés après confirmation / Confirmés
+  shipping_rate:       number;  // Expédiés / Confirmés
+  delivery_rate:       number;  // Livrés / Expédiés
+  refusal_rate:        number;  // Retours / Expédiés
   total_revenue:       number;
   real_revenue:        number;
   estimated_profit:    number;
@@ -192,12 +201,13 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   let q = supabase
     .from("orders")
     .select([
-      "status","is_paid","total_amount_mad","estimated_profit",
+      "id","status","is_paid","total_amount_mad","estimated_profit",
       "real_profit_mad","cogs_total","delivery_cost_real_mad","return_cost_mad",
       "customer_city","expected_delivery_cost","delivery_margin","actual_delivery_cost",
       "assigned_to",
-    ].join(","))
-    .neq("status", "cancelled");
+    ].join(","));
+  // Note: on n'exclut PLUS "cancelled" ici — on en a besoin pour calculer le
+  // taux d'annulation après confirmation. Elles sont juste exclues du profit/CA.
 
   if (filter) {
     q = q.gte("created_at", filter.from).lte("created_at", filter.to + "T23:59:59");
@@ -208,7 +218,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
 
   const { data } = await q;
   const rows = (data ?? []) as {
-    status: string; is_paid: boolean;
+    id: string; status: string; is_paid: boolean;
     total_amount_mad: number; estimated_profit: number;
     real_profit_mad: number | null; cogs_total: number;
     delivery_cost_real_mad: number; return_cost_mad: number;
@@ -219,33 +229,53 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     assigned_to: string | null;
   }[];
 
-  const CONFIRMED_STATUSES = new Set(["confirmed","sent_to_delivery","in_transit","delivered","paid"]);
+  // ── "Confirmés" = commandes qui SONT PASSÉES par une confirmation, même si
+  // annulées/refusées/retournées ensuite — basé sur l'historique réel, pas
+  // le statut actuel seul (sinon une commande confirmée puis annulée disparaît
+  // à tort du taux de confirmation).
+  const orderIds = rows.map((r) => r.id);
+  const everConfirmedIds = new Set<string>();
+  if (orderIds.length > 0) {
+    const { data: histRows } = await supabaseAdmin
+      .from("order_status_history")
+      .select("order_id")
+      .eq("to_status", "confirmed")
+      .in("order_id", orderIds);
+    for (const h of (histRows ?? []) as { order_id: string }[]) everConfirmedIds.add(h.order_id);
+  }
+
+  const SHIPPED_STATUSES  = new Set(["sent_to_delivery","in_transit","delivered","paid","returned","refused_delivery"]);
   const DELIVERED_STATUSES = new Set(["delivered","paid"]);
+  const RETURNED_STATUSES  = new Set(["returned","refused_delivery"]);
 
-  const total_leads            = rows.length;
-  const confirmed_count        = rows.filter((r) => CONFIRMED_STATUSES.has(r.status)).length;
-  const sent_to_delivery_count = rows.filter((r) => r.status === "sent_to_delivery").length;
-  const in_transit_count       = rows.filter((r) => r.status === "in_transit").length;
-  const delivered_count        = rows.filter((r) => DELIVERED_STATUSES.has(r.status)).length;
-  const paid_count             = rows.filter((r) => r.status === "paid" && r.is_paid).length;
-  const returned_count         = rows.filter((r) => r.status === "returned").length;
-  const refused_count          = rows.filter((r) => r.status === "refused_delivery").length;
-  const no_answer_count        = rows.filter((r) => r.status === "no_answer").length;
-  const cancelled_count        = 0;
+  const activeRows = rows.filter((r) => r.status !== "cancelled"); // pour CA/profit uniquement
 
-  const estimated_revenue   = rows.reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
-  const real_revenue        = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
-  const estimated_profit    = rows.reduce((s, r) => s + (r.estimated_profit ?? 0), 0);
-  const real_profit         = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.real_profit_mad ?? 0), 0);
-  const total_cogs          = rows.reduce((s, r) => s + (r.cogs_total ?? 0), 0);
-  const total_delivery_cost = rows.reduce((s, r) => s + (r.delivery_cost_real_mad ?? 0), 0);
-  const total_return_losses = rows.reduce((s, r) => s + (r.return_cost_mad ?? 0), 0);
-  const pending_collection  = rows
+  const total_leads              = rows.length;
+  const confirmed_count          = rows.filter((r) => everConfirmedIds.has(r.id) || r.status === "confirmed").length;
+  const cancelled_after_confirm  = rows.filter((r) => r.status === "cancelled" && everConfirmedIds.has(r.id)).length;
+  const shipped_count            = rows.filter((r) => SHIPPED_STATUSES.has(r.status)).length;
+  const sent_to_delivery_count   = rows.filter((r) => r.status === "sent_to_delivery").length;
+  const in_transit_count         = rows.filter((r) => r.status === "in_transit").length;
+  const delivered_count          = rows.filter((r) => DELIVERED_STATUSES.has(r.status)).length;
+  const paid_count               = rows.filter((r) => r.status === "paid" && r.is_paid).length;
+  const returned_count           = rows.filter((r) => RETURNED_STATUSES.has(r.status)).length;
+  const refused_count            = rows.filter((r) => r.status === "refused_delivery").length;
+  const no_answer_count          = rows.filter((r) => r.status === "no_answer").length;
+  const cancelled_count          = rows.filter((r) => r.status === "cancelled").length;
+
+  const estimated_revenue   = activeRows.reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
+  const real_revenue        = activeRows.filter((r) => r.is_paid).reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
+  const estimated_profit    = activeRows.reduce((s, r) => s + (r.estimated_profit ?? 0), 0);
+  const real_profit         = activeRows.filter((r) => r.is_paid).reduce((s, r) => s + (r.real_profit_mad ?? 0), 0);
+  const total_cogs          = activeRows.reduce((s, r) => s + (r.cogs_total ?? 0), 0);
+  const total_delivery_cost = activeRows.reduce((s, r) => s + (r.delivery_cost_real_mad ?? 0), 0);
+  const total_return_losses = activeRows.reduce((s, r) => s + (r.return_cost_mad ?? 0), 0);
+  const pending_collection  = activeRows
     .filter((r) => DELIVERED_STATUSES.has(r.status) && !r.is_paid)
     .reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
 
   // Net à recevoir = montant collecté - frais livraison (20 MAD Casa, 35 MAD autres villes)
-  const net_a_recevoir = rows
+  const net_a_recevoir = activeRows
     .filter((r) => DELIVERED_STATUSES.has(r.status) && !r.is_paid)
     .reduce((s, r) => {
       const city = (r.customer_city ?? "").toLowerCase();
@@ -258,7 +288,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   // sont JAMAIS mis à jour par l'app avec le vrai frais par commande — on ne peut pas
   // s'y fier (ex: Casa reste à 35 au lieu de 20). On utilise donc le calcul par ville,
   // qui matche exactement les factures Digylog réelles (vérifié: 34/34 sans écart).
-  const net_collected = rows
+  const net_collected = activeRows
     .filter((r) => r.is_paid)
     .reduce((s, r) => {
       const city   = (r.customer_city ?? "").toLowerCase();
@@ -271,7 +301,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   let total_delivery_overcharge = 0;
   let casa_orders_count = 0;
 
-  for (const r of rows) {
+  for (const r of activeRows) {
     const city = r.customer_city ?? "";
     const norm = normalizeCity(city);
     const expectedCost = getExpectedDeliveryCost(city);
@@ -286,10 +316,17 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     if (overcharge > 0.5) total_delivery_overcharge += overcharge;
   }
 
+  // ── Les 5 KPI, formules exactes ──────────────────────────────────────────────
   const confirmation_rate = total_leads > 0
     ? Math.round(confirmed_count / total_leads * 1000) / 10 : 0;
-  const delivery_rate = confirmed_count > 0
-    ? Math.round(delivered_count / confirmed_count * 1000) / 10 : 0;
+  const cancellation_rate = confirmed_count > 0        // Annulation avant expédition
+    ? Math.round(cancelled_after_confirm / confirmed_count * 1000) / 10 : 0;
+  const shipping_rate = confirmed_count > 0            // Taux d'expédition
+    ? Math.round(shipped_count / confirmed_count * 1000) / 10 : 0;
+  const delivery_rate = shipped_count > 0              // Taux de livraison
+    ? Math.round(delivered_count / shipped_count * 1000) / 10 : 0;
+  const return_rate = shipped_count > 0                // Taux de retour
+    ? Math.round(returned_count / shipped_count * 1000) / 10 : 0;
   const net_margin_pct = real_revenue > 0
     ? Math.round(real_profit / real_revenue * 1000) / 10 : 0;
   const roi = total_cogs > 0
@@ -337,12 +374,12 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   return {
     total_leads, confirmed_count, sent_to_delivery_count, in_transit_count,
     delivered_count, paid_count, returned_count, refused_count,
-    no_answer_count, cancelled_count,
+    no_answer_count, cancelled_count, cancelled_after_confirm, shipped_count,
     estimated_revenue, real_revenue, estimated_profit, real_profit,
     total_cogs, total_delivery_cost, total_return_losses, pending_collection, net_a_recevoir,
     net_collected, total_ads_spend, real_profit_net_ads,
     total_call_center_cost, total_other_expenses, true_final_profit,
-    confirmation_rate, delivery_rate,
+    confirmation_rate, cancellation_rate, shipping_rate, delivery_rate, return_rate,
     total_delivery_margin, total_delivery_overcharge, casa_orders_count,
     net_margin_pct, roi,
   };
@@ -525,8 +562,7 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
   // This prevents counting all-time orders when a date filter is active
   let ordPeriodQ = supabase
     .from("orders")
-    .select("id,status,is_paid,total_amount_mad,estimated_profit,real_profit_mad,cogs_total,delivery_cost_real_mad,return_cost_mad")
-    .neq("status", "cancelled");
+    .select("id,status,is_paid,total_amount_mad,estimated_profit,real_profit_mad,cogs_total,delivery_cost_real_mad,return_cost_mad");
   if (filter) {
     ordPeriodQ = ordPeriodQ.gte("created_at", filter.from).lte("created_at", filter.to + "T23:59:59");
   }
@@ -546,8 +582,7 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
   const ordQ = supabase
     .from("orders")
     .select("id,status,is_paid,total_amount_mad,estimated_profit,real_profit_mad,cogs_total,delivery_cost_real_mad,return_cost_mad")
-    .in("id", orderIds)
-    .neq("status", "cancelled");
+    .in("id", orderIds);
 
   const { data: orders } = await ordQ;
   type OrderRow = {
@@ -555,9 +590,22 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
     estimated_profit: number; real_profit_mad: number | null;
     cogs_total: number; delivery_cost_real_mad: number; return_cost_mad: number;
   };
-  const ordersMap = new Map<string, Omit<OrderRow, "id">>();
+  const ordersMap = new Map<string, OrderRow>();
   for (const o of (orders ?? []) as unknown as OrderRow[]) {
     ordersMap.set(o.id, o);
+  }
+
+  // "Confirmés" = commandes qui SONT PASSÉES par une confirmation (historique
+  // réel), même si annulées ensuite — sinon une commande confirmée puis
+  // annulée disparaît à tort du taux de confirmation par produit.
+  const everConfirmedIds = new Set<string>();
+  if (orderIds.length > 0) {
+    const { data: histRows } = await supabaseAdmin
+      .from("order_status_history")
+      .select("order_id")
+      .eq("to_status", "confirmed")
+      .in("order_id", orderIds);
+    for (const h of (histRows ?? []) as { order_id: string }[]) everConfirmedIds.add(h.order_id);
   }
 
   const productOrders = new Map<string, string[]>();
@@ -566,36 +614,45 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
     productOrders.get(item.product_id)!.push(item.order_id);
   }
 
-  const CONF = new Set(["confirmed","sent_to_delivery","in_transit","delivered","paid"]);
-  const DELV = new Set(["delivered","paid"]);
-
   return ps.map((p) => {
     const oIds = productOrders.get(p.id) ?? [];
     const rows = oIds.map((id) => ordersMap.get(id)).filter(Boolean) as {
-      status: string; is_paid: boolean; total_amount_mad: number;
+      id: string; status: string; is_paid: boolean; total_amount_mad: number;
       estimated_profit: number; real_profit_mad: number | null;
       cogs_total: number; delivery_cost_real_mad: number; return_cost_mad: number;
     }[];
 
-    const lead_count      = rows.length;
-    const confirmed_count = rows.filter((r) => CONF.has(r.status)).length;
-    const delivered_count = rows.filter((r) => DELV.has(r.status)).length;
-    const returned_count  = rows.filter((r) => r.status === "returned").length;
-    const refused_count   = rows.filter((r) => r.status === "refused_delivery").length;
+    const SHIPPED  = new Set(["sent_to_delivery","in_transit","delivered","paid","returned","refused_delivery"]);
+    const DELV     = new Set(["delivered","paid"]);
+    const RETOURS  = new Set(["returned","refused_delivery"]);
+    const activeRows = rows.filter((r) => r.status !== "cancelled"); // CA/profit: hors annulées
 
+    const lead_count             = rows.length;
+    const confirmed_count        = rows.filter((r) => everConfirmedIds.has(r.id) || r.status === "confirmed").length;
+    const cancelled_after_confirm = rows.filter((r) => r.status === "cancelled" && everConfirmedIds.has(r.id)).length;
+    const shipped_count          = rows.filter((r) => SHIPPED.has(r.status)).length;
+    const delivered_count        = rows.filter((r) => DELV.has(r.status)).length;
+    const returned_count         = rows.filter((r) => RETOURS.has(r.status)).length;
+    const refused_count          = rows.filter((r) => r.status === "refused_delivery").length;
+
+    // Les 5 KPI, formules exactes
     const confirmation_rate = lead_count > 0
       ? Math.round(confirmed_count / lead_count * 1000) / 10 : 0;
-    const delivery_rate = confirmed_count > 0
-      ? Math.round(delivered_count / confirmed_count * 1000) / 10 : 0;
-    const refusal_rate = confirmed_count > 0
-      ? Math.round(refused_count / confirmed_count * 1000) / 10 : 0;
+    const cancellation_rate = confirmed_count > 0        // Annulation avant expédition
+      ? Math.round(cancelled_after_confirm / confirmed_count * 1000) / 10 : 0;
+    const shipping_rate = confirmed_count > 0            // Taux d'expédition
+      ? Math.round(shipped_count / confirmed_count * 1000) / 10 : 0;
+    const delivery_rate = shipped_count > 0              // Taux de livraison
+      ? Math.round(delivered_count / shipped_count * 1000) / 10 : 0;
+    const refusal_rate = shipped_count > 0               // Taux de retour
+      ? Math.round(returned_count / shipped_count * 1000) / 10 : 0;
 
-    const total_revenue    = rows.reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
-    const real_revenue     = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
-    const estimated_profit = rows.reduce((s, r) => s + (r.estimated_profit ?? 0), 0);
-    const total_cogs       = rows.reduce((s, r) => s + (r.cogs_total ?? 0), 0);
-    const total_delivery_cost = rows.reduce((s, r) => s + (r.delivery_cost_real_mad ?? 0), 0);
-    const return_losses    = rows.reduce((s, r) => s + (r.return_cost_mad ?? 0), 0);
+    const total_revenue    = activeRows.reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
+    const real_revenue     = activeRows.filter((r) => r.is_paid).reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
+    const estimated_profit = activeRows.reduce((s, r) => s + (r.estimated_profit ?? 0), 0);
+    const total_cogs       = activeRows.reduce((s, r) => s + (r.cogs_total ?? 0), 0);
+    const total_delivery_cost = activeRows.reduce((s, r) => s + (r.delivery_cost_real_mad ?? 0), 0);
+    const return_losses    = activeRows.reduce((s, r) => s + (r.return_cost_mad ?? 0), 0);
 
     // Real ad spend from a connected platform (Meta/Google/TikTok) takes
     // priority over the manual ads_cost_mad field on the product. The manual
@@ -659,7 +716,8 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
       sale_price_mad: p.sale_price_mad, total_cost_mad: p.total_cost_mad,
       unit_profit: p.estimated_profit_mad, ads_cost_mad: adsCostToUse, is_real_ad_spend,
       lead_count, confirmed_count, delivered_count, returned_count, refused_count,
-      confirmation_rate, delivery_rate, refusal_rate,
+      cancelled_after_confirm, shipped_count,
+      confirmation_rate, cancellation_rate, shipping_rate, delivery_rate, refusal_rate,
       total_revenue, real_revenue, estimated_profit, real_profit,
       total_cogs, total_delivery_cost, return_losses, real_margin_pct,
       performance_status: performance_status as ProductPerformance["performance_status"],
@@ -681,8 +739,9 @@ function makeEmptyPerf(
     unit_profit: p.estimated_profit_mad,
     ads_cost_mad: realAdSpend ?? p.ads_cost_mad,
     is_real_ad_spend: realAdSpend !== undefined,
-    lead_count: 0, confirmed_count: 0, delivered_count: 0, returned_count: 0, refused_count: 0,
-    confirmation_rate: 0, delivery_rate: 0, refusal_rate: 0,
+    lead_count: 0, confirmed_count: 0, cancelled_after_confirm: 0, shipped_count: 0,
+    delivered_count: 0, returned_count: 0, refused_count: 0,
+    confirmation_rate: 0, cancellation_rate: 0, shipping_rate: 0, delivery_rate: 0, refusal_rate: 0,
     total_revenue: 0, real_revenue: 0, estimated_profit: 0, real_profit: 0,
     total_cogs: 0, total_delivery_cost: 0, return_losses: 0, real_margin_pct: 0,
     performance_status: "no_data",
@@ -702,7 +761,7 @@ export async function getDailyFinance(days = 30, storeId?: string): Promise<Dail
     .neq("status", "cancelled");
 
   const map = new Map<string, DailyFinance>();
-  const CONF = new Set(["confirmed","sent_to_delivery","in_transit","delivered","paid"]);
+  const CONF = new Set(["confirmed","sent_to_delivery","in_transit","delivered","paid","returned","refused_delivery"]);
   const DELV = new Set(["delivered","paid"]);
 
   for (const o of (data ?? []) as {
