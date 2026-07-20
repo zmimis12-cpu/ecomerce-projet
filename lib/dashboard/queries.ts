@@ -235,13 +235,17 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   // à tort du taux de confirmation).
   const orderIds = rows.map((r) => r.id);
   const everConfirmedIds = new Set<string>();
+  const everShippedIds   = new Set<string>();
   if (orderIds.length > 0) {
     const { data: histRows } = await supabaseAdmin
       .from("order_status_history")
-      .select("order_id")
-      .eq("to_status", "confirmed")
+      .select("order_id, to_status")
+      .in("to_status", ["confirmed", "sent_to_delivery"])
       .in("order_id", orderIds);
-    for (const h of (histRows ?? []) as { order_id: string }[]) everConfirmedIds.add(h.order_id);
+    for (const h of (histRows ?? []) as { order_id: string; to_status: string }[]) {
+      if (h.to_status === "confirmed") everConfirmedIds.add(h.order_id);
+      if (h.to_status === "sent_to_delivery") everShippedIds.add(h.order_id);
+    }
   }
 
   const SHIPPED_STATUSES  = new Set(["sent_to_delivery","in_transit","delivered","paid","returned","refused_delivery"]);
@@ -253,7 +257,10 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   const total_leads              = rows.length;
   const confirmed_count          = rows.filter((r) => everConfirmedIds.has(r.id) || r.status === "confirmed").length;
   const cancelled_after_confirm  = rows.filter((r) => r.status === "cancelled" && everConfirmedIds.has(r.id)).length;
-  const shipped_count            = rows.filter((r) => SHIPPED_STATUSES.has(r.status)).length;
+  // "Expédiés" = a été envoyé à la livraison un jour (historique), même si
+  // annulé/perdu depuis — sinon un colis perdu par Digylog disparaît à tort
+  // du compte, alors qu'il a bien été réellement expédié (même bug que confirmé→annulé).
+  const shipped_count            = rows.filter((r) => everShippedIds.has(r.id) || SHIPPED_STATUSES.has(r.status)).length;
   const sent_to_delivery_count   = rows.filter((r) => r.status === "sent_to_delivery").length;
   const in_transit_count         = rows.filter((r) => r.status === "in_transit").length;
   const delivered_count          = rows.filter((r) => DELIVERED_STATUSES.has(r.status)).length;
@@ -595,17 +602,22 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
     ordersMap.set(o.id, o);
   }
 
-  // "Confirmés" = commandes qui SONT PASSÉES par une confirmation (historique
-  // réel), même si annulées ensuite — sinon une commande confirmée puis
-  // annulée disparaît à tort du taux de confirmation par produit.
+  // "Confirmés"/"Expédiés" = commandes qui SONT PASSÉES par cette étape
+  // (historique réel), même si annulées/perdues ensuite — sinon une commande
+  // confirmée puis annulée, ou expédiée puis perdue par Digylog, disparaît à
+  // tort des compteurs par produit.
   const everConfirmedIds = new Set<string>();
+  const everShippedIds   = new Set<string>();
   if (orderIds.length > 0) {
     const { data: histRows } = await supabaseAdmin
       .from("order_status_history")
-      .select("order_id")
-      .eq("to_status", "confirmed")
+      .select("order_id, to_status")
+      .in("to_status", ["confirmed", "sent_to_delivery"])
       .in("order_id", orderIds);
-    for (const h of (histRows ?? []) as { order_id: string }[]) everConfirmedIds.add(h.order_id);
+    for (const h of (histRows ?? []) as { order_id: string; to_status: string }[]) {
+      if (h.to_status === "confirmed") everConfirmedIds.add(h.order_id);
+      if (h.to_status === "sent_to_delivery") everShippedIds.add(h.order_id);
+    }
   }
 
   const productOrders = new Map<string, string[]>();
@@ -630,7 +642,7 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
     const lead_count             = rows.length;
     const confirmed_count        = rows.filter((r) => everConfirmedIds.has(r.id) || r.status === "confirmed").length;
     const cancelled_after_confirm = rows.filter((r) => r.status === "cancelled" && everConfirmedIds.has(r.id)).length;
-    const shipped_count          = rows.filter((r) => SHIPPED.has(r.status)).length;
+    const shipped_count          = rows.filter((r) => everShippedIds.has(r.id) || SHIPPED.has(r.status)).length;
     const delivered_count        = rows.filter((r) => DELV.has(r.status)).length;
     const returned_count         = rows.filter((r) => RETOURS.has(r.status)).length;
     const refused_count          = rows.filter((r) => r.status === "refused_delivery").length;
