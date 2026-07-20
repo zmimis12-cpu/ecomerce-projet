@@ -117,8 +117,9 @@ export default async function AdminDashboardPage({
               <KpiCard label="Confirmés"       value={summary.confirmed_count.toLocaleString()}
                 icon={CheckCircle} variant="blue"
                 sub={`${summary.confirmation_rate.toFixed(1)}% taux conf.`} />
-              <KpiCard label="Expédiés"        value={summary.sent_to_delivery_count.toLocaleString()}
-                icon={Send} variant="blue" />
+              <KpiCard label="Expédiés"        value={summary.shipped_count.toLocaleString()}
+                icon={Send} variant="blue"
+                sub={`${summary.shipping_rate.toFixed(1)}% taux exp.`} />
               <KpiCard label="En transit"      value={summary.in_transit_count.toLocaleString()}
                 icon={Truck} variant="blue" />
               <KpiCard label="Livrés"          value={summary.delivered_count.toLocaleString()}
