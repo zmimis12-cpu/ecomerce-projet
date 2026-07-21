@@ -57,7 +57,7 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
     ((defaultValues?.customer_photos as string[]) ?? []).join("\n")
   );
   const [sections,     setSections]     = useState<LPSection[]>(
-    (defaultValues?.sections as LPSection[]) ?? buildDefaultSections(templateKey)
+    (defaultValues?.sections as LPSection[]) ?? buildDefaultSections(templateKey, defaultValues?.title as string | undefined)
   );
 
   // Auto-fill when product selected
@@ -72,13 +72,15 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
       setB1(String(p.sale_price_mad));
       setB2(String((p.sale_price_mad * 2 * 0.9).toFixed(2)));
       setB3(String((p.sale_price_mad * 3 * 0.8).toFixed(2)));
+      setSections(buildDefaultSections(templateKey, p.name)); // remplit direct avec le vrai nom produit
     }
   }
 
   // Apply template — reset sections
   function handleTemplateChange(key: TemplateKey) {
     setTemplateKey(key);
-    setSections(buildDefaultSections(key));
+    const p = products.find((p) => p.id === productId);
+    setSections(buildDefaultSections(key, p?.name ?? title));
   }
 
   // Apply AI generated content
