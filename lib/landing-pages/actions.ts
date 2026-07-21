@@ -124,15 +124,23 @@ export async function upsertLandingPage(id: string | null, data: {
   // ── Section Engine: valider les sections déjà migrées vers le nouveau
   // système de schémas Zod (lib/lp-engine). Les types pas encore migrés
   // passent sans validation (migration progressive, pas un big-bang).
+  // Si une section est invalide (ex: données legacy incomplètes), on la
+  // RÉPARE automatiquement avec des valeurs par défaut au lieu de bloquer
+  // toute la sauvegarde — sinon une seule vieille section cassée empêche
+  // de sauvegarder n'importe quelle autre modification sur la page.
   if (Array.isArray(data.sections)) {
-    const { isMigratedSectionType, safeValidateSection } = await import("@/lib/lp-engine/schema/registry");
-    for (const section of data.sections as { type: string; [k: string]: unknown }[]) {
-      if (!isMigratedSectionType(section.type)) continue;
+    const { isMigratedSectionType, safeValidateSection, SECTION_REGISTRY } = await import("@/lib/lp-engine/schema/registry");
+    const ctx = { productId: "", productName: data.title || "المنتج", price: 0, description: null, mediaCount: 0 };
+    data.sections = (data.sections as { type: string; [k: string]: unknown }[]).map((section) => {
+      if (!isMigratedSectionType(section.type)) return section;
       const result = safeValidateSection(section.type, section);
-      if (!result.success) {
-        return { success: false, error: `Section "${section.type}" invalide: ${result.error}` };
-      }
-    }
+      if (result.success) return section;
+      // Réparation: on repart des valeurs par défaut du type, en gardant
+      // enabled/variant si présents, pour ne pas perdre l'état d'activation.
+      console.warn(`[lp-engine] Section "${section.type}" invalide (${result.error}) — réparée avec les valeurs par défaut.`);
+      const def = SECTION_REGISTRY[section.type];
+      return { type: section.type, enabled: section.enabled ?? true, ...def.defaultData(ctx) };
+    });
   }
 
   const { error } = id
