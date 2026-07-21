@@ -270,6 +270,16 @@ export async function unifiedSendToDigylog(
     } as never).eq("id", orderId),
   ]);
 
+  // Historique du statut — INDISPENSABLE pour que "Expédiés" compte cette
+  // commande même si elle est annulée/perdue plus tard côté Digylog (sinon
+  // elle disparaît à tort du décompte, comme observé: écart 61 vs 72 réels).
+  await supabaseAdmin.from("order_status_history").insert({
+    order_id:    orderId,
+    from_status: order.status,
+    to_status:   "sent_to_delivery",
+    notes:       "Envoyée à Digylog.",
+  } as never).then(() => {}, () => {});
+
   // Attach to today's daily batch (creates if not exists)
   let batchId: string | undefined;
   try {
