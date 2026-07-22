@@ -80,11 +80,16 @@ export function ProductGallery({ images, productName, discountPct = 0 }: Props) 
         }}
       >
         <Image
+          className="lp-gallery-zoom"
           src={active.public_url}
           alt={`${productName} — صورة ${activeIndex + 1}`}
           fill style={{ objectFit: "cover" }} priority={activeIndex === 0} unoptimized
           sizes="(max-width:600px) 100vw,(max-width:900px) 80vw,560px"
         />
+        <style jsx>{`
+          .lp-gallery-zoom{transition:transform .25s ease-out;}
+          .lp-gallery-zoom:active{transform:scale(1.04);}
+        `}</style>
 
         {/* Counter */}
         <span style={{

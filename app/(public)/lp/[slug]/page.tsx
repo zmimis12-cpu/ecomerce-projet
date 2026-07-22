@@ -205,6 +205,10 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       <link rel="preconnect" href="https://www.googletagmanager.com" />
       <link rel="dns-prefetch" href="https://wa.me" />
 
+      <script dangerouslySetInnerHTML={{ __html:
+        `if('IntersectionObserver' in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('lp-visible');io.unobserve(e.target);}});},{threshold:0.12});document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.lp-root section').forEach(function(s){io.observe(s);});});}else{document.querySelectorAll('.lp-root section').forEach(function(s){s.classList.add('lp-visible');});}`
+      }} />
+
       {page.google_gtm_id && (
         <noscript>
           <iframe src={`https://www.googletagmanager.com/ns.html?id=${page.google_gtm_id}`}
@@ -708,6 +712,26 @@ const GLOBAL_CSS = `
     from{opacity:0;transform:translateY(8px);}
     to{opacity:1;transform:translateY(0);}
   }
+
+  /* ── Scroll reveal: chaque section apparaît en douceur en descendant ── */
+  @media (prefers-reduced-motion: no-preference) {
+    .lp-root section{opacity:0;transform:translateY(20px);transition:opacity .55s ease-out,transform .55s ease-out;}
+    .lp-root section.lp-visible{opacity:1;transform:translateY(0);}
+    .lp-root section.lp-hero{opacity:1!important;transform:none!important;} /* toujours visible direct */
+  }
+
+  /* ── CTA pulse: attire l'œil sans être agressif ── */
+  @media (prefers-reduced-motion: no-preference) {
+    .lp-cta{animation:lpCtaPulse 2.2s ease-in-out infinite;}
+  }
+  @keyframes lpCtaPulse{
+    0%,100%{box-shadow:0 10px 28px -8px rgba(184,134,11,.5);transform:scale(1);}
+    50%{box-shadow:0 14px 36px -6px rgba(184,134,11,.7);transform:scale(1.015);}
+  }
+
+  /* ── Galerie: léger zoom au tap/clic ── */
+  .lp-gallery-img{transition:transform .25s ease-out;}
+  .lp-gallery-img:active{transform:scale(1.04);}
 
   /* ── Price card ── */
   .lp-price-card{display:flex;justify-content:space-between;align-items:center;
