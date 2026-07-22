@@ -166,10 +166,14 @@ function SectionFields({ section, idx, onField, onListItem }: {
 
     case "reviews": {
       const items = (section.items as { name: string; city: string; text: string }[]) ?? [];
+      const addItem = () => onField(idx, "items", [...items, { name: "", city: "", text: "" }]);
+      const removeItem = (i: number) => onField(idx, "items", items.filter((_, j) => j !== i));
       return (
         <div className="space-y-3">
           {items.map((item, i) => (
-            <div key={i} className="rounded-lg bg-secondary/20 p-3 space-y-2">
+            <div key={i} className="rounded-lg bg-secondary/20 p-3 space-y-2 relative">
+              <button type="button" onClick={() => removeItem(i)}
+                className="absolute top-2 left-2 text-red-500 hover:text-red-700 text-xs">✕</button>
               <div className="grid grid-cols-2 gap-2">
                 <input value={item.name} onChange={(e) => onListItem(idx, "items", i, "name", e.target.value)}
                   placeholder="Nom client" className="h-8 rounded-md border border-input bg-background px-2 text-xs" dir="auto" />
@@ -181,16 +185,24 @@ function SectionFields({ section, idx, onField, onListItem }: {
                 className="flex w-full rounded-md border border-input bg-background px-2 py-1 text-xs resize-none" dir="auto" />
             </div>
           ))}
+          <button type="button" onClick={addItem}
+            className="w-full rounded-md border border-dashed border-gray-300 py-2 text-xs text-muted-foreground hover:border-gray-400">
+            + Ajouter un avis
+          </button>
         </div>
       );
     }
 
     case "faq": {
       const items = (section.items as { q: string; a: string }[]) ?? [];
+      const addItem = () => onField(idx, "items", [...items, { q: "", a: "" }]);
+      const removeItem = (i: number) => onField(idx, "items", items.filter((_, j) => j !== i));
       return (
         <div className="space-y-3">
           {items.map((item, i) => (
-            <div key={i} className="space-y-1">
+            <div key={i} className="space-y-1 relative pl-4">
+              <button type="button" onClick={() => removeItem(i)}
+                className="absolute top-0 left-0 text-red-500 hover:text-red-700 text-xs">✕</button>
               <input value={item.q} onChange={(e) => onListItem(idx, "items", i, "q", e.target.value)}
                 placeholder="Question" className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs" dir="auto" />
               <textarea value={item.a} onChange={(e) => onListItem(idx, "items", i, "a", e.target.value)}
@@ -198,6 +210,10 @@ function SectionFields({ section, idx, onField, onListItem }: {
                 className="flex w-full rounded-md border border-input bg-background px-2 py-1 text-xs resize-none" dir="auto" />
             </div>
           ))}
+          <button type="button" onClick={addItem}
+            className="w-full rounded-md border border-dashed border-gray-300 py-2 text-xs text-muted-foreground hover:border-gray-400">
+            + Ajouter une question
+          </button>
         </div>
       );
     }
