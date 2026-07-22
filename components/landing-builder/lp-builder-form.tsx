@@ -5,6 +5,7 @@ import { upsertLandingPage } from "@/lib/landing-pages/actions";
 import { AIGenerateButton } from "./ai-generate-button";
 import { SmartGenerateButton } from "./smart-generate-button";
 import { SectionsEditor } from "./sections-editor";
+import { SectionsImporter } from "./sections-importer";
 import { SectionImagePicker } from "./section-image-picker";
 import { TEMPLATE_LABELS, TEMPLATE_DESCRIPTIONS, buildDefaultSections } from "@/lib/templates";
 import type { TemplateKey, LPSection } from "@/lib/templates";
@@ -450,6 +451,7 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
           <p className="text-xs text-muted-foreground mb-3">
             Activez/désactivez et éditez chaque section. L&apos;ordre est fixé par le template.
           </p>
+          <SectionsImporter sections={sections} onImport={setSections} />
           <SectionsEditor sections={sections} onChange={setSections} />
         </Card>
       )}
