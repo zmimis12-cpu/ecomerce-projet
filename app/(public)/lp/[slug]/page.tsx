@@ -642,7 +642,10 @@ const GLOBAL_CSS = `
   .lp-store-name{font-weight:800;font-size:13px;color:#111827;}
 
   /* ── Hero banner (image marketing optionnelle) ── */
-  .lp-hero-banner{width:100%;border-radius:16px;margin-bottom:14px;display:block;}
+  .lp-hero-banner{
+    width:100%;max-height:65vh;object-fit:contain;object-position:top center;
+    border-radius:16px;margin-bottom:14px;display:block;background:#f8f8f6;
+  }
 
   /* ── Badges ── */
   .lp-badges{display:flex;justify-content:center;flex-wrap:wrap;
