@@ -833,7 +833,7 @@ const GLOBAL_CSS = `
   .lp-story-item--green::before{content:"✓";position:absolute;right:0;color:#16a34a;font-weight:800;}
   .lp-story-img{width:100%;border-radius:12px;margin:8px 0;object-fit:cover;max-height:160px;}
 
-  .lp-step-img{width:56px;height:56px;border-radius:12px;object-fit:cover;margin:0 auto 8px;display:block;}
+  .lp-step-img{width:100%;max-width:150px;aspect-ratio:1/1;border-radius:14px;object-fit:cover;margin:0 auto 10px;display:block;box-shadow:0 2px 8px rgba(0,0,0,.08);}
 
   .lp-card--green{
     background:#f0fdf4;border-color:#bbf7d0;
