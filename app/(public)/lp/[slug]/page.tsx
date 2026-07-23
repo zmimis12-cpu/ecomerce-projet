@@ -205,7 +205,20 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       <link rel="dns-prefetch" href="https://wa.me" />
 
       <script dangerouslySetInnerHTML={{ __html:
-        `if('IntersectionObserver' in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('lp-visible');io.unobserve(e.target);}});},{threshold:0.12});document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.lp-root section').forEach(function(s){io.observe(s);});});}else{document.querySelectorAll('.lp-root section').forEach(function(s){s.classList.add('lp-visible');});}`
+        `if('IntersectionObserver' in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('lp-visible');io.unobserve(e.target);}});},{threshold:0.12});document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.lp-root section').forEach(function(s){io.observe(s);});});}else{document.querySelectorAll('.lp-root section').forEach(function(s){s.classList.add('lp-visible');});}
+        (function(){
+          function initSticky(){
+            var bar=document.getElementById('lp-sticky-bar');
+            var hero=document.querySelector('.lp-hero');
+            var form=document.getElementById('lp-form');
+            if(!bar||!hero||!form||!('IntersectionObserver' in window))return;
+            var heroPassed=false, formVisible=false;
+            function update(){ bar.classList.toggle('lp-sticky-show', heroPassed && !formVisible); }
+            new IntersectionObserver(function(es){ heroPassed=!es[0].isIntersecting; update(); },{threshold:0}).observe(hero);
+            new IntersectionObserver(function(es){ formVisible=es[0].isIntersecting; update(); },{threshold:0.15}).observe(form);
+          }
+          if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',initSticky);}else{initSticky();}
+        })();`
       }} />
 
       {page.google_gtm_id && (
@@ -307,6 +320,22 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </section>
 
+        {/* ── STATS BAR ── */}
+        {!!statsSection && Array.isArray(statsSection.items) && (
+          <section className="lp-section lp-stats-section">
+            <div className="lp-wrap">
+              <div className="lp-stats-grid">
+                {(statsSection.items as { percent: string; label: string }[]).map((s, i) => (
+                  <div key={i} className="lp-stat">
+                    <span className="lp-stat-num">{s.percent}</span>
+                    <p className="lp-stat-label">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* ── WHY THE PROBLEM EXISTS / WHY THIS SOLVES IT ── */}
         {!!psSection && Array.isArray(psSection.before_points) && Array.isArray(psSection.after_points) && (
           <section className="lp-section lp-story">
@@ -337,22 +366,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                     <li key={i} className="lp-story-item lp-story-item--green">{p}</li>
                   ))}
                 </ul>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ── STATS BAR ── */}
-        {!!statsSection && Array.isArray(statsSection.items) && (
-          <section className="lp-section lp-stats-section">
-            <div className="lp-wrap">
-              <div className="lp-stats-grid">
-                {(statsSection.items as { percent: string; label: string }[]).map((s, i) => (
-                  <div key={i} className="lp-stat">
-                    <span className="lp-stat-num">{s.percent}</span>
-                    <p className="lp-stat-label">{s.label}</p>
-                  </div>
-                ))}
               </div>
             </div>
           </section>
@@ -439,40 +452,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </section>
         )}
 
-        {/* ── GUARANTEES ── */}
-        {!!gtySection && Array.isArray(gtySection.items) && (
-          <section className="lp-section">
-            <div className="lp-wrap">
-              <h2 className="lp-h2">{String(gtySection.title ?? "ليه تثق فينا؟")}</h2>
-              <div className="lp-grid-2">
-                {(gtySection.items as { icon: string; title: string; desc: string }[]).map((g, i) => (
-                  <div key={i} className="lp-card lp-benefit">
-                    <span className="lp-benefit-icon">{g.icon}</span>
-                    <div>
-                      <p className="lp-benefit-title">{g.title}</p>
-                      <p className="lp-benefit-desc">{g.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ── ORDER FORM — repositionné ici (après bénéfices/garanties, avant
-             avis) suite à l'audit CRO: proposer le choix de bundle avant que
-             le client soit convaincu créait de la confusion prématurée. ── */}
-        <section className="lp-section">
-          <div id="lp-form" className="lp-wrap lp-form-inline">
-            <p className="lp-form-note green">{formNote}</p>
-            <OrderFormPublic product={product} productSlug={slug}
-              ctaText={ctaText} b1={b1} b2={b2} b3={b3}
-              pixelId={page.meta_pixel_id?.trim() || undefined}
-              tiktokPixelId={page.tiktok_pixel_id?.trim() || undefined}
-              cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
-          </div>
-        </section>
-
         {/* ── REVIEWS ── */}
         <section className="lp-section lp-section--gray">
           <div className="lp-wrap">
@@ -507,6 +486,26 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </section>
 
+        {/* ── GUARANTEES ── */}
+        {!!gtySection && Array.isArray(gtySection.items) && (
+          <section className="lp-section">
+            <div className="lp-wrap">
+              <h2 className="lp-h2">{String(gtySection.title ?? "ليه تثق فينا؟")}</h2>
+              <div className="lp-grid-2">
+                {(gtySection.items as { icon: string; title: string; desc: string }[]).map((g, i) => (
+                  <div key={i} className="lp-card lp-benefit">
+                    <span className="lp-benefit-icon">{g.icon}</span>
+                    <div>
+                      <p className="lp-benefit-title">{g.title}</p>
+                      <p className="lp-benefit-desc">{g.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* ── FAQ ── */}
         <section className="lp-section">
           <div className="lp-wrap">
@@ -531,6 +530,20 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </section>
         )}
 
+        {/* ── ORDER FORM — repositionné ici (après bénéfices/garanties, avant
+             avis) suite à l'audit CRO: proposer le choix de bundle avant que
+             le client soit convaincu créait de la confusion prématurée. ── */}
+        <section className="lp-section">
+          <div id="lp-form" className="lp-wrap lp-form-inline">
+            <p className="lp-form-note green">{formNote}</p>
+            <OrderFormPublic product={product} productSlug={slug}
+              ctaText={ctaText} b1={b1} b2={b2} b3={b3}
+              pixelId={page.meta_pixel_id?.trim() || undefined}
+              tiktokPixelId={page.tiktok_pixel_id?.trim() || undefined}
+              cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
+          </div>
+        </section>
+
         {/* ── FINAL CTA ── */}
         <section className="lp-final">
           <div className="lp-wrap" style={{ textAlign:"center" }}>
@@ -545,8 +558,9 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <p>جميع الحقوق محفوظة © {new Date().getFullYear()}</p>
         </footer>
 
-        {/* ── STICKY BAR (mobile) ── */}
-        <div className="lp-sticky">
+        {/* ── STICKY BAR (mobile) — apparaît après le hero, disparaît quand
+             le formulaire est visible, géré par le script plus bas ── */}
+        <div className="lp-sticky" id="lp-sticky-bar">
           <div className="lp-sticky-inner">
             <div className="lp-sticky-info">
               <p className="lp-sticky-name">{product.name}</p>
@@ -985,13 +999,18 @@ const GLOBAL_CSS = `
     font-weight:800;margin-bottom:4px;}
   .lp-final-sub{color:rgba(255,255,255,.8);font-size:13px;margin-bottom:18px;}
 
-  /* ── Sticky bar ── */
+  /* ── Sticky bar (mobile): apparaît après le hero, disparaît quand le
+       formulaire de commande est visible — géré en JS plus bas ── */
   .lp-sticky{
     position:fixed;bottom:0;left:0;right:0;z-index:50;
     background:#fff;border-top:1px solid #e5e7eb;
     padding:10px 16px 14px;
     box-shadow:0 -4px 16px rgba(0,0,0,.08);
+    transform:translateY(100%);opacity:0;
+    transition:transform .3s ease-out,opacity .3s ease-out;
+    pointer-events:none;
   }
+  .lp-sticky.lp-sticky-show{transform:translateY(0);opacity:1;pointer-events:auto;}
   .lp-sticky-inner{
     display:flex;align-items:center;gap:12px;
     max-width:580px;margin:0 auto;
@@ -999,13 +1018,16 @@ const GLOBAL_CSS = `
   .lp-sticky-info{flex:1;min-width:0;}
   .lp-sticky-name{font-weight:700;font-size:12px;color:#111827;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .lp-sticky-price{font-size:17px;font-weight:900;color:#16a34a;line-height:1.1;}
+  .lp-sticky-price{font-size:17px;font-weight:900;color:#8a6d00;line-height:1.1;}
   .lp-sticky-price small{font-size:11px;}
   .lp-sticky-btn{
-    flex-shrink:0;background:#16a34a;color:#fff;
+    flex-shrink:0;background:linear-gradient(135deg,#f7d264,#d4a017);color:#1a1400;
     font-family:var(--font-cairo),sans-serif;font-size:14px;font-weight:800;
     padding:11px 20px;border-radius:12px;text-decoration:none;
-    box-shadow:0 2px 10px rgba(22,163,74,.28);
+    box-shadow:0 4px 14px -2px rgba(184,134,11,.45);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .lp-sticky-btn{animation:lpCtaPulse 2.2s ease-in-out infinite;}
   }
 
   /* ── Desktop adjustments ── */
