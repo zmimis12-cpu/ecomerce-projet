@@ -6,7 +6,6 @@ import { FALLBACK_CITIES } from "@/components/landing/order-form-public";
 import { getLandingPage } from "@/lib/public/queries";
 import { OrderFormPublic } from "@/components/landing/order-form-public";
 import { StockCounter } from "@/components/landing/stock-counter";
-import { CountdownTimer } from "@/components/landing/countdown-timer";
 import { FaqAccordion } from "@/components/landing/faq-accordion";
 import { ProductGallery } from "@/components/landing/product-gallery";
 import type { LPSection } from "@/lib/templates";
@@ -290,18 +289,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             {/* Primary CTA */}
             <a href="#lp-form" className="lp-cta">{ctaText}</a>
 
-            {/* Order form — moved directly into the hero so a customer can
-                complete a purchase without scrolling past unrelated sections.
-                This is the core change from the old multi-section layout. */}
-            <div id="lp-form" className="lp-form-inline">
-              <p className="lp-form-note green">{formNote}</p>
-              <OrderFormPublic product={product} productSlug={slug}
-                ctaText={ctaText} b1={b1} b2={b2} b3={b3}
-                pixelId={page.meta_pixel_id?.trim() || undefined}
-                tiktokPixelId={page.tiktok_pixel_id?.trim() || undefined}
-                cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
-            </div>
-
             {/* Product description — clear, visible explanation of what this is */}
             <div className="lp-desc">
               <p>{description}</p>
@@ -472,6 +459,20 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </section>
         )}
 
+        {/* ── ORDER FORM — repositionné ici (après bénéfices/garanties, avant
+             avis) suite à l'audit CRO: proposer le choix de bundle avant que
+             le client soit convaincu créait de la confusion prématurée. ── */}
+        <section className="lp-section">
+          <div id="lp-form" className="lp-wrap lp-form-inline">
+            <p className="lp-form-note green">{formNote}</p>
+            <OrderFormPublic product={product} productSlug={slug}
+              ctaText={ctaText} b1={b1} b2={b2} b3={b3}
+              pixelId={page.meta_pixel_id?.trim() || undefined}
+              tiktokPixelId={page.tiktok_pixel_id?.trim() || undefined}
+              cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
+          </div>
+        </section>
+
         {/* ── REVIEWS ── */}
         <section className="lp-section lp-section--gray">
           <div className="lp-wrap">
@@ -535,7 +536,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <div className="lp-wrap" style={{ textAlign:"center" }}>
             <p className="lp-final-title">ما تخليش الفرصة تفوتك</p>
             <p className="lp-final-sub">الكمية محدودة · الدفع عند الاستلام · توصيل مجاني</p>
-            <CountdownTimer />
+            <StockCounter variant="dark" />
             <a href="#lp-form" className="lp-cta lp-cta--white">اطلب الآن</a>
           </div>
         </section>
@@ -641,16 +642,14 @@ const GLOBAL_CSS = `
 
   /* ── Store branding (confiance) ── */
   .lp-store-brand{
-    display:flex;align-items:center;justify-content:center;gap:10px;
-    padding:12px 16px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);
-    border-bottom:1px solid #f1f5f9;position:sticky;top:0;z-index:50;
-    box-shadow:0 1px 3px rgba(0,0,0,.04);
+    display:flex;align-items:center;justify-content:center;gap:6px;
+    padding:6px 16px;background:#fff;border-bottom:1px solid #f1f5f9;
   }
   .lp-store-logo{
-    width:34px;height:34px;border-radius:50%;object-fit:cover;
-    border:2px solid #f5c744;box-shadow:0 2px 8px rgba(184,134,11,.25);
+    width:20px;height:20px;border-radius:50%;object-fit:cover;
+    border:1.5px solid #f5c744;
   }
-  .lp-store-name{font-weight:800;font-size:14px;color:#111827;letter-spacing:.2px;}
+  .lp-store-name{font-weight:700;font-size:11px;color:#6b7280;letter-spacing:.2px;}
   @media (prefers-reduced-motion: no-preference) {
     .lp-store-brand{animation:lpStoreBrandIn .5s ease-out both;}
   }
