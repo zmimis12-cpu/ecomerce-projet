@@ -953,7 +953,7 @@ const GLOBAL_CSS = `
   /* ── Full-bleed image blocks avec titre superposé (structure nivo.ma) ── */
   .lp-fullbleed{margin-bottom:0;}
   .lp-fullbleed-img{
-    width:100%;aspect-ratio:4/5;background-size:cover;background-position:center;
+    width:100%;aspect-ratio:4/3;max-height:340px;background-size:cover;background-position:center;
     background-color:#1c1712;position:relative;display:flex;align-items:flex-end;
     padding:24px 20px;
   }
