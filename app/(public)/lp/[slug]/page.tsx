@@ -640,10 +640,24 @@ const GLOBAL_CSS = `
     letter-spacing:.01em;}
 
   /* ── Store branding (confiance) ── */
-  .lp-store-brand{display:flex;align-items:center;justify-content:center;gap:8px;
-    padding:10px 16px;background:#fff;border-bottom:1px solid #f1f5f9;}
-  .lp-store-logo{width:28px;height:28px;border-radius:50%;object-fit:cover;}
-  .lp-store-name{font-weight:800;font-size:13px;color:#111827;}
+  .lp-store-brand{
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    padding:12px 16px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);
+    border-bottom:1px solid #f1f5f9;position:sticky;top:0;z-index:50;
+    box-shadow:0 1px 3px rgba(0,0,0,.04);
+  }
+  .lp-store-logo{
+    width:34px;height:34px;border-radius:50%;object-fit:cover;
+    border:2px solid #f5c744;box-shadow:0 2px 8px rgba(184,134,11,.25);
+  }
+  .lp-store-name{font-weight:800;font-size:14px;color:#111827;letter-spacing:.2px;}
+  @media (prefers-reduced-motion: no-preference) {
+    .lp-store-brand{animation:lpStoreBrandIn .5s ease-out both;}
+  }
+  @keyframes lpStoreBrandIn{
+    from{opacity:0;transform:translateY(-10px);}
+    to{opacity:1;transform:translateY(0);}
+  }
 
   /* ── Hero banner (image marketing optionnelle) ── */
   .lp-hero-banner{
