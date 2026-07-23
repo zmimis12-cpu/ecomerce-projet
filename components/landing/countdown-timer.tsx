@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 
 /** Countdown daily reset (minuit) — crée une vraie urgence sans mentir sur une deadline fixe qui expire */
-export function CountdownTimer() {
+export function CountdownTimer({ variant = "block", label }: { variant?: "block" | "topbar"; label?: string }) {
   const [time, setTime] = useState<{ h: number; m: number; s: number } | null>(null);
 
   useEffect(() => {
@@ -22,6 +22,15 @@ export function CountdownTimer() {
   }, []);
 
   if (!time) return null;
+
+  if (variant === "topbar") {
+    return (
+      <div className="lp-urgency-bar">
+        🔥 {label ?? "التوصيل فابور لمدة محدودة"}{" "}
+        <strong>{String(time.h).padStart(2,"0")}:{String(time.m).padStart(2,"0")}:{String(time.s).padStart(2,"0")}</strong>
+      </div>
+    );
+  }
 
   return (
     <div className="lp-countdown">
