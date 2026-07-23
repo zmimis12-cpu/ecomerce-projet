@@ -6,6 +6,7 @@ import { FALLBACK_CITIES } from "@/components/landing/order-form-public";
 import { getLandingPage } from "@/lib/public/queries";
 import { OrderFormPublic } from "@/components/landing/order-form-public";
 import { StockCounter } from "@/components/landing/stock-counter";
+import { CountdownTimer } from "@/components/landing/countdown-timer";
 import { FaqAccordion } from "@/components/landing/faq-accordion";
 import { ProductGallery } from "@/components/landing/product-gallery";
 import type { LPSection } from "@/lib/templates";
@@ -209,12 +210,18 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         (function(){
           function initSticky(){
             var bar=document.getElementById('lp-sticky-bar');
-            var hero=document.querySelector('.lp-hero');
             var form=document.getElementById('lp-form');
-            if(!bar||!hero||!form||!('IntersectionObserver' in window))return;
-            var heroPassed=false, formVisible=false;
-            function update(){ bar.classList.toggle('lp-sticky-show', heroPassed && !formVisible); }
-            new IntersectionObserver(function(es){ heroPassed=!es[0].isIntersecting; update(); },{threshold:0}).observe(hero);
+            if(!bar||!form||!('IntersectionObserver' in window))return;
+            var scrolledEnough=false, formVisible=false;
+            function update(){ bar.classList.toggle('lp-sticky-show', scrolledEnough && !formVisible); }
+            function onScroll(){
+              var doc=document.documentElement;
+              var pct=(window.scrollY)/(doc.scrollHeight-doc.clientHeight);
+              scrolledEnough = pct >= 0.25;
+              update();
+            }
+            window.addEventListener('scroll', onScroll, { passive:true });
+            onScroll();
             new IntersectionObserver(function(es){ formVisible=es[0].isIntersecting; update(); },{threshold:0.15}).observe(form);
           }
           if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',initSticky);}else{initSticky();}
@@ -231,6 +238,9 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       <style>{GLOBAL_CSS}</style>
 
       <div className="lp-root" dir="rtl" lang="ar">
+
+        {/* ── URGENCY TOP BAR ── */}
+        <CountdownTimer variant="topbar" />
 
         {/* ── STORE BRANDING (confiance client) ── */}
         {(storeLogoUrl || storeName) && (
@@ -302,6 +312,18 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             {/* Primary CTA */}
             <a href="#lp-form" className="lp-cta">{ctaText}</a>
 
+            {/* Order form — juste après le hero, exactement comme sur les
+                captures Nivo.ma de référence (formulaire visible dès le
+                premier écran, avant tout le contenu de réassurance). */}
+            <div id="lp-form" className="lp-form-inline">
+              <p className="lp-form-note green">{formNote}</p>
+              <OrderFormPublic product={product} productSlug={slug}
+                ctaText={ctaText} b1={b1} b2={b2} b3={b3}
+                pixelId={page.meta_pixel_id?.trim() || undefined}
+                tiktokPixelId={page.tiktok_pixel_id?.trim() || undefined}
+                cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
+            </div>
+
             {/* Product description — clear, visible explanation of what this is */}
             <div className="lp-desc">
               <p>{description}</p>
@@ -336,39 +358,46 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </section>
         )}
 
-        {/* ── WHY THE PROBLEM EXISTS / WHY THIS SOLVES IT ── */}
+        {/* ── WHY THE PROBLEM EXISTS / WHY THIS SOLVES IT ──
+             Plein cadre, titre superposé sur l'image, bullets en dessous —
+             copie fidèle de la structure visuelle nivo.ma (pages 3/4/6 du PDF
+             de référence), pas juste des petites vignettes à côté du texte. */}
         {!!psSection && Array.isArray(psSection.before_points) && Array.isArray(psSection.after_points) && (
-          <section className="lp-section lp-story">
-            <div className="lp-wrap">
-              <div className="lp-story-col lp-story-before">
-                <span className="lp-story-tag lp-story-tag--red">المشكل</span>
-                <h2 className="lp-h2" style={{marginTop:8}}>{String(psSection.before_title ?? "")}</h2>
-                {!!psSection.before_image && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={String(psSection.before_image)} alt="" className="lp-story-img" />
-                )}
+          <>
+            <section className="lp-fullbleed">
+              <div className="lp-fullbleed-img" style={psSection.before_image ? {backgroundImage:`url(${String(psSection.before_image)})`} : undefined}>
+                {!psSection.before_image && <span className="lp-fullbleed-placeholder">[ صورة توضح المشكل ]</span>}
+                <div className="lp-fullbleed-overlay">
+                  <span className="lp-story-tag lp-story-tag--red">المشكل</span>
+                  <h2 className="lp-fullbleed-title">{String(psSection.before_title ?? "")}</h2>
+                </div>
+              </div>
+              <div className="lp-wrap lp-fullbleed-body">
                 <ul className="lp-story-list">
                   {(psSection.before_points as string[]).map((p, i) => (
                     <li key={i} className="lp-story-item lp-story-item--red">{p}</li>
                   ))}
                 </ul>
               </div>
-              <div className="lp-story-arrow">←</div>
-              <div className="lp-story-col lp-story-after">
-                <span className="lp-story-tag lp-story-tag--green">الحل</span>
-                <h2 className="lp-h2" style={{marginTop:8}}>{String(psSection.after_title ?? "")}</h2>
-                {!!psSection.after_image && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={String(psSection.after_image)} alt="" className="lp-story-img" />
-                )}
+            </section>
+
+            <section className="lp-fullbleed">
+              <div className="lp-fullbleed-img" style={psSection.after_image ? {backgroundImage:`url(${String(psSection.after_image)})`} : undefined}>
+                {!psSection.after_image && <span className="lp-fullbleed-placeholder">[ صورة توضح الحل ]</span>}
+                <div className="lp-fullbleed-overlay">
+                  <span className="lp-story-tag lp-story-tag--green">الحل</span>
+                  <h2 className="lp-fullbleed-title">{String(psSection.after_title ?? "")}</h2>
+                </div>
+              </div>
+              <div className="lp-wrap lp-fullbleed-body">
                 <ul className="lp-story-list">
                   {(psSection.after_points as string[]).map((p, i) => (
                     <li key={i} className="lp-story-item lp-story-item--green">{p}</li>
                   ))}
                 </ul>
               </div>
-            </div>
-          </section>
+            </section>
+          </>
         )}
 
         {/* ── BENEFITS (short) ── */}
@@ -490,6 +519,13 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         {!!gtySection && Array.isArray(gtySection.items) && (
           <section className="lp-section">
             <div className="lp-wrap">
+              {!!gtySection.box_image && (
+                <div className="lp-box-included">
+                  <p className="lp-box-included-title">📦 كلشي واجد فالطلبية</p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={String(gtySection.box_image)} alt="محتوى الطلبية" className="lp-box-included-img" />
+                </div>
+              )}
               <h2 className="lp-h2">{String(gtySection.title ?? "ليه تثق فينا؟")}</h2>
               <div className="lp-grid-2">
                 {(gtySection.items as { icon: string; title: string; desc: string }[]).map((g, i) => (
@@ -505,6 +541,25 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             </div>
           </section>
         )}
+
+        {/* ── POLICIES ACCORDION (retour/garantie/service client) ── */}
+        <section className="lp-section lp-section--dark">
+          <div className="lp-wrap">
+            {[
+              { icon: "📦", title: "سياسة الاسترجاع", body: "عندك 7 أيام من توصل الطلب باش ترجعو إلا كان فيه مشكل، بلا أي تعقيد." },
+              { icon: "🛡️", title: "7 أيام ضمان", body: "كل منتج مضمون 7 أيام — إلا وصلك فيه عيب، نبدلوه ليك فوراً بلا ما تخلص شي حاجة." },
+              { icon: "💬", title: "خدمة العملاء", body: "فريقنا موجود يجاوبك على أي سؤال، قبل وبعد الطلب — عبر الهاتف أو واتساب." },
+            ].map((p, i) => (
+              <details key={i} className="lp-policy">
+                <summary className="lp-policy-summary">
+                  <span>{p.icon} {p.title}</span>
+                  <span className="lp-policy-arrow">˅</span>
+                </summary>
+                <p className="lp-policy-body">{p.body}</p>
+              </details>
+            ))}
+          </div>
+        </section>
 
         {/* ── FAQ ── */}
         <section className="lp-section">
@@ -530,20 +585,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </section>
         )}
 
-        {/* ── ORDER FORM — repositionné ici (après bénéfices/garanties, avant
-             avis) suite à l'audit CRO: proposer le choix de bundle avant que
-             le client soit convaincu créait de la confusion prématurée. ── */}
-        <section className="lp-section">
-          <div id="lp-form" className="lp-wrap lp-form-inline">
-            <p className="lp-form-note green">{formNote}</p>
-            <OrderFormPublic product={product} productSlug={slug}
-              ctaText={ctaText} b1={b1} b2={b2} b3={b3}
-              pixelId={page.meta_pixel_id?.trim() || undefined}
-              tiktokPixelId={page.tiktok_pixel_id?.trim() || undefined}
-              cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
-          </div>
-        </section>
-
         {/* ── FINAL CTA ── */}
         <section className="lp-final">
           <div className="lp-wrap" style={{ textAlign:"center" }}>
@@ -555,21 +596,33 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         </section>
 
         <footer className="lp-footer">
-          <p>جميع الحقوق محفوظة © {new Date().getFullYear()}</p>
+          <div className="lp-footer-social">
+            <a href="#" aria-label="Facebook">📘</a>
+            <a href="#" aria-label="Instagram">📷</a>
+            <a href="#" aria-label="TikTok">🎵</a>
+          </div>
+          {!!storeName && <h3 className="lp-footer-about-title">من نحن — {storeName}</h3>}
+          <p className="lp-footer-about-text">
+            نحرص على توفير منتجات عملية ومختارة بعناية لتسهيل حياتك اليومية، مع خدمة توصيل موثوقة وسريعة داخل جميع مدن المغرب.
+          </p>
+          <div className="lp-footer-links">
+            <span>سياسة الخصوصية</span> · <span>شروط الخدمة</span> · <span>سياسة الاسترجاع</span> · <span>تواصل معنا</span>
+          </div>
+          <p className="lp-footer-copyright">
+            {storeName ?? "جميع الحقوق محفوظة"} © {new Date().getFullYear()}
+          </p>
         </footer>
 
-        {/* ── STICKY BAR (mobile) — apparaît après le hero, disparaît quand
-             le formulaire est visible, géré par le script plus bas ── */}
+        {/* ── FLOATING PILL CTA (mobile) — apparaît après 25% de scroll,
+             disparaît quand le formulaire est visible ── */}
         <div className="lp-sticky" id="lp-sticky-bar">
-          <div className="lp-sticky-inner">
-            <div className="lp-sticky-info">
-              <p className="lp-sticky-name">{product.name}</p>
-              <p className="lp-sticky-price">
-                {price.toFixed(0)} <small>درهم</small>
-              </p>
-            </div>
-            <a href="#lp-form" className="lp-sticky-btn">{ctaText}</a>
-          </div>
+          <a href="#lp-form" className="lp-sticky-pill">
+            <span className="lp-sticky-cart">🛒</span>
+            <span className="lp-sticky-texts">
+              <span className="lp-sticky-cta-text">{ctaText}</span>
+              <span className="lp-sticky-cod-text">الدفع عند الاستلام</span>
+            </span>
+          </a>
         </div>
 
         {/* ── FLOATING WHATSAPP BUTTON ── */}
@@ -614,10 +667,10 @@ const defaultFaq = [
 const GLOBAL_CSS = `
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;overflow-x:hidden}
-  body{font-family:var(--font-cairo),sans-serif;background:#f7f8fa;color:#111827;overflow-x:hidden;width:100%;position:relative}
+  body{font-family:var(--font-cairo),sans-serif;background:#0f0f10;color:#111827;overflow-x:hidden;width:100%;position:relative}
 
   /* ── Layout ── */
-  .lp-root{min-height:100vh;overflow-x:hidden;width:100%;max-width:100vw}
+  .lp-root{min-height:100vh;overflow-x:hidden;width:100%;max-width:100vw;background:#fff;border-radius:0 0 28px 28px;}
   .lp-wrap{max-width:580px;margin:0 auto;padding:0 16px;width:100%;box-sizing:border-box}
 
   /* ── Typography scale ── */
@@ -646,10 +699,41 @@ const GLOBAL_CSS = `
   .lp-hero{background:#fff;padding-bottom:28px}
   .lp-trust{background:#111827;margin-top:8px;padding:22px 0}
   .lp-final{background:#16a34a;margin-top:8px;padding:28px 0}
-  .lp-footer{background:#111827;padding:16px;text-align:center;
+  .lp-footer{background:#0b0b0b;padding:28px 20px;text-align:center;
     color:#6b7280;font-size:11px;margin-bottom:68px}
+  .lp-footer-social{display:flex;justify-content:center;gap:18px;font-size:20px;margin-bottom:18px;}
+  .lp-footer-social a{text-decoration:none;filter:grayscale(0);}
+  .lp-footer-about-title{color:#f5c744;font-size:14px;font-weight:800;margin-bottom:8px;}
+  .lp-footer-about-text{color:#9ca3af;font-size:11px;line-height:1.8;margin-bottom:16px;max-width:320px;margin-left:auto;margin-right:auto;}
+  .lp-footer-links{color:#d1d5db;font-size:10.5px;line-height:2;margin-bottom:16px;}
+  .lp-footer-copyright{color:#6b7280;font-size:10px;margin-top:8px;}
 
   /* ── Offer bar ── */
+  /* ── Urgency top bar (sombre chaud, pas noir pur) ── */
+  .lp-urgency-bar{
+    background:#221a12;color:#f5c744;text-align:center;
+    padding:8px 12px;font-size:12px;font-weight:700;
+    letter-spacing:.01em;
+  }
+  .lp-urgency-bar strong{color:#fff;font-weight:900;}
+
+  /* ── Section sombre (fond brun chaud, pas noir pur) ── */
+  .lp-section--dark{background:#1c1712;}
+  .lp-policy{border-bottom:1px solid rgba(245,199,68,.15);padding:14px 4px;}
+  .lp-policy:first-child{border-top:1px solid rgba(245,199,68,.15);}
+  .lp-policy-summary{
+    display:flex;justify-content:space-between;align-items:center;
+    cursor:pointer;list-style:none;color:#f5f0e6;font-weight:700;font-size:13px;
+  }
+  .lp-policy-summary::-webkit-details-marker{display:none;}
+  .lp-policy-arrow{color:#f5c744;transition:transform .2s;}
+  .lp-policy[open] .lp-policy-arrow{transform:rotate(180deg);}
+  .lp-policy-body{color:#c9beac;font-size:12px;line-height:1.7;margin-top:10px;}
+
+  .lp-box-included{text-align:center;margin-bottom:18px;}
+  .lp-box-included-title{font-weight:800;font-size:14px;margin-bottom:10px;}
+  .lp-box-included-img{width:100%;border-radius:14px;box-shadow:0 4px 16px rgba(0,0,0,.08);}
+
   .lp-bar{background:#111827;color:#fff;text-align:center;
     padding:9px 16px;font-size:13px;font-weight:600;
     letter-spacing:.01em;}
@@ -776,15 +860,18 @@ const GLOBAL_CSS = `
   /* ── CTA button ── */
   .lp-cta{
     display:block;width:100%;text-align:center;
-    background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;
+    background:linear-gradient(135deg,#f7d264,#d4a017);color:#1a1400;
     font-family:var(--font-cairo),sans-serif;
     font-size:clamp(15px,4vw,17px);font-weight:800;
-    padding:16px 24px;border-radius:14px;
+    padding:16px 24px;border-radius:16px;
     text-decoration:none;border:none;cursor:pointer;
-    box-shadow:0 4px 18px rgba(22,163,74,.32),0 1px 3px rgba(22,163,74,.2);
-    transition:background .15s,transform .1s,box-shadow .15s;
+    box-shadow:0 4px 18px rgba(184,134,11,.35),0 1px 3px rgba(184,134,11,.2);
+    transition:transform .18s ease,box-shadow .18s ease;
   }
-  .lp-cta:hover{box-shadow:0 6px 22px rgba(22,163,74,.4),0 1px 3px rgba(22,163,74,.2);}
+  @media(hover:hover){
+    .lp-cta:hover{transform:translateY(-2px) scale(1.015);box-shadow:0 8px 26px rgba(184,134,11,.45),0 2px 6px rgba(184,134,11,.25);}
+  }
+  .lp-cta:active{transform:scale(.97);box-shadow:0 2px 10px rgba(184,134,11,.3);}
   .lp-cta:active{transform:scale(.98);background:#15803d}
   .lp-cta:focus-visible{outline:3px solid #bbf7d0;outline-offset:2px;}
   .lp-cta--white{
@@ -837,11 +924,14 @@ const GLOBAL_CSS = `
 
   /* ── Cards ── */
   .lp-card{
-    background:#fff;border-radius:14px;
+    background:#fff;border-radius:20px;
     border:1px solid #e5e7eb;
     box-shadow:0 1px 2px rgba(0,0,0,.04),0 6px 16px rgba(0,0,0,.05);
     padding:16px 18px;
-    transition:box-shadow .2s,transform .2s;
+    transition:box-shadow .25s ease,transform .25s ease;
+  }
+  @media(hover:hover){
+    .lp-card:hover{transform:translateY(-3px);box-shadow:0 4px 8px rgba(0,0,0,.06),0 14px 28px rgba(0,0,0,.09);}
   }
 
   /* ── Story (why problem / why solution) ── */
@@ -859,6 +949,25 @@ const GLOBAL_CSS = `
   .lp-story-item--red::before{content:"✕";position:absolute;right:0;color:#dc2626;font-weight:800;}
   .lp-story-item--green::before{content:"✓";position:absolute;right:0;color:#16a34a;font-weight:800;}
   .lp-story-img{width:100%;border-radius:12px;margin:8px 0;object-fit:cover;max-height:160px;}
+
+  /* ── Full-bleed image blocks avec titre superposé (structure nivo.ma) ── */
+  .lp-fullbleed{margin-bottom:0;}
+  .lp-fullbleed-img{
+    width:100%;aspect-ratio:4/5;background-size:cover;background-position:center;
+    background-color:#1c1712;position:relative;display:flex;align-items:flex-end;
+    padding:24px 20px;
+  }
+  .lp-fullbleed-img::before{
+    content:"";position:absolute;inset:0;
+    background:linear-gradient(to top,rgba(0,0,0,.75) 20%,rgba(0,0,0,.15) 60%,transparent);
+  }
+  .lp-fullbleed-placeholder{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:#b8860b;font-size:12px;font-weight:700;text-align:center;padding:20px;
+  }
+  .lp-fullbleed-overlay{position:relative;z-index:1;}
+  .lp-fullbleed-title{color:#fff;font-size:22px;font-weight:900;line-height:1.35;margin-top:8px;}
+  .lp-fullbleed-body{padding:18px 16px;background:#fff;}
 
   .lp-step-img{width:100%;max-width:150px;aspect-ratio:1/1;border-radius:14px;object-fit:cover;margin:0 auto 10px;display:block;box-shadow:0 2px 8px rgba(0,0,0,.08);}
 
@@ -999,35 +1108,29 @@ const GLOBAL_CSS = `
     font-weight:800;margin-bottom:4px;}
   .lp-final-sub{color:rgba(255,255,255,.8);font-size:13px;margin-bottom:18px;}
 
-  /* ── Sticky bar (mobile): apparaît après le hero, disparaît quand le
-       formulaire de commande est visible — géré en JS plus bas ── */
+  /* ── Floating pill CTA (mobile): apparaît après 25% de scroll, disparaît
+       quand le formulaire de commande est visible — géré en JS plus bas ── */
   .lp-sticky{
-    position:fixed;bottom:0;left:0;right:0;z-index:50;
-    background:#fff;border-top:1px solid #e5e7eb;
-    padding:10px 16px 14px;
-    box-shadow:0 -4px 16px rgba(0,0,0,.08);
-    transform:translateY(100%);opacity:0;
+    position:fixed;bottom:16px;left:0;right:0;z-index:50;
+    display:flex;justify-content:center;
+    transform:translateY(120%);opacity:0;
     transition:transform .3s ease-out,opacity .3s ease-out;
     pointer-events:none;
   }
   .lp-sticky.lp-sticky-show{transform:translateY(0);opacity:1;pointer-events:auto;}
-  .lp-sticky-inner{
-    display:flex;align-items:center;gap:12px;
-    max-width:580px;margin:0 auto;
+  .lp-sticky-pill{
+    display:flex;align-items:center;gap:10px;
+    background:linear-gradient(135deg,#f7d264,#d4a017);color:#1a1400;
+    padding:12px 22px;border-radius:9999px;text-decoration:none;
+    box-shadow:0 8px 24px -4px rgba(184,134,11,.5),0 2px 8px rgba(0,0,0,.15);
+    font-family:var(--font-cairo),sans-serif;
   }
-  .lp-sticky-info{flex:1;min-width:0;}
-  .lp-sticky-name{font-weight:700;font-size:12px;color:#111827;
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .lp-sticky-price{font-size:17px;font-weight:900;color:#8a6d00;line-height:1.1;}
-  .lp-sticky-price small{font-size:11px;}
-  .lp-sticky-btn{
-    flex-shrink:0;background:linear-gradient(135deg,#f7d264,#d4a017);color:#1a1400;
-    font-family:var(--font-cairo),sans-serif;font-size:14px;font-weight:800;
-    padding:11px 20px;border-radius:12px;text-decoration:none;
-    box-shadow:0 4px 14px -2px rgba(184,134,11,.45);
-  }
+  .lp-sticky-cart{font-size:18px;}
+  .lp-sticky-texts{display:flex;flex-direction:column;line-height:1.2;}
+  .lp-sticky-cta-text{font-size:14px;font-weight:800;}
+  .lp-sticky-cod-text{font-size:9px;font-weight:600;opacity:.75;}
   @media (prefers-reduced-motion: no-preference) {
-    .lp-sticky-btn{animation:lpCtaPulse 2.2s ease-in-out infinite;}
+    .lp-sticky-pill{animation:lpCtaPulse 2.2s ease-in-out infinite;}
   }
 
   /* ── Desktop adjustments ── */
