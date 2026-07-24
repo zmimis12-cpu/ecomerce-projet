@@ -32,7 +32,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   const hasFiredInitiateCheckout = useRef(false);
   const [form, setForm] = useState({
     customer_name:"", customer_phone:"", customer_city:"",
-    customer_address:"", notes:"", website:"",
+    customer_address:"سيتم تأكيد العنوان عبر الهاتف", notes:"", website:"",
   });
 
   // InitiateCheckout — se déclenche une seule fois, à la première interaction
@@ -267,14 +267,9 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         {ERR(errors.customer_phone)}
       </div>
 
-      {/* Address */}
-      <div style={{ marginBottom:"14px" }}>
-        <label style={LBL}>العنوان التفصيلي *</label>
-        <input type="text" value={form.customer_address}
-          onChange={(e) => set("customer_address", e.target.value)}
-          placeholder="الحي، الشارع، رقم البناية..." style={INP(!!errors.customer_address)} required />
-        {ERR(errors.customer_address)}
-      </div>
+      {/* Address field removed from UI (demandé — jugé trop long/difficile pour
+          le client). On garde une valeur par défaut pour ne pas casser Digylog
+          qui a besoin de ce champ pour générer le bon de livraison. */}
 
       {/* City — custom searchable dropdown */}
       <div style={{ marginBottom:"14px", position:"relative" }}>
@@ -311,7 +306,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
             </div>
             <div style={{maxHeight:"200px", overflowY:"auto"}}>
               {cities
-                .filter(c => !citySearch || c.toLowerCase().includes(citySearch.toLowerCase()) || c.includes(citySearch))
+                .filter(c => citySearchMatches(c, citySearch))
                 .map(c => (
                   <div key={c}
                     onMouseDown={(e) => { e.preventDefault(); set("customer_city", c); setCityOpen(false); setCitySearch(""); }}
@@ -374,6 +369,36 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
       </p>
     </form>
   );
+}
+
+// Recherche en arabe sur des villes affichées en français (Digylog) — ne
+// change JAMAIS ce qui est affiché/stocké/envoyé à Digylog ou aux sheets,
+// sert UNIQUEMENT à faire matcher la saisie arabe du client avec la bonne ville.
+const CITY_AR_TO_FR: Record<string, string> = {
+  "الدار البيضاء":"casablanca", "كازا":"casablanca", "كازابلانكا":"casablanca",
+  "الرباط":"rabat", "مراكش":"marrakech", "فاس":"fes fez", "طنجة":"tanger tangier",
+  "أكادير":"agadir", "مكناس":"meknes", "وجدة":"oujda", "القنيطرة":"kenitra",
+  "تطوان":"tetouan", "سلا":"sale", "الجديدة":"jadida", "خريبكة":"khouribga",
+  "بني ملال":"beni mellal", "تازة":"taza", "الناظور":"nador", "سطات":"settat",
+  "آسفي":"safi", "العرائش":"larache", "الحسيمة":"hoceima", "الرشيدية":"rachidia errachidia",
+  "ورزازات":"ouarzazate", "إفران":"ifrane", "زاكورة":"zagora", "طاطا":"tata",
+  "العيون":"laayoune", "الداخلة":"dakhla", "برشيد":"berrechid", "الفقيه بن صالح":"fquih ben saleh",
+  "تارودانت":"taroudant", "تيفلت":"tiflet", "بركان":"berkane", "الصويرة":"essaouira",
+  "شفشاون":"chefchaouen", "ميدلت":"midelt", "قلعة السراغنة":"kelaa sraghna", "خنيفرة":"khenifra",
+  "سيدي قاسم":"sidi kacem", "سيدي سليمان":"sidi slimane", "تاونات":"taounate",
+};
+
+function citySearchMatches(cityName: string, query: string): boolean {
+  if (!query) return true;
+  const q = query.trim().toLowerCase();
+  if (cityName.toLowerCase().includes(q) || cityName.includes(query)) return true;
+  // Si la recherche contient de l'arabe, on la traduit et compare au nom français
+  for (const [ar, fr] of Object.entries(CITY_AR_TO_FR)) {
+    if (ar.includes(q) || q.includes(ar)) {
+      if (fr.split(" ").some((token) => cityName.toLowerCase().includes(token))) return true;
+    }
+  }
+  return false;
 }
 
 export const FALLBACK_CITIES = [
