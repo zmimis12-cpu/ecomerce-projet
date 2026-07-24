@@ -279,7 +279,9 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           style={{...INP(!!errors.customer_city), display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer", height:"54px", padding:"0 14px"}}
         >
           <span style={{color: form.customer_city ? "#111827" : "#9ca3af"}}>
-            {form.customer_city || "اختر مدينتك"}
+            {form.customer_city
+              ? `${form.customer_city}${cityArabicLabel(form.customer_city) ? ` (${cityArabicLabel(form.customer_city)})` : ""}`
+              : "اختر مدينتك"}
           </span>
           <span style={{fontSize:"12px", color:"#9ca3af"}}>▼</span>
         </div>
@@ -318,7 +320,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
                       color: form.customer_city === c ? "#16a34a" : "#111",
                       fontWeight: form.customer_city === c ? 700 : 400,
                     }}
-                  >{c}</div>
+                  >{c}{cityArabicLabel(c) ? ` (${cityArabicLabel(c)})` : ""}</div>
                 ))
               }
             </div>
@@ -369,6 +371,32 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
       </p>
     </form>
   );
+}
+
+// Affichage "Casablanca (الدار البيضاء)" pour que le client comprenne — la
+// VALEUR réelle envoyée/stockée reste toujours le nom français seul (Digylog,
+// sheets, etc. ne voient jamais l'arabe, juste l'affichage visuel change).
+const CITY_FR_TO_AR: Record<string, string> = {
+  "casablanca":"الدار البيضاء", "rabat":"الرباط", "marrakech":"مراكش",
+  "fes":"فاس", "fez":"فاس", "tanger":"طنجة", "tangier":"طنجة",
+  "agadir":"أكادير", "meknes":"مكناس", "oujda":"وجدة", "kenitra":"القنيطرة",
+  "tetouan":"تطوان", "sale":"سلا", "jadida":"الجديدة", "khouribga":"خريبكة",
+  "beni mellal":"بني ملال", "taza":"تازة", "nador":"الناظور", "settat":"سطات",
+  "safi":"آسفي", "larache":"العرائش", "hoceima":"الحسيمة", "rachidia":"الرشيدية",
+  "errachidia":"الرشيدية", "ouarzazate":"ورزازات", "ifrane":"إفران", "zagora":"زاكورة",
+  "tata":"طاطا", "laayoune":"العيون", "dakhla":"الداخلة", "berrechid":"برشيد",
+  "fquih ben saleh":"الفقيه بن صالح", "taroudant":"تارودانت", "tiflet":"تيفلت",
+  "berkane":"بركان", "essaouira":"الصويرة", "chefchaouen":"شفشاون", "midelt":"ميدلت",
+  "kelaa sraghna":"قلعة السراغنة", "khenifra":"خنيفرة", "sidi kacem":"سيدي قاسم",
+  "sidi slimane":"سيدي سليمان", "taounate":"تاونات",
+};
+
+function cityArabicLabel(cityName: string): string | null {
+  const norm = cityName.trim().toLowerCase();
+  for (const [fr, ar] of Object.entries(CITY_FR_TO_AR)) {
+    if (norm.includes(fr)) return ar;
+  }
+  return null;
 }
 
 // Recherche en arabe sur des villes affichées en français (Digylog) — ne
