@@ -414,7 +414,37 @@ function cityArabicLabel(cityName: string): string | null {
   for (const [fr, ar] of Object.entries(CITY_FR_TO_AR)) {
     if (norm.includes(fr)) return ar;
   }
-  return null;
+  // Ville pas dans le dictionnaire précis (Maroc = 1500+ communes, impossible
+  // de toutes les lister à la main) — translittération phonétique automatique
+  // en secours, pour qu'il y ait TOUJOURS un affichage arabe, même approximatif.
+  return transliterateToArabic(cityName.trim());
+}
+
+/** Translittération phonétique français → arabe, lettre par lettre (approximative
+ * mais lisible) — sert de filet de sécurité pour les villes non répertoriées. */
+function transliterateToArabic(name: string): string {
+  const s = stripAccents(name.toLowerCase());
+  const digraphs: [string, string][] = [
+    ["ch","ش"], ["gh","غ"], ["kh","خ"], ["th","ث"], ["ou","و"], ["ain","عين"],
+    ["sh","ش"], ["dh","ذ"], ["ph","ف"],
+  ];
+  const singles: Record<string, string> = {
+    a:"ا", b:"ب", c:"ك", d:"د", e:"ي", f:"ف", g:"ڭ", h:"ه", i:"ي", j:"ج",
+    k:"ك", l:"ل", m:"م", n:"ن", o:"و", p:"ب", q:"ق", r:"ر", s:"س", t:"ت",
+    u:"و", v:"ف", w:"و", x:"كس", y:"ي", z:"ز", " ":" ", "-":" ", "'":"",
+  };
+  let out = "";
+  let i = 0;
+  while (i < s.length) {
+    let matched = false;
+    for (const [d, ar] of digraphs) {
+      if (s.slice(i, i + d.length) === d) { out += ar; i += d.length; matched = true; break; }
+    }
+    if (matched) continue;
+    out += singles[s[i]] ?? s[i];
+    i++;
+  }
+  return out.trim();
 }
 
 // Recherche en arabe sur des villes affichées en français (Digylog) — ne
