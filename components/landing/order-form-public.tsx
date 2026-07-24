@@ -376,23 +376,41 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
 // Affichage "Casablanca (الدار البيضاء)" pour que le client comprenne — la
 // VALEUR réelle envoyée/stockée reste toujours le nom français seul (Digylog,
 // sheets, etc. ne voient jamais l'arabe, juste l'affichage visuel change).
+function stripAccents(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
 const CITY_FR_TO_AR: Record<string, string> = {
   "casablanca":"الدار البيضاء", "rabat":"الرباط", "marrakech":"مراكش",
   "fes":"فاس", "fez":"فاس", "tanger":"طنجة", "tangier":"طنجة",
   "agadir":"أكادير", "meknes":"مكناس", "oujda":"وجدة", "kenitra":"القنيطرة",
-  "tetouan":"تطوان", "sale":"سلا", "jadida":"الجديدة", "khouribga":"خريبكة",
-  "beni mellal":"بني ملال", "taza":"تازة", "nador":"الناظور", "settat":"سطات",
-  "safi":"آسفي", "larache":"العرائش", "hoceima":"الحسيمة", "rachidia":"الرشيدية",
-  "errachidia":"الرشيدية", "ouarzazate":"ورزازات", "ifrane":"إفران", "zagora":"زاكورة",
-  "tata":"طاطا", "laayoune":"العيون", "dakhla":"الداخلة", "berrechid":"برشيد",
-  "fquih ben saleh":"الفقيه بن صالح", "taroudant":"تارودانت", "tiflet":"تيفلت",
-  "berkane":"بركان", "essaouira":"الصويرة", "chefchaouen":"شفشاون", "midelt":"ميدلت",
-  "kelaa sraghna":"قلعة السراغنة", "khenifra":"خنيفرة", "sidi kacem":"سيدي قاسم",
-  "sidi slimane":"سيدي سليمان", "taounate":"تاونات",
+  "tetouan":"تطوان", "sale":"سلا", "el jadida":"الجديدة", "jadida":"الجديدة",
+  "khouribga":"خريبكة", "beni mellal":"بني ملال", "taza":"تازة", "nador":"الناظور",
+  "settat":"سطات", "safi":"آسفي", "larache":"العرائش", "hoceima":"الحسيمة",
+  "al hoceima":"الحسيمة", "rachidia":"الرشيدية", "errachidia":"الرشيدية",
+  "ouarzazate":"ورزازات", "ifrane":"إفران", "zagora":"زاكورة", "tata":"طاطا",
+  "laayoune":"العيون", "layoune":"العيون", "dakhla":"الداخلة", "berrechid":"برشيد",
+  "fquih ben salah":"الفقيه بن صالح", "fkih ben salah":"الفقيه بن صالح",
+  "taroudant":"تارودانت", "tiflet":"تيفلت", "berkane":"بركان", "essaouira":"الصويرة",
+  "chefchaouen":"شفشاون", "chaouen":"شفشاون", "midelt":"ميدلت",
+  "kelaa des sraghna":"قلعة السراغنة", "kelaa sraghna":"قلعة السراغنة",
+  "khenifra":"خنيفرة", "sidi kacem":"سيدي قاسم", "sidi slimane":"سيدي سليمان",
+  "taounate":"تاونات", "mohammedia":"المحمدية", "temara":"تمارة",
+  "khemisset":"الخميسات", "guelmim":"كلميم", "sefrou":"صفرو", "azrou":"أزرو",
+  "ouezzane":"وزان", "ben guerir":"بن جرير", "youssoufia":"اليوسفية",
+  "guercif":"جرسيف", "sidi bennour":"سيدي بنور", "boujdour":"بوجدور",
+  "smara":"السمارة", "assa zag":"أسا زاك", "tan tan":"طانطان", "tantan":"طانطان",
+  "azilal":"أزيلال", "demnate":"دمنات", "chichaoua":"شيشاوة", "el kelaa":"قلعة",
+  "bouarfa":"بوعرفة", "figuig":"فجيج", "jerada":"جرادة", "taourirt":"تاوريرت",
+  "ksar el kebir":"القصر الكبير", "asilah":"أصيلة", "martil":"مرتيل",
+  "fnideq":"الفنيدق", "mdiq":"المضيق", "sidi ifni":"سيدي إفني",
+  "moulay yacoub":"مولاي يعقوب", "ouislane":"ويسلان", "ain harrouda":"عين حرودة",
+  "bouznika":"بوزنيقة", "skhirate":"الصخيرات", "had soualem":"حد السوالم",
+  "driouch":"الدريوش", "imzouren":"إمزورن", "targuist":"تارجيست",
 };
 
 function cityArabicLabel(cityName: string): string | null {
-  const norm = cityName.trim().toLowerCase();
+  const norm = stripAccents(cityName.trim().toLowerCase());
   for (const [fr, ar] of Object.entries(CITY_FR_TO_AR)) {
     if (norm.includes(fr)) return ar;
   }
@@ -419,7 +437,8 @@ const CITY_AR_TO_FR: Record<string, string> = {
 function citySearchMatches(cityName: string, query: string): boolean {
   if (!query) return true;
   const q = query.trim().toLowerCase();
-  if (cityName.toLowerCase().includes(q) || cityName.includes(query)) return true;
+  const cityNorm = stripAccents(cityName.toLowerCase());
+  if (cityNorm.includes(stripAccents(q)) || cityName.includes(query)) return true;
   // Si la recherche contient de l'arabe, on la traduit et compare au nom français
   for (const [ar, fr] of Object.entries(CITY_AR_TO_FR)) {
     if (ar.includes(q) || q.includes(ar)) {
