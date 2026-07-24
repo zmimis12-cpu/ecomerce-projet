@@ -409,10 +409,17 @@ const CITY_FR_TO_AR: Record<string, string> = {
   "driouch":"الدريوش", "imzouren":"إمزورن", "targuist":"تارجيست",
 };
 
+function wordMatch(haystack: string, needle: string): boolean {
+  // Vérifie needle comme MOT ENTIER dans haystack (limites de mots), pas une
+  // simple sous-chaîne — sinon "saleh" matche à tort avec "sale" (Salé).
+  const re = new RegExp(`(^|[^a-z])${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z]|$)`, "i");
+  return re.test(haystack);
+}
+
 function cityArabicLabel(cityName: string): string | null {
   const norm = stripAccents(cityName.trim().toLowerCase());
   for (const [fr, ar] of Object.entries(CITY_FR_TO_AR)) {
-    if (norm.includes(fr)) return ar;
+    if (wordMatch(norm, fr)) return ar;
   }
   // Ville pas dans le dictionnaire précis (Maroc = 1500+ communes, impossible
   // de toutes les lister à la main) — translittération phonétique automatique
@@ -464,16 +471,35 @@ const CITY_AR_TO_FR: Record<string, string> = {
   "سيدي قاسم":"sidi kacem", "سيدي سليمان":"sidi slimane", "تاونات":"taounate",
 };
 
+/** Translittération inverse arabe → latin approximative, pour la recherche
+ * en secours sur les villes non répertoriées dans CITY_AR_TO_FR. */
+function transliterateArabicToLatin(s: string): string {
+  const map: Record<string, string> = {
+    "ا":"a", "ب":"b", "ت":"t", "ث":"th", "ج":"j", "ح":"h", "خ":"kh", "د":"d",
+    "ذ":"dh", "ر":"r", "ز":"z", "س":"s", "ش":"ch", "ص":"s", "ض":"d", "ط":"t",
+    "ظ":"z", "ع":"a", "غ":"gh", "ف":"f", "ق":"q", "ك":"k", "ل":"l", "م":"m",
+    "ن":"n", "ه":"h", "و":"ou", "ي":"i", "ى":"a", "ة":"a", "ء":"", " ":" ",
+  };
+  return s.split("").map((c) => map[c] ?? c).join("");
+}
+
 function citySearchMatches(cityName: string, query: string): boolean {
   if (!query) return true;
   const q = query.trim().toLowerCase();
   const cityNorm = stripAccents(cityName.toLowerCase());
   if (cityNorm.includes(stripAccents(q)) || cityName.includes(query)) return true;
-  // Si la recherche contient de l'arabe, on la traduit et compare au nom français
+  // Recherche arabe: 1) match direct via le dictionnaire précis (~75 villes)
   for (const [ar, fr] of Object.entries(CITY_AR_TO_FR)) {
     if (ar.includes(q) || q.includes(ar)) {
-      if (fr.split(" ").some((token) => cityName.toLowerCase().includes(token))) return true;
+      if (fr.split(" ").some((token) => cityNorm.includes(token))) return true;
     }
+  }
+  // 2) secours: translittération phonétique arabe→latin, pour toutes les
+  // autres villes (pas besoin d'être dans le dictionnaire pour être trouvée)
+  const isArabicQuery = /[\u0600-\u06FF]/.test(q);
+  if (isArabicQuery) {
+    const transliterated = transliterateArabicToLatin(q).replace(/\s+/g, " ").trim();
+    if (transliterated.length >= 3 && cityNorm.includes(transliterated)) return true;
   }
   return false;
 }
