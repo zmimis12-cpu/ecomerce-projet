@@ -43,6 +43,7 @@ export type ReconciliationStatus =
   | "UNPAID"
   | "FEE_OVERCHARGE"
   | "COD_MISMATCH"
+  | "RETURNED"
   | "EXTRA";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -264,6 +265,18 @@ export async function reconcileInvoice(invoiceId: string): Promise<{
       const codDigylog = item.cod_amount_mad;
       const codDiff    = Math.abs(codSystem - codDigylog);
 
+      // Commande retournée/refusée/annulée: un paiement à 0 (ou frais réduits)
+      // est NORMAL, pas une erreur — sinon chaque retour légitime s'affichait
+      // à tort comme un "écart" de plusieurs centaines de dirhams.
+      const RETURNED_STATUSES = new Set(["returned", "refused_delivery", "cancelled"]);
+      if (RETURNED_STATUSES.has(order.status)) {
+        status = "RETURNED";
+        mismatchReason = "Commande retournée/refusée — paiement à 0 normal, pas une erreur.";
+        totalExpectedPayout += 0;
+        totalActualPayout   += item.amount_paid_mad;
+        matched++;
+      } else {
+
       // Expected payout = COD - delivery cost
       const expectedPayout = codSystem - expectedDeliveryCost;
       // Actual payout from invoice
@@ -312,12 +325,13 @@ export async function reconcileInvoice(invoiceId: string): Promise<{
         payoutDiff,
         status,
       });
+      }
     }
 
     // Update item
     await supabaseAdmin.from("delivery_invoice_items").update({
       order_id:       order?.id ?? null,
-      matched_status: status === "OK" ? "matched" : status === "EXTRA" ? "pending" : "mismatched",
+      matched_status: (status === "OK" || status === "RETURNED") ? "matched" : status === "EXTRA" ? "pending" : "mismatched",
       mismatch_reason: mismatchReason,
     } as never).eq("id", item.id);
   }

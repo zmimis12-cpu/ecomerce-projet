@@ -5,6 +5,7 @@ import { ChevronLeft, CheckCircle, AlertTriangle, HelpCircle, TrendingDown } fro
 import { requireRole } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { ReconcileButton } from "@/components/delivery-integration/reconcile-button";
+import { MarkPaidButton } from "@/components/delivery-integration/mark-paid-button";
 import { normalizeCity, getExpectedDeliveryCost } from "@/lib/delivery/reconciliation-utils";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +26,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
 
   const { data: items } = await supabase
     .from("delivery_invoice_items")
-    .select("*, orders(order_number,customer_name,customer_city,total_amount_mad,status)")
+    .select("*, orders(id,order_number,customer_name,customer_city,total_amount_mad,status)")
     .eq("invoice_id", id)
     .order("matched_status");
 
@@ -42,7 +43,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     delivery_fee_mad: number; return_fee_mad: number; amount_paid_mad: number;
     invoice_status: string; matched_status: string; mismatch_reason: string | null;
     raw_payload: Record<string, unknown>;
-    orders: { order_number: string; customer_name: string; customer_city: string; total_amount_mad: number; status: string } | null;
+    orders: { id: string; order_number: string; customer_name: string; customer_city: string; total_amount_mad: number; status: string } | null;
   };
 
   const inv  = invoice as Record<string, unknown>;
@@ -62,6 +63,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     EXTRA:         { label:"Hors système", cls:"bg-purple-100 text-purple-700",icon:HelpCircle },
     DUPLICATE:     { label:"Doublon",      cls:"bg-yellow-100 text-yellow-700",icon:AlertTriangle },
     UNPAID:        { label:"Non payé",     cls:"bg-red-100 text-red-800",      icon:AlertTriangle },
+    RETURNED:      { label:"Retourné",     cls:"bg-blue-100 text-blue-700",    icon:CheckCircle },
     matched:       { label:"OK",           cls:"bg-green-100 text-green-800",  icon:CheckCircle },
     mismatched:    { label:"Écart",        cls:"bg-red-100 text-red-800",      icon:AlertTriangle },
     pending:       { label:"En attente",   cls:"bg-gray-100 text-gray-600",    icon:HelpCircle },
@@ -151,7 +153,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b bg-secondary/30">
-                {["Tracking","Commande","Ville","COD Sys.","COD Digy.","Frais attendu","Frais Digy.","Écart frais","Payout attendu","Payout réel","Diff","Statut","Raison"].map((h) => (
+                {["Tracking","Commande","Ville","COD Sys.","COD Digy.","Frais attendu","Frais Digy.","Écart frais","Payout attendu","Payout réel","Diff","Statut","Raison","Action"].map((h) => (
                   <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -206,6 +208,11 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                     </td>
                     <td className="px-3 py-2.5 text-muted-foreground max-w-[180px] truncate">
                       {item.mismatch_reason ?? "—"}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {item.orders?.id && badgeKey !== "matched" && (
+                        <MarkPaidButton orderId={item.orders.id} />
+                      )}
                     </td>
                   </tr>
                 );
