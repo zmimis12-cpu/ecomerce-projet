@@ -102,13 +102,28 @@ export async function POST(request: NextRequest) {
   const unitCost   = p.total_cost_mad ?? 0;
 
   // ── Bundle pricing ─────────────────────────────────────────────────────────
-  // Standard e-commerce bundle discounts: -10% for 2x, -20% for 3x
-  // The expected price is calculated server-side to avoid trusting the client.
-  // If the client sends a bundle_price that matches within 5% of the expected
-  // value, we use it. Otherwise we calculate it ourselves.
+  // On va chercher les VRAIS prix de bundle configurés par le vendeur sur la
+  // landing page (bundle_1/2/3_price) — jamais une formule générique -10%/-20%
+  // qui ne correspond pas forcément aux prix réellement affichés au client.
+  let realBundlePrices: Record<number, number | null> = { 1: null, 2: null, 3: null };
+  if (product_slug) {
+    const { data: lp } = await supabaseAdmin
+      .from("landing_pages")
+      .select("bundle_1_price, bundle_2_price, bundle_3_price")
+      .eq("slug", String(product_slug).trim().toLowerCase())
+      .maybeSingle();
+    if (lp) {
+      const l = lp as { bundle_1_price: number | null; bundle_2_price: number | null; bundle_3_price: number | null };
+      realBundlePrices = { 1: l.bundle_1_price, 2: l.bundle_2_price, 3: l.bundle_3_price };
+    }
+  }
+
   const BUNDLE_DISCOUNT: Record<number, number> = { 1: 0, 2: 0.10, 3: 0.20 };
   const discount     = BUNDLE_DISCOUNT[qty] ?? 0;
-  const expectedTotal = Math.round(unitPrice * qty * (1 - discount));
+  const genericFallback = Math.round(unitPrice * qty * (1 - discount));
+  // Prix attendu = le vrai prix configuré par le vendeur pour cette quantité,
+  // sinon (produit sans bundle configuré) on retombe sur la formule générique.
+  const expectedTotal = realBundlePrices[qty] ?? genericFallback;
 
   // Validate client-submitted bundle_price (must be within 5% of expected and >= cost)
   const clientBundlePrice = Number(bundle_price);
@@ -122,7 +137,8 @@ export async function POST(request: NextRequest) {
   ) {
     subtotal = clientBundlePrice;
   } else {
-    // Recalculate server-side with standard discount
+    // Recalculate server-side avec le vrai prix vendeur (ou la formule
+    // générique en dernier recours si aucun bundle n'est configuré)
     subtotal = expectedTotal;
   }
 
@@ -207,12 +223,16 @@ export async function POST(request: NextRequest) {
   const orderNumber = (order as { order_number: string }).order_number;
 
   // ── 8. Create order item ──────────────────────────────────────────────────────
+  // unit_price = prix EFFECTIF (prix bundle réel ÷ quantité), pas le prix
+  // catalogue brut — sinon l'affichage (unit_price × qté) montre un total
+  // différent du vrai total de la commande (ex: 298 affiché vs 249 réel).
+  const effectiveUnitPrice = Math.round((subtotal / qty) * 100) / 100;
   await supabaseAdmin.from("order_items").insert({
     order_id:      orderId,
     product_id:    p.id,
     product_name:  p.name,
     product_sku:   p.sku,
-    unit_price:    unitPrice,
+    unit_price:    effectiveUnitPrice,
     unit_cost_mad: unitCost,
     quantity:      qty,
     discount_pct:  0,
