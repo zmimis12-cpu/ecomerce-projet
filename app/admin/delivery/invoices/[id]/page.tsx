@@ -64,6 +64,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     DUPLICATE:     { label:"Doublon",      cls:"bg-yellow-100 text-yellow-700",icon:AlertTriangle },
     UNPAID:        { label:"Non payé",     cls:"bg-red-100 text-red-800",      icon:AlertTriangle },
     RETURNED:      { label:"Retourné",     cls:"bg-blue-100 text-blue-700",    icon:CheckCircle },
+    RETURNED_PENDING: { label:"Retour pas reçu", cls:"bg-amber-100 text-amber-800", icon:AlertTriangle },
     matched:       { label:"OK",           cls:"bg-green-100 text-green-800",  icon:CheckCircle },
     mismatched:    { label:"Écart",        cls:"bg-red-100 text-red-800",      icon:AlertTriangle },
     pending:       { label:"En attente",   cls:"bg-gray-100 text-gray-600",    icon:HelpCircle },
@@ -160,10 +161,11 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             </thead>
             <tbody className="divide-y">
               {enrichedRows.map((item) => {
-                const badgeKey = item.mismatch_reason?.includes("double") ? "DUPLICATE"
+                const badgeKey = (item as { reconciliation_status?: string }).reconciliation_status
+                  ?? (item.mismatch_reason?.includes("double") ? "DUPLICATE"
                   : item.matched_status === "matched" ? "matched"
                   : item.matched_status === "mismatched" ? "mismatched"
-                  : "pending";
+                  : "pending");
                 const badge = statusBadge[badgeKey as keyof typeof statusBadge] ?? statusBadge.pending;
                 const Icon = badge.icon;
                 return (
@@ -210,7 +212,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                       {item.mismatch_reason ?? "—"}
                     </td>
                     <td className="px-3 py-2.5">
-                      {item.orders?.id && badgeKey !== "matched" && (
+                      {item.orders?.id && badgeKey !== "matched" && badgeKey !== "OK" && badgeKey !== "RETURNED" && (
                         <MarkPaidButton orderId={item.orders.id} />
                       )}
                     </td>

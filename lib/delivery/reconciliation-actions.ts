@@ -44,6 +44,7 @@ export type ReconciliationStatus =
   | "FEE_OVERCHARGE"
   | "COD_MISMATCH"
   | "RETURNED"
+  | "RETURNED_PENDING"
   | "EXTRA";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -229,6 +230,20 @@ export async function reconcileInvoice(invoiceId: string): Promise<{
     orderMap.set(o.delivery_tracking_number.toUpperCase(), o);
   }
 
+  // Un colis "retourné" côté Digylog n'est PAS forcément physiquement reçu et
+  // vérifié — il faut avoir été scanné à l'entrepôt (table returns.received_at)
+  // pour être vraiment confirmé, sinon on affiche "en attente de réception".
+  const orderIdsForReturnCheck = (ordersData ?? []).map((o) => (o as ORow).id);
+  const receivedReturnOrderIds = new Set<string>();
+  if (orderIdsForReturnCheck.length > 0) {
+    const { data: receivedReturns } = await supabaseAdmin
+      .from("returns")
+      .select("order_id, received_at")
+      .in("order_id", orderIdsForReturnCheck)
+      .not("received_at", "is", null);
+    for (const r of (receivedReturns ?? []) as { order_id: string }[]) receivedReturnOrderIds.add(r.order_id);
+  }
+
   let matched = 0, missing = 0, extra = 0, feeOvercharge = 0, codMismatch = 0;
   let totalExpectedPayout = 0, totalActualPayout = 0;
 
@@ -263,15 +278,17 @@ export async function reconcileInvoice(invoiceId: string): Promise<{
     } else {
       const codSystem  = order.total_amount_mad;
       const codDigylog = item.cod_amount_mad;
-      const codDiff    = Math.abs(codSystem - codDigylog);
 
       // Commande retournée/refusée/annulée: un paiement à 0 (ou frais réduits)
       // est NORMAL, pas une erreur — sinon chaque retour légitime s'affichait
       // à tort comme un "écart" de plusieurs centaines de dirhams.
       const RETURNED_STATUSES = new Set(["returned", "refused_delivery", "cancelled"]);
       if (RETURNED_STATUSES.has(order.status)) {
-        status = "RETURNED";
-        mismatchReason = "Commande retournée/refusée — paiement à 0 normal, pas une erreur.";
+        const physicallyReceived = receivedReturnOrderIds.has(order.id);
+        status = physicallyReceived ? "RETURNED" : "RETURNED_PENDING";
+        mismatchReason = physicallyReceived
+          ? "Commande retournée/refusée — paiement à 0 normal, colis reçu et vérifié."
+          : "⚠️ Digylog annonce un retour, mais le colis n'a PAS encore été scanné/reçu à l'entrepôt — à vérifier.";
         totalExpectedPayout += 0;
         totalActualPayout   += item.amount_paid_mad;
         matched++;
@@ -288,9 +305,13 @@ export async function reconcileInvoice(invoiceId: string): Promise<{
 
       const reasons: string[] = [];
 
-      if (codDiff > 0.5) {
+      // Règle métier: Digylog qui paye PAREIL ou PLUS que prévu = bon signe,
+      // jamais une anomalie à signaler. Seul un paiement INFÉRIEUR est un vrai
+      // écart à corriger (Digylog collecté 600 MAD au lieu de 599 prévus = ok).
+      const codShortfall = codSystem - codDigylog; // positif = Digylog a payé MOINS que prévu
+      if (codShortfall > 0.5) {
         codMismatch++;
-        reasons.push(`COD système ${codSystem} ≠ Digylog ${codDigylog} (écart ${codDiff.toFixed(2)} MAD)`);
+        reasons.push(`COD système ${codSystem} ≠ Digylog ${codDigylog} (manque ${codShortfall.toFixed(2)} MAD)`);
       }
 
       if (feeDiff > 0.5) {
@@ -301,7 +322,7 @@ export async function reconcileInvoice(invoiceId: string): Promise<{
         reasons.push(`Frais sous-facturés ${Math.abs(feeDiff).toFixed(2)} MAD`);
       }
 
-      if (reasons.length === 0 && Math.abs(payoutDiff) < 1) {
+      if (reasons.length === 0 && payoutDiff > -1) {
         status = "OK";
         matched++;
       } else if (status !== "FEE_OVERCHARGE") {
@@ -331,7 +352,8 @@ export async function reconcileInvoice(invoiceId: string): Promise<{
     // Update item
     await supabaseAdmin.from("delivery_invoice_items").update({
       order_id:       order?.id ?? null,
-      matched_status: (status === "OK" || status === "RETURNED") ? "matched" : status === "EXTRA" ? "pending" : "mismatched",
+      matched_status: (status === "OK" || status === "RETURNED") ? "matched" : status === "EXTRA" || status === "RETURNED_PENDING" ? "pending" : "mismatched",
+      reconciliation_status: status,
       mismatch_reason: mismatchReason,
     } as never).eq("id", item.id);
   }
