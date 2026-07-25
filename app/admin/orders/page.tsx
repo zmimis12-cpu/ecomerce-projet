@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth/session";
 import { getOrders } from "@/lib/orders/queries";
 import { OrderList } from "@/components/orders/order-list";
+import { ImportBonRetourButton } from "@/components/orders/import-bon-retour-button";
 import { hasRole } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Commandes" };
@@ -24,11 +25,14 @@ export default async function OrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Commandes</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {isAgent ? "Vos commandes assignées." : "Toutes les commandes client."}
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Commandes</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {isAgent ? "Vos commandes assignées." : "Toutes les commandes client."}
+          </p>
+        </div>
+        {canManage && <ImportBonRetourButton />}
       </div>
       <OrderList orders={orders} canManage={canManage} />
     </div>

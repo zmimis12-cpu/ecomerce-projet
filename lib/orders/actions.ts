@@ -15,6 +15,65 @@ import { AGENT_ALLOWED_STATUSES } from "@/types/orders";
 const MANAGER_ROLES = ["super_admin", "admin", "manager"] as const;
 const ALL_ORDER_ROLES = ["super_admin", "admin", "manager", "call_center_agent"] as const;
 
+// ─── Import Bon Retour Digylog ───────────────────────────────────────────────
+// Colle le texte du PDF "Bon Retour" (Order / Traking / Ville / Store) —
+// on extrait les numéros de tracking et on marque les commandes correspondantes
+// comme "returned" automatiquement, au lieu de le faire une par une à la main.
+export async function importBonRetour(rawText: string): Promise<{
+  success: boolean; matched: number; notFound: string[]; error?: string;
+}> {
+  const session = await requireRole([...MANAGER_ROLES]);
+  const supabase = await createClient();
+
+  // Extrait les tracking codes: lignes du type "HC-01255  SF2CF10BT  Temara  HajtekZone"
+  // — on capture le token qui ressemble à un tracking Digylog (lettres+chiffres, 6-14 car.)
+  const lines = rawText.split("\n").map((l) => l.trim()).filter(Boolean);
+  const trackingCodes: string[] = [];
+  for (const line of lines) {
+    const tokens = line.split(/\s+/);
+    for (const t of tokens) {
+      if (/^[A-Z0-9]{6,14}$/.test(t) && /[0-9]/.test(t) && /[A-Z]/.test(t) && !/^HC-/.test(t)) {
+        trackingCodes.push(t);
+      }
+    }
+  }
+
+  if (trackingCodes.length === 0) {
+    return { success: false, matched: 0, notFound: [], error: "Aucun code de tracking détecté dans le texte collé." };
+  }
+
+  const { data: orders } = await supabase
+    .from("orders")
+    .select("id, delivery_tracking_number, status")
+    .in("delivery_tracking_number", trackingCodes);
+
+  const found = (orders ?? []) as { id: string; delivery_tracking_number: string; status: string }[];
+  const foundTrackingSet = new Set(found.map((o) => o.delivery_tracking_number));
+  const notFound = trackingCodes.filter((t) => !foundTrackingSet.has(t));
+
+  let matched = 0;
+  for (const o of found) {
+    if (o.status === "returned") { matched++; continue; } // déjà marqué, on skip proprement
+    const { error } = await supabase
+      .from("orders")
+      .update({ status: "returned" } as never)
+      .eq("id", o.id);
+    if (!error) {
+      await supabase.from("order_status_history").insert({
+        order_id: o.id,
+        from_status: o.status,
+        to_status: "returned",
+        changed_by: session.authId,
+        notes: "Import automatique — Bon Retour Digylog.",
+      } as never);
+      matched++;
+    }
+  }
+
+  revalidatePath("/admin/orders");
+  return { success: true, matched, notFound };
+}
+
 // ─── Create order ──────────────────────────────────────────────────────────────
 export async function createOrder(formData: FormData) {
   const session = await requireRole([...MANAGER_ROLES]);
