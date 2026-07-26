@@ -155,7 +155,13 @@ export default async function AdminDashboardPage({
                 sub="Après frais livraison (Casa 20 / Autres 35)" />
               <KpiCard label="Net Collecté"     value={mad((summary as {net_collected?:number}).net_collected ?? 0)}
                 icon={TrendingUp} variant="green" highlight
-                sub="Payé par Digylog, net des frais de livraison" />
+                sub="Digylog (net des frais) + livreur propre (montant intégral)" />
+              <KpiCard label="Livré par Digylog" value={(summary.digylog_count ?? 0).toLocaleString()}
+                icon={Package} variant="default"
+                sub="Commandes via transporteur" />
+              <KpiCard label="Livré par nous"    value={(summary.self_delivery_count ?? 0).toLocaleString()}
+                icon={Truck} variant="default"
+                sub={`${mad(summary.self_delivery_revenue ?? 0)} collecté (livreur propre)`} />
               <KpiCard label="Profit Estimé"   value={mad(summary.estimated_profit)}
                 icon={TrendingUp} />
               <KpiCard label="Profit Réel"     value={mad(summary.real_profit)}
