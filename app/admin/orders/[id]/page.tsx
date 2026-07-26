@@ -12,6 +12,7 @@ import { TrackingEditor } from "@/components/orders/tracking-editor";
 import { ExchangeDialog } from "@/components/orders/exchange-dialog";
 import { ResendWhatsAppButton } from "@/components/whatsapp/resend-whatsapp-button";
 import { ManualWhatsAppPanel } from "@/components/whatsapp/manual-whatsapp-panel";
+import { SelfDeliveryTicketButton } from "@/components/orders/self-delivery-ticket-button";
 import { DeleteOrderButton } from "@/components/orders/delete-order-button";
 import { hasRole } from "@/lib/auth/roles";
 import { DuplicateBadge } from "@/components/orders/duplicate-badge";
@@ -173,6 +174,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             )}
             {canManage && <ResendWhatsAppButton orderId={id} />}
             {canManage && <ManualWhatsAppPanel orderId={id} />}
+            {canManage && <SelfDeliveryTicketButton orderId={id} orderNumber={order.order_number} />}
           </div>
 
           {/* Agent assignment */}
