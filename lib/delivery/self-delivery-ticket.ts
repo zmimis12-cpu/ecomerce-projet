@@ -12,7 +12,7 @@ const MANAGER_ROLES = ["super_admin", "admin", "manager"] as const;
  *
  * Calcul: montant à collecter = total_amount_mad (prix produit intégral).
  */
-export async function generateSelfDeliveryTicket(orderId: string): Promise<{
+export async function generateSelfDeliveryTicket(orderId: string, deliveryFee: number = 0): Promise<{
   success: boolean; base64?: string; error?: string;
 }> {
   await requireRole([...MANAGER_ROLES]);
@@ -115,8 +115,19 @@ export async function generateSelfDeliveryTicket(orderId: string): Promise<{
   }
   y -= 12;
   // Montant à collecter — mis en avant, gros et encadré visuellement (couleur)
-  line("المبلغ الواجب تحصيله", { bold: true, size: 13 });
-  line(`${o.total_amount_mad.toFixed(2)} درهم`, { bold: true, size: 22, color: [0.09, 0.55, 0.25] });
+  const fee = Math.max(0, deliveryFee);
+  const net = o.total_amount_mad - fee;
+
+  line("المبلغ الواجب تحصيله من الزبون", { bold: true, size: 13 });
+  line(`${o.total_amount_mad.toFixed(2)} درهم`, { bold: true, size: 20, color: [0.09, 0.55, 0.25] });
+  y -= 6;
+
+  if (fee > 0) {
+    line(`أجرة التوصيل (للسائق): ${fee.toFixed(2)} درهم`, { size: 12, color: [0.72, 0.53, 0.04] });
+    y -= 4;
+    line("الصافي الواجب إرجاعه للمتجر", { bold: true, size: 13 });
+    line(`${net.toFixed(2)} درهم`, { bold: true, size: 20, color: [0.09, 0.3, 0.55] });
+  }
   y -= 20;
   line("توقيع الزبون: ________________", { size: 11 });
   y -= 4;
