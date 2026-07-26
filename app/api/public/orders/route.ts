@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     const variantEntries = Object.entries(rawVariants as Record<string, string>)
       .filter(([, v]) => v && String(v).trim());
     if (variantEntries.length > 0) {
-      const variantText = variantEntries.map(([k, v]) => `${k}: ${v}`).join(" | ");
+      const variantText = variantEntries.map(([, v]) => v).join(" | ");
       notesWithVariants = notesWithVariants ? `${notesWithVariants} — ${variantText}` : variantText;
     }
   }
