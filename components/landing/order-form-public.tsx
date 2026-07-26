@@ -227,7 +227,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
       {variants.length > 0 && variants.map((v, vi) => (
         <div key={vi} style={{marginBottom:"14px"}}>
           <label style={LBL}>{v.name} *</label>
-          <div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
+          <div style={{display:"flex",flexWrap:"wrap",gap:"10px"}}>
             {v.options.filter(o => o.label.trim()).map((opt, oi) => {
               const isSelected = selectedVariants[v.name] === opt.label;
               return (
@@ -236,22 +236,27 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
                   type="button"
                   onClick={() => setSelectedVariants(prev => ({...prev, [v.name]: opt.label}))}
                   style={{
-                    display:"flex", alignItems:"center", gap:"6px",
-                    padding: opt.image ? "6px 14px 6px 6px" : "8px 16px",
-                    borderRadius:"10px",border:"2px solid",
+                    display:"flex", flexDirection: opt.image ? "column" : "row",
+                    alignItems:"center", gap: opt.image ? "6px" : "0",
+                    padding: opt.image ? "8px" : "10px 18px",
+                    borderRadius:"14px",border:"2px solid",
                     borderColor: isSelected ? "#16a34a" : "#e5e7eb",
                     background: isSelected ? "#f0fdf4" : "#fff",
                     color: isSelected ? "#16a34a" : "#374151",
                     fontWeight: isSelected ? 700 : 400,
-                    fontSize:"14px",cursor:"pointer",
+                    fontSize:"13px",cursor:"pointer",
                     fontFamily:"var(--font-cairo),sans-serif",
                     transition:"all .15s",
+                    boxShadow: isSelected ? "0 2px 8px rgba(22,163,74,.15)" : "none",
                   }}
                 >
                   {opt.image && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={opt.image} alt={opt.label}
-                      style={{width:"28px",height:"28px",borderRadius:"7px",objectFit:"cover"}} />
+                      style={{
+                        width:"64px",height:"64px",borderRadius:"10px",objectFit:"cover",
+                        border: isSelected ? "2px solid #16a34a" : "1px solid #e5e7eb",
+                      }} />
                   )}
                   {opt.label}
                 </button>
