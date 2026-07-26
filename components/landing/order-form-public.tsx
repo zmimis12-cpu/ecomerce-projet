@@ -15,7 +15,7 @@ interface Props {
   ctaText?: string;
   b1: number; b2: number; b3: number;
   cities?: string[];
-  variants?: {name:string; options:string}[];
+  variants?: {name:string; options:{label:string; image?:string}[]}[];
   pixelId?: string;
   tiktokPixelId?: string;
 }
@@ -228,23 +228,35 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         <div key={vi} style={{marginBottom:"14px"}}>
           <label style={LBL}>{v.name} *</label>
           <div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
-            {v.options.split(",").map(opt => opt.trim()).filter(Boolean).map((opt, oi) => (
-              <button
-                key={oi}
-                type="button"
-                onClick={() => setSelectedVariants(prev => ({...prev, [v.name]: opt}))}
-                style={{
-                  padding:"8px 16px",borderRadius:"10px",border:"2px solid",
-                  borderColor: selectedVariants[v.name] === opt ? "#16a34a" : "#e5e7eb",
-                  background: selectedVariants[v.name] === opt ? "#f0fdf4" : "#fff",
-                  color: selectedVariants[v.name] === opt ? "#16a34a" : "#374151",
-                  fontWeight: selectedVariants[v.name] === opt ? 700 : 400,
-                  fontSize:"14px",cursor:"pointer",
-                  fontFamily:"var(--font-cairo),sans-serif",
-                  transition:"all .15s",
-                }}
-              >{opt}</button>
-            ))}
+            {v.options.filter(o => o.label.trim()).map((opt, oi) => {
+              const isSelected = selectedVariants[v.name] === opt.label;
+              return (
+                <button
+                  key={oi}
+                  type="button"
+                  onClick={() => setSelectedVariants(prev => ({...prev, [v.name]: opt.label}))}
+                  style={{
+                    display:"flex", alignItems:"center", gap:"6px",
+                    padding: opt.image ? "6px 14px 6px 6px" : "8px 16px",
+                    borderRadius:"10px",border:"2px solid",
+                    borderColor: isSelected ? "#16a34a" : "#e5e7eb",
+                    background: isSelected ? "#f0fdf4" : "#fff",
+                    color: isSelected ? "#16a34a" : "#374151",
+                    fontWeight: isSelected ? 700 : 400,
+                    fontSize:"14px",cursor:"pointer",
+                    fontFamily:"var(--font-cairo),sans-serif",
+                    transition:"all .15s",
+                  }}
+                >
+                  {opt.image && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={opt.image} alt={opt.label}
+                      style={{width:"28px",height:"28px",borderRadius:"7px",objectFit:"cover"}} />
+                  )}
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       ))}

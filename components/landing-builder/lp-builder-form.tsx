@@ -5,6 +5,7 @@ import { upsertLandingPage } from "@/lib/landing-pages/actions";
 import { AIGenerateButton } from "./ai-generate-button";
 import { SmartGenerateButton } from "./smart-generate-button";
 import { SectionsEditor } from "./sections-editor";
+import { VariantOptionsEditor, type VariantGroup } from "./variant-options-editor";
 import { SectionsImporter } from "./sections-importer";
 import { SectionImagePicker } from "./section-image-picker";
 import { TEMPLATE_LABELS, TEMPLATE_DESCRIPTIONS, buildDefaultSections } from "@/lib/templates";
@@ -53,6 +54,9 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
   const [b1,           setB1]           = useState<string>(String(defaultValues?.bundle_1_price ?? ""));
   const [b2,           setB2]           = useState<string>(String(defaultValues?.bundle_2_price ?? ""));
   const [b3,           setB3]           = useState<string>(String(defaultValues?.bundle_3_price ?? ""));
+  const [variantOptions, setVariantOptions] = useState<VariantGroup[]>(
+    (defaultValues?.variant_options as VariantGroup[] | undefined) ?? []
+  );
   const [aiAnalysis,   setAiAnalysis]   = useState<Record<string, string> | null>(null);
   const [customerPhotos, setCustomerPhotos] = useState<string>(
     ((defaultValues?.customer_photos as string[]) ?? []).join("\n")
@@ -137,6 +141,7 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
           is_active:        isActive,
           ai_analysis:     aiAnalysis ?? undefined,
           bundle_1_price:   b1 ? parseFloat(b1) : null,
+          variant_options:  variantOptions.filter((g) => g.name.trim() && g.options.some((o) => o.label.trim())),
           bundle_2_price:   b2 ? parseFloat(b2) : null,
           bundle_3_price:   b3 ? parseFloat(b3) : null,
         }
@@ -295,6 +300,13 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
                 </Field>
               ))}
             </div>
+          </Card>
+
+          <Card title="اختيارات المنتج (المقاس / اللون)">
+            <p className="text-xs text-muted-foreground mb-2">
+              اختيار الزبون غادي يتسجل تلقائياً فملاحظات الطلب (وكيتزاد لـ Google Sheets وDigylog).
+            </p>
+            <VariantOptionsEditor value={variantOptions} onChange={setVariantOptions} />
           </Card>
 
           <Card title="WhatsApp (optionnel)">

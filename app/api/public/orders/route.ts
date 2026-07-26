@@ -37,6 +37,20 @@ export async function POST(request: NextRequest) {
     bundle_price     = 0,    // total price for the bundle sent by the form
   } = body as Record<string, string | number>;
 
+  // Choix de variantes (taille/couleur) — fusionnés dans "notes" pour qu'ils
+  // apparaissent automatiquement à Digylog et dans les exports Google Sheets,
+  // sans avoir besoin d'une colonne séparée partout.
+  const rawVariants = (body as Record<string, unknown>).variants;
+  let notesWithVariants = String(notes);
+  if (rawVariants && typeof rawVariants === "object") {
+    const variantEntries = Object.entries(rawVariants as Record<string, string>)
+      .filter(([, v]) => v && String(v).trim());
+    if (variantEntries.length > 0) {
+      const variantText = variantEntries.map(([k, v]) => `${k}: ${v}`).join(" | ");
+      notesWithVariants = notesWithVariants ? `${notesWithVariants} — ${variantText}` : variantText;
+    }
+  }
+
   // ── 1. Honeypot ──────────────────────────────────────────────────────────────
   if (isHoneypotTriggered(String(website))) {
     // Silent accept — bots think they succeeded
@@ -193,7 +207,7 @@ export async function POST(request: NextRequest) {
       total_amount_mad:  subtotal,
       source:            "landing_page",
       landing_page_slug: pslug || p.slug,
-      notes:             String(notes).trim() || null,
+      notes:             notesWithVariants.trim() || null,
       import_source:     "landing_page",
       assigned_to:       agentId,
       ip_hash:           hashIp(ip),

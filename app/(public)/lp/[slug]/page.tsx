@@ -321,6 +321,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                 ctaText={ctaText} b1={b1} b2={b2} b3={b3}
                 pixelId={page.meta_pixel_id?.trim() || undefined}
                 tiktokPixelId={page.tiktok_pixel_id?.trim() || undefined}
+                variants={(Array.isArray(lp.variant_options) ? lp.variant_options : []) as { name: string; options: { label: string; image?: string }[] }[]}
                 cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
             </div>
 

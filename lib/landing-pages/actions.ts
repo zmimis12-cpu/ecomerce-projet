@@ -98,6 +98,7 @@ export async function upsertLandingPage(id: string | null, data: {
   hero_headline?: string;
   hero_subheadline?: string;
   hero_image?: string;
+  variant_options?: unknown;
   store_logo_url?: string;
   store_name?: string;
   price_text?: string;
