@@ -8,16 +8,15 @@ const MANAGER_ROLES = ["super_admin", "admin", "manager"] as const;
 function generateHZTrackingCode(orderNumber: string): string {
   const clean = orderNumber.replace(/[^A-Z0-9]/gi, "");
   const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `HZ-${clean}-${rand}`;
+  return `HZ${clean}${rand}`;
 }
 
 /**
- * Génère un ticket de livraison PDF 10×10cm pour une commande livrée par TON
- * PROPRE livreur (pas Digylog) — marque HajtekZone, avec QR code + code-barres
- * de tracking interne générés automatiquement.
- *
- * Calcul: montant à collecter = total_amount_mad. Si un frais de livreur est
- * précisé, le net à remettre au magasin = total - frais.
+ * Génère un ticket de livraison PDF 10×10cm, reproduisant la structure en
+ * grille/cases bordées d'une vraie étiquette de transporteur (logo/statut,
+ * expéditeur/destinataire, tracking+QR+montant, ville, produit, code-barres)
+ * — mais en marque HajtekZone, pour les livraisons gérées par ton propre
+ * livreur (pas Digylog).
  */
 export async function generateSelfDeliveryTicket(orderId: string, deliveryFee: number = 0): Promise<{
   success: boolean; base64?: string; error?: string;
@@ -39,9 +38,10 @@ export async function generateSelfDeliveryTicket(orderId: string, deliveryFee: n
 
   const { data: items } = await supabaseAdmin
     .from("order_items")
-    .select("product_name, quantity, unit_price")
+    .select("product_name, quantity")
     .eq("order_id", orderId);
-  const lineItems = (items ?? []) as { product_name: string; quantity: number; unit_price: number }[];
+  const lineItems = (items ?? []) as { product_name: string; quantity: number }[];
+  const productLine = lineItems.map((it) => `${it.quantity}x_${it.product_name}`).join(", ");
 
   const trackingCode = generateHZTrackingCode(o.order_number);
 
@@ -81,14 +81,13 @@ export async function generateSelfDeliveryTicket(orderId: string, deliveryFee: n
   // ── 10cm × 10cm exactement ──────────────────────────────────────────────────
   const SZ = 283.46; // 100mm en points PDF
   const page = doc.addPage([SZ, SZ]);
-  const MARGIN = 10;
-  const RIGHT = SZ - MARGIN;
-  const LEFT  = MARGIN;
+  const M = 6; // marge extérieure très fine, comme une vraie étiquette
+  const W = SZ - 2 * M;
+  const X0 = M;
+  const X1 = SZ - M;
+  const BORDER = rgb(0, 0, 0);
+  const GRAY_BG = rgb(0.93, 0.93, 0.93);
 
-  // FIX du bug d'inversion: ne JAMAIS reshaper une ligne qui mélange arabe et
-  // latin/chiffres — le reshaper arabe inverse alors TOUT le texte (y compris
-  // les chiffres/latin), donnant "58310-CH" au lieu de "CH-01358". On dessine
-  // donc le label arabe et la valeur latine comme 2 blocs séparés.
   function reshapeIfArabic(text: string): string {
     const fixed = text.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').trim();
     if (/[\u0600-\u06FF]/.test(fixed)) {
@@ -96,86 +95,124 @@ export async function generateSelfDeliveryTicket(orderId: string, deliveryFee: n
     }
     return fixed;
   }
-
-  /** Dessine "label: valeur" — label arabe (reshapé, aligné à droite) puis
-   * valeur latine/numérique (NON reshapée, dans son ordre normal), juste à
-   * gauche du label — jamais mélangés dans un seul appel drawText. */
-  function labelValue(label: string, value: string, y: number, opts: { size?: number; boldValue?: boolean; valueColor?: [number, number, number] } = {}) {
-    const size = opts.size ?? 11;
-    const labelText = reshapeIfArabic(label);
-    const labelW = fontNormal.widthOfTextAtSize(labelText, size);
-    page.drawText(labelText, { x: RIGHT - labelW, y, size, font: fontNormal, color: rgb(0.35, 0.35, 0.35) });
-
-    const valueFont = opts.boldValue ? fontBold : fontNormal;
-    const valueW = valueFont.widthOfTextAtSize(value, size);
-    page.drawText(value, {
-      x: RIGHT - labelW - 6 - valueW, y, size, font: valueFont,
-      color: opts.valueColor ? rgb(...opts.valueColor) : rgb(0.1, 0.1, 0.1),
-    });
-  }
-
-  /** Ligne 100% arabe (titre de section, etc.) — reshaping normal, sûr ici
-   * car aucun mélange avec du latin/chiffres. */
-  function arabicLine(text: string, y: number, opts: { bold?: boolean; size?: number; color?: [number, number, number] } = {}) {
+  function textR(text: string, xRight: number, y: number, opts: { bold?: boolean; size?: number; color?: [number, number, number] } = {}) {
     const font = opts.bold ? fontBold : fontNormal;
-    const size = opts.size ?? 11;
+    const size = opts.size ?? 9;
     const t = reshapeIfArabic(text);
     const w = font.widthOfTextAtSize(t, size);
-    page.drawText(t, { x: RIGHT - w, y, size, font, color: opts.color ? rgb(...opts.color) : rgb(0.1, 0.1, 0.1) });
+    page.drawText(t, { x: xRight - w, y, size, font, color: opts.color ? rgb(...opts.color) : rgb(0, 0, 0) });
+    return w;
+  }
+  function textL(text: string, xLeft: number, y: number, opts: { bold?: boolean; size?: number; color?: [number, number, number] } = {}) {
+    const font = opts.bold ? fontBold : fontNormal;
+    const size = opts.size ?? 9;
+    page.drawText(text, { x: xLeft, y, size, font, color: opts.color ? rgb(...opts.color) : rgb(0, 0, 0) });
+  }
+  function textCenterArabic(text: string, xCenter: number, y: number, opts: { bold?: boolean; size?: number } = {}) {
+    const font = opts.bold ? fontBold : fontNormal;
+    const size = opts.size ?? 9;
+    const t = reshapeIfArabic(text);
+    const w = font.widthOfTextAtSize(t, size);
+    page.drawText(t, { x: xCenter - w / 2, y, size, font, color: rgb(0, 0, 0) });
+  }
+  function hLine(y: number) {
+    page.drawLine({ start: { x: X0, y }, end: { x: X1, y }, thickness: 0.75, color: BORDER });
+  }
+  function vLine(x: number, yTop: number, yBottom: number) {
+    page.drawLine({ start: { x, y: yTop }, end: { x, y: yBottom }, thickness: 0.75, color: BORDER });
+  }
+  function outerBox(yTop: number, yBottom: number) {
+    page.drawRectangle({ x: X0, y: yBottom, width: W, height: yTop - yBottom, borderColor: BORDER, borderWidth: 1, color: undefined });
   }
 
-  let y = SZ - 18;
+  let y = SZ - M;
+  const rowH = (h: number) => { const top = y; y -= h; return top; };
 
-  // ── En-tête HajtekZone (PAS Digylog) ──────────────────────────────────────
-  page.drawText("HajtekZone", { x: LEFT, y, size: 15, font: fontBold, color: rgb(0.72, 0.53, 0.04) });
-  arabicLine("توصيل داخلي", y, { bold: true, size: 12 });
-  y -= 16;
-  page.drawLine({ start: { x: LEFT, y }, end: { x: RIGHT, y }, thickness: 1, color: rgb(0.85, 0.85, 0.85) });
-  y -= 14;
+  // ── Cadre extérieur global ───────────────────────────────────────────────
+  outerBox(SZ - M, M);
 
-  labelValue("رقم الطلب:", o.order_number, y, { boldValue: true }); y -= 15;
-  labelValue("رمز التتبع:", trackingCode, y, { size: 10 }); y -= 15;
-  labelValue("التاريخ:", new Date(o.created_at).toLocaleDateString("fr-FR"), y, { size: 10 }); y -= 18;
+  // ── Rangée 1: Logo HajtekZone | Statut/Date ──────────────────────────────
+  const row1Top = rowH(30);
+  hLine(row1Top - 30);
+  const midX1 = X0 + W * 0.55;
+  vLine(midX1, row1Top, row1Top - 30);
+  textL("HajtekZone", X0 + 6, row1Top - 19, { bold: true, size: 15, color: [0.72, 0.53, 0.04] });
+  page.drawRectangle({ x: midX1, y: row1Top - 15, width: X1 - midX1, height: 15, color: rgb(0.09, 0.09, 0.09) });
+  textCenterArabic("توصيل داخلي (ليس Digylog)", midX1 + (X1 - midX1) / 2, row1Top - 12, { bold: true, size: 8 });
+  textCenterArabic(new Date(o.created_at).toLocaleDateString("fr-FR"), midX1 + (X1 - midX1) / 2, row1Top - 26, { size: 9 });
 
-  arabicLine("معلومات الزبون", y, { bold: true, size: 11 }); y -= 15;
-  labelValue("الاسم:", o.customer_name, y, { size: 10 }); y -= 14;
-  labelValue("الهاتف:", o.customer_phone, y, { size: 10, boldValue: true }); y -= 14;
-  labelValue("المدينة:", o.customer_city, y, { size: 10 }); y -= 14;
-  arabicLine(`العنوان: ${o.customer_address}`, y, { size: 9 }); y -= 18;
+  // ── Rangée 2: Expéditeur | Destinataire ──────────────────────────────────
+  const row2Top = row1Top - 30;
+  const row2H = 28;
+  hLine(row2Top - row2H);
+  vLine(midX1, row2Top, row2Top - row2H);
+  textL("Expediteur :", X0 + 6, row2Top - 11, { bold: true, size: 8 });
+  textL("HajtekZone", X0 + 6, row2Top - 22, { size: 9 });
+  textL("Destinataire :", midX1 + 6, row2Top - 11, { bold: true, size: 8 });
+  textL(o.customer_name, midX1 + 6, row2Top - 22, { size: 9 });
 
-  arabicLine("المنتج", y, { bold: true, size: 11 }); y -= 15;
-  for (const it of lineItems) {
-    labelValue(`${it.product_name} ×${it.quantity}`, `${(it.unit_price * it.quantity).toFixed(2)} MAD`, y, { size: 9 });
-    y -= 13;
-  }
-  y -= 8;
+  // ── Rangée 3: Tracking/ID | QR | Montant ─────────────────────────────────
+  const row3Top = row2Top - row2H;
+  const row3H = 55;
+  const colA = X0 + W * 0.32;
+  const colB = X0 + W * 0.68;
+  hLine(row3Top - row3H);
+  vLine(colA, row3Top, row3Top - row3H);
+  vLine(colB, row3Top, row3Top - row3H);
+  textL(trackingCode, X0 + 6, row3Top - 22, { bold: true, size: 10 });
+  textL(o.order_number, X0 + 6, row3Top - 42, { size: 9 });
 
-  const fee = Math.max(0, deliveryFee);
-  const net = o.total_amount_mad - fee;
-  arabicLine("المبلغ الواجب تحصيله", y, { bold: true, size: 11 }); y -= 16;
-  page.drawText(`${o.total_amount_mad.toFixed(2)} MAD`, { x: RIGHT - fontBold.widthOfTextAtSize(`${o.total_amount_mad.toFixed(2)} MAD`, 18), y, size: 18, font: fontBold, color: rgb(0.09, 0.55, 0.25) });
-  y -= 20;
-  if (fee > 0) {
-    labelValue("أجرة السائق:", `${fee.toFixed(2)} MAD`, y, { size: 10, valueColor: [0.72, 0.53, 0.04] }); y -= 14;
-    labelValue("الصافي للمتجر:", `${net.toFixed(2)} MAD`, y, { size: 11, boldValue: true, valueColor: [0.09, 0.3, 0.55] }); y -= 16;
-  }
-
-  // ── QR code + code-barres du tracking généré (bas du ticket) ──────────────
   const qrDataUrl = await QRCode.toDataURL(trackingCode, { margin: 0, width: 200 });
   const qrPngBytes = Buffer.from(qrDataUrl.split(",")[1], "base64");
   const qrImage = await doc.embedPng(qrPngBytes);
-  const qrSize = 62;
-  page.drawImage(qrImage, { x: LEFT, y: 12, width: qrSize, height: qrSize });
+  const qrSize = 44;
+  page.drawImage(qrImage, { x: colA + (colB - colA - qrSize) / 2, y: row3Top - row3H + (row3H - qrSize) / 2, width: qrSize, height: qrSize });
+
+  const fee = Math.max(0, deliveryFee);
+  const net = o.total_amount_mad - fee;
+  textCenterArabic(`${o.total_amount_mad.toFixed(0)} DH`, colB + (X1 - colB) / 2, row3Top - 26, { bold: true, size: 15 });
+  if (fee > 0) {
+    textCenterArabic(`(net: ${net.toFixed(0)} DH)`, colB + (X1 - colB) / 2, row3Top - 40, { size: 7 });
+  }
+
+  // ── Rangée 4: Ville (grande, centrée) ─────────────────────────────────────
+  const row4Top = row3Top - row3H;
+  const row4H = 20;
+  hLine(row4Top - row4H);
+  textCenterArabic(o.customer_city.toUpperCase(), SZ / 2, row4Top - 14, { bold: true, size: 12 });
+
+  // ── Rangée 5: Confirmation adresse par téléphone ─────────────────────────
+  const row5Top = row4Top - row4H;
+  const row5H = 16;
+  hLine(row5Top - row5H);
+  textCenterArabic("سيتم تأكيد العنوان عبر الهاتف", SZ / 2, row5Top - 11, { size: 8 });
+
+  // ── Rangée 6: Produit(s) ─────────────────────────────────────────────────
+  const row6Top = row5Top - row5H;
+  const row6H = 16;
+  hLine(row6Top - row6H);
+  textCenterArabic(productLine || "-", SZ / 2, row6Top - 11, { size: 8 });
+
+  // ── Rangée 7: Note (fond gris) ────────────────────────────────────────────
+  const row7Top = row6Top - row6H;
+  const row7H = 16;
+  page.drawRectangle({ x: X0, y: row7Top - row7H, width: W, height: row7H, color: GRAY_BG });
+  hLine(row7Top - row7H);
+  textCenterArabic("ملحوظة : توصيل داخلي عبر ليفور HajtekZone", SZ / 2, row7Top - 11, { size: 7.5 });
+
+  // ── Rangée 8: horodatage + code-barres + référence ───────────────────────
+  const row8Top = row7Top - row7H;
+  const nowStr = `${trackingCode} - ${new Date().toLocaleDateString("fr-FR")} ${new Date().toLocaleTimeString("fr-FR", {hour:"2-digit",minute:"2-digit"})}`;
+  textCenterArabic(nowStr, SZ / 2, row8Top - 12, { size: 7 });
 
   const barcodePng = await bwipjs.toBuffer({
-    bcid: "code128", text: trackingCode, scale: 2, height: 10, includetext: false,
+    bcid: "code128", text: trackingCode, scale: 2, height: 9, includetext: false,
   });
   const barcodeImage = await doc.embedPng(barcodePng);
-  const bcW = 150, bcH = 34;
-  page.drawImage(barcodeImage, { x: RIGHT - bcW, y: 30, width: bcW, height: bcH });
-  const trackFont = fontNormal;
-  const trackW = trackFont.widthOfTextAtSize(trackingCode, 8);
-  page.drawText(trackingCode, { x: RIGHT - trackW, y: 20, size: 8, font: trackFont, color: rgb(0.3, 0.3, 0.3) });
+  const bcW = W - 20, bcH = 30;
+  page.drawImage(barcodeImage, { x: X0 + (W - bcW) / 2, y: row8Top - 48, width: bcW, height: bcH });
+
+  textCenterArabic(`${o.order_number} - ${trackingCode}`, SZ / 2, row8Top - 56, { bold: true, size: 8 });
 
   const bytes = await doc.save();
   const base64 = Buffer.from(bytes).toString("base64");
