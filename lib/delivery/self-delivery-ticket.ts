@@ -115,6 +115,23 @@ export async function generateSelfDeliveryTicket(orderId: string, deliveryFee: n
     const w = font.widthOfTextAtSize(t, size);
     page.drawText(t, { x: xCenter - w / 2, y, size, font, color: rgb(0, 0, 0) });
   }
+  /** Centre un groupe "texte arabe" + "texte latin" (ex: marque HajtekZone)
+   * SANS jamais les mélanger dans un seul appel — sinon le reshaper arabe
+   * inverse aussi le latin (bug déjà rencontré: "enoZketjaH" au lieu de
+   * "HajtekZone"). Le latin (dernier mot lu, donc le plus à GAUCHE en RTL)
+   * est dessiné en premier à gauche, l'arabe reshapé juste à sa droite. */
+  function textCenterMixed(arabicText: string, latinText: string, xCenter: number, y: number, opts: { bold?: boolean; size?: number } = {}) {
+    const font = opts.bold ? fontBold : fontNormal;
+    const size = opts.size ?? 9;
+    const gap = 4;
+    const arabicShaped = reshapeIfArabic(arabicText);
+    const arabicW = font.widthOfTextAtSize(arabicShaped, size);
+    const latinW  = font.widthOfTextAtSize(latinText, size);
+    const total = arabicW + gap + latinW;
+    const startX = xCenter - total / 2;
+    page.drawText(latinText, { x: startX, y, size, font, color: rgb(0, 0, 0) });
+    page.drawText(arabicShaped, { x: startX + latinW + gap, y, size, font, color: rgb(0, 0, 0) });
+  }
   function hLine(y: number) {
     page.drawLine({ start: { x: X0, y }, end: { x: X1, y }, thickness: 0.75, color: BORDER });
   }
@@ -168,12 +185,9 @@ export async function generateSelfDeliveryTicket(orderId: string, deliveryFee: n
   const qrSize = 44;
   page.drawImage(qrImage, { x: colA + (colB - colA - qrSize) / 2, y: row3Top - row3H + (row3H - qrSize) / 2, width: qrSize, height: qrSize });
 
-  const fee = Math.max(0, deliveryFee);
-  const net = o.total_amount_mad - fee;
+  // Livraison gratuite annoncée au client — on affiche uniquement le prix
+  // total de la commande, jamais de "net" après déduction d'un frais.
   textCenterArabic(`${o.total_amount_mad.toFixed(0)} DH`, colB + (X1 - colB) / 2, row3Top - 26, { bold: true, size: 15 });
-  if (fee > 0) {
-    textCenterArabic(`(net: ${net.toFixed(0)} DH)`, colB + (X1 - colB) / 2, row3Top - 40, { size: 7 });
-  }
 
   // ── Rangée 4: Ville (grande, centrée) ─────────────────────────────────────
   const row4Top = row3Top - row3H;
@@ -198,7 +212,7 @@ export async function generateSelfDeliveryTicket(orderId: string, deliveryFee: n
   const row7H = 16;
   page.drawRectangle({ x: X0, y: row7Top - row7H, width: W, height: row7H, color: GRAY_BG });
   hLine(row7Top - row7H);
-  textCenterArabic("ملحوظة : توصيل داخلي عبر ليفور HajtekZone", SZ / 2, row7Top - 11, { size: 7.5 });
+  textCenterMixed("ملحوظة : توصيل داخلي عبر ليفور", "HajtekZone", SZ / 2, row7Top - 11, { size: 7.5 });
 
   // ── Rangée 8: horodatage + code-barres + référence ───────────────────────
   const row8Top = row7Top - row7H;
