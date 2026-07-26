@@ -30,6 +30,9 @@ export interface DashboardSummary {
   pending_collection:     number;
   net_a_recevoir:         number;
   net_collected:          number;  // Argent déjà collecté par Digylog, net des frais de livraison
+  self_delivery_count:    number;  // Commandes livrées par un livreur propre (pas Digylog)
+  self_delivery_revenue:  number;
+  digylog_count:          number;
   total_ads_spend:        number;  // Meta (réel, synced) + TikTok/Google/autre (saisie manuelle)
   real_profit_net_ads:    number;  // real_profit - total_ads_spend
   total_call_center_cost: number;  // commissions agents sur commandes payées de la période
@@ -204,7 +207,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
       "id","status","is_paid","total_amount_mad","estimated_profit",
       "real_profit_mad","cogs_total","delivery_cost_real_mad","return_cost_mad",
       "customer_city","expected_delivery_cost","delivery_margin","actual_delivery_cost",
-      "assigned_to",
+      "assigned_to","actual_cod_collected_mad","fulfillment_type",
     ].join(","));
   // Note: on n'exclut PLUS "cancelled" ici — on en a besoin pour calculer le
   // taux d'annulation après confirmation. Elles sont juste exclues du profit/CA.
@@ -226,6 +229,8 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     expected_delivery_cost: number | null;
     delivery_margin: number | null;
     actual_delivery_cost: number | null;
+    actual_cod_collected_mad: number | null;
+    fulfillment_type: string | null;
     assigned_to: string | null;
   }[];
 
@@ -298,10 +303,27 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   const net_collected = activeRows
     .filter((r) => r.is_paid)
     .reduce((s, r) => {
+      // Aucun frais à déduire pour les commandes livrées par un livreur propre
+      // (pas de transporteur tiers, livraison gratuite annoncée au client) —
+      // seules les commandes Digylog ont un vrai frais de 20/35 MAD à soustraire.
+      const isSelfDelivery = r.fulfillment_type === "self_delivery";
       const city   = (r.customer_city ?? "").toLowerCase();
-      const livFee = city.includes("casablanca") || city.includes("casa") || city === "الدار البيضاء" ? 20 : 35;
-      return s + (r.total_amount_mad ?? 0) - livFee;
+      const livFee = isSelfDelivery ? 0
+        : city.includes("casablanca") || city.includes("casa") || city === "الدار البيضاء" ? 20 : 35;
+      // Priorité au vrai montant collecté par Digylog (réconciliation) — sinon
+      // le prix système par défaut. Sans ça, un surplus collecté (ex: 600 MAD
+      // au lieu de 599 prévus) n'apparaissait jamais dans Net Collecté.
+      const realAmount = r.actual_cod_collected_mad ?? r.total_amount_mad ?? 0;
+      return s + realAmount - livFee;
     }, 0);
+
+  // Répartition Digylog vs livreur propre — pour ne jamais mélanger les deux
+  // dans les rapports (frais/logique de calcul différents entre les deux).
+  const self_delivery_count = activeRows.filter((r) => r.fulfillment_type === "self_delivery").length;
+  const self_delivery_revenue = activeRows
+    .filter((r) => r.fulfillment_type === "self_delivery" && r.is_paid)
+    .reduce((s, r) => s + (r.actual_cod_collected_mad ?? r.total_amount_mad ?? 0), 0);
+  const digylog_count = activeRows.length - self_delivery_count;
 
   // Delivery margin: +10 MAD for each Casa order
   let total_delivery_margin = 0;
@@ -385,6 +407,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     estimated_revenue, real_revenue, estimated_profit, real_profit,
     total_cogs, total_delivery_cost, total_return_losses, pending_collection, net_a_recevoir,
     net_collected, total_ads_spend, real_profit_net_ads,
+    self_delivery_count, self_delivery_revenue, digylog_count,
     total_call_center_cost, total_other_expenses, true_final_profit,
     confirmation_rate, cancellation_rate, shipping_rate, delivery_rate, return_rate,
     total_delivery_margin, total_delivery_overcharge, casa_orders_count,

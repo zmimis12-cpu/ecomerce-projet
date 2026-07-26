@@ -475,6 +475,48 @@ export async function deleteOrder(orderId: string) {
 }
 
 // ─── Meta Purchase server-side (Conversions API) ────────────────────────────────
+// ─── Marquer payée — livraison propre (espèce, pas Digylog) ─────────────────
+// Aucun frais de transporteur à déduire ici (livraison gratuite annoncée au
+// client) — le montant réellement collecté = le prix total de la commande.
+export async function markSelfDeliveryPaid(orderId: string): Promise<{ success: boolean; error?: string }> {
+  const session = await requireRole([...ALL_ORDER_ROLES]);
+  const supabase = await createClient();
+
+  const { data: currentOrder } = await supabase
+    .from("orders").select("status, total_amount_mad").eq("id", orderId).single();
+  if (!currentOrder) return { success: false, error: "Commande introuvable." };
+  const current = currentOrder as { status: string; total_amount_mad: number };
+
+  const { error } = await supabase
+    .from("orders")
+    .update({
+      status:                    "paid",
+      is_paid:                   true,
+      payment_status:            "paid",
+      paid_at:                   new Date().toISOString(),
+      fulfillment_type:          "self_delivery",
+      actual_cod_collected_mad:  current.total_amount_mad, // montant intégral, pas de frais Digylog
+    } as never)
+    .eq("id", orderId);
+  if (error) return { success: false, error: error.message };
+
+  await supabase.from("order_status_history").insert({
+    order_id:    orderId,
+    from_status: current.status,
+    to_status:   "paid",
+    changed_by:  session.authId,
+    notes:       "Marquée payée en espèces — livraison avec livreur propre (pas Digylog).",
+  } as never);
+
+  // Purchase Meta/TikTok — même logique que pour les commandes Digylog
+  sendMetaPurchaseIfNeeded(orderId).catch((e) => console.error("[meta-purchase]", e));
+  sendTikTokPurchaseIfNeeded(orderId).catch((e) => console.error("[tiktok-purchase]", e));
+
+  revalidatePath(`/admin/orders/${orderId}`);
+  revalidatePath("/admin/orders");
+  return { success: true };
+}
+
 export async function sendMetaPurchaseIfNeeded(orderId: string): Promise<void> {
   const supabaseAdmin = (await import("@/lib/supabase/admin")).supabaseAdmin;
 
