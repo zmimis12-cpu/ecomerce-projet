@@ -219,7 +219,8 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     q = q.eq("delivery_store_id", filter.storeId);
   }
 
-  const { data } = await q;
+  const { data, error: qError } = await q;
+  if (qError) console.error("[getDashboardSummary] query error:", qError.message, qError.details, qError.hint);
   const rows = (data ?? []) as {
     id: string; status: string; is_paid: boolean;
     total_amount_mad: number; estimated_profit: number;
