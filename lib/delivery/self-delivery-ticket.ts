@@ -106,7 +106,10 @@ export async function generateSelfDeliveryTicket(orderId: string, deliveryFee: n
   function textL(text: string, xLeft: number, y: number, opts: { bold?: boolean; size?: number; color?: [number, number, number] } = {}) {
     const font = opts.bold ? fontBold : fontNormal;
     const size = opts.size ?? 9;
-    page.drawText(text, { x: xLeft, y, size, font, color: opts.color ? rgb(...opts.color) : rgb(0, 0, 0) });
+    // reshapeIfArabic() ne reshape QUE si le texte contient de l'arabe (sinon
+    // le renvoie tel quel) — sans ça, les noms clients arabes s'affichaient
+    // en lettres déconnectées (ز ه ي ر au lieu de زهير).
+    page.drawText(reshapeIfArabic(text), { x: xLeft, y, size, font, color: opts.color ? rgb(...opts.color) : rgb(0, 0, 0) });
   }
   function textCenterArabic(text: string, xCenter: number, y: number, opts: { bold?: boolean; size?: number } = {}) {
     const font = opts.bold ? fontBold : fontNormal;
