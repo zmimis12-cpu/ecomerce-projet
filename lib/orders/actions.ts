@@ -585,6 +585,16 @@ export async function sendTikTokPurchaseIfNeeded(orderId: string): Promise<void>
   if (o.tiktok_purchase_sent) return;
   if (!o.tiktok_pixel_id) return;
 
+  // Produit de la commande — requis par TikTok (sinon "Content ID is missing"
+  // dans Diagnostics, un des 3 problèmes critiques signalés).
+  const { data: item } = await supabaseAdmin
+    .from("order_items")
+    .select("product_id, product_name")
+    .eq("order_id", orderId)
+    .limit(1)
+    .maybeSingle();
+  const itemData = item as { product_id: string; product_name: string } | null;
+
   const { data: settings } = await supabaseAdmin
     .from("ad_platform_settings")
     .select("access_token, is_active")
@@ -605,6 +615,8 @@ export async function sendTikTokPurchaseIfNeeded(orderId: string): Promise<void>
     clientIp: o.tiktok_client_ip,
     clientUserAgent: o.tiktok_client_ua,
     eventId: o.id,
+    productId: itemData?.product_id ?? o.id,
+    productName: itemData?.product_name,
   });
 
   if (res.ok) {

@@ -22,6 +22,8 @@ export interface TikTokPurchaseInput {
   clientIp?: string | null;
   clientUserAgent?: string | null;
   eventId: string;       // = order id, dédup
+  productId: string;     // requis: sans ça TikTok signale "Content ID is missing"
+  productName?: string;
 }
 
 export async function sendTikTokCompletePayment(input: TikTokPurchaseInput): Promise<{ ok: boolean; error?: string }> {
@@ -45,7 +47,12 @@ export async function sendTikTokCompletePayment(input: TikTokPurchaseInput): Pro
         event_time: Math.floor(Date.now() / 1000),
         event_id: `${input.eventId}-cp`,
         user: userData,
-        properties: { value: input.value, currency: input.currency },
+        properties: {
+          value: input.value, currency: input.currency,
+          content_id: input.productId,
+          content_type: "product",
+          contents: [{ content_id: input.productId, content_name: input.productName ?? "" }],
+        },
         page: input.ttclid ? { url: `?ttclid=${input.ttclid}` } : undefined,
       },
       // TikTok exige précisément l'événement "Purchase" pour son funnel
@@ -56,7 +63,12 @@ export async function sendTikTokCompletePayment(input: TikTokPurchaseInput): Pro
         event_time: Math.floor(Date.now() / 1000),
         event_id: `${input.eventId}-purchase`,
         user: userData,
-        properties: { value: input.value, currency: input.currency },
+        properties: {
+          value: input.value, currency: input.currency,
+          content_id: input.productId,
+          content_type: "product",
+          contents: [{ content_id: input.productId, content_name: input.productName ?? "" }],
+        },
         page: input.ttclid ? { url: `?ttclid=${input.ttclid}` } : undefined,
       },
     ],
