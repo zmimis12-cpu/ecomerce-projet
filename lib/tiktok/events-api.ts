@@ -39,14 +39,27 @@ export async function sendTikTokCompletePayment(input: TikTokPurchaseInput): Pro
   const body = {
     event_source: "web",
     event_source_id: input.pixelId,
-    data: [{
-      event: "CompletePayment",
-      event_time: Math.floor(Date.now() / 1000),
-      event_id: input.eventId,
-      user: userData,
-      properties: { value: input.value, currency: input.currency },
-      page: input.ttclid ? { url: `?ttclid=${input.ttclid}` } : undefined,
-    }],
+    data: [
+      {
+        event: "CompletePayment",
+        event_time: Math.floor(Date.now() / 1000),
+        event_id: `${input.eventId}-cp`,
+        user: userData,
+        properties: { value: input.value, currency: input.currency },
+        page: input.ttclid ? { url: `?ttclid=${input.ttclid}` } : undefined,
+      },
+      // TikTok exige précisément l'événement "Purchase" pour son funnel
+      // e-commerce standard (Diagnostics → "Missing events" le réclame
+      // explicitement, même si CompletePayment est aussi un événement valide).
+      {
+        event: "Purchase",
+        event_time: Math.floor(Date.now() / 1000),
+        event_id: `${input.eventId}-purchase`,
+        user: userData,
+        properties: { value: input.value, currency: input.currency },
+        page: input.ttclid ? { url: `?ttclid=${input.ttclid}` } : undefined,
+      },
+    ],
   };
 
   const res = await fetch(url, {

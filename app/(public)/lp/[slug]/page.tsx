@@ -224,7 +224,27 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             onScroll();
             new IntersectionObserver(function(es){ formVisible=es[0].isIntersecting; update(); },{threshold:0.15}).observe(form);
           }
-          if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',initSticky);}else{initSticky();}
+          function initTikTokFunnelEvents(){
+            // TikTok exige AddToCart + InitiateCheckout dans le funnel e-commerce
+            // standard (Diagnostics → "Missing events") — ni l'un ni l'autre
+            // n'étaient déclenchés nulle part avant ce fix.
+            if(typeof window.ttq==='undefined')return;
+            var addToCartFired=false, checkoutFired=false;
+            document.querySelectorAll('.lp-cta').forEach(function(btn){
+              btn.addEventListener('click', function(){
+                if(addToCartFired)return; addToCartFired=true;
+                window.ttq.track('AddToCart',{content_id:'${product.id}',content_name:'${product.name.replace(/'/g, "\\'")}',value:${price},currency:'MAD'});
+              });
+            });
+            var form=document.getElementById('lp-form');
+            if(form){
+              form.addEventListener('input', function(){
+                if(checkoutFired)return; checkoutFired=true;
+                window.ttq.track('InitiateCheckout',{content_id:'${product.id}',content_name:'${product.name.replace(/'/g, "\\'")}',value:${price},currency:'MAD'});
+              }, { once:true, capture:true });
+            }
+          }
+          if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){initSticky();initTikTokFunnelEvents();});}else{initSticky();initTikTokFunnelEvents();}
         })();`
       }} />
 
