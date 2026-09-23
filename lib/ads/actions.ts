@@ -57,6 +57,16 @@ export async function testMetaConnection() {
   return client.testConnection();
 }
 
+export async function testTikTokConnection() {
+  await requireRole(["super_admin", "admin", "manager", "finance"]);
+  const settings = await getAdPlatformSettings("tiktok");
+  if (!settings) return { ok: false, error: "Aucun paramètre TikTok enregistré." };
+
+  const { TikTokAdsClient } = await import("./tiktok/client");
+  const client = new TikTokAdsClient(settings.access_token, settings.account_id);
+  return client.testConnection();
+}
+
 /**
  * Pull campaign spend from Meta for the given date range, match campaigns to
  * products by SKU, and store the result in product_ad_spend. This overwrites
@@ -187,6 +197,135 @@ export async function syncMetaAdSpend(dateFrom: string, dateTo: string) {
     last_sync_status: "ok",
     last_sync_error: null,
   } as never).eq("platform", "meta");
+
+  revalidatePath("/admin/finance");
+
+  return {
+    ok: true as const,
+    matchedProducts: rowsToUpsert.length,
+    totalSpendMatched: rowsToUpsert.reduce((s, r) => s + r.spend_mad, 0),
+    unmatchedCampaigns: result.campaigns
+      .filter((c) => !assignedCampaignIds.has(c.campaign_id) && c.spend > 0)
+      .filter((c) => !matches.find((m) => m.matched_campaign_names.includes(c.campaign_name)))
+      .map((c) => ({ name: c.campaign_name, spend: c.spend })),
+  };
+}
+
+export async function syncTikTokAdSpend(dateFrom: string, dateTo: string) {
+  await requireRole(["super_admin", "admin", "manager", "finance"]);
+
+  const settings = await getAdPlatformSettings("tiktok");
+  if (!settings || !settings.is_active) {
+    return { ok: false as const, error: "Intégration TikTok Ads non configurée." };
+  }
+
+  const { TikTokAdsClient } = await import("./tiktok/client");
+  const client = new TikTokAdsClient(settings.access_token, settings.account_id);
+  const result = await client.getCampaignSpend(dateFrom, dateTo);
+
+  if (!result.ok) {
+    await supabaseAdmin.from("ad_platform_settings").update({
+      last_sync_at: new Date().toISOString(),
+      last_sync_status: "error",
+      last_sync_error: result.error,
+    } as never).eq("platform", "tiktok");
+    return { ok: false as const, error: result.error };
+  }
+
+  const { data: products } = await supabaseAdmin.from("products").select("id, sku, name");
+  const productList = (products ?? []) as ProductForMatching[];
+
+  const { data: manualAssignments } = await supabaseAdmin
+    .from("campaign_product_assignments")
+    .select("campaign_id, campaign_name, product_id")
+    .eq("platform", "tiktok");
+  const manualMap = new Map<string, string>();
+  for (const a of (manualAssignments ?? []) as { campaign_id: string; product_id: string }[]) {
+    manualMap.set(a.campaign_id, a.product_id);
+  }
+
+  const spendByProduct = new Map<string, { spend: number; campaign_names: string[] }>();
+
+  for (const campaign of result.campaigns) {
+    if (campaign.spend === 0) continue;
+    const manualProductId = manualMap.get(campaign.campaign_id);
+    if (manualProductId) {
+      const existing = spendByProduct.get(manualProductId) ?? { spend: 0, campaign_names: [] };
+      existing.spend += campaign.spend;
+      existing.campaign_names.push(campaign.campaign_name);
+      spendByProduct.set(manualProductId, existing);
+    }
+  }
+
+  const assignedCampaignIds = new Set(manualMap.keys());
+  const unassignedCampaigns = result.campaigns.filter((c) => !assignedCampaignIds.has(c.campaign_id) && c.spend > 0);
+  const { matches } = matchCampaignsToProducts(productList, unassignedCampaigns);
+  for (const match of matches) {
+    if (match.matched_campaign_names.length === 0) continue;
+    const existing = spendByProduct.get(match.product_id) ?? { spend: 0, campaign_names: [] };
+    existing.spend += match.total_spend;
+    existing.campaign_names.push(...match.matched_campaign_names);
+    spendByProduct.set(match.product_id, existing);
+  }
+
+  const matchedNames = new Set(matches.flatMap((m) => m.matched_campaign_names));
+  const unmatchedCampaigns = unassignedCampaigns.filter((c) => !matchedNames.has(c.campaign_name));
+  const unmatchedSpendRaw = unmatchedCampaigns.reduce((s, c) => s + c.spend, 0);
+
+  // Taux devise compte→MAD (clé: tiktok_currency_to_mad, défaut 1 — la
+  // plupart des comptes TikTok Ads Maroc facturent déjà directement en MAD,
+  // contrairement à Meta qui est souvent en USD).
+  const { data: rateRow } = await supabaseAdmin.from("app_settings").select("value").eq("key", "tiktok_currency_to_mad").maybeSingle();
+  const RATE_TO_MAD = Number((rateRow as { value?: string } | null)?.value ?? 1);
+
+  const rowsToUpsert = [...spendByProduct.entries()].map(([product_id, { spend, campaign_names }]) => ({
+    product_id,
+    platform: "tiktok" as const,
+    matched_campaign_names: campaign_names,
+    spend_mad: Math.round(spend * RATE_TO_MAD * 100) / 100,
+    period_start: dateFrom,
+    period_end: dateTo,
+    synced_at: new Date().toISOString(),
+  }));
+
+  if (rowsToUpsert.length > 0) {
+    await supabaseAdmin
+      .from("product_ad_spend")
+      .delete()
+      .eq("platform", "tiktok")
+      .lte("period_start", dateTo)
+      .gte("period_end", dateFrom);
+
+    const { error: upsertErr } = await supabaseAdmin
+      .from("product_ad_spend")
+      .insert(rowsToUpsert as never);
+    if (upsertErr) {
+      return { ok: false as const, error: `Échec de sauvegarde: ${upsertErr.message}` };
+    }
+  }
+
+  await supabaseAdmin
+    .from("unmatched_ad_spend")
+    .delete()
+    .eq("platform", "tiktok")
+    .lte("period_start", dateTo)
+    .gte("period_end", dateFrom);
+
+  if (unmatchedSpendRaw > 0) {
+    await supabaseAdmin.from("unmatched_ad_spend").insert({
+      platform:               "tiktok",
+      matched_campaign_names: unmatchedCampaigns.map((c) => c.campaign_name),
+      spend_mad:              Math.round(unmatchedSpendRaw * RATE_TO_MAD * 100) / 100,
+      period_start:           dateFrom,
+      period_end:             dateTo,
+    } as never);
+  }
+
+  await supabaseAdmin.from("ad_platform_settings").update({
+    last_sync_at: new Date().toISOString(),
+    last_sync_status: "ok",
+    last_sync_error: null,
+  } as never).eq("platform", "tiktok");
 
   revalidatePath("/admin/finance");
 

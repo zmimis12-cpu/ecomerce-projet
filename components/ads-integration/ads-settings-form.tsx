@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import {
-  saveAdPlatformSettings, testMetaConnection, syncMetaAdSpend,
+  saveAdPlatformSettings, testMetaConnection, syncMetaAdSpend, syncTikTokAdSpend, testTikTokConnection,
   type AdPlatformSettings
 } from "@/lib/ads/actions";
 
@@ -68,9 +68,15 @@ export function AdsSettingsForm({ platform, settings }: Props) {
   function handleTest() {
     setMsg(null);
     startTransition(async () => {
-      // Only Meta test is implemented today — Google/TikTok show a placeholder
-      if (platform !== "meta") {
+      if (platform === "google") {
         setMsg({ type: "ok", text: "Paramètres sauvegardés. Test de connexion disponible après intégration API." });
+        return;
+      }
+      if (platform === "tiktok") {
+        const res = await testTikTokConnection();
+        setMsg(res.ok
+          ? { type: "ok", text: `Connexion réussie — ${res.accountName}` }
+          : { type: "error", text: res.error ?? "Échec" });
         return;
       }
       const res = await testMetaConnection();
@@ -83,8 +89,18 @@ export function AdsSettingsForm({ platform, settings }: Props) {
   function handleSync() {
     setMsg(null);
     startTransition(async () => {
-      if (platform !== "meta") {
-        setMsg({ type: "ok", text: "Synchronisation Google/TikTok bientôt disponible." });
+      if (platform === "google") {
+        setMsg({ type: "ok", text: "Synchronisation Google bientôt disponible." });
+        return;
+      }
+      if (platform === "tiktok") {
+        const res = await syncTikTokAdSpend(dateFrom, dateTo);
+        if (!res.ok) { setMsg({ type: "error", text: res.error ?? "Échec" }); return; }
+        const unmatched = res.unmatchedCampaigns ?? [];
+        setMsg({
+          type: "ok",
+          text: `${res.matchedProducts} produit(s) mis à jour — ${(res.totalSpendMatched ?? 0).toFixed(0)} MAD.${unmatched.length > 0 ? ` ${unmatched.length} campagne(s) sans SKU reconnu.` : ""}`,
+        });
         return;
       }
       const res = await syncMetaAdSpend(dateFrom, dateTo);
