@@ -24,7 +24,14 @@ export type TikTokInsightsResult =
   | { ok: false; error: string };
 
 export class TikTokAdsClient {
-  constructor(private accessToken: string, private advertiserId: string) {}
+  private advertiserId: string;
+
+  constructor(private accessToken: string, advertiserIdRaw: string) {
+    // TikTok exige un ID purement numérique — on nettoie les espaces/caractères
+    // collés par erreur (copier-coller depuis Ads Manager inclut parfois des
+    // espaces invisibles), sinon l'API renvoie "Not a valid integer".
+    this.advertiserId = advertiserIdRaw.trim().replace(/[^0-9]/g, "");
+  }
 
   hasCredentials(): boolean {
     return this.accessToken.length > 0 && this.advertiserId.length > 0;
