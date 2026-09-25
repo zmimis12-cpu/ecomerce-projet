@@ -74,12 +74,84 @@ function parseDigylogCashPaidJson(text: string): DigylogInvoiceRow[] {
   return rows;
 }
 
+const CASH_PAID_STATUS_WORDS = ["Versés", "Révoquée", "En cours de versement"];
+
+/**
+ * Repli robuste quand le JSON n'est pas strictement valide — ce qui arrive
+ * souvent quand le fichier Digylog est passé par Excel/Sheets avant d'être
+ * copié-collé (échappement CSV appliqué par-dessus le JSON, guillemets
+ * doublés, parfois une ligne entière transformée en objet {"0":...} au lieu
+ * d'un tableau). On extrait les valeurs par position RELATIVE au numéro de
+ * tracking et au mot de statut plutôt que par un parsing JSON strict, ce qui
+ * tolère ce genre de corruption sans perdre de lignes.
+ */
+function parseDigylogCashPaidResilient(rawText: string): DigylogInvoiceRow[] {
+  let text = rawText;
+  text = text.replace(/\\\//g, "/");
+  text = text.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+  text = text.replace(/"{2,}/g, "\"");
+  text = text.replace(/[[\]{}]/g, "");
+
+  let tokens = text.split(/","/).map((t) => t.replace(/^"|"$/g, "").trim());
+  tokens = tokens.map((t) => t.replace(/^\d{1,2}:/, "").replace(/"/g, "").trim());
+
+  const trackIndices: number[] = [];
+  tokens.forEach((t, i) => { if (/^S[A-Z0-9]{6,10}$/.test(t)) trackIndices.push(i); });
+
+  const rows: DigylogInvoiceRow[] = [];
+  for (let k = 0; k < trackIndices.length; k++) {
+    const start = trackIndices[k];
+    const end = k + 1 < trackIndices.length ? trackIndices[k + 1] : tokens.length;
+    const window = tokens.slice(start, end);
+    const tracking = window[0];
+
+    let orderIdx = -1;
+    let orderNumber = "";
+    for (let i = 1; i <= 2 && i < window.length; i++) {
+      if (/^HC-?\d+$/i.test(window[i]) || /^\d{7,}$/.test(window[i])) {
+        orderIdx = i; orderNumber = window[i]; break;
+      }
+    }
+
+    const statusIdx = window.findIndex((t) => CASH_PAID_STATUS_WORDS.includes(t));
+
+    let codAmount = 0;
+    if (orderIdx >= 0) {
+      for (let i = orderIdx + 1; i < window.length; i++) {
+        if (/^-?\d+(\.\d+)?$/.test(window[i])) { codAmount = parseFloat(window[i]); break; }
+      }
+    }
+    let netPaid = 0;
+    if (statusIdx > 0) {
+      for (let i = statusIdx - 1; i >= 0; i--) {
+        if (/^-?\d+(\.\d+)?$/.test(window[i])) { netPaid = parseFloat(window[i]); break; }
+      }
+    }
+
+    rows.push({
+      tracking_number: tracking.toUpperCase(),
+      invoice_status:  window[statusIdx] || "livré",
+      cod_amount:      codAmount,
+      delivery_fee:    Math.max(0, codAmount - netPaid),
+      return_fee:      0,
+      amount_paid:     netPaid,
+      order_number:    orderNumber || undefined,
+    });
+  }
+  return rows;
+}
+
 export function parseDigylogCsv(csvText: string): DigylogInvoiceRow[] {
   // Auto-détection: si le contenu commence par "[" c'est le format JSON
   // "Cash Paid" de Digylog, pas un vrai CSV — on route vers le bon parser.
   const trimmed = csvText.trim();
-  if (trimmed.startsWith("[")) {
-    return parseDigylogCashPaidJson(trimmed);
+  if (trimmed.startsWith("[") || trimmed.startsWith("\"[") || trimmed.startsWith("\"\"[")) {
+    const strict = parseDigylogCashPaidJson(trimmed);
+    // Si le JSON strict échoue (0 ligne alors qu'il y a du contenu — signe
+    // d'un fichier corrompu par un passage dans Excel), on retombe sur le
+    // parseur tolérant plutôt que d'afficher "aucune ligne détectée".
+    if (strict.length > 0) return strict;
+    return parseDigylogCashPaidResilient(trimmed);
   }
 
   const lines = csvText.split("\n").map((l) => l.trim()).filter(Boolean);
