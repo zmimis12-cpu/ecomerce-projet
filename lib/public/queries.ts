@@ -41,12 +41,20 @@ export async function getLandingPage(slug: string): Promise<PublicLandingPage | 
   const supabase = getPublicClient();
 
   // Try landing_pages table first
-  const { data: lp } = await supabase
+  const { data: lp, error: lpError } = await supabase
     .from("landing_pages")
     .select("id, slug, title, subtitle, description, offer_text, meta_pixel_id, tiktok_pixel_id, google_gtm_id, product_id")
     .eq("slug", slug)
     .eq("is_active", true)
     .maybeSingle();
+
+  // Erreur DB réelle (timeout/réseau) — ne JAMAIS traiter comme "page absente".
+  // Avec revalidate=3600 (ISR), un notFound() ici figerait un faux 404 en cache
+  // pendant 1h pour tous les visiteurs, même après que Supabase soit rétabli.
+  if (lpError) {
+    console.error("[getLandingPage] DB error, keeping stale cache instead of 404:", lpError.message);
+    throw new Error(`getLandingPage query failed: ${lpError.message}`);
+  }
 
   if (lp) {
     const page = lp as unknown as { id: string; slug: string; title: string; subtitle: string | null; description: string | null; offer_text: string | null; meta_pixel_id: string | null; tiktok_pixel_id: string | null; google_gtm_id: string | null; product_id: string };
@@ -76,13 +84,19 @@ export async function getLandingPage(slug: string): Promise<PublicLandingPage | 
 async function getPublicProduct(id: string): Promise<PublicProduct | null> {
   const supabase = getPublicClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("products")
     .select("id, slug, name, description, sale_price_mad")
     .eq("id", id)
     .eq("is_active", true)
     .single();
 
+  // Erreur DB réelle — ne jamais confondre avec "produit inexistant" (voir
+  // getLandingPage ci-dessus pour l'explication du risque de faux 404 en cache).
+  if (error && error.code !== "PGRST116") { // PGRST116 = 0 ligne trouvée, ça c'est normal
+    console.error("[getPublicProduct] DB error:", error.message);
+    throw new Error(`getPublicProduct query failed: ${error.message}`);
+  }
   if (!data) return null;
   const p = data as unknown as { id: string; slug: string; name: string; description: string | null; sale_price_mad: number };
 
@@ -101,13 +115,17 @@ async function getPublicProduct(id: string): Promise<PublicProduct | null> {
 async function getPublicProductBySlug(slug: string): Promise<PublicProduct | null> {
   const supabase = getPublicClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("products")
     .select("id, slug, name, description, sale_price_mad")
     .eq("slug", slug)
     .eq("is_active", true)
     .single();
 
+  if (error && error.code !== "PGRST116") {
+    console.error("[getPublicProductBySlug] DB error:", error.message);
+    throw new Error(`getPublicProductBySlug query failed: ${error.message}`);
+  }
   if (!data) return null;
   const p = data as unknown as { id: string; slug: string; name: string; description: string | null; sale_price_mad: number };
 

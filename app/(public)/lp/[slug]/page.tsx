@@ -59,12 +59,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function LandingPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  const { data: lpData } = await supabaseAdmin
+  const { data: lpData, error: lpDataError } = await supabaseAdmin
     .from("landing_pages")
     .select("*")
     .eq("slug", slug)
     .eq("is_active", true)
     .maybeSingle();
+
+  if (lpDataError) {
+    console.error("[LandingPage] lpData query error, aborting render instead of showing an empty page:", lpDataError.message);
+    throw new Error(`lpData query failed: ${lpDataError.message}`);
+  }
 
   const page = await getLandingPage(slug);
   if (!page) notFound();
