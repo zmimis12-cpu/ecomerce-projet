@@ -32,7 +32,56 @@ export interface DigylogInvoiceRow {
   city?:            string;
 }
 
+/**
+ * Le rapport "Cash Paid" de Digylog n'est PAS un vrai CSV ni un vrai Excel —
+ * c'est un tableau JSON brut sans en-têtes, colonnes identifiées uniquement
+ * par leur position (juste renommé .xlsx/.csv par erreur côté Digylog).
+ * Format confirmé par un vrai export: 21 colonnes par ligne, ex:
+ * ["467499","01/07/2026","26/06/2026","HajtekZone","SA80030AG","HC-01209",
+ *  "499.00","Guercif","حسن. التازي","0670129676","ليراك","-","Livraison",
+ *  "1","35.00","35.00","Port dû","35.00","499.00",464,"Versés"]
+ */
+function parseDigylogCashPaidJson(text: string): DigylogInvoiceRow[] {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(data)) return [];
+
+  const rows: DigylogInvoiceRow[] = [];
+  for (const line of data) {
+    if (!Array.isArray(line) || line.length < 21) continue;
+    const tracking = String(line[4] ?? "").trim();
+    if (!tracking) continue;
+
+    const cod    = parseFloat(String(line[6] ?? "0").replace(",", ".")) || 0;
+    const fee    = parseFloat(String(line[14] ?? "0").replace(",", ".")) || 0;
+    const netPaid = typeof line[19] === "number" ? line[19] : parseFloat(String(line[19] ?? "0").replace(",", ".")) || 0;
+
+    rows.push({
+      tracking_number: tracking.toUpperCase(),
+      invoice_status:  String(line[20] ?? "").trim() || "livré",
+      cod_amount:      cod,
+      delivery_fee:    fee,
+      return_fee:      0,
+      amount_paid:     netPaid,
+      order_number:    String(line[5] ?? "").trim() || undefined,
+      city:            String(line[7] ?? "").trim() || undefined,
+    });
+  }
+  return rows;
+}
+
 export function parseDigylogCsv(csvText: string): DigylogInvoiceRow[] {
+  // Auto-détection: si le contenu commence par "[" c'est le format JSON
+  // "Cash Paid" de Digylog, pas un vrai CSV — on route vers le bon parser.
+  const trimmed = csvText.trim();
+  if (trimmed.startsWith("[")) {
+    return parseDigylogCashPaidJson(trimmed);
+  }
+
   const lines = csvText.split("\n").map((l) => l.trim()).filter(Boolean);
   if (lines.length < 2) return [];
 
