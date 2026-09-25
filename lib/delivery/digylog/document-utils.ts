@@ -14,7 +14,55 @@ export interface RawDocumentLine {
   raw_line_payload?:  Record<string, unknown>;
 }
 
+/**
+ * Le rapport "Cash Paid" de Digylog n'est PAS un vrai CSV — c'est un tableau
+ * JSON brut sans en-têtes, colonnes identifiées par position (voir
+ * reconciliation-utils.ts pour l'explication complète et le format exact,
+ * confirmé sur un vrai export: 21 colonnes, tracking en position 4, commande
+ * en position 5, COD en position 6, frais en position 14, net en position
+ * 19, statut en position 20).
+ */
+function parseCashPaidJson(text: string): RawDocumentLine[] {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(data)) return [];
+
+  const rows: RawDocumentLine[] = [];
+  for (const line of data) {
+    if (!Array.isArray(line) || line.length < 21) continue;
+    const tracking = String(line[4] ?? "").trim();
+    if (!tracking) continue;
+
+    const cod    = parseFloat(String(line[6] ?? "0").replace(",", ".")) || 0;
+    const fee    = parseFloat(String(line[14] ?? "0").replace(",", ".")) || 0;
+    const net    = typeof line[19] === "number" ? line[19] : parseFloat(String(line[19] ?? "0").replace(",", ".")) || 0;
+
+    rows.push({
+      tracking_number:  tracking.toUpperCase(),
+      cod_amount:       cod,
+      delivery_fee:     fee,
+      return_fee:       0,
+      payout_amount:    net,
+      city:             String(line[7] ?? "").trim(),
+      status:           String(line[20] ?? "").trim(),
+      raw_line_payload: { raw: line, order_number: String(line[5] ?? "").trim() },
+    });
+  }
+  return rows;
+}
+
 export function parseDocumentCsv(text: string): RawDocumentLine[] {
+  // Auto-détection: contenu commençant par "[" = format JSON "Cash Paid" de
+  // Digylog, pas un vrai CSV — on route vers le bon parser.
+  const trimmed = text.trim();
+  if (trimmed.startsWith("[")) {
+    return parseCashPaidJson(trimmed);
+  }
+
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   if (lines.length < 2) return [];
 
