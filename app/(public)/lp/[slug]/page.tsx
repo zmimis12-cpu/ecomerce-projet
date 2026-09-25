@@ -59,37 +59,49 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function LandingPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  const { data: lpData, error: lpDataError } = await supabaseAdmin
-    .from("landing_pages")
-    .select("*")
-    .eq("slug", slug)
-    .eq("is_active", true)
-    .maybeSingle();
+  // Les 3 requêtes ci-dessous sont totalement indépendantes — les lancer en
+  // PARALLÈLE au lieu de les enchaîner réduit fortement la latence cumulée.
+  // Sous trafic normal ça passait inaperçu, mais pendant un pic de trafic pub
+  // (Supabase plus lent sous charge), le cumul de 3 requêtes séquentielles
+  // pouvait dépasser la limite de temps d'exécution de Vercel → timeout côté
+  // client (ERR_CONNECTION_TIMED_OUT), exactement le symptôme observé.
+  const [
+    { data: lpData, error: lpDataError },
+    page,
+    dgSettingsResult,
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("landing_pages")
+      .select("*")
+      .eq("slug", slug)
+      .eq("is_active", true)
+      .maybeSingle(),
+    getLandingPage(slug),
+    supabaseAdmin
+      .from("digylog_settings")
+      .select("config")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then((r) => r, () => ({ data: null, error: null })), // fallback silencieux comme avant (try/catch équivalent)
+  ]);
 
   if (lpDataError) {
     console.error("[LandingPage] lpData query error, aborting render instead of showing an empty page:", lpDataError.message);
     throw new Error(`lpData query failed: ${lpDataError.message}`);
   }
 
-  const page = await getLandingPage(slug);
   if (!page) notFound();
 
   supabaseAdmin.rpc("increment_lp_views" as never, { p_slug: slug } as never).then(() => {}, () => {});
 
   // Load Digylog cities from cached settings (updated via sync in admin)
   let digylogCities: string[] = [];
-  try {
-    const { data: dgSettings } = await supabaseAdmin
-      .from("digylog_settings")
-      .select("config")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const config = (dgSettings as { config?: Record<string, unknown> } | null)?.config;
-    if (Array.isArray(config?.cities) && (config.cities as string[]).length > 0) {
-      digylogCities = config.cities as string[];
-    }
-  } catch { /* fallback to hardcoded */ }
+  const dgSettings = dgSettingsResult?.data;
+  const config = (dgSettings as { config?: Record<string, unknown> } | null)?.config;
+  if (Array.isArray(config?.cities) && (config.cities as string[]).length > 0) {
+    digylogCities = config.cities as string[];
+  }
 
   const lp      = (lpData ?? {}) as Record<string, unknown>;
   const product = page.product;

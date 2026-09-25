@@ -86,7 +86,7 @@ async function getPublicProduct(id: string): Promise<PublicProduct | null> {
 
   const { data, error } = await supabase
     .from("products")
-    .select("id, slug, name, description, sale_price_mad")
+    .select("id, slug, name, description, sale_price_mad, product_images(id, public_url, is_primary, display_order)")
     .eq("id", id)
     .eq("is_active", true)
     .single();
@@ -98,13 +98,12 @@ async function getPublicProduct(id: string): Promise<PublicProduct | null> {
     throw new Error(`getPublicProduct query failed: ${error.message}`);
   }
   if (!data) return null;
-  const p = data as unknown as { id: string; slug: string; name: string; description: string | null; sale_price_mad: number };
-
-  const { data: imgs } = await supabase
-    .from("product_images")
-    .select("id, public_url, is_primary, display_order")
-    .eq("product_id", id)
-    .order("display_order");
+  const raw = data as unknown as {
+    id: string; slug: string; name: string; description: string | null; sale_price_mad: number;
+    product_images: PublicProduct["images"];
+  };
+  const p = { id: raw.id, slug: raw.slug, name: raw.name, description: raw.description, sale_price_mad: raw.sale_price_mad };
+  const imgs = (raw.product_images ?? []).sort((a, b) => a.display_order - b.display_order);
 
   return {
     ...p,
