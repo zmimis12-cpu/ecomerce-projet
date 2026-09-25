@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth/session";
 import { getOrders } from "@/lib/orders/queries";
 import { OrderList } from "@/components/orders/order-list";
 import { ImportBonRetourButton } from "@/components/orders/import-bon-retour-button";
+import { ExportCashPaidButton } from "@/components/orders/export-cash-paid-button";
 import { hasRole } from "@/lib/auth/roles";
 
 export const metadata: Metadata = { title: "Commandes" };
@@ -33,6 +34,7 @@ export default async function OrdersPage() {
           </p>
         </div>
         {canManage && <ImportBonRetourButton />}
+        {canManage && <ExportCashPaidButton />}
       </div>
       <OrderList orders={orders} canManage={canManage} />
     </div>
