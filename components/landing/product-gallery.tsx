@@ -83,7 +83,7 @@ export function ProductGallery({ images, productName, discountPct = 0 }: Props) 
           className="lp-gallery-zoom"
           src={active.public_url}
           alt={`${productName} — صورة ${activeIndex + 1}`}
-          fill style={{ objectFit: "cover" }} priority={activeIndex === 0} unoptimized
+          fill style={{ objectFit: "cover" }} priority={activeIndex === 0}
           sizes="(max-width:600px) 100vw,(max-width:900px) 80vw,560px"
         />
         <style jsx>{`
@@ -142,7 +142,7 @@ export function ProductGallery({ images, productName, discountPct = 0 }: Props) 
             >
               <Image
                 src={img.public_url} alt={`${productName} ${i + 1}`}
-                fill style={{ objectFit: "cover" }} unoptimized sizes="80px"
+                fill style={{ objectFit: "cover" }} sizes="80px"
               />
             </button>
           ))}
