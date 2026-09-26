@@ -45,8 +45,11 @@ export async function middleware(request: NextRequest) {
       requestHeaders.set("x-pathname", url.pathname);
       requestHeaders.set("x-public-domain", "1");
       const res = NextResponse.rewrite(url, { request: { headers: requestHeaders } });
-      // Security headers
-      res.headers.set("X-Frame-Options", "DENY");
+      // Security headers — PAS de X-Frame-Options ici: ces pages sont des
+      // landing pages publiques ouvertes depuis des pubs Facebook/Instagram/
+      // TikTok, dont les navigateurs intégrés chargent parfois le lien dans
+      // une iframe interne. DENY bloquait silencieusement l'affichage,
+      // causant un chargement infini côté client sans erreur visible.
       res.headers.set("X-Content-Type-Options", "nosniff");
       res.headers.set("Referrer-Policy", "no-referrer");
       res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
@@ -72,7 +75,7 @@ export async function middleware(request: NextRequest) {
     const res = NextResponse.next({ request: { headers: requestHeaders } });
 
     if (pathname.startsWith("/lp/")) {
-      res.headers.set("X-Frame-Options", "DENY");
+      // Même raison: pas de X-Frame-Options sur les landing pages publiques.
       res.headers.set("X-Content-Type-Options", "nosniff");
       res.headers.set("Referrer-Policy", "no-referrer");
       res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
