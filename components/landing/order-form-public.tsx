@@ -26,7 +26,8 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   const [errors, setErrors]          = useState<Record<string, string>>({});
   const [serverError, setServerError]= useState("");
   const [citySearch, setCitySearch]  = useState("");
-  const [selectedVariants, setSelectedVariants] = useState<Record<string,string>>({});
+  // Une sélection de variantes par pièce (index 0 = pièce 1, etc.)
+  const [selectedVariants, setSelectedVariants] = useState<Record<string,string>[]>([{}]);
   const [cityOpen, setCityOpen]      = useState(false);
   const [bundle, setBundle]          = useState(1);
   const hasFiredInitiateCheckout = useRef(false);
@@ -59,6 +60,23 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
       note:`وفّر ${Math.round(unitPrice * 3 - (b3 || Math.round(unitPrice * 3 * 0.80)))} درهم` },
   ];
   const total = bundles.find((b) => b.qty === bundle)?.price ?? unitPrice;
+  const activeVariants = variants.filter(v => v.options.some(o => o.label.trim()));
+
+  function changeBundle(qty: number) {
+    setBundle(qty);
+    setSelectedVariants(prev => {
+      const next = prev.slice(0, qty);
+      while (next.length < qty) next.push({ ...(next[next.length - 1] ?? {}) });
+      return next;
+    });
+    setErrors(e => { const n = { ...e }; delete n.variants; return n; });
+  }
+
+  function pickVariant(unit: number, name: string, label: string) {
+    trackInitiateCheckoutOnce();
+    setSelectedVariants(prev => prev.map((sel, i) => i === unit ? { ...sel, [name]: label } : sel));
+    setErrors(e => { const n = { ...e }; delete n.variants; return n; });
+  }
 
   function set(key: string, val: string) {
     if (key !== "website") trackInitiateCheckoutOnce(); // ignore le honeypot anti-bot
@@ -74,6 +92,11 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     if (!form.customer_name.trim()) newErrors.customer_name = "الاسم مطلوب";
     if (!form.customer_phone.trim()) newErrors.customer_phone = "رقم الهاتف مطلوب";
     if (!form.customer_city.trim()) newErrors.customer_city = "المدينة مطلوبة";
+    const missingVariant = selectedVariants.slice(0, bundle).some(sel =>
+      activeVariants.some(v => !sel[v.name]));
+    if (missingVariant) newErrors.variants = bundle > 1
+      ? "المرجو اختيار الخيارات لكل قطعة"
+      : "المرجو اختيار الخيارات";
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
 
     startTransition(async () => {
@@ -84,7 +107,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
             ...form,
             quantity:     bundle,
             bundle_price: total,   // send the bundle total so API applies correct pricing
-            variants:     selectedVariants,
+            variants:     selectedVariants.slice(0, bundle),
             product_id:   product.id,
             product_slug: productSlug,
             meta_pixel_id: pixelId ?? null,
@@ -187,7 +210,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         <label style={LBL}>الكمية</label>
         <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
           {bundles.map((b) => (
-            <button key={b.qty} type="button" onClick={() => setBundle(b.qty)}
+            <button key={b.qty} type="button" onClick={() => changeBundle(b.qty)}
               style={{ display:"flex", justifyContent:"space-between",
                 alignItems:"center", padding:"12px 14px", borderRadius:"12px",
                 border:`2px solid ${bundle===b.qty ? "#16a34a" : "#e5e7eb"}`,
@@ -223,48 +246,61 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         </div>
       </div>
 
-      {/* Variants — only show if configured in LP builder */}
-      {variants.length > 0 && variants.map((v, vi) => (
-        <div key={vi} style={{marginBottom:"14px"}}>
-          <label style={LBL}>{v.name} *</label>
-          <div style={{display:"flex",flexWrap:"wrap",gap:"10px"}}>
-            {v.options.filter(o => o.label.trim()).map((opt, oi) => {
-              const isSelected = selectedVariants[v.name] === opt.label;
-              return (
-                <button
-                  key={oi}
-                  type="button"
-                  onClick={() => setSelectedVariants(prev => ({...prev, [v.name]: opt.label}))}
-                  style={{
-                    display:"flex", flexDirection: opt.image ? "column" : "row",
-                    alignItems:"center", gap: opt.image ? "6px" : "0",
-                    padding: opt.image ? "8px" : "10px 18px",
-                    borderRadius:"14px",border:"2px solid",
-                    borderColor: isSelected ? "#16a34a" : "#e5e7eb",
-                    background: isSelected ? "#f0fdf4" : "#fff",
-                    color: isSelected ? "#16a34a" : "#374151",
-                    fontWeight: isSelected ? 700 : 400,
-                    fontSize:"13px",cursor:"pointer",
-                    fontFamily:"var(--font-cairo),sans-serif",
-                    transition:"all .15s",
-                    boxShadow: isSelected ? "0 2px 8px rgba(22,163,74,.15)" : "none",
-                  }}
-                >
-                  {opt.image && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={opt.image} alt={opt.label}
+      {/* Variants — une sélection par pièce quand qty >= 2 */}
+      {activeVariants.length > 0 && Array.from({ length: bundle }).map((_, unit) => (
+        <div key={unit} style={bundle > 1 ? {
+          marginBottom:"14px", padding:"12px", borderRadius:"14px",
+          border:"1px dashed #d1d5db", background:"#fafafa",
+        } : undefined}>
+          {bundle > 1 && (
+            <div style={{fontWeight:700,fontSize:"14px",marginBottom:"10px",color:"#111827"}}>
+              القطعة {unit + 1}
+            </div>
+          )}
+          {activeVariants.map((v, vi) => (
+            <div key={vi} style={{marginBottom:"14px"}}>
+              <label style={LBL}>{v.name} *</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"10px"}}>
+                {v.options.filter(o => o.label.trim()).map((opt, oi) => {
+                  const isSelected = selectedVariants[unit]?.[v.name] === opt.label;
+                  return (
+                    <button
+                      key={oi}
+                      type="button"
+                      onClick={() => pickVariant(unit, v.name, opt.label)}
                       style={{
-                        width:"64px",height:"64px",borderRadius:"10px",objectFit:"cover",
-                        border: isSelected ? "2px solid #16a34a" : "1px solid #e5e7eb",
-                      }} />
-                  )}
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
+                        display:"flex", flexDirection: opt.image ? "column" : "row",
+                        alignItems:"center", gap: opt.image ? "6px" : "0",
+                        padding: opt.image ? "8px" : "10px 18px",
+                        borderRadius:"14px",border:"2px solid",
+                        borderColor: isSelected ? "#16a34a" : "#e5e7eb",
+                        background: isSelected ? "#f0fdf4" : "#fff",
+                        color: isSelected ? "#16a34a" : "#374151",
+                        fontWeight: isSelected ? 700 : 400,
+                        fontSize:"13px",cursor:"pointer",
+                        fontFamily:"var(--font-cairo),sans-serif",
+                        transition:"all .15s",
+                        boxShadow: isSelected ? "0 2px 8px rgba(22,163,74,.15)" : "none",
+                      }}
+                    >
+                      {opt.image && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={opt.image} alt={opt.label}
+                          style={{
+                            width:"64px",height:"64px",borderRadius:"10px",objectFit:"cover",
+                            border: isSelected ? "2px solid #16a34a" : "1px solid #e5e7eb",
+                          }} />
+                      )}
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       ))}
+      {activeVariants.length > 0 && ERR(errors.variants)}
 
       {/* Name */}
       <div style={{ marginBottom:"14px" }}>

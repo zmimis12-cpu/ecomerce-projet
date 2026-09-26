@@ -42,13 +42,26 @@ export async function POST(request: NextRequest) {
   // sans avoir besoin d'une colonne séparée partout.
   const rawVariants = (body as Record<string, unknown>).variants;
   let notesWithVariants = String(notes);
-  if (rawVariants && typeof rawVariants === "object") {
-    const variantEntries = Object.entries(rawVariants as Record<string, string>)
-      .filter(([, v]) => v && String(v).trim());
-    if (variantEntries.length > 0) {
-      const variantText = variantEntries.map(([, v]) => v).join(" | ");
-      notesWithVariants = notesWithVariants ? `${notesWithVariants} — ${variantText}` : variantText;
+  const unitText = (sel: unknown) =>
+    sel && typeof sel === "object"
+      ? Object.values(sel as Record<string, string>).filter(v => v && String(v).trim()).join(" | ")
+      : "";
+  let variantText = "";
+  if (Array.isArray(rawVariants)) {
+    // Une sélection par pièce → regroupe les identiques : "2× Noir | M + 1× Rouge | L"
+    const counts = new Map<string, number>();
+    for (const sel of rawVariants) {
+      const t = unitText(sel);
+      if (t) counts.set(t, (counts.get(t) ?? 0) + 1);
     }
+    variantText = rawVariants.length > 1
+      ? [...counts].map(([t, n]) => `${n}× ${t}`).join(" + ")
+      : [...counts.keys()].join("");
+  } else {
+    variantText = unitText(rawVariants); // ancien format (objet unique)
+  }
+  if (variantText) {
+    notesWithVariants = notesWithVariants ? `${notesWithVariants} — ${variantText}` : variantText;
   }
 
   // ── 1. Honeypot ──────────────────────────────────────────────────────────────
