@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Clapperboard, Users, Info } from "lucide-react";
+import { Clapperboard, Users, Info, Wallet } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getCreativesReport, adLink } from "@/lib/creatives/queries";
@@ -9,6 +9,9 @@ import {
   CreativeEditorSelect, DeleteCreativeButton,
 } from "@/components/creatives/creative-controls";
 import { PeriodFilter, currentMonth, mad, rate } from "@/components/creatives/period-filter";
+import { getEditorBalances } from "@/lib/creatives/payment-queries";
+import { AddPaymentForm } from "@/components/creatives/payment-controls";
+import { PaymentsList } from "@/components/creatives/payments-list";
 
 export const metadata: Metadata = { title: "Vidéos & Éditeurs" };
 export const dynamic = "force-dynamic";
@@ -18,14 +21,17 @@ const PLATFORM: Record<string, string> = { meta: "Meta", tiktok: "TikTok", other
 export default async function CreativesAdminPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string>> }) {
-  await requireRole(["super_admin", "admin", "manager"]);
+  const session = await requireRole(["super_admin", "admin", "manager"]);
   const sp = await searchParams;
   const month = sp.month ?? currentMonth();
 
-  const [report, { data: productsRaw }] = await Promise.all([
+  const [report, { data: productsRaw }, { balances, payments }] = await Promise.all([
     getCreativesReport({ month }),
     supabaseAdmin.from("products").select("id, name").eq("is_active", true).order("name"),
+    getEditorBalances(),
   ]);
+  const totalRemaining = balances.reduce((s, b) => s + Math.max(0, b.remaining), 0);
+  const editorNames = new Map(balances.map((b) => [b.editorId, b.name]));
   const products = (productsRaw ?? []) as { id: string; name: string }[];
   const totalEarnings = report.editors.reduce((s, e) => s + e.earnings, 0);
 
@@ -101,6 +107,47 @@ export default async function CreativesAdminPage({
               ))}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      {/* Paiements */}
+      <section className="rounded-xl border bg-card">
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <h2 className="flex items-center gap-2 font-medium"><Wallet className="h-4 w-4" /> Paiements éditeurs</h2>
+          <span className="text-sm">Reste à payer (total) : <b className="text-amber-700">{mad(totalRemaining)}</b></span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2">Éditeur</th>
+                <th className="px-4 py-2 text-right">Total gagné</th>
+                <th className="px-4 py-2 text-right">Déjà payé</th>
+                <th className="px-4 py-2 text-right">Reste à payer</th>
+              </tr>
+            </thead>
+            <tbody>
+              {balances.map((b) => (
+                <tr key={b.editorId} className="border-t">
+                  <td className="px-4 py-2 font-medium">{b.name}</td>
+                  <td className="px-4 py-2 text-right">{mad(b.earned)}</td>
+                  <td className="px-4 py-2 text-right">{mad(b.paid)}</td>
+                  <td className={"px-4 py-2 text-right font-semibold " + (b.remaining > 0 ? "text-amber-700" : b.remaining < 0 ? "text-red-600" : "text-emerald-700")}>
+                    {mad(b.remaining)}{b.remaining < 0 && " (avance)"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="border-t p-4">
+          <h3 className="mb-3 text-sm font-medium">Enregistrer un paiement</h3>
+          <AddPaymentForm editors={balances.map((b) => ({ id: b.editorId, name: b.name, remaining: b.remaining }))} />
+        </div>
+        <div className="border-t">
+          <h3 className="px-4 pt-3 text-sm font-medium">Historique des paiements</h3>
+          <PaymentsList payments={payments} editorNames={editorNames}
+            canDelete={session.role === "super_admin" || session.role === "admin"} />
         </div>
       </section>
 

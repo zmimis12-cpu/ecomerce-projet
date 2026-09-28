@@ -3,6 +3,8 @@ import { Clapperboard, Film, ShoppingCart, CheckCircle, Award } from "lucide-rea
 import { requireRole } from "@/lib/auth/session";
 import { getCreativesReport } from "@/lib/creatives/queries";
 import { PeriodFilter, currentMonth, mad, rate } from "@/components/creatives/period-filter";
+import { getEditorBalances } from "@/lib/creatives/payment-queries";
+import { PaymentsList } from "@/components/creatives/payments-list";
 
 export const metadata: Metadata = { title: "Mes vidéos & gains" };
 export const dynamic = "force-dynamic";
@@ -24,7 +26,11 @@ export default async function EditorPage({
     return <p className="text-sm text-muted-foreground">Choisis un éditeur depuis la page Vidéos & Éditeurs.</p>;
   }
 
-  const report = await getCreativesReport({ month, editorId });
+  const [report, { balances, payments }] = await Promise.all([
+    getCreativesReport({ month, editorId }),
+    getEditorBalances(editorId),
+  ]);
+  const bal = balances[0] ?? { earned: 0, paid: 0, remaining: 0 };
   const me = report.editors[0];
   const commissionLabel = me
     ? me.commissionType === "percent" ? `${me.commissionValue}% par commande livrée` : `${me.commissionValue} MAD par commande livrée`
@@ -34,7 +40,7 @@ export default async function EditorPage({
     { label: "Vidéos en pub", value: `${me?.videosInAds ?? 0} / ${me?.videos ?? 0}`, icon: Film },
     { label: "Commandes", value: String(me?.orders ?? 0), icon: ShoppingCart },
     { label: "Livrées", value: `${me?.delivered ?? 0} (${rate(me?.delivered ?? 0, me?.orders ?? 0)})`, icon: CheckCircle },
-    { label: "Mes gains", value: mad(me?.earnings ?? 0), icon: Award },
+    { label: "Gains (période)", value: mad(me?.earnings ?? 0), icon: Award },
   ];
 
   return (
@@ -58,6 +64,26 @@ export default async function EditorPage({
           </div>
         ))}
       </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border bg-card p-4">
+          <div className="text-xs text-muted-foreground">Total gagné (depuis le début)</div>
+          <div className="mt-1 text-lg font-semibold">{mad(bal.earned)}</div>
+        </div>
+        <div className="rounded-xl border bg-card p-4">
+          <div className="text-xs text-muted-foreground">Déjà payé</div>
+          <div className="mt-1 text-lg font-semibold text-emerald-700">{mad(bal.paid)}</div>
+        </div>
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <div className="text-xs text-amber-800">Reste à payer</div>
+          <div className="mt-1 text-lg font-semibold text-amber-800">{mad(bal.remaining)}</div>
+        </div>
+      </div>
+
+      <section className="rounded-xl border bg-card">
+        <div className="border-b px-4 py-3"><h2 className="font-medium">Mes paiements</h2></div>
+        <PaymentsList payments={payments} canDelete={false} />
+      </section>
 
       <section className="rounded-xl border bg-card">
         <div className="border-b px-4 py-3"><h2 className="font-medium">Mes vidéos</h2></div>
