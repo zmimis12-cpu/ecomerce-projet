@@ -72,3 +72,35 @@ export async function updateEditorCommission(
   revalidatePath("/admin/creatives");
   return { success: true };
 }
+
+/** Change l'éditeur d'une vidéo (corrige une mauvaise assignation). */
+export async function updateCreativeEditor(id: string, editorId: string): Promise<Result> {
+  await requireRole([...MANAGERS]);
+  if (!editorId) return { success: false, error: "Choisis un éditeur." };
+  const { error } = await supabaseAdmin
+    .from("creatives" as never)
+    .update({ editor_id: editorId } as never)
+    .eq("id", id);
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/creatives");
+  return { success: true };
+}
+
+/** Supprime une vidéo — seulement si aucune commande n'y est rattachée. */
+export async function deleteCreative(id: string): Promise<Result> {
+  await requireRole([...MANAGERS]);
+  const { count } = await supabaseAdmin
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("creative_id" as never, id);
+  if ((count ?? 0) > 0) {
+    return {
+      success: false,
+      error: `Cette vidéo a ${count} commande(s) : impossible de la supprimer sans perdre les gains. Mets-la en pause ou change l'éditeur.`,
+    };
+  }
+  const { error } = await supabaseAdmin.from("creatives" as never).delete().eq("id", id);
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/creatives");
+  return { success: true };
+}

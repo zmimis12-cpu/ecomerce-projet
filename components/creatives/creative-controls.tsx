@@ -1,7 +1,9 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Copy, Check, Plus } from "lucide-react";
-import { createCreative, updateCreativeStatus, updateEditorCommission } from "@/lib/creatives/actions";
+import { Copy, Check, Plus, Trash2 } from "lucide-react";
+import {
+  createCreative, updateCreativeStatus, updateEditorCommission, updateCreativeEditor, deleteCreative,
+} from "@/lib/creatives/actions";
 
 const INPUT = "h-9 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30";
 const BTN = "inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-50";
@@ -146,5 +148,52 @@ export function EditorCommissionForm({
       {state === "saved" && <Check className="h-4 w-4 text-emerald-600" />}
       {state === "error" && <span className="text-xs text-red-600">Erreur</span>}
     </div>
+  );
+}
+
+export function CreativeEditorSelect({
+  id, editorId, editors,
+}: { id: string; editorId: string; editors: { id: string; name: string }[] }) {
+  const [value, setValue] = useState(editorId);
+  const [pending, start] = useTransition();
+  return (
+    <select
+      className={INPUT + " h-8 text-xs"}
+      value={value}
+      disabled={pending}
+      onChange={(e) => {
+        const v = e.target.value;
+        const prev = value;
+        if (!confirm("Changer l'éditeur de cette vidéo ? Les gains de ses commandes iront au nouvel éditeur.")) return;
+        setValue(v);
+        start(async () => {
+          const r = await updateCreativeEditor(id, v);
+          if (!r.success) { setValue(prev); alert(r.error); }
+        });
+      }}
+    >
+      {editors.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+    </select>
+  );
+}
+
+export function DeleteCreativeButton({ id, code }: { id: string; code: string }) {
+  const [pending, start] = useTransition();
+  return (
+    <button
+      type="button"
+      title="Supprimer"
+      disabled={pending}
+      className="inline-flex items-center rounded-md border px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
+      onClick={() => {
+        if (!confirm(`Supprimer la vidéo ${code} ?`)) return;
+        start(async () => {
+          const r = await deleteCreative(id);
+          if (!r.success) alert(r.error);
+        });
+      }}
+    >
+      <Trash2 className="h-3.5 w-3.5" />
+    </button>
   );
 }

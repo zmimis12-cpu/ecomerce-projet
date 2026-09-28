@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getCreativesReport, adLink } from "@/lib/creatives/queries";
 import {
   CreateCreativeForm, CreativeStatusSelect, CopyLinkButton, EditorCommissionForm,
+  CreativeEditorSelect, DeleteCreativeButton,
 } from "@/components/creatives/creative-controls";
 import { PeriodFilter, currentMonth, mad, rate } from "@/components/creatives/period-filter";
 
@@ -141,14 +142,25 @@ export default async function CreativesAdminPage({
                       : c.title}</div>
                     <div className="text-xs text-muted-foreground">{PLATFORM[c.platform] ?? c.platform}</div>
                   </td>
-                  <td className="px-4 py-2">{c.editorName}</td>
+                  <td className="px-4 py-2">
+                    <CreativeEditorSelect
+                      id={c.id}
+                      editorId={c.editorId}
+                      editors={report.editors.map((e) => ({ id: e.id, name: e.name }))}
+                    />
+                  </td>
                   <td className="px-4 py-2">{c.productName}</td>
                   <td className="px-4 py-2"><CreativeStatusSelect id={c.id} status={c.status} /></td>
                   <td className="px-4 py-2 text-right">{c.orders}</td>
                   <td className="px-4 py-2 text-right">{c.delivered}</td>
                   <td className="px-4 py-2 text-right">{rate(c.delivered, c.orders)}</td>
                   <td className="px-4 py-2 text-right font-semibold text-emerald-700">{mad(c.earnings)}</td>
-                  <td className="px-4 py-2 text-right"><CopyLinkButton link={adLink(c.lpSlug, c.code)} /></td>
+                  <td className="px-4 py-2 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <CopyLinkButton link={adLink(c.lpSlug, c.code)} />
+                      <DeleteCreativeButton id={c.id} code={c.code} />
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
