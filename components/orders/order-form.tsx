@@ -58,15 +58,21 @@ export function OrderForm({ products, agents, onSubmit }: OrderFormProps) {
   });
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  // Prix total des produits modifiable ("" = prix catalogue × quantité)
+  const [priceOverride, setPriceOverride] = useState("");
 
   useEffect(() => {
     const p = products.find((p) => p.id === values.product_id) ?? null;
     setSelectedProduct(p);
+    setPriceOverride("");
   }, [values.product_id, products]);
 
   const unitPrice  = selectedProduct?.sale_price_mad ?? 0;
   const unitCost   = selectedProduct?.total_cost_mad ?? 0;
-  const subtotal   = unitPrice * values.quantity;
+  const catalogSubtotal = unitPrice * values.quantity;
+  const subtotal   = priceOverride !== "" && !isNaN(parseFloat(priceOverride))
+    ? parseFloat(priceOverride)
+    : catalogSubtotal;
   const totalAmount = subtotal + values.shipping_charge;
   const cogs       = unitCost * values.quantity;
   const estProfit  = totalAmount - cogs;
@@ -81,6 +87,7 @@ export function OrderForm({ products, agents, onSubmit }: OrderFormProps) {
     setErrors({});
     const fd = new FormData();
     Object.entries(values).forEach(([k, v]) => fd.set(k, String(v)));
+    if (priceOverride !== "") fd.set("custom_subtotal", priceOverride);
 
     startTransition(async () => {
       const result = await onSubmit(fd);
@@ -157,6 +164,23 @@ export function OrderForm({ products, agents, onSubmit }: OrderFormProps) {
                 disabled={isPending}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
               />
+            </Field>
+
+            <Field label="Prix total produits (MAD)" error={errors.custom_subtotal}>
+              <input
+                type="number" min="0" step="0.01"
+                value={priceOverride}
+                onChange={(e) => { setPriceOverride(e.target.value); setErrors((er) => { const n = { ...er }; delete n.custom_subtotal; return n; }); }}
+                placeholder={selectedProduct ? `${catalogSubtotal.toFixed(2)} (catalogue)` : "Choisir un produit"}
+                disabled={isPending || !selectedProduct}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+              />
+              {priceOverride !== "" && selectedProduct && (
+                <button type="button" onClick={() => setPriceOverride("")}
+                  className="mt-1 text-xs text-muted-foreground hover:underline">
+                  ↺ Revenir au prix catalogue ({catalogSubtotal.toFixed(2)})
+                </button>
+              )}
             </Field>
 
             <Field label="Frais de livraison (MAD)">

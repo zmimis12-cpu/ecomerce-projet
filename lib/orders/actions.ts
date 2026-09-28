@@ -90,8 +90,14 @@ export async function createOrder(formData: FormData) {
   const notes         = String(formData.get("notes") ?? "").trim() || null;
   const shippingCharge = parseFloat(String(formData.get("shipping_charge") ?? "0")) || 0;
   const assignedTo    = String(formData.get("assigned_to") ?? "").trim() || null;
+  // Prix total produits saisi à la main (vide = prix catalogue × quantité)
+  const customRaw     = String(formData.get("custom_subtotal") ?? "").trim();
+  const customSubtotal = customRaw === "" ? null : parseFloat(customRaw);
 
   const errors: Record<string, string> = {};
+  if (customSubtotal !== null && (isNaN(customSubtotal) || customSubtotal < 0)) {
+    errors.custom_subtotal = "Prix invalide.";
+  }
   if (!customerName)  errors.customer_name  = "Nom requis.";
   if (!customerPhone) errors.customer_phone = "Téléphone requis.";
   if (!customerCity)  errors.customer_city  = "Ville requise.";
@@ -116,9 +122,11 @@ export async function createOrder(formData: FormData) {
     sale_price_mad: number; total_cost_mad: number;
   };
 
-  const unitPrice   = p.sale_price_mad ?? 0;
   const unitCost    = p.total_cost_mad ?? 0;
-  const subtotal    = unitPrice * qty;
+  const subtotal    = customSubtotal !== null
+    ? Math.round(customSubtotal * 100) / 100
+    : (p.sale_price_mad ?? 0) * qty;
+  const unitPrice   = Math.round((subtotal / qty) * 100) / 100;
   const cogs        = unitCost * qty;
   const estProfit   = subtotal + shippingCharge - cogs;
 
