@@ -5,6 +5,7 @@ import { ChevronLeft } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { EditOrderForm } from "@/components/orders/edit-order-form";
+import { getCreativeOptions } from "@/lib/creatives/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
     .select(`
       id, order_number, customer_name, customer_phone,
       customer_city, customer_address, notes, status,
-      shipping_charge, source,
+      shipping_charge, source, subtotal, creative_id,
       order_items (
         quantity, product_id,
         products ( id, name, sku, sale_price_mad )
@@ -38,7 +39,8 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
   type Order = {
     id: string; order_number: string; customer_name: string; customer_phone: string;
     customer_city: string; customer_address: string; notes: string | null;
-    status: string; shipping_charge: number; source: string | null;
+    status: string; shipping_charge: number; source: string | null; subtotal: number | null;
+    creative_id: string | null;
     order_items: OItem[];
   };
   const o = order as unknown as Order;
@@ -49,12 +51,15 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
     redirect(`/admin/orders/${id}`);
   }
 
-  // Load products for select
-  const { data: products } = await supabaseAdmin
-    .from("products")
-    .select("id, name, sku, sale_price_mad")
-    .eq("is_active", true)
-    .order("name");
+  // Load products + vidéos for selects
+  const [{ data: products }, creatives] = await Promise.all([
+    supabaseAdmin
+      .from("products")
+      .select("id, name, sku, sale_price_mad")
+      .eq("is_active", true)
+      .order("name"),
+    getCreativeOptions(),
+  ]);
 
   type Prod = { id: string; name: string; sku: string; sale_price_mad: number };
 
@@ -87,8 +92,11 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
           source:           o.source ?? "",
           product_id:       o.order_items[0]?.product_id ?? "",
           quantity:         o.order_items[0]?.quantity ?? 1,
+          subtotal:         Number(o.subtotal ?? 0),
+          creative_id:      o.creative_id ?? "",
         }}
         products={(products ?? []) as Prod[]}
+        creatives={creatives}
       />
     </div>
   );

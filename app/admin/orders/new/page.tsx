@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAgents } from "@/lib/orders/queries";
 import { OrderForm } from "@/components/orders/order-form";
 import { createOrder } from "@/lib/orders/actions";
+import { getCreativeOptions } from "@/lib/creatives/queries";
 
 export const metadata: Metadata = { title: "Nouvelle commande" };
 
@@ -19,7 +20,7 @@ export default async function NewOrderPage() {
     .eq("is_active", true)
     .order("name");
 
-  const agents = await getAgents();
+  const [agents, creatives] = await Promise.all([getAgents(), getCreativeOptions()]);
 
   const productList = (products ?? []) as unknown as {
     id: string; name: string; sku: string;
@@ -56,7 +57,7 @@ export default async function NewOrderPage() {
           </Link>
         </div>
       ) : (
-        <OrderForm products={productList} agents={agents} onSubmit={createOrder} />
+        <OrderForm products={productList} agents={agents} creatives={creatives} onSubmit={createOrder} />
       )}
     </div>
   );

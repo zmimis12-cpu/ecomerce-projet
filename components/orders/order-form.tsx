@@ -1,5 +1,7 @@
 "use client";
 
+import { CreativeSelect } from "@/components/orders/creative-select";
+import type { CreativeOption } from "@/lib/creatives/queries";
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -16,6 +18,7 @@ interface Agent {
 interface OrderFormProps {
   products: Product[];
   agents: Agent[];
+  creatives?: CreativeOption[];
   onSubmit: (fd: FormData) => Promise<{
     success: boolean;
     errors?: Record<string, string>;
@@ -38,7 +41,7 @@ function agentDisplayName(a: Agent): string {
   return `${a.full_name} — ${AVAILABILITY_LABEL[status] ?? status}`;
 }
 
-export function OrderForm({ products, agents, onSubmit }: OrderFormProps) {
+export function OrderForm({ products, agents, creatives = [], onSubmit }: OrderFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -55,6 +58,7 @@ export function OrderForm({ products, agents, onSubmit }: OrderFormProps) {
     source:           "manual",
     notes:            "",
     assigned_to:      "",
+    creative_id:      "",
   });
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -215,6 +219,17 @@ export function OrderForm({ products, agents, onSubmit }: OrderFormProps) {
                   <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
                 ))}
               </select>
+            </Field>
+
+            <Field label="Vidéo (éditeur) — pour WhatsApp / téléphone">
+              <CreativeSelect
+                creatives={creatives}
+                productId={values.product_id}
+                value={values.creative_id}
+                onChange={(v) => set("creative_id", v)}
+                disabled={isPending}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+              />
             </Field>
 
             <Field label="Assigner à un agent">

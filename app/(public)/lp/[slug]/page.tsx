@@ -222,6 +222,10 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       <link rel="preconnect" href="https://www.googletagmanager.com" />
       <link rel="dns-prefetch" href="https://wa.me" />
 
+      {/* Code vidéo (?cr=V001) → ajouté au message WhatsApp pour attribuer la commande à l'éditeur */}
+      <script dangerouslySetInnerHTML={{ __html:
+        `(function(){function cr(){var c=null;try{var p=new URLSearchParams(location.search);c=p.get('cr');if(!c){var u=p.get('utm_content');if(u&&/^V\\d+$/i.test(u))c=u;}if(c&&/^[A-Za-z0-9_-]{1,20}$/.test(c)){c=c.toUpperCase();sessionStorage.setItem('hz_cr',c);}else{c=sessionStorage.getItem('hz_cr');}}catch(e){}return c;}function tag(){var c=cr();if(!c)return;document.querySelectorAll('a[href^="https://wa.me/"]').forEach(function(a){if(a.dataset.cr)return;try{var u=new URL(a.href);var t=u.searchParams.get('text')||'';u.searchParams.set('text',t+'\\n\\n🎬 '+c);a.href=u.toString();a.dataset.cr='1';}catch(e){}});}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',tag);}else{tag();}setTimeout(tag,1500);})();`
+      }} />
       <script dangerouslySetInnerHTML={{ __html:
         `if('IntersectionObserver' in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('lp-visible');io.unobserve(e.target);}});},{threshold:0.12});document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.lp-root section').forEach(function(s){io.observe(s);});});}else{document.querySelectorAll('.lp-root section').forEach(function(s){s.classList.add('lp-visible');});}
         (function(){

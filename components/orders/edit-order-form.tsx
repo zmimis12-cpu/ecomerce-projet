@@ -3,6 +3,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Save, Loader2 } from "lucide-react";
 import { updateOrder } from "@/lib/orders/actions";
+import { CreativeSelect } from "@/components/orders/creative-select";
+import type { CreativeOption } from "@/lib/creatives/queries";
 
 type Prod = { id: string; name: string; sku: string; sale_price_mad: number };
 
@@ -12,16 +14,26 @@ interface Props {
     customer_name: string; customer_phone: string;
     customer_city: string; customer_address: string;
     notes: string; shipping_charge: number; source: string;
-    product_id: string; quantity: number;
+    product_id: string; quantity: number; subtotal?: number;
+    creative_id?: string;
   };
   products: Prod[];
+  creatives?: CreativeOption[];
 }
 
-export function EditOrderForm({ orderId, defaultValues, products }: Props) {
+export function EditOrderForm({ orderId, defaultValues, products, creatives = [] }: Props) {
+  const [creativeId, setCreativeId] = useState(defaultValues.creative_id ?? "");
   const router  = useRouter();
   const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState(false);
+  const [productId, setProductId] = useState(defaultValues.product_id);
+  const [quantity, setQuantity] = useState(defaultValues.quantity);
+  // Prix total produits : pré-rempli avec le prix actuel de la commande.
+  // Vide = prix catalogue × quantité.
+  const [price, setPrice] = useState(defaultValues.subtotal != null ? String(defaultValues.subtotal) : "");
+  const selected = products.find((p) => p.id === productId);
+  const catalogTotal = selected ? selected.sale_price_mad * (quantity || 1) : null;
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -88,7 +100,8 @@ export function EditOrderForm({ orderId, defaultValues, products }: Props) {
       <div className="grid grid-cols-3 gap-4">
         <div className="col-span-2">
           <label className={LABEL}>Produit</label>
-          <select name="product_id" defaultValue={defaultValues.product_id} className={INPUT}>
+          <select name="product_id" value={productId} className={INPUT}
+            onChange={(e) => { setProductId(e.target.value); if (e.target.value !== defaultValues.product_id) setPrice(""); }}>
             <option value="">— Garder produit actuel —</option>
             {products.map((p) => (
               <option key={p.id} value={p.id}>
@@ -100,10 +113,28 @@ export function EditOrderForm({ orderId, defaultValues, products }: Props) {
         </div>
         <div>
           <label className={LABEL}>Quantité</label>
-          <input name="quantity" type="number" min="1" defaultValue={defaultValues.quantity}
+          <input name="quantity" type="number" min="1" value={quantity}
+            onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
             className={INPUT} />
           {errors.quantity && <p className="text-xs text-red-600 mt-1">{errors.quantity}</p>}
         </div>
+      </div>
+
+      <div>
+        <label className={LABEL}>Prix total produits (MAD)</label>
+        <input name="custom_subtotal" type="number" min="0" step="0.01" value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          placeholder={catalogTotal !== null ? `${catalogTotal.toFixed(2)} (catalogue)` : ""}
+          className={INPUT} />
+        {catalogTotal !== null && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Prix catalogue : {catalogTotal.toFixed(2)} MAD ({quantity} × {selected!.sale_price_mad}) ·{" "}
+            <button type="button" className="hover:underline" onClick={() => setPrice(catalogTotal.toFixed(2))}>
+              appliquer
+            </button>
+          </p>
+        )}
+        {errors.custom_subtotal && <p className="text-xs text-red-600 mt-1">{errors.custom_subtotal}</p>}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -112,6 +143,18 @@ export function EditOrderForm({ orderId, defaultValues, products }: Props) {
           <input name="shipping_charge" type="number" min="0" step="0.01"
             defaultValue={defaultValues.shipping_charge} className={INPUT} />
         </div>
+        <div>
+          <label className={LABEL}>Vidéo (éditeur)</label>
+          <CreativeSelect
+            name="creative_id"
+            creatives={creatives}
+            productId={productId}
+            value={creativeId}
+            onChange={setCreativeId}
+            className={INPUT}
+          />
+        </div>
+
         <div>
           <label className={LABEL}>Source</label>
           <select name="source" defaultValue={defaultValues.source} className={INPUT}>

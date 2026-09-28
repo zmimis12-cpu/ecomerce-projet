@@ -208,3 +208,31 @@ export function lpDomain() {
 export function adLink(slug: string | null, code: string) {
   return slug ? `https://${lpDomain()}/lp/${slug}?cr=${code}` : null;
 }
+
+export type CreativeOption = {
+  id: string;
+  code: string;
+  title: string;
+  editorName: string;
+  productId: string | null;
+  status: string;
+};
+
+/** Liste courte des vidéos pour les selects (création / modification de commande). */
+export async function getCreativeOptions(): Promise<CreativeOption[]> {
+  const [{ data: cr }, editors] = await Promise.all([
+    supabaseAdmin
+      .from("creatives" as never)
+      .select("id, code, title, editor_id, product_id, status")
+      .order("code", { ascending: false }),
+    getVideoEditors(),
+  ]);
+  const names = new Map(editors.map((e) => [e.id, e.name]));
+  return ((cr ?? []) as unknown as {
+    id: string; code: string; title: string; editor_id: string; product_id: string | null; status: string;
+  }[]).map((c) => ({
+    id: c.id, code: c.code, title: c.title,
+    editorName: names.get(c.editor_id) ?? "—",
+    productId: c.product_id, status: c.status,
+  }));
+}

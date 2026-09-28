@@ -75,6 +75,19 @@ export async function importBonRetour(rawText: string): Promise<{
 }
 
 // ─── Create order ──────────────────────────────────────────────────────────────
+/** Vidéo choisie dans le formulaire (attribution éditeur) → { id, code } ou null. */
+async function resolveCreative(formData: FormData): Promise<{ id: string; code: string } | null> {
+  const id = String(formData.get("creative_id") ?? "").trim();
+  if (!id) return null;
+  const { supabaseAdmin } = await import("@/lib/supabase/admin");
+  const { data } = await supabaseAdmin
+    .from("creatives" as never)
+    .select("id, code")
+    .eq("id", id)
+    .maybeSingle();
+  return (data as { id: string; code: string } | null) ?? null;
+}
+
 export async function createOrder(formData: FormData) {
   const session = await requireRole([...MANAGER_ROLES]);
   const supabase = await createClient();
@@ -90,6 +103,7 @@ export async function createOrder(formData: FormData) {
   const notes         = String(formData.get("notes") ?? "").trim() || null;
   const shippingCharge = parseFloat(String(formData.get("shipping_charge") ?? "0")) || 0;
   const assignedTo    = String(formData.get("assigned_to") ?? "").trim() || null;
+  const creativeSel   = await resolveCreative(formData);
   // Prix total produits saisi à la main (vide = prix catalogue × quantité)
   const customRaw     = String(formData.get("custom_subtotal") ?? "").trim();
   const customSubtotal = customRaw === "" ? null : parseFloat(customRaw);
@@ -156,6 +170,7 @@ export async function createOrder(formData: FormData) {
       import_source:    "manual",
       is_duplicate:     dupCheck.isDuplicate,
       duplicate_of:     dupCheck.existingOrderId,
+      ...(creativeSel ? { creative_id: creativeSel.id, creative_code: creativeSel.code } : {}),
     } as never)
     .select("id, order_number")
     .single();
@@ -388,12 +403,17 @@ export async function updateOrder(orderId: string, formData: FormData) {
   const qty           = parseInt(String(formData.get("quantity") ?? "1"));
   const shippingCharge = parseFloat(String(formData.get("shipping_charge") ?? "0")) || 0;
   const source        = String(formData.get("source") ?? "").trim() || null;
+  const customRaw     = String(formData.get("custom_subtotal") ?? "").trim();
+  const customSubtotal = customRaw === "" ? null : parseFloat(customRaw);
 
   const errors: Record<string, string> = {};
   if (!customerName)  errors.customer_name  = "Nom requis.";
   if (!customerPhone) errors.customer_phone = "Téléphone requis.";
   if (!customerCity)  errors.customer_city  = "Ville requise.";
   if (isNaN(qty) || qty < 1) errors.quantity = "Quantité invalide.";
+  if (customSubtotal !== null && (isNaN(customSubtotal) || customSubtotal < 0)) {
+    errors.custom_subtotal = "Prix invalide.";
+  }
   if (Object.keys(errors).length > 0) return { success: false, errors };
 
   // Load current order (check status)
@@ -419,7 +439,9 @@ export async function updateOrder(orderId: string, formData: FormData) {
     productSku  = p.sku;
   }
 
-  const subtotal    = unitPrice * qty;
+  // Prix saisi à la main → prioritaire sur le prix catalogue
+  const subtotal    = customSubtotal !== null ? Math.round(customSubtotal * 100) / 100 : unitPrice * qty;
+  if (customSubtotal !== null) unitPrice = Math.round((subtotal / qty) * 100) / 100;
   const cogs        = unitCost * qty;
   const estProfit   = subtotal + shippingCharge - cogs;
 
@@ -433,10 +455,28 @@ export async function updateOrder(orderId: string, formData: FormData) {
     updated_at:       new Date().toISOString(),
   };
   if (source) updatePayload.source = source;
+  if (formData.has("creative_id")) {
+    const sel = await resolveCreative(formData);
+    updatePayload.creative_id   = sel?.id ?? null;
+    updatePayload.creative_code = sel?.code ?? null;
+  }
   if (productId) {
     updatePayload.subtotal         = subtotal;
     updatePayload.cogs_total       = cogs;
     updatePayload.estimated_profit = estProfit;
+  } else if (customSubtotal !== null) {
+    // Produit gardé tel quel mais prix modifié
+    const { data: cur } = await supabase.from("orders").select("cogs_total").eq("id", orderId).single();
+    const curCogs = Number((cur as { cogs_total: number } | null)?.cogs_total ?? 0);
+    updatePayload.subtotal         = subtotal;
+    updatePayload.estimated_profit = subtotal + shippingCharge - curCogs;
+    const { data: items } = await supabase.from("order_items").select("id, quantity").eq("order_id", orderId);
+    const it = (items ?? []) as { id: string; quantity: number }[];
+    if (it.length === 1) {
+      await supabase.from("order_items")
+        .update({ unit_price: Math.round((subtotal / (it[0].quantity || 1)) * 100) / 100 } as never)
+        .eq("id", it[0].id);
+    }
   }
 
   const { error } = await supabase.from("orders").update(updatePayload as never).eq("id", orderId);
