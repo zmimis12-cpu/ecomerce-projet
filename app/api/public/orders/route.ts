@@ -87,8 +87,42 @@ export async function POST(request: NextRequest) {
 
   const normalizedPhone = validation.phone!;
 
-  // ── 3. Rate limit ─────────────────────────────────────────────────────────────
-  const rateCheck = await checkRateLimit(ip);
+  // ── 3+4. Rate limit, produit, LP, commandes récentes, agent — EN PARALLÈLE ──
+  // Avant: ~8 requêtes Supabase l'une après l'autre → le client attendait
+  // plusieurs secondes après "Valider". Ces requêtes sont indépendantes.
+  const pid = String(product_id).trim();
+  const pslug = String(product_slug).trim();
+  if (!pid && !pslug) {
+    return NextResponse.json({ success: false, error: "المنتج غير محدد." }, { status: 400 });
+  }
+
+  let query = supabaseAdmin
+    .from("products")
+    .select("id, name, sku, sale_price_mad, total_cost_mad, estimated_profit_mad, slug")
+    .eq("is_active", true);
+  query = (pid ? query.eq("id", pid) : query.eq("slug", pslug)) as typeof query;
+
+  const since24h = new Date(Date.now() - 86400_000).toISOString();
+
+  const [rateCheck, productRes, lpRes, recentRes, agentId] = await Promise.all([
+    checkRateLimit(ip),
+    query.single(),
+    pslug
+      ? supabaseAdmin
+          .from("landing_pages")
+          .select("bundle_1_price, bundle_2_price, bundle_3_price")
+          .eq("slug", pslug.toLowerCase())
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabaseAdmin
+      .from("orders")
+      .select("id, order_number")
+      .eq("customer_phone", normalizedPhone)
+      .gte("created_at", since24h)
+      .not("status", "in", '("cancelled","returned")'),
+    findAvailableAgent(),
+  ]);
+
   if (!rateCheck.allowed) {
     return NextResponse.json(
       { success: false, error: "لقد تجاوزت الحد المسموح به من الطلبات. يرجى المحاولة لاحقاً." },
@@ -96,24 +130,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // ── 4. Fetch product (validate exists + get price) ────────────────────────────
-  const pid = String(product_id).trim();
-  const pslug = String(product_slug).trim();
-
-  let query = supabaseAdmin
-    .from("products")
-    .select("id, name, sku, sale_price_mad, total_cost_mad, estimated_profit_mad, slug")
-    .eq("is_active", true);
-
-  if (pid) {
-    query = query.eq("id", pid) as typeof query;
-  } else if (pslug) {
-    query = query.eq("slug", pslug) as typeof query;
-  } else {
-    return NextResponse.json({ success: false, error: "المنتج غير محدد." }, { status: 400 });
-  }
-
-  const { data: product } = await query.single();
+  const product = productRes.data;
   if (!product) {
     return NextResponse.json({ success: false, error: "المنتج غير موجود." }, { status: 404 });
   }
@@ -133,16 +150,9 @@ export async function POST(request: NextRequest) {
   // landing page (bundle_1/2/3_price) — jamais une formule générique -10%/-20%
   // qui ne correspond pas forcément aux prix réellement affichés au client.
   let realBundlePrices: Record<number, number | null> = { 1: null, 2: null, 3: null };
-  if (product_slug) {
-    const { data: lp } = await supabaseAdmin
-      .from("landing_pages")
-      .select("bundle_1_price, bundle_2_price, bundle_3_price")
-      .eq("slug", String(product_slug).trim().toLowerCase())
-      .maybeSingle();
-    if (lp) {
-      const l = lp as { bundle_1_price: number | null; bundle_2_price: number | null; bundle_3_price: number | null };
-      realBundlePrices = { 1: l.bundle_1_price, 2: l.bundle_2_price, 3: l.bundle_3_price };
-    }
+  const lp = lpRes.data as { bundle_1_price: number | null; bundle_2_price: number | null; bundle_3_price: number | null } | null;
+  if (lp) {
+    realBundlePrices = { 1: lp.bundle_1_price, 2: lp.bundle_2_price, 3: lp.bundle_3_price };
   }
 
   const BUNDLE_DISCOUNT: Record<number, number> = { 1: 0, 2: 0.10, 3: 0.20 };
@@ -173,14 +183,7 @@ export async function POST(request: NextRequest) {
   const estProfit = subtotal - cogs;
 
   // ── 5. Duplicate detection ────────────────────────────────────────────────────
-  const since24h = new Date(Date.now() - 86400_000).toISOString();
-
-  const { data: recentOrders } = await supabaseAdmin
-    .from("orders")
-    .select("id, order_number")
-    .eq("customer_phone", normalizedPhone)
-    .gte("created_at", since24h)
-    .not("status", "in", '("cancelled","returned")');
+  const recentOrders = recentRes.data;
 
   let isDuplicate    = false;
   let duplicateOfId: string | null = null;
@@ -201,7 +204,7 @@ export async function POST(request: NextRequest) {
   }
 
   // ── 6. Auto-assign agent ──────────────────────────────────────────────────────
-  const agentId = await findAvailableAgent();
+  // agentId déjà récupéré en parallèle plus haut
 
   // ── 7. Create order ───────────────────────────────────────────────────────────
   const { data: order, error: orderErr } = await supabaseAdmin
@@ -266,7 +269,7 @@ export async function POST(request: NextRequest) {
   } as never);
 
   // ── 9. Log rate limit entry ───────────────────────────────────────────────────
-  await recordRequest(ip);
+  after(() => recordRequest(ip)); // ne bloque plus la réponse
 
   // ── 9b. Envoi WhatsApp de confirmation — EN ARRIÈRE-PLAN, ne bloque plus
   // jamais la réponse au client. Avant: `await` ici faisait attendre le
