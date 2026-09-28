@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import type { PublicProduct } from "@/lib/public/queries";
 import { toInternationalMorocco } from "@/lib/delivery/phone-utils";
 
@@ -7,6 +7,26 @@ function getCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
   return match ? decodeURIComponent(match[1]) : null;
+}
+
+// Code de la vidéo (créative) qui a amené le client : ?cr=V001 dans le lien pub.
+// Gardé en sessionStorage pour survivre à un rechargement de la page.
+const CR_RE = /^[A-Za-z0-9_-]{1,20}$/;
+function getCreativeCode(): string | null {
+  if (typeof window === "undefined") return null;
+  const p = new URLSearchParams(window.location.search);
+  let c = p.get("cr");
+  if (!c) {
+    const u = p.get("utm_content");
+    if (u && /^V\d+$/i.test(u)) c = u;
+  }
+  const fromUrl = c && CR_RE.test(c) ? c.toUpperCase() : null;
+  try {
+    if (fromUrl) { sessionStorage.setItem("hz_cr", fromUrl); return fromUrl; }
+    return sessionStorage.getItem("hz_cr");
+  } catch {
+    return fromUrl;
+  }
 }
 
 interface Props {
@@ -22,6 +42,7 @@ interface Props {
 
 export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId }: Props) {
   const [isPending, startTransition] = useTransition();
+  useEffect(() => { getCreativeCode(); }, []); // mémorise ?cr= dès l'arrivée
   const [submitted, setSubmitted]    = useState(false);
   const [errors, setErrors]          = useState<Record<string, string>>({});
   const [serverError, setServerError]= useState("");
@@ -116,6 +137,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
             tiktok_pixel_id: tiktokPixelId ?? null,
             tiktok_ttp: getCookie("_ttp"),
             tiktok_ttclid: new URLSearchParams(window.location.search).get("ttclid"),
+            creative_code: getCreativeCode(),
           }),
         });
         const data = await res.json() as {

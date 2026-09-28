@@ -104,7 +104,12 @@ export async function POST(request: NextRequest) {
 
   const since24h = new Date(Date.now() - 86400_000).toISOString();
 
-  const [rateCheck, productRes, lpRes, recentRes, agentId] = await Promise.all([
+  // Code vidéo (créative) venant du lien pub ?cr=V001 → attribution éditeur
+  const rawCr = (body as Record<string, unknown>).creative_code;
+  const creativeCode =
+    typeof rawCr === "string" && /^[A-Za-z0-9_-]{1,20}$/.test(rawCr) ? rawCr.toUpperCase() : null;
+
+  const [rateCheck, productRes, lpRes, recentRes, agentId, creativeRes] = await Promise.all([
     checkRateLimit(ip),
     query.single(),
     pslug
@@ -121,7 +126,11 @@ export async function POST(request: NextRequest) {
       .gte("created_at", since24h)
       .not("status", "in", '("cancelled","returned")'),
     findAvailableAgent(),
+    creativeCode
+      ? supabaseAdmin.from("creatives" as never).select("id").eq("code", creativeCode).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
+  const creativeId = (creativeRes.data as { id: string } | null)?.id ?? null;
 
   if (!rateCheck.allowed) {
     return NextResponse.json(
@@ -240,6 +249,8 @@ export async function POST(request: NextRequest) {
       tiktok_ttclid:     typeof body.tiktok_ttclid === "string" ? body.tiktok_ttclid : null,
       tiktok_client_ip:  ip,
       tiktok_client_ua:  request.headers.get("user-agent")?.slice(0, 255) ?? null,
+      creative_id:       creativeId,
+      creative_code:     creativeCode,
     } as never)
     .select("id, order_number")
     .single();

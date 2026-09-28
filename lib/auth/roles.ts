@@ -15,6 +15,7 @@ export const ROLE_HIERARCHY: UserRole[] = [
   "finance",
   "call_center_agent",
   "scanner_agent",
+  "video_editor",
   "viewer",
   // Legacy values — treated as lowest privilege
   "agent",
@@ -31,6 +32,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   finance:           "Finance",
   call_center_agent: "Agent Call Center",
   scanner_agent:     "Agent Scanner",
+  video_editor:      "Éditeur Vidéo",
   viewer:            "Lecteur",
   // Legacy
   agent:             "Agent (legacy)",
@@ -47,6 +49,7 @@ export const ROLE_BADGE: Record<UserRole, { bg: string; text: string }> = {
   finance:           { bg: "bg-amber-100",   text: "text-amber-800" },
   call_center_agent: { bg: "bg-teal-100",    text: "text-teal-800" },
   scanner_agent:     { bg: "bg-green-100",   text: "text-green-800" },
+  video_editor:      { bg: "bg-fuchsia-100", text: "text-fuchsia-800" },
   viewer:            { bg: "bg-gray-100",    text: "text-gray-600" },
   agent:             { bg: "bg-gray-100",    text: "text-gray-500" },
   accountant:        { bg: "bg-gray-100",    text: "text-gray-500" },

@@ -100,6 +100,10 @@ export async function requireAdmin(): Promise<SessionUser> {
 export async function requireRole(allowedRoles: UserRole[]): Promise<SessionUser> {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (!allowedRoles.includes(session.role)) redirect("/admin?error=unauthorized");
+  if (!allowedRoles.includes(session.role)) {
+    // L'éditeur vidéo n'a accès qu'à son espace — évite une boucle vers /admin
+    if (session.role === "video_editor") redirect("/admin/editor");
+    redirect("/admin?error=unauthorized");
+  }
   return session;
 }

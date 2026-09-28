@@ -19,6 +19,7 @@ export type UserRole =
   | "call_center_agent"
   | "scanner_agent"
   | "finance"
+  | "video_editor"
   | "viewer"
   // Legacy values — kept for backward compat
   | "agent"

@@ -5,7 +5,7 @@
 
 export type AppRole =
   | "super_admin" | "admin" | "manager" | "finance"
-  | "scanner_agent" | "call_center_agent" | "media_buyer" | "viewer";
+  | "scanner_agent" | "call_center_agent" | "media_buyer" | "video_editor" | "viewer";
 
 export const ROLE_LABELS: Record<AppRole, string> = {
   super_admin:       "Super Admin",
@@ -15,6 +15,7 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   scanner_agent:     "Scanner",
   call_center_agent: "Call Center",
   media_buyer:       "Media Buyer",
+  video_editor:      "Éditeur Vidéo",
   viewer:            "Viewer",
 };
 
@@ -26,6 +27,7 @@ export const ROLE_COLORS: Record<AppRole, string> = {
   scanner_agent:     "bg-amber-100 text-amber-800",
   call_center_agent: "bg-orange-100 text-orange-800",
   media_buyer:       "bg-pink-100 text-pink-800",
+  video_editor:      "bg-fuchsia-100 text-fuchsia-800",
   viewer:            "bg-gray-100 text-gray-600",
 };
 
@@ -37,12 +39,13 @@ export const ROLE_MODULES: Record<AppRole, string[]> = {
   scanner_agent:     ["scanner","returns"],
   call_center_agent: ["call_center","orders"],
   media_buyer:       ["dashboard","ads","finance"],
+  video_editor:      ["creatives"],
   viewer:            ["dashboard","orders"],
 };
 
 export const ALL_ROLES: AppRole[] = [
   "super_admin","admin","manager","finance",
-  "scanner_agent","call_center_agent","media_buyer","viewer",
+  "scanner_agent","call_center_agent","media_buyer","video_editor","viewer",
 ];
 
 export const ALL_MODULES = [

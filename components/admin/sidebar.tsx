@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, PhoneCall,
   Truck, Layers, FileSpreadsheet, FileText, FolderOpen,
   ScanLine, RotateCcw, BarChart3, Globe, Settings,
-  Shield, Phone, Award, Users, ListOrdered, CreditCard,
+  Shield, Phone, Award, Users, ListOrdered, CreditCard, Clapperboard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/lib/settings/users-constants";
@@ -57,6 +57,7 @@ const ADMIN_NAV: NavGroup[] = [
       { href: "/admin/profitability",           label: "Rentabilité",      icon: BarChart3 },
       { href: "/admin/expenses",                label: "Dépenses & Cartes", icon: CreditCard },
       { href: "/admin/landing-pages", label: "Landing Pages", icon: Globe     },
+      { href: "/admin/creatives",     label: "Vidéos & Éditeurs", icon: Clapperboard },
     ],
   },
   {
@@ -96,7 +97,18 @@ const SCANNER_AGENT_NAV: NavGroup[] = [
   },
 ];
 
+// ─── Éditeur vidéo nav ────────────────────────────────────────────────────────
+const VIDEO_EDITOR_NAV: NavGroup[] = [
+  {
+    label: null,
+    items: [
+      { href: "/admin/editor", label: "Mes vidéos & gains", icon: Clapperboard, exact: true },
+    ],
+  },
+];
+
 function getNavForRole(role: AppRole): NavGroup[] {
+  if (role === "video_editor")      return VIDEO_EDITOR_NAV;
   if (role === "call_center_agent") return CC_AGENT_NAV;
   if (role === "scanner_agent")     return SCANNER_AGENT_NAV;
   // All management roles get admin nav (filtered if needed)
