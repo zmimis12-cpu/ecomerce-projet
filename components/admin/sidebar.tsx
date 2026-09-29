@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, PhoneCall,
   Truck, Layers, FileSpreadsheet, FileText, FolderOpen,
   ScanLine, RotateCcw, BarChart3, Globe, Settings,
-  Shield, Phone, Award, Users, ListOrdered, CreditCard, Clapperboard,
+  Shield, Phone, Award, Users, ListOrdered, CreditCard, Clapperboard, PackageCheck, Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/lib/settings/users-constants";
@@ -102,7 +102,10 @@ const VIDEO_EDITOR_NAV: NavGroup[] = [
   {
     label: null,
     items: [
-      { href: "/admin/editor", label: "Mes vidéos & gains", icon: Clapperboard, exact: true },
+      { href: "/admin/editor",          label: "Tableau de bord",   icon: LayoutDashboard, exact: true },
+      { href: "/admin/editor/videos",   label: "Mes vidéos",        icon: Clapperboard },
+      { href: "/admin/editor/orders",   label: "Commandes livrées", icon: PackageCheck },
+      { href: "/admin/editor/payments", label: "Mes paiements",     icon: Wallet },
     ],
   },
 ];
