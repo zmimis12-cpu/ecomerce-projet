@@ -37,7 +37,10 @@ export interface DashboardSummary {
   real_profit_net_ads:    number;  // real_profit - total_ads_spend
   total_call_center_cost: number;  // commissions agents sur commandes payées de la période
   total_other_expenses:   number;  // domaine, abonnements, etc. (table expenses)
-  true_final_profit:      number;  // real_profit - pub - call center - autres charges = LE vrai profit
+  true_final_profit:      number;  // marge avant pub - pub réelle - call center = LE vrai profit
+  real_profit_before_ads: number;  // profit des commandes payées AVANT pub et confirmation
+  pending_profit:         number;  // marge des commandes livrées non payées + en transit (pas encore encaissée)
+  pending_orders_count:   number;
   confirmation_rate:      number;  // Confirmés / Leads
   cancellation_rate:      number;  // Annulés après confirmation / Confirmés
   shipping_rate:          number;  // Expédiés / Confirmés
@@ -400,9 +403,44 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     ((expenseRows ?? []) as { amount_mad: number }[]).reduce((s, e) => s + (e.amount_mad ?? 0), 0) * 100
   ) / 100;
 
+  // ── Correction double comptage ─────────────────────────────────────────────
+  // real_profit_mad de chaque commande déduit DÉJÀ une pub ESTIMÉE et un coût
+  // de confirmation (inclus dans le coût produit total_cost_mad → cogs_total).
+  // On soustrait ensuite la VRAIE pub Meta + les commissions call center →
+  // avant, la pub et la confirmation étaient comptées DEUX fois.
+  // On rajoute donc la part estimée avant de soustraire le réel.
+  const paidIds    = activeRows.filter((r) => r.is_paid).map((r) => r.id);
+  const pendingRows = activeRows.filter((r) =>
+    !r.is_paid && (r.status === "delivered" || r.status === "in_transit" || r.status === "sent_to_delivery"));
+  const pendingIds = pendingRows.map((r) => r.id);
+  const embedded = new Map<string, number>(); // order_id → pub estimée + confirmation incluses
+  const idsForItems = [...paidIds, ...pendingIds];
+  if (idsForItems.length) {
+    const { data: prodCosts } = await supabaseAdmin
+      .from("products").select("id, ads_cost_mad, confirmation_cost_mad");
+    const perUnit = new Map(((prodCosts ?? []) as { id: string; ads_cost_mad: number | null; confirmation_cost_mad: number | null }[])
+      .map((p) => [p.id, (p.ads_cost_mad ?? 0) + (p.confirmation_cost_mad ?? 0)]));
+    for (let i = 0; i < idsForItems.length; i += 150) {
+      const { data: its } = await supabaseAdmin
+        .from("order_items").select("order_id, product_id, quantity")
+        .in("order_id", idsForItems.slice(i, i + 150));
+      for (const it of (its ?? []) as { order_id: string; product_id: string | null; quantity: number }[]) {
+        const add = (it.product_id ? perUnit.get(it.product_id) ?? 0 : 0) * (it.quantity ?? 1);
+        embedded.set(it.order_id, (embedded.get(it.order_id) ?? 0) + add);
+      }
+    }
+  }
+  const embeddedPaid = paidIds.reduce((s, id) => s + (embedded.get(id) ?? 0), 0);
+  const real_profit_before_ads = Math.round((real_profit + embeddedPaid) * 100) / 100;
+
   const true_final_profit = Math.round(
-    (real_profit - total_ads_spend - total_call_center_cost) * 100
+    (real_profit_before_ads - total_ads_spend - total_call_center_cost) * 100
   ) / 100;
+
+  // Marge pas encore encaissée (la pub de ces commandes est déjà dépensée)
+  const pending_profit = Math.round(pendingRows.reduce((s, r) =>
+    s + (r.total_amount_mad ?? 0) - (r.cogs_total ?? 0) + (embedded.get(r.id) ?? 0), 0) * 100) / 100;
+  const pending_orders_count = pendingRows.length;
 
   return {
     total_leads, confirmed_count, sent_to_delivery_count, in_transit_count,
@@ -413,6 +451,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     net_collected, total_ads_spend, real_profit_net_ads,
     self_delivery_count, self_delivery_revenue, digylog_count,
     total_call_center_cost, total_other_expenses, true_final_profit,
+    real_profit_before_ads, pending_profit, pending_orders_count,
     confirmation_rate, cancellation_rate, shipping_rate, delivery_rate, return_rate,
     total_delivery_margin, total_delivery_overcharge, casa_orders_count,
     net_margin_pct, roi,
