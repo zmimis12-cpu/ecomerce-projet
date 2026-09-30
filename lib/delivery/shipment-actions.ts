@@ -474,7 +474,16 @@ export async function applyDigylogStatusUpdate(params: {
     orderUpdate.refused_at = eventTime;
   }
 
-  await supabaseAdmin.from("orders").update(orderUpdate as never).eq("id", orderId);
+  // Une commande déjà PAYÉE ne redescend pas à "livrée"/"en transit" à cause
+  // d'un événement Digylog tardif (seul un retour peut encore la changer).
+  const currentOrderStatus = (currentOrder as { status?: string } | null)?.status;
+  if (currentOrderStatus === "paid" && !mapped.isReturned) {
+    delete orderUpdate.status;
+    delete orderUpdate.delivered_at;
+  }
+
+  const { error: updErr } = await supabaseAdmin.from("orders").update(orderUpdate as never).eq("id", orderId);
+  if (updErr) throw new Error(`Mise à jour commande échouée: ${updErr.message}`);
 
   // Audit log — fire and forget
   auditStatusChange({

@@ -45,9 +45,19 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ type: "subscribe", key: payload.key }, { status: 200 });
   }
 
-  // Extract tracking — Digylog may use different field names
-  const tracking =
-    String(payload.tracking ?? payload.num ?? payload.trackingNumber ?? payload.code ?? "").trim();
+  // Digylog envoie le tracking dans "traking" (sans c !) et NOTRE numéro de
+  // commande dans "num". Avant, on lisait "num" en premier → on cherchait
+  // "HC-01505" comme tracking → commande introuvable → webhook ignoré (orphelin).
+  let tracking =
+    String(payload.traking ?? payload.tracking ?? payload.trackingNumber ?? payload.code ?? "").trim();
+  if (!tracking && payload.num) {
+    const { data: byNum } = await supabaseAdmin
+      .from("orders")
+      .select("delivery_tracking_number")
+      .eq("order_number", String(payload.num))
+      .maybeSingle();
+    tracking = String((byNum as { delivery_tracking_number: string | null } | null)?.delivery_tracking_number ?? "").trim();
+  }
 
   const idStatus  = Number(payload.idStatus ?? payload.id_status ?? payload.statusId ?? 0);
   const extStatus = String(payload.status   ?? payload.libelle   ?? payload.statusLabel ?? "");
@@ -87,6 +97,13 @@ async function processWebhook(params: {
       eventTime:   String(payload.updatedAt   ?? payload.date ?? new Date().toISOString()),
       rawPayload:  payload,
     });
+    // Infos en plus envoyées par Digylog : téléphone livreur + date de report
+    const extra: Record<string, unknown> = {};
+    if (payload.driverPhone) extra.delivery_driver_phone = String(payload.driverPhone);
+    if ("postponedTo" in payload) extra.delivery_reported_to = (payload.postponedTo as string | null) ?? null;
+    if (Object.keys(extra).length) {
+      await supabaseAdmin.from("orders").update(extra as never).eq("delivery_tracking_number", tracking);
+    }
     await log("processed", payload, { tracking, idStatus });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown";

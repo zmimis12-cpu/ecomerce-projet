@@ -23,7 +23,7 @@ export async function syncDigylogActiveOrders(opts: { max?: number } = {}) {
     .from("orders")
     .select("id, delivery_tracking_number, delivery_store_id, delivery_external_status_id, delivery_driver_phone, delivery_reported_to")
     .not("delivery_tracking_number", "is", null)
-    .in("status", ["sent_to_delivery", "in_transit", "delivered", "postponed"])
+    .in("status", ["sent_to_delivery", "in_transit", "delivered"])
     .neq("fulfillment_type", "self_delivery")
     .order("delivery_last_sync_at", { ascending: true, nullsFirst: true })
     .limit(max);
