@@ -7,6 +7,7 @@ import type { DeliveryOrder } from "@/types/delivery";
 import { cn } from "@/lib/utils";
 import { Truck, Search, TrendingUp, TrendingDown, CheckCircle, FileDown, Send } from "lucide-react";
 import { getDigylogLabelUrl, getDigylogBlUrl, sendOrderToDigylog } from "@/lib/delivery/shipment-actions";
+import { DigylogStatusBadge } from "@/components/orders/digylog-status-badge";
 
 interface DeliveryListProps { orders: DeliveryOrder[]; }
 
@@ -157,11 +158,11 @@ export function DeliveryList({ orders }: DeliveryListProps) {
                         {o.delivery_tracking_number
                           ? <div className="space-y-0.5">
                               <span className="font-mono text-xs bg-secondary px-1.5 py-0.5 rounded">{o.delivery_tracking_number}</span>
-                              {(o as unknown as { delivery_external_status?: string }).delivery_external_status && (
-                                <p className="text-[10px] text-muted-foreground">
-                                  {(o as unknown as { delivery_external_status: string }).delivery_external_status}
-                                </p>
-                              )}
+                              <DigylogStatusBadge
+                                label={(o as unknown as { delivery_external_status?: string }).delivery_external_status}
+                                id={(o as unknown as { delivery_external_status_id?: number | null }).delivery_external_status_id}
+                                compact
+                              />
                             </div>
                           : <span className="text-xs text-muted-foreground">—</span>}
                       </td>

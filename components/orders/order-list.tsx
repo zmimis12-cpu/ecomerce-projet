@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import type { OrderListItem as Order, OrderStatus } from "@/types/orders";
 import { StatusBadge } from "./status-badge";
+import { DigylogStatusBadge } from "@/components/orders/digylog-status-badge";
 import { sendOrderToDigylog, getDigylogLabelUrl } from "@/lib/delivery/shipment-actions";
 import { Send, FileDown, RefreshCw, Package } from "lucide-react";
 
@@ -286,7 +287,15 @@ export function OrderList({ orders, canManage }: OrderListProps) {
                       {order.first_product_name ?? "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={order.status} />
+                      <div className="flex flex-col items-start gap-1">
+                        <StatusBadge status={order.status} />
+                        <DigylogStatusBadge
+                          label={order.delivery_tracking_number ? order.delivery_external_status : null}
+                          id={order.delivery_external_status_id}
+                          reportedTo={order.delivery_reported_to}
+                          driverPhone={order.delivery_driver_phone}
+                        />
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {order.delivery_tracking_number ? (
@@ -294,21 +303,7 @@ export function OrderList({ orders, canManage }: OrderListProps) {
                           <span className="font-mono text-xs bg-secondary px-1.5 py-0.5 rounded">
                             {order.delivery_tracking_number}
                           </span>
-                          {order.delivery_external_status && (
-                            <p className="text-[10px] text-muted-foreground">
-                              {order.delivery_external_status}
-                            </p>
-                          )}
-                          {order.delivery_driver_phone && (
-                            <a href={`tel:${order.delivery_driver_phone}`} className="block text-[10px] text-primary hover:underline">
-                              🛵 {order.delivery_driver_phone}
-                            </a>
-                          )}
-                          {order.delivery_reported_to && (
-                            <p className="text-[10px] text-amber-700">
-                              Reportée au {new Date(order.delivery_reported_to).toLocaleDateString("fr-FR")}
-                            </p>
-                          )}
+
                         </div>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>

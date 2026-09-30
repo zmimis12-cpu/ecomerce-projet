@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth/session";
 import { getOrder, getAgents } from "@/lib/orders/queries";
 import { getProducts } from "@/lib/products/queries";
 import { StatusBadge } from "@/components/orders/status-badge";
+import { DigylogStatusBadge } from "@/components/orders/digylog-status-badge";
 import { StatusUpdater } from "@/components/orders/status-updater";
 import { AgentAssigner } from "@/components/orders/agent-assigner";
 import { TrackingEditor } from "@/components/orders/tracking-editor";
@@ -163,6 +164,17 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <StatusUpdater orderId={id} currentStatus={order.status} isAgent={isAgent} />
             ) : (
               <StatusBadge status={order.status} />
+            )}
+            {order.delivery_tracking_number && (order as unknown as { delivery_external_status?: string }).delivery_external_status && (
+              <div className="rounded-lg border bg-muted/30 p-2.5">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Chez Digylog</p>
+                <DigylogStatusBadge
+                  label={(order as unknown as { delivery_external_status: string }).delivery_external_status}
+                  id={(order as unknown as { delivery_external_status_id: number | null }).delivery_external_status_id}
+                  reportedTo={(order as unknown as { delivery_reported_to: string | null }).delivery_reported_to}
+                  driverPhone={(order as unknown as { delivery_driver_phone: string | null }).delivery_driver_phone}
+                />
+              </div>
             )}
             {canExchange && (
               <ExchangeDialog
