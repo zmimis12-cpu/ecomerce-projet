@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { MetaAdsClient } from "./meta/client";
 import { matchCampaignsToProducts, type ProductForMatching } from "./matcher";
+import { getUsdToMad } from "./fx";
 
 type Settings = { access_token: string; account_id: string; is_active: boolean };
 
@@ -85,9 +86,8 @@ async function syncMetaAdSpendOneRange(dateFrom: string, dateTo: string) {
   const unmatchedCampaigns = unassignedCampaigns.filter((c) => !matchedNames.has(c.campaign_name));
   const unmatchedSpendUsd = unmatchedCampaigns.reduce((s, c) => s + c.spend, 0);
 
-  // Taux USD→MAD depuis app_settings (clé: meta_usd_to_mad, défaut: 10)
-  const { data: rateRow } = await supabaseAdmin.from("app_settings").select("value").eq("key", "meta_usd_to_mad").maybeSingle();
-  const USD_TO_MAD = Number((rateRow as { value?: string } | null)?.value ?? 10);
+  // Taux USD→MAD réel du jour (marché + frais bancaires éventuels)
+  const { rate: USD_TO_MAD } = await getUsdToMad();
 
   const rowsToUpsert = [...spendByProduct.entries()].map(([product_id, { spend, campaign_names }]) => ({
     product_id,

@@ -417,9 +417,13 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   const idsForItems = [...paidIds, ...pendingIds];
   if (idsForItems.length) {
     const { data: prodCosts } = await supabaseAdmin
-      .from("products").select("id, ads_cost_mad, confirmation_cost_mad");
-    const perUnit = new Map(((prodCosts ?? []) as { id: string; ads_cost_mad: number | null; confirmation_cost_mad: number | null }[])
-      .map((p) => [p.id, (p.ads_cost_mad ?? 0) + (p.confirmation_cost_mad ?? 0)]));
+      .from("products").select("id, ads_cost_mad, confirmation_cost_mad, shipping_cost_mad");
+    // Parts ESTIMÉES incluses dans le coût produit (donc dans cogs_total) :
+    // pub + confirmation + livraison forfaitaire 35 MAD (× quantité !).
+    // On les rajoute puis on soustrait les VRAIS montants (pub Meta, commissions,
+    // vrais frais Digylog : 20 MAD Casa / 35 ailleurs, une seule fois par commande).
+    const perUnit = new Map(((prodCosts ?? []) as { id: string; ads_cost_mad: number | null; confirmation_cost_mad: number | null; shipping_cost_mad: number | null }[])
+      .map((p) => [p.id, (p.ads_cost_mad ?? 0) + (p.confirmation_cost_mad ?? 0) + (p.shipping_cost_mad ?? 0)]));
     for (let i = 0; i < idsForItems.length; i += 150) {
       const { data: its } = await supabaseAdmin
         .from("order_items").select("order_id, product_id, quantity")
@@ -431,7 +435,9 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     }
   }
   const embeddedPaid = paidIds.reduce((s, id) => s + (embedded.get(id) ?? 0), 0);
-  const real_profit_before_ads = Math.round((real_profit + embeddedPaid) * 100) / 100;
+  const realDelivery = (r: (typeof activeRows)[number]) => r.actual_delivery_cost ?? r.expected_delivery_cost ?? 35;
+  const realDeliveryPaid = activeRows.filter((r) => r.is_paid).reduce((s, r) => s + realDelivery(r), 0);
+  const real_profit_before_ads = Math.round((real_profit + embeddedPaid - realDeliveryPaid) * 100) / 100;
 
   const true_final_profit = Math.round(
     (real_profit_before_ads - total_ads_spend - total_call_center_cost) * 100
@@ -439,7 +445,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
 
   // Marge pas encore encaissée (la pub de ces commandes est déjà dépensée)
   const pending_profit = Math.round(pendingRows.reduce((s, r) =>
-    s + (r.total_amount_mad ?? 0) - (r.cogs_total ?? 0) + (embedded.get(r.id) ?? 0), 0) * 100) / 100;
+    s + (r.total_amount_mad ?? 0) - (r.cogs_total ?? 0) + (embedded.get(r.id) ?? 0) - realDelivery(r), 0) * 100) / 100;
   const pending_orders_count = pendingRows.length;
 
   return {

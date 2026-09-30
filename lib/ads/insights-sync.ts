@@ -6,6 +6,7 @@
  */
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { readSettings } from "./sync-core";
+import { getUsdToMad } from "./fx";
 
 const META_BASE = "https://graph.facebook.com/v21.0";
 const TIKTOK_BASE = "https://business-api.tiktok.com/open_api/v1.3";
@@ -82,7 +83,7 @@ export async function syncMetaAdInsights(since: string, until: string) {
   const s = await readSettings("meta");
   if (!s?.is_active || !s.access_token || !s.account_id) return { ok: false, error: "Meta non configuré" };
   const acc = s.account_id.startsWith("act_") ? s.account_id : `act_${s.account_id}`;
-  const usdToMad = await rate("meta_usd_to_mad", 10);
+  const { rate: usdToMad } = await getUsdToMad();
 
   const url = new URL(`${META_BASE}/${acc}/insights`);
   url.searchParams.set("level", "ad");
@@ -131,7 +132,7 @@ export async function syncTikTokAdInsights(since: string, until: string) {
   if (!/^\d+$/.test(advertiserId)) {
     return { ok: false, error: "Advertiser ID TikTok invalide (doit être uniquement des chiffres)" };
   }
-  const toMad = await rate("tiktok_currency_to_mad", 10);
+  const toMad = await rate("tiktok_currency_to_mad", 1);
 
   const rows: Row[] = [];
   const now = new Date().toISOString();
