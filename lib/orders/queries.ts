@@ -10,6 +10,7 @@ const ORDER_LIST_FIELDS = `
   status, total_amount_mad, estimated_profit, assigned_to,
   source, notes, delivery_tracking_number,
   delivery_external_status, delivery_external_status_id,
+  delivery_driver_phone, delivery_reported_to,
   delivery_status, delivery_last_sync_at, bl_id,
   is_duplicate, duplicate_of, created_at
 `;
@@ -146,6 +147,8 @@ export async function getOrders(
       delivery_tracking_number: o.delivery_tracking_number,
       delivery_external_status: (o as unknown as Record<string,unknown>).delivery_external_status as string | null ?? null,
       delivery_external_status_id: (o as unknown as Record<string,unknown>).delivery_external_status_id as number | null ?? null,
+      delivery_driver_phone: (o as unknown as Record<string,unknown>).delivery_driver_phone as string | null ?? null,
+      delivery_reported_to: (o as unknown as Record<string,unknown>).delivery_reported_to as string | null ?? null,
       delivery_status: (o as unknown as Record<string,unknown>).delivery_status as string | null ?? null,
       delivery_last_sync_at: (o as unknown as Record<string,unknown>).delivery_last_sync_at as string | null ?? null,
       bl_id: (o as unknown as Record<string,unknown>).bl_id as number | null ?? null,

@@ -3,10 +3,10 @@ import Link from "next/link";
 import { Clapperboard, Users, Info, Wallet } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { getCreativesReport, adLink } from "@/lib/creatives/queries";
+import { getCreativesReport, adLink, getRecentAds, ctr, ago } from "@/lib/creatives/queries";
 import {
   CreateCreativeForm, CreativeStatusSelect, CopyLinkButton, EditorCommissionForm,
-  CreativeEditorSelect, DeleteCreativeButton,
+  CreativeEditorSelect, DeleteCreativeButton, AdLinkSelect,
 } from "@/components/creatives/creative-controls";
 import { PeriodFilter, currentMonth, mad, rate } from "@/components/creatives/period-filter";
 import { getEditorBalances } from "@/lib/creatives/payment-queries";
@@ -25,10 +25,11 @@ export default async function CreativesAdminPage({
   const sp = await searchParams;
   const month = sp.month ?? currentMonth();
 
-  const [report, { data: productsRaw }, { balances, payments }] = await Promise.all([
+  const [report, { data: productsRaw }, { balances, payments }, recentAds] = await Promise.all([
     getCreativesReport({ month }),
     supabaseAdmin.from("products").select("id, name").eq("is_active", true).order("name"),
     getEditorBalances(),
+    getRecentAds(),
   ]);
   const totalRemaining = balances.reduce((s, b) => s + Math.max(0, b.remaining), 0);
   const editorNames = new Map(balances.map((b) => [b.editorId, b.name]));
@@ -159,7 +160,10 @@ export default async function CreativesAdminPage({
 
       {/* Vidéos */}
       <section className="rounded-xl border bg-card">
-        <div className="border-b px-4 py-3"><h2 className="font-medium">Vidéos ({report.creatives.length})</h2></div>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+          <h2 className="font-medium">Vidéos ({report.creatives.length})</h2>
+          <span className="text-xs text-muted-foreground">Stats pubs mises à jour {ago(report.adsUpdatedAt)} · automatique toutes les 15 min</span>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
@@ -169,16 +173,21 @@ export default async function CreativesAdminPage({
                 <th className="px-4 py-2">Éditeur</th>
                 <th className="px-4 py-2">Produit</th>
                 <th className="px-4 py-2">Statut</th>
+                <th className="px-4 py-2 text-right">Impr.</th>
+                <th className="px-4 py-2 text-right">CTR</th>
+                <th className="px-4 py-2 text-right">Leads pub</th>
+                <th className="px-4 py-2 text-right">Dépense</th>
                 <th className="px-4 py-2 text-right">Commandes</th>
                 <th className="px-4 py-2 text-right">Livrées</th>
                 <th className="px-4 py-2 text-right">Taux</th>
+                <th className="px-4 py-2 text-right">Coût / livrée</th>
                 <th className="px-4 py-2 text-right">Gain éditeur</th>
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
             <tbody>
               {report.creatives.length === 0 && (
-                <tr><td colSpan={10} className="px-4 py-6 text-center text-muted-foreground">Aucune vidéo.</td></tr>
+                <tr><td colSpan={15} className="px-4 py-6 text-center text-muted-foreground">Aucune vidéo.</td></tr>
               )}
               {report.creatives.map((c) => (
                 <tr key={c.id} className="border-t">
@@ -198,15 +207,69 @@ export default async function CreativesAdminPage({
                   </td>
                   <td className="px-4 py-2">{c.productName}</td>
                   <td className="px-4 py-2"><CreativeStatusSelect id={c.id} status={c.status} /></td>
+                  <td className="px-4 py-2 text-right" title={`${c.adsCount} pub(s) liée(s)`}>
+                    {c.adsCount ? c.impressions.toLocaleString("fr-FR") : <span className="text-xs text-amber-600">0 pub liée</span>}
+                  </td>
+                  <td className="px-4 py-2 text-right">{ctr(c.linkClicks, c.impressions)}</td>
+                  <td className="px-4 py-2 text-right">{c.adLeads}{c.messages ? <span className="text-xs text-muted-foreground"> +{c.messages} msg</span> : null}</td>
+                  <td className="px-4 py-2 text-right">{c.spend ? mad(c.spend) : "—"}</td>
                   <td className="px-4 py-2 text-right">{c.orders}</td>
                   <td className="px-4 py-2 text-right">{c.delivered}</td>
                   <td className="px-4 py-2 text-right">{rate(c.delivered, c.orders)}</td>
+                  <td className="px-4 py-2 text-right">{c.delivered && c.spend ? mad(Math.round(c.spend / c.delivered)) : "—"}</td>
                   <td className="px-4 py-2 text-right font-semibold text-emerald-700">{mad(c.earnings)}</td>
                   <td className="px-4 py-2 text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       <CopyLinkButton link={adLink(c.lpSlug, c.code)} />
                       <DeleteCreativeButton id={c.id} code={c.code} />
                     </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Pubs Meta / TikTok ↔ vidéos */}
+      <section className="rounded-xl border bg-card">
+        <div className="border-b px-4 py-3">
+          <h2 className="font-medium">Pubs Meta / TikTok (30 derniers jours)</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Une pub dont le nom contient le code (ex: « V001 - hook ») est liée automatiquement.
+            Sinon, choisis la vidéo ici. Les pubs non liées ne comptent pour aucun éditeur.
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2">Pub</th>
+                <th className="px-4 py-2">Campagne</th>
+                <th className="px-4 py-2 text-right">Impr.</th>
+                <th className="px-4 py-2 text-right">Dépense</th>
+                <th className="px-4 py-2">Vidéo liée</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentAds.length === 0 && (
+                <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
+                  Aucune donnée pub pour l&apos;instant (la synchro automatique tourne toutes les 15 min).
+                </td></tr>
+              )}
+              {recentAds.map((a) => (
+                <tr key={a.platform + a.adId} className="border-t">
+                  <td className="px-4 py-2">
+                    <div className="font-medium">{a.adName}</div>
+                    <div className="text-xs text-muted-foreground">{a.platform === "meta" ? "Meta" : "TikTok"} · {a.adId}</div>
+                  </td>
+                  <td className="px-4 py-2 text-xs">{a.campaignName}</td>
+                  <td className="px-4 py-2 text-right">{a.impressions.toLocaleString("fr-FR")}</td>
+                  <td className="px-4 py-2 text-right">{mad(a.spend)}</td>
+                  <td className="px-4 py-2">
+                    <AdLinkSelect platform={a.platform} adId={a.adId} creativeId={a.creativeId}
+                      creatives={report.creatives.map((c) => ({ id: c.id, code: c.code, title: c.title }))} />
+                    {a.linkedBy === "auto" && <span className="ms-1 text-[10px] text-muted-foreground">auto</span>}
                   </td>
                 </tr>
               ))}

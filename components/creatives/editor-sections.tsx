@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { Film, ShoppingCart, CheckCircle, Award } from "lucide-react";
+import { Film, ShoppingCart, CheckCircle, Award, Eye, MousePointerClick } from "lucide-react";
 import type { EditorContext } from "@/lib/creatives/editor-context";
 import { PeriodFilter, mad, rate } from "@/components/creatives/period-filter";
+import { ctr, ago } from "@/lib/creatives/queries";
 
 const STATUS: Record<string, string> = { in_ads: "🟢 En pub", paused: "⏸️ En pause", draft: "📝 Brouillon" };
 
@@ -29,6 +30,9 @@ export function EditorHeader({
           <p className="mt-1 text-sm text-muted-foreground">
             Rémunération : {ctx.commissionLabel}. Seules les commandes livrées comptent.
           </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Stats pubs mises à jour {ago(ctx.report.adsUpdatedAt)} · automatique toutes les 15 min
+          </p>
         </div>
         {withFilter && (
           <PeriodFilter period={ctx.report.period} extra={ctx.isEditor ? undefined : { editor: ctx.editorId }} />
@@ -53,12 +57,14 @@ export function StatCards({ ctx }: { ctx: EditorContext }) {
   const me = ctx.me;
   const cards = [
     { label: "Vidéos en pub", value: `${me?.videosInAds ?? 0} / ${me?.videos ?? 0}`, icon: Film },
+    { label: "Impressions", value: (me?.impressions ?? 0).toLocaleString("fr-FR"), icon: Eye },
+    { label: "CTR (lien)", value: ctr(me?.linkClicks ?? 0, me?.impressions ?? 0), icon: MousePointerClick },
     { label: "Commandes", value: String(me?.orders ?? 0), icon: ShoppingCart },
     { label: "Livrées", value: `${me?.delivered ?? 0} (${rate(me?.delivered ?? 0, me?.orders ?? 0)})`, icon: CheckCircle },
     { label: "Gains (période)", value: mad(me?.earnings ?? 0), icon: Award },
   ];
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
       {cards.map((c) => (
         <div key={c.label} className="rounded-xl border bg-card p-4">
           <div className="flex items-center gap-2 text-xs text-muted-foreground"><c.icon className="h-4 w-4" />{c.label}</div>
@@ -99,6 +105,10 @@ export function VideosTable({ ctx, limit }: { ctx: EditorContext; limit?: number
             <th className="px-4 py-2">Vidéo</th>
             <th className="px-4 py-2">Produit</th>
             <th className="px-4 py-2">Statut</th>
+            <th className="px-4 py-2 text-right">Impr.</th>
+            <th className="px-4 py-2 text-right">Clics</th>
+            <th className="px-4 py-2 text-right">CTR</th>
+            <th className="px-4 py-2 text-right">Leads pub</th>
             <th className="px-4 py-2 text-right">Commandes</th>
             <th className="px-4 py-2 text-right">Livrées</th>
             <th className="px-4 py-2 text-right">Taux</th>
@@ -107,7 +117,7 @@ export function VideosTable({ ctx, limit }: { ctx: EditorContext; limit?: number
         </thead>
         <tbody>
           {rows.length === 0 && (
-            <tr><td colSpan={8} className="px-4 py-6 text-center text-muted-foreground">Aucune vidéo pour le moment.</td></tr>
+            <tr><td colSpan={12} className="px-4 py-6 text-center text-muted-foreground">Aucune vidéo pour le moment.</td></tr>
           )}
           {rows.map((c) => (
             <tr key={c.id} className="border-t">
@@ -117,6 +127,10 @@ export function VideosTable({ ctx, limit }: { ctx: EditorContext; limit?: number
                 : c.title}</td>
               <td className="px-4 py-2">{c.productName}</td>
               <td className="px-4 py-2 text-xs">{STATUS[c.status] ?? c.status}</td>
+              <td className="px-4 py-2 text-right">{c.impressions.toLocaleString("fr-FR")}</td>
+              <td className="px-4 py-2 text-right">{c.linkClicks.toLocaleString("fr-FR")}</td>
+              <td className="px-4 py-2 text-right">{ctr(c.linkClicks, c.impressions)}</td>
+              <td className="px-4 py-2 text-right">{c.adLeads}{c.messages ? <span className="text-xs text-muted-foreground"> +{c.messages} msg</span> : null}</td>
               <td className="px-4 py-2 text-right">{c.orders}</td>
               <td className="px-4 py-2 text-right">{c.delivered}</td>
               <td className="px-4 py-2 text-right">{rate(c.delivered, c.orders)}</td>

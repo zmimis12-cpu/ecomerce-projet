@@ -104,3 +104,19 @@ export async function deleteCreative(id: string): Promise<Result> {
   revalidatePath("/admin/creatives");
   return { success: true };
 }
+
+/** Lie (ou délie si creativeId vide) une pub Meta/TikTok à une vidéo. */
+export async function linkAdToCreative(platform: string, adId: string, creativeId: string): Promise<Result> {
+  await requireRole([...MANAGERS]);
+  if (!creativeId) {
+    const { error } = await supabaseAdmin.from("creative_ads" as never).delete().eq("platform", platform).eq("ad_id", adId);
+    if (error) return { success: false, error: error.message };
+  } else {
+    const { error } = await supabaseAdmin
+      .from("creative_ads" as never)
+      .upsert({ platform, ad_id: adId, creative_id: creativeId, linked_by: "manual" } as never, { onConflict: "platform,ad_id" });
+    if (error) return { success: false, error: error.message };
+  }
+  revalidatePath("/admin/creatives");
+  return { success: true };
+}

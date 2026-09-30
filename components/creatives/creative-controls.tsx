@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import { Copy, Check, Plus, Trash2 } from "lucide-react";
 import {
   createCreative, updateCreativeStatus, updateEditorCommission, updateCreativeEditor, deleteCreative,
+  linkAdToCreative,
 } from "@/lib/creatives/actions";
 
 const INPUT = "h-9 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30";
@@ -195,5 +196,33 @@ export function DeleteCreativeButton({ id, code }: { id: string; code: string })
     >
       <Trash2 className="h-3.5 w-3.5" />
     </button>
+  );
+}
+
+export function AdLinkSelect({
+  platform, adId, creativeId, creatives,
+}: {
+  platform: string; adId: string; creativeId: string | null;
+  creatives: { id: string; code: string; title: string }[];
+}) {
+  const [value, setValue] = useState(creativeId ?? "");
+  const [pending, start] = useTransition();
+  return (
+    <select
+      className={INPUT + " h-8 max-w-[220px] text-xs" + (value ? "" : " border-amber-400")}
+      value={value}
+      disabled={pending}
+      onChange={(e) => {
+        const v = e.target.value; const prev = value;
+        setValue(v);
+        start(async () => {
+          const r = await linkAdToCreative(platform, adId, v);
+          if (!r.success) { setValue(prev); alert(r.error); }
+        });
+      }}
+    >
+      <option value="">— Non liée —</option>
+      {creatives.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.title}</option>)}
+    </select>
   );
 }

@@ -3,7 +3,7 @@
  * Receives real-time status updates from Digylog.
  * Always returns 200 — Digylog stops retrying on any non-200.
  */
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse, after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { applyDigylogStatusUpdate } from "@/lib/delivery/shipment-actions";
 
@@ -58,10 +58,14 @@ async function handle(request: NextRequest) {
     return OK;
   }
 
-  // Process async — return 200 immediately so Digylog doesn't timeout
-  processWebhook({ tracking, idStatus, extStatus, payload }).catch((err) => {
-    console.error("[digylog webhook] Async error:", err?.message);
-  });
+  // Traité APRÈS la réponse avec after() : avant, la promesse "fire-and-forget"
+  // était coupée par Vercel dès l'envoi du 200 → la mise à jour pouvait ne
+  // jamais s'exécuter.
+  after(() =>
+    processWebhook({ tracking, idStatus, extStatus, payload }).catch((err) => {
+      console.error("[digylog webhook] Async error:", err?.message);
+    })
+  );
 
   return OK;
 }
@@ -119,9 +123,11 @@ export async function GET(request: NextRequest) {
 }
 
 async function log(status: string, payload: unknown, meta: Record<string, unknown>) {
+  // La colonne s'appelle "payload" (pas raw_payload) : avant, chaque insert
+  // échouait en silence → aucun log Digylog n'a jamais été enregistré.
   await supabaseAdmin.from("webhook_logs").insert({
-    event_type:  "delivery.digylog",
+    event_type: "delivery.digylog",
     status,
-    raw_payload: { payload, ...meta } as never,
+    payload:    { payload, ...meta } as never,
   } as never).then(() => {}, () => {});
 }

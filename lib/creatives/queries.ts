@@ -36,9 +36,19 @@ export type CreativeStat = {
   delivered: number;   // livrées dans la période
   revenue: number;     // CA livré
   earnings: number;    // gain éditeur
+  // Stats pubs (Meta/TikTok) des pubs liées à cette vidéo, sur la période
+  adsCount: number;
+  impressions: number;
+  linkClicks: number;
+  adLeads: number;
+  messages: number;
+  spend: number;       // ⚠️ privé : jamais affiché aux éditeurs
 };
 
 export type EditorStat = EditorInfo & {
+  impressions: number;
+  linkClicks: number;
+  adLeads: number;
   videos: number;
   videosInAds: number;
   orders: number;
@@ -158,7 +168,46 @@ export async function getCreativesReport(opts: { month?: string | null; editorId
       productName: c.product_id ? productName.get(c.product_id) ?? "—" : "—",
       lpSlug: c.product_id ? lpSlug.get(c.product_id) ?? null : null,
       orders: 0, delivered: 0, revenue: 0, earnings: 0,
+      adsCount: 0, impressions: 0, linkClicks: 0, adLeads: 0, messages: 0, spend: 0,
     });
+  }
+
+  // ── Stats pubs liées (ad_insights_daily via creative_ads) ─────────────────
+  let adsUpdatedAt: string | null = null;
+  if (creativeIds.length) {
+    const { data: links } = await supabaseAdmin
+      .from("creative_ads" as never)
+      .select("platform, ad_id, creative_id")
+      .in("creative_id", creativeIds);
+    const linkRows = (links ?? []) as { platform: string; ad_id: string; creative_id: string }[];
+    const adToCreative = new Map(linkRows.map((l) => [`${l.platform}:${l.ad_id}`, l.creative_id]));
+    for (const l of linkRows) { const st = stats.get(l.creative_id); if (st) st.adsCount++; }
+
+    const adIds = [...new Set(linkRows.map((l) => l.ad_id))];
+    for (let i = 0; i < adIds.length; i += 150) {
+      let iq = supabaseAdmin
+        .from("ad_insights_daily" as never)
+        .select("platform, ad_id, impressions, link_clicks, leads, messages, spend_mad, updated_at")
+        .in("ad_id", adIds.slice(i, i + 150));
+      if (from && to) {
+        iq = iq.gte("day", from.toISOString().slice(0, 10)).lt("day", to.toISOString().slice(0, 10));
+      }
+      const { data: ins } = await iq;
+      for (const r of (ins ?? []) as {
+        platform: string; ad_id: string; impressions: number; link_clicks: number;
+        leads: number; messages: number; spend_mad: number; updated_at: string;
+      }[]) {
+        const cid = adToCreative.get(`${r.platform}:${r.ad_id}`);
+        const st = cid ? stats.get(cid) : undefined;
+        if (!st) continue;
+        st.impressions += Number(r.impressions);
+        st.linkClicks  += Number(r.link_clicks);
+        st.adLeads     += Number(r.leads);
+        st.messages    += Number(r.messages);
+        st.spend       += Number(r.spend_mad);
+        if (!adsUpdatedAt || r.updated_at > adsUpdatedAt) adsUpdatedAt = r.updated_at;
+      }
+    }
   }
 
   const deliveredRows: DeliveredOrderRow[] = [];
@@ -192,13 +241,16 @@ export async function getCreativesReport(opts: { month?: string | null; editorId
         videos: mine.length,
         videosInAds: mine.filter((c) => c.status === "in_ads").length,
         orders: mine.reduce((s, c) => s + c.orders, 0),
+        impressions: mine.reduce((s, c) => s + c.impressions, 0),
+        linkClicks: mine.reduce((s, c) => s + c.linkClicks, 0),
+        adLeads: mine.reduce((s, c) => s + c.adLeads, 0),
         delivered: mine.reduce((s, c) => s + c.delivered, 0),
         revenue: mine.reduce((s, c) => s + c.revenue, 0),
         earnings: mine.reduce((s, c) => s + c.earnings, 0),
       };
     });
 
-  return { period: key, creatives: creativeStats, editors: editorStats, deliveredOrders: deliveredRows };
+  return { period: key, creatives: creativeStats, editors: editorStats, deliveredOrders: deliveredRows, adsUpdatedAt };
 }
 
 export function lpDomain() {
@@ -235,4 +287,60 @@ export async function getCreativeOptions(): Promise<CreativeOption[]> {
     editorName: names.get(c.editor_id) ?? "—",
     productId: c.product_id, status: c.status,
   }));
+}
+
+/** CTR lien en % (clics sur le lien ÷ impressions). */
+export function ctr(clicks: number, impressions: number) {
+  return impressions > 0 ? (Math.round((clicks / impressions) * 10000) / 100).toFixed(2) + "%" : "—";
+}
+
+export function ago(iso: string | null) {
+  if (!iso) return "jamais";
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return "à l'instant";
+  if (min < 60) return `il y a ${min} min`;
+  const h = Math.round(min / 60);
+  return h < 24 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`;
+}
+
+export type AdRow = {
+  platform: string;
+  adId: string;
+  adName: string;
+  campaignName: string;
+  impressions: number;
+  spend: number;
+  creativeId: string | null;
+  linkedBy: string | null;
+};
+
+/** Pubs actives des 30 derniers jours + la vidéo à laquelle elles sont liées. */
+export async function getRecentAds(): Promise<AdRow[]> {
+  const since = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
+  const { data } = await supabaseAdmin
+    .from("ad_insights_daily" as never)
+    .select("platform, ad_id, ad_name, campaign_name, impressions, spend_mad, day")
+    .gte("day", since)
+    .limit(20000);
+  const agg = new Map<string, AdRow & { lastDay: string }>();
+  for (const r of (data ?? []) as {
+    platform: string; ad_id: string; ad_name: string | null; campaign_name: string | null;
+    impressions: number; spend_mad: number; day: string;
+  }[]) {
+    const k = `${r.platform}:${r.ad_id}`;
+    const a = agg.get(k) ?? {
+      platform: r.platform, adId: r.ad_id, adName: r.ad_name ?? r.ad_id, campaignName: r.campaign_name ?? "",
+      impressions: 0, spend: 0, creativeId: null, linkedBy: null, lastDay: r.day,
+    };
+    a.impressions += Number(r.impressions);
+    a.spend += Number(r.spend_mad);
+    if (r.day >= a.lastDay) { a.lastDay = r.day; a.adName = r.ad_name ?? a.adName; }
+    agg.set(k, a);
+  }
+  const { data: links } = await supabaseAdmin.from("creative_ads" as never).select("platform, ad_id, creative_id, linked_by");
+  for (const l of (links ?? []) as { platform: string; ad_id: string; creative_id: string; linked_by: string }[]) {
+    const a = agg.get(`${l.platform}:${l.ad_id}`);
+    if (a) { a.creativeId = l.creative_id; a.linkedBy = l.linked_by; }
+  }
+  return [...agg.values()].filter((a) => a.impressions > 0).sort((a, b) => b.spend - a.spend);
 }

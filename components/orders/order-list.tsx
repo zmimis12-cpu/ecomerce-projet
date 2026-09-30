@@ -299,6 +299,16 @@ export function OrderList({ orders, canManage }: OrderListProps) {
                               {order.delivery_external_status}
                             </p>
                           )}
+                          {order.delivery_driver_phone && (
+                            <a href={`tel:${order.delivery_driver_phone}`} className="block text-[10px] text-primary hover:underline">
+                              🛵 {order.delivery_driver_phone}
+                            </a>
+                          )}
+                          {order.delivery_reported_to && (
+                            <p className="text-[10px] text-amber-700">
+                              Reportée au {new Date(order.delivery_reported_to).toLocaleDateString("fr-FR")}
+                            </p>
+                          )}
                         </div>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
