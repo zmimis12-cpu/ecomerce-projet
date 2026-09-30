@@ -413,39 +413,45 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   const pendingRows = activeRows.filter((r) =>
     !r.is_paid && (r.status === "delivered" || r.status === "in_transit" || r.status === "sent_to_delivery"));
   const pendingIds = pendingRows.map((r) => r.id);
-  const embedded = new Map<string, number>(); // order_id → pub estimée + confirmation incluses
+  // Marge RÉELLE de chaque commande, recalculée depuis le coût d'ACHAT :
+  //   vente − (achat + emballage) × quantité − vrai frais de livraison Digylog
+  // On n'utilise PAS cogs_total : selon la date de la commande il contient
+  // (ou pas) une pub estimée, une confirmation et une livraison forfaitaire →
+  // rajouter/retirer ces parts donnait un résultat faux sur les anciennes commandes.
   const idsForItems = [...paidIds, ...pendingIds];
+  const goodsCost = new Map<string, number>(); // order_id → (achat + emballage) × qté
   if (idsForItems.length) {
     const { data: prodCosts } = await supabaseAdmin
-      .from("products").select("id, ads_cost_mad, confirmation_cost_mad, shipping_cost_mad");
-    // Parts ESTIMÉES incluses dans le coût produit (donc dans cogs_total) :
-    // pub + confirmation + livraison forfaitaire 35 MAD (× quantité !).
-    // On les rajoute puis on soustrait les VRAIS montants (pub Meta, commissions,
-    // vrais frais Digylog : 20 MAD Casa / 35 ailleurs, une seule fois par commande).
-    const perUnit = new Map(((prodCosts ?? []) as { id: string; ads_cost_mad: number | null; confirmation_cost_mad: number | null; shipping_cost_mad: number | null }[])
-      .map((p) => [p.id, (p.ads_cost_mad ?? 0) + (p.confirmation_cost_mad ?? 0) + (p.shipping_cost_mad ?? 0)]));
+      .from("products").select("id, total_cost_mad, ads_cost_mad, confirmation_cost_mad, shipping_cost_mad");
+    const unitGoods = new Map(((prodCosts ?? []) as {
+      id: string; total_cost_mad: number | null; ads_cost_mad: number | null;
+      confirmation_cost_mad: number | null; shipping_cost_mad: number | null;
+    }[]).map((p) => [p.id,
+      (p.total_cost_mad ?? 0) - (p.ads_cost_mad ?? 0) - (p.confirmation_cost_mad ?? 0) - (p.shipping_cost_mad ?? 0)]));
     for (let i = 0; i < idsForItems.length; i += 150) {
       const { data: its } = await supabaseAdmin
         .from("order_items").select("order_id, product_id, quantity")
         .in("order_id", idsForItems.slice(i, i + 150));
       for (const it of (its ?? []) as { order_id: string; product_id: string | null; quantity: number }[]) {
-        const add = (it.product_id ? perUnit.get(it.product_id) ?? 0 : 0) * (it.quantity ?? 1);
-        embedded.set(it.order_id, (embedded.get(it.order_id) ?? 0) + add);
+        const u = it.product_id ? unitGoods.get(it.product_id) : undefined;
+        if (u === undefined) continue;
+        goodsCost.set(it.order_id, (goodsCost.get(it.order_id) ?? 0) + u * (it.quantity ?? 1));
       }
     }
   }
-  const embeddedPaid = paidIds.reduce((s, id) => s + (embedded.get(id) ?? 0), 0);
   const realDelivery = (r: (typeof activeRows)[number]) => r.actual_delivery_cost ?? r.expected_delivery_cost ?? 35;
-  const realDeliveryPaid = activeRows.filter((r) => r.is_paid).reduce((s, r) => s + realDelivery(r), 0);
-  const real_profit_before_ads = Math.round((real_profit + embeddedPaid - realDeliveryPaid) * 100) / 100;
+  const orderMargin = (r: (typeof activeRows)[number]) =>
+    (r.total_amount_mad ?? 0) - (goodsCost.get(r.id) ?? (r.cogs_total ?? 0)) - realDelivery(r);
+
+  const real_profit_before_ads = Math.round(
+    activeRows.filter((r) => r.is_paid).reduce((s, r) => s + orderMargin(r), 0) * 100) / 100;
 
   const true_final_profit = Math.round(
     (real_profit_before_ads - total_ads_spend - total_call_center_cost) * 100
   ) / 100;
 
   // Marge pas encore encaissée (la pub de ces commandes est déjà dépensée)
-  const pending_profit = Math.round(pendingRows.reduce((s, r) =>
-    s + (r.total_amount_mad ?? 0) - (r.cogs_total ?? 0) + (embedded.get(r.id) ?? 0) - realDelivery(r), 0) * 100) / 100;
+  const pending_profit = Math.round(pendingRows.reduce((s, r) => s + orderMargin(r), 0) * 100) / 100;
   const pending_orders_count = pendingRows.length;
 
   return {
