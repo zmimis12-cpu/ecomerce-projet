@@ -45,7 +45,7 @@ export function ProductPerformanceTable({ data }: ProductPerformanceTableProps) 
           <tr className="border-b bg-secondary/30">
             {[
               "Photo","Produit","SKU","Pub","Leads","Conf.","Livré","Retourné",
-              "Tx Conf","Tx Livr","CA Total","CA Réel",
+              "Tx Conf","Tx Livr","Coût / Lead","Coût / Livré","CA Total","CA Réel",
               "Profit Est.","Profit Réel","Marge",
               "Ads Total","Ads Max Est.","Ads Max Réel","ADS/O",
               "Statut"
@@ -111,6 +111,31 @@ export function ProductPerformanceTable({ data }: ProductPerformanceTableProps) 
                 )}>
                   {row.delivery_rate}%
                 </span>
+              </td>
+              {/* Coût pub par lead */}
+              <td className="px-3 py-2.5 font-mono whitespace-nowrap">
+                {row.cost_per_lead > 0
+                  ? <span>{fmt(row.cost_per_lead)} <span className="text-[9px] text-muted-foreground">MAD</span></span>
+                  : <span className="text-muted-foreground">—</span>}
+              </td>
+              {/* Coût pub par commande LIVRÉE — vert si ≤ budget max estimé */}
+              <td className="px-3 py-2.5 font-mono whitespace-nowrap">
+                {row.cost_per_delivered > 0 ? (
+                  <span
+                    className={cn(
+                      "rounded px-1.5 py-0.5 font-bold",
+                      row.ads_max_estimation > 0 && row.cost_per_delivered <= row.ads_max_estimation
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-700"
+                    )}
+                    title={`Pub ${fmt(row.ads_total)} MAD ÷ ${row.delivered_count} livrée(s)` +
+                      (row.ads_max_estimation > 0 ? ` — max conseillé ${fmt(row.ads_max_estimation)} MAD` : "")}
+                  >
+                    {fmt(row.cost_per_delivered)} <span className="text-[9px] font-normal">MAD</span>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground" title="Aucune commande livrée ou aucune dépense pub">—</span>
+                )}
               </td>
               <td className="px-3 py-2.5 font-mono text-muted-foreground">{fmt(row.total_revenue)}</td>
               <td className="px-3 py-2.5 font-mono font-semibold">{fmt(row.real_revenue)}</td>

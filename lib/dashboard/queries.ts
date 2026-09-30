@@ -100,6 +100,7 @@ export interface ProductPerformance {
   ads_max_estimation:  number;   // Budget max estimé (marge × taux_conf × taux_livr)
   ads_max_real:        number;   // Budget max réel ajusté avec vrais taux
   cost_per_delivered:  number;   // Coût ads par commande livrée
+  cost_per_lead:       number;   // Coût ads par lead
   ads_live:            number | null; // Spend live du jour depuis l'API (null = non connecté)
 }
 
@@ -738,12 +739,18 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
 
     // ADS MAX RÉEL = total ads Meta dépensés ÷ nombre livré
     // = coût réel en ads pour chaque commande livrée
-    const ads_max_real = delivered_count > 0 && adsCostToUse > 0
-      ? Math.round(adsCostToUse / delivered_count)
+    // Basé sur ads_total (dépense réelle Meta OU estimation × leads). Avant:
+    // adsCostToUse = coût estimé PAR LEAD quand pas de synchro → résultat faux.
+    const ads_max_real = delivered_count > 0 && ads_total > 0
+      ? Math.round(ads_total / delivered_count)
       : 0;
 
-    // COÛT PAR LIVRÉ = même que ads_max_real
+    // COÛT PAR LIVRÉ = total pub ÷ commandes livrées
     const cost_per_delivered = ads_max_real;
+    // COÛT PAR LEAD = total pub ÷ leads
+    const cost_per_lead = lead_count > 0 && ads_total > 0
+      ? Math.round(ads_total / lead_count)
+      : 0;
 
     // Suppress nbDays unused warning — kept for future daily budget feature
     void nbDays;
@@ -759,7 +766,7 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
       total_revenue, real_revenue, estimated_profit, real_profit,
       total_cogs, total_delivery_cost, return_losses, real_margin_pct,
       performance_status: performance_status as ProductPerformance["performance_status"],
-      ads_total, ads_max_estimation, ads_max_real, cost_per_delivered,
+      ads_total, ads_max_estimation, ads_max_real, cost_per_delivered, cost_per_lead,
       ads_live: liveSpendByProduct.get(p.id) ?? null,
     };
   });
@@ -783,7 +790,7 @@ function makeEmptyPerf(
     total_revenue: 0, real_revenue: 0, estimated_profit: 0, real_profit: 0,
     total_cogs: 0, total_delivery_cost: 0, return_losses: 0, real_margin_pct: 0,
     performance_status: "no_data",
-    ads_total: 0, ads_max_estimation: 0, ads_max_real: 0, cost_per_delivered: 0, ads_live: null,
+    ads_total: 0, ads_max_estimation: 0, ads_max_real: 0, cost_per_delivered: 0, cost_per_lead: 0, ads_live: null,
   };
 }
 
