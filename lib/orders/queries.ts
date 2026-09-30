@@ -10,7 +10,7 @@ const ORDER_LIST_FIELDS = `
   status, total_amount_mad, estimated_profit, assigned_to,
   source, notes, delivery_tracking_number,
   delivery_external_status, delivery_external_status_id,
-  delivery_driver_phone, delivery_reported_to,
+  delivery_driver_phone, delivery_reported_to, creative_code,
   delivery_status, delivery_last_sync_at, bl_id,
   is_duplicate, duplicate_of, created_at
 `;
@@ -23,7 +23,7 @@ const ORDER_DETAIL_FIELDS = `
   status, payment_status, payment_method,
   assigned_to, confirmed_by, confirmed_at,
   notes, internal_notes, delivery_tracking_number, sync_error, import_source,
-  delivery_external_status, delivery_external_status_id, delivery_driver_phone, delivery_reported_to,
+  delivery_external_status, delivery_external_status_id, delivery_driver_phone, delivery_reported_to, creative_code,
   source, is_duplicate, duplicate_of, is_exchange, exchange_of_order_id,
   created_at, updated_at
 `;
@@ -55,7 +55,7 @@ export async function getOrders(
     if (filters.status && filters.status !== "all") query = query.eq("status", filters.status);
     if (filters.search) {
       query = query.or(
-        `customer_name.ilike.%${filters.search}%,customer_phone.ilike.%${filters.search}%,order_number.ilike.%${filters.search}%`
+        `customer_name.ilike.%${filters.search}%,customer_phone.ilike.%${filters.search}%,order_number.ilike.%${filters.search}%,creative_code.ilike.%${filters.search}%`
       );
     }
     if (filters.dateFrom) query = query.gte("created_at", filters.dateFrom);
@@ -150,6 +150,7 @@ export async function getOrders(
       delivery_external_status_id: (o as unknown as Record<string,unknown>).delivery_external_status_id as number | null ?? null,
       delivery_driver_phone: (o as unknown as Record<string,unknown>).delivery_driver_phone as string | null ?? null,
       delivery_reported_to: (o as unknown as Record<string,unknown>).delivery_reported_to as string | null ?? null,
+      creative_code: (o as unknown as Record<string,unknown>).creative_code as string | null ?? null,
       delivery_status: (o as unknown as Record<string,unknown>).delivery_status as string | null ?? null,
       delivery_last_sync_at: (o as unknown as Record<string,unknown>).delivery_last_sync_at as string | null ?? null,
       bl_id: (o as unknown as Record<string,unknown>).bl_id as number | null ?? null,

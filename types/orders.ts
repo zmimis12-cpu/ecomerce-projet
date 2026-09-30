@@ -83,6 +83,7 @@ export interface Order {
   delivery_external_status_id: number | null;
   delivery_driver_phone?: string | null;
   delivery_reported_to?: string | null;
+  creative_code?: string | null;
   delivery_status: string | null;
   delivery_last_sync_at: string | null;
   bl_id: number | null;
@@ -137,6 +138,7 @@ export interface OrderListItem {
   delivery_external_status_id: number | null;
   delivery_driver_phone?: string | null;
   delivery_reported_to?: string | null;
+  creative_code?: string | null;
   delivery_status: string | null;
   delivery_last_sync_at: string | null;
   bl_id: number | null;

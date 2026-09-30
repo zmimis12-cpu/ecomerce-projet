@@ -59,6 +59,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </Link>
           <span className="text-muted-foreground">/</span>
           <span className="text-sm font-mono font-medium">{order.order_number}</span>
+          {(order as unknown as { creative_code?: string | null }).creative_code && (
+            <span className="rounded bg-fuchsia-100 px-2 py-0.5 text-xs font-semibold text-fuchsia-800"
+              title="Commande venant de cette vidéo (éditeur)">
+              🎬 {(order as unknown as { creative_code: string }).creative_code}
+            </span>
+          )}
         </div>
         {canManage && <DeleteOrderButton orderId={id} orderNumber={order.order_number} />}
       </div>

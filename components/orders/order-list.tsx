@@ -165,7 +165,7 @@ export function OrderList({ orders, canManage }: OrderListProps) {
     const matchStatus = statusFilter === "all" || o.status === statusFilter;
     const matchSearch = !q || [
       o.order_number, o.customer_name, o.customer_phone,
-      o.customer_city, o.delivery_tracking_number ?? "",
+      o.customer_city, o.delivery_tracking_number ?? "", o.creative_code ?? "",
     ].some((f) => f.toLowerCase().includes(q));
     return matchStatus && matchSearch;
   });
@@ -202,7 +202,7 @@ export function OrderList({ orders, canManage }: OrderListProps) {
       {/* Filters */}
       <div className="flex flex-wrap gap-2 items-center">
         <input value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder="Rechercher commande, client, téléphone, tracking…"
+          placeholder="Rechercher commande, client, téléphone, tracking, code vidéo (V001)…"
           className="flex h-9 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
         <div className="flex flex-wrap gap-1">
           {STATUS_OPTIONS.map((opt) => (
@@ -277,6 +277,16 @@ export function OrderList({ orders, canManage }: OrderListProps) {
                       <Link href={`/admin/orders/${order.id}`} className="hover:text-primary">
                         {order.order_number}
                       </Link>
+                      {order.creative_code && (
+                        <button
+                          type="button"
+                          onClick={() => setSearch(order.creative_code!)}
+                          title="Commande venant de cette vidéo — cliquer pour voir toutes ses commandes"
+                          className="mt-1 block rounded bg-fuchsia-100 px-1.5 py-0.5 text-[10px] font-semibold text-fuchsia-800 hover:bg-fuchsia-200"
+                        >
+                          🎬 {order.creative_code}
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-xs">{order.customer_name}</p>
