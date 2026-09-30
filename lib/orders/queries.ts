@@ -41,47 +41,78 @@ export async function getOrders(
   limit = 200
 ): Promise<{ orders: OrderListItem[]; total: number }> {
   const supabase = await createClient();
-  const perPage  = filters.perPage ?? limit;
-  const page     = filters.page ?? 0;
 
-  let query = supabase
-    .from("orders")
-    .select(ORDER_LIST_FIELDS, { count: "exact" })
-    .order("created_at", { ascending: false })
-    .range(page * perPage, (page + 1) * perPage - 1);
+  // Construit la requête filtrée pour une tranche [from, to]
+  const build = (from: number, to: number) => {
+    let query = supabase
+      .from("orders")
+      .select(ORDER_LIST_FIELDS, { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, to);
+    if (isAgent && agentId) query = query.eq("assigned_to", agentId);
+    if (filters.status && filters.status !== "all") query = query.eq("status", filters.status);
+    if (filters.search) {
+      query = query.or(
+        `customer_name.ilike.%${filters.search}%,customer_phone.ilike.%${filters.search}%,order_number.ilike.%${filters.search}%`
+      );
+    }
+    if (filters.dateFrom) query = query.gte("created_at", filters.dateFrom);
+    if (filters.dateTo)   query = query.lte("created_at", filters.dateTo + "T23:59:59");
+    return query;
+  };
 
-  if (isAgent && agentId) query = query.eq("assigned_to", agentId);
-  if (filters.status && filters.status !== "all") query = query.eq("status", filters.status);
-  if (filters.search) {
-    query = query.or(
-      `customer_name.ilike.%${filters.search}%,customer_phone.ilike.%${filters.search}%,order_number.ilike.%${filters.search}%`
-    );
+  // Avant: plafond fixe de 200 commandes → la liste affichait 200 alors que le
+  // dashboard en comptait 201. Maintenant: toutes les commandes, par tranches
+  // de 1000 (limite Supabase), sauf si une page précise est demandée.
+  let orders: Order[] = [];
+  let total = 0;
+  if (filters.page !== undefined || filters.perPage !== undefined) {
+    const perPage = filters.perPage ?? limit;
+    const page    = filters.page ?? 0;
+    const { data, error, count } = await build(page * perPage, (page + 1) * perPage - 1);
+    if (error) {
+      console.error("[orders] getOrders error:", error.message);
+      return { orders: [], total: 0 };
+    }
+    orders = (data ?? []) as unknown as Order[];
+    total  = count ?? orders.length;
+  } else {
+    const CHUNK = 1000;
+    for (let from = 0; ; from += CHUNK) {
+      const { data, error, count } = await build(from, from + CHUNK - 1);
+      if (error) {
+        console.error("[orders] getOrders error:", error.message);
+        return { orders: [], total: 0 };
+      }
+      const rows = (data ?? []) as unknown as Order[];
+      orders = orders.concat(rows);
+      total  = count ?? orders.length;
+      if (rows.length < CHUNK) break;
+    }
   }
-  if (filters.dateFrom) query = query.gte("created_at", filters.dateFrom);
-  if (filters.dateTo)   query = query.lte("created_at", filters.dateTo + "T23:59:59");
-
-  const { data, error, count } = await query;
-
-  if (error) {
-    console.error("[orders] getOrders error:", error.message);
-    return { orders: [], total: 0 };
-  }
-
-  const orders = (data ?? []) as unknown as Order[];
   if (orders.length === 0) return { orders: [], total: 0 };
 
   const orderIds  = orders.map((o) => o.id);
   const agentIds  = [...new Set(orders.map((o) => o.assigned_to).filter(Boolean))] as string[];
 
-  const [itemsRes, agentsRes] = await Promise.all([
-    supabase
-      .from("order_items")
-      .select("order_id, product_name, product_sku")
-      .in("order_id", orderIds),
+  // .in() avec des centaines d'IDs dépasse la longueur max d'URL → par lots
+  const BATCH = 150;
+  const itemBatches: Promise<{ data: unknown[] | null }>[] = [];
+  for (let i = 0; i < orderIds.length; i += BATCH) {
+    itemBatches.push(
+      supabase
+        .from("order_items")
+        .select("order_id, product_name, product_sku")
+        .in("order_id", orderIds.slice(i, i + BATCH)) as unknown as Promise<{ data: unknown[] | null }>
+    );
+  }
+  const [itemResults, agentsRes] = await Promise.all([
+    Promise.all(itemBatches),
     agentIds.length > 0
       ? supabase.from("users").select("id, full_name").in("id", agentIds)
       : { data: [] },
   ]);
+  const itemsRes = { data: itemResults.flatMap((r) => r.data ?? []) };
 
   const itemsByOrder: Record<string, { product_name: string; product_sku: string }[]> = {};
   for (const item of (itemsRes.data ?? []) as unknown as { order_id: string; product_name: string; product_sku: string }[]) {
@@ -123,7 +154,7 @@ export async function getOrders(
       created_at: o.created_at,
     } as OrderListItem;
   });
-  return { orders: merged as OrderListItem[], total: count ?? merged.length };
+  return { orders: merged as OrderListItem[], total: total || merged.length };
 }
 
 export async function getOrder(id: string): Promise<Order | null> {

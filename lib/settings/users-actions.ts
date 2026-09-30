@@ -4,6 +4,7 @@
  * Server-side only user management.
  * Never exposes service role key to frontend.
  */
+import { findAvailableAgent } from "@/lib/orders/auto-assign";
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth/session";
@@ -230,8 +231,29 @@ export async function deleteUser(userId: string): Promise<{ success: boolean; er
     return { success: false, error: "Vous ne pouvez pas supprimer votre propre compte." };
   }
 
+  // 1. Désactiver d'abord → il ne reçoit plus AUCUNE nouvelle commande
+  await supabaseAdmin.from("users").update({ is_active: false } as never).eq("id", userId);
+  await supabaseAdmin.from("call_center_agents").update({ active: false } as never).eq("user_id", userId);
+
+  // 2. Ses commandes en cours sont redistribuées aux agents actifs (ou non assignées)
+  const { data: openOrders } = await supabaseAdmin
+    .from("orders")
+    .select("id")
+    .eq("assigned_to", userId)
+    .not("status", "in", '("confirmed","refused","delivered","paid","cancelled","returned","sent_to_delivery","in_transit","exchanged")');
+  for (const o of (openOrders ?? []) as { id: string }[]) {
+    const nextAgent = await findAvailableAgent();
+    await supabaseAdmin.from("orders").update({ assigned_to: nextAgent } as never).eq("id", o.id);
+  }
+
+  // 3. Supprimer l'accès (login)
   await supabaseAdmin.auth.admin.deleteUser(userId);
-  await supabaseAdmin.from("users").delete().eq("id", userId);
+
+  // 4. Supprimer la fiche. Si elle est liée à d'anciennes commandes (historique),
+  //    la base refuse → on la garde DÉSACTIVÉE (avant: erreur ignorée et l'agent
+  //    restait actif → nouvelles commandes assignées à un utilisateur supprimé).
+  const { error: delErr } = await supabaseAdmin.from("users").delete().eq("id", userId);
+  if (delErr) console.warn("[deleteUser] fiche conservée (désactivée) :", delErr.message);
 
   createAuditLog({
     userId:       session.authId,

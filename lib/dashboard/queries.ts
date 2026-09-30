@@ -320,9 +320,11 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
 
   // Répartition Digylog vs livreur propre — pour ne jamais mélanger les deux
   // dans les rapports (frais/logique de calcul différents entre les deux).
-  const self_delivery_count = activeRows.filter((r) => r.fulfillment_type === "self_delivery").length;
+  const isSelfDone = (r: (typeof activeRows)[number]) =>
+    r.fulfillment_type === "self_delivery" && (r.status === "paid" || r.status === "delivered");
+  const self_delivery_count = activeRows.filter(isSelfDone).length;
   const self_delivery_revenue = activeRows
-    .filter((r) => r.fulfillment_type === "self_delivery" && r.is_paid)
+    .filter((r) => isSelfDone(r) && r.is_paid)
     .reduce((s, r) => s + (r.actual_cod_collected_mad ?? r.total_amount_mad ?? 0), 0);
   const digylog_count = activeRows.length - self_delivery_count;
 

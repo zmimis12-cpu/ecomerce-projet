@@ -248,10 +248,11 @@ export async function updateOrderStatus(
   // Get current status for history
   const { data: current } = await supabase
     .from("orders")
-    .select("status")
+    .select("status, fulfillment_type")
     .eq("id", orderId)
     .single();
   const currentStatus = (current as { status: string } | null)?.status ?? null;
+  const currentFulfillment = (current as { fulfillment_type?: string } | null)?.fulfillment_type ?? null;
 
   // Update
   const updatePayload: Record<string, unknown> = { status: newStatus };
@@ -273,6 +274,13 @@ export async function updateOrderStatus(
     updatePayload.is_paid        = false;
     updatePayload.payment_status = "unpaid";
     updatePayload.paid_at        = null;
+    // Marquée "payée par notre livreur" par erreur puis renvoyée en livraison :
+    // elle redevient une commande Digylog, sinon le dashboard la compte encore
+    // dans "Livré par nous" avec un montant encaissé qui n'existe pas.
+    if (currentFulfillment === "self_delivery") {
+      updatePayload.fulfillment_type         = "digylog";
+      updatePayload.actual_cod_collected_mad = null;
+    }
   }
 
   const { error } = await supabase
