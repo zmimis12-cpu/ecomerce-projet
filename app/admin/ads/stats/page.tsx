@@ -7,6 +7,8 @@ import { getUsdToMad } from "@/lib/ads/fx";
 import { periodToRange } from "@/lib/creatives/queries";
 import { PeriodFilter, currentMonth } from "@/components/creatives/period-filter";
 import { MetaLiveSection } from "@/components/ads/meta-live-section";
+import { MetaTaxCard } from "@/components/ads/meta-tax-card";
+import { getMetaTaxReport } from "@/lib/ads/meta-tax";
 
 export const metadata: Metadata = { title: "Stats pubs" };
 export const dynamic = "force-dynamic";
@@ -25,6 +27,7 @@ export default async function AdminAdStatsPage({
     getUsdToMad(),
     getAccountLifetimeSpend(),
   ]);
+  const taxReport = await getMetaTaxReport();
   const codeOf = new Map(((creatives ?? []) as { id: string; code: string }[]).map((c) => [c.id, c.code]));
   const codeByAd = new Map(((links ?? []) as { ad_id: string; creative_id: string }[])
     .map((l) => [l.ad_id, codeOf.get(l.creative_id) ?? ""]));
@@ -56,6 +59,7 @@ export default async function AdminAdStatsPage({
           </div>
         </div>
       )}
+      <MetaTaxCard report={taxReport} rate={fx.rate} />
       <MetaLiveSection live={live} codeByAd={Object.fromEntries(codeByAd)} rate={fx.rate} title="Toutes les pubs Meta — en direct" showTotals />
     </div>
   );
