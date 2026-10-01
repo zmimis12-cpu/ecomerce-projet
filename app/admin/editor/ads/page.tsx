@@ -3,6 +3,7 @@ import { BarChart3 } from "lucide-react";
 import { loadEditorContext } from "@/lib/creatives/editor-context";
 import { getEditorAdStats, ctr, getEditorLinkedAds, periodToRange } from "@/lib/creatives/queries";
 import { getMetaAdsLive } from "@/lib/ads/meta-live";
+import { TONE_CLS } from "@/lib/ads/meta-status";
 import { getUsdToMad } from "@/lib/ads/fx";
 import { LiveRefresh } from "@/components/creatives/live-refresh";
 import { EditorHeader } from "@/components/creatives/editor-sections";
@@ -87,7 +88,7 @@ export default async function EditorAdsPage({
                   <tr key={a.id} className="border-t">
                     <td className="px-3 py-2 font-mono font-semibold">{codeByAd.get(a.id) ?? "—"}</td>
                     <td className="px-3 py-2 font-medium">{a.name}</td>
-                    <td className="px-3 py-2">{STATUS[a.delivery] ?? a.delivery}</td>
+                    <td className="px-3 py-2"><span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${TONE_CLS[a.delivery.tone]}`}>{a.delivery.label}</span></td>
                     <td className="px-3 py-2">{a.attribution}</td>
                     <td className="px-3 py-2 text-right">
                       <div className="font-semibold">{a.results ?? "—"}</div>

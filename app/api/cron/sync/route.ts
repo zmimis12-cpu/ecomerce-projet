@@ -10,6 +10,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { syncDigylogActiveOrders } from "@/lib/delivery/digylog/auto-sync";
 import { syncMetaAdSpendCore, syncTikTokAdSpendCore } from "@/lib/ads/sync-core";
 import { syncMetaAdInsights, syncTikTokAdInsights } from "@/lib/ads/insights-sync";
+import { syncCreativeStatuses } from "@/lib/ads/meta-status";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -54,6 +55,7 @@ export async function GET(req: NextRequest) {
     result.tiktokSpend = short(await safe(() => syncTikTokAdSpendCore(from, days[0])));
     result.metaInsights   = await safe(() => syncMetaAdInsights(from, days[0]));
     result.tiktokInsights = await safe(() => syncTikTokAdInsights(from, days[0]));
+    result.creativeStatuses = await safe(() => syncCreativeStatuses());
 
     if (backfill && result.metaSpend === "ok") {
       await supabaseAdmin.from("app_settings")

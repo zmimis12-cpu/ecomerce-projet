@@ -4,6 +4,7 @@ import { Film, ShoppingCart, CheckCircle, Award, Eye, MousePointerClick } from "
 import type { EditorContext } from "@/lib/creatives/editor-context";
 import { PeriodFilter, mad, rate } from "@/components/creatives/period-filter";
 import { ctr, ago } from "@/lib/creatives/queries";
+import { TONE_CLS } from "@/lib/ads/meta-status";
 
 const STATUS: Record<string, string> = { in_ads: "🟢 En pub", paused: "⏸️ En pause", draft: "📝 Brouillon" };
 
@@ -57,7 +58,7 @@ export function EditorHeader({
 export function StatCards({ ctx }: { ctx: EditorContext }) {
   const me = ctx.me;
   const cards = [
-    { label: "Vidéos en pub", value: `${me?.videosInAds ?? 0} / ${me?.videos ?? 0}`, icon: Film },
+    { label: "Vidéos en pub (direct)", value: `${ctx.liveInAds} / ${me?.videos ?? 0}`, icon: Film },
     { label: "Impressions", value: (me?.impressions ?? 0).toLocaleString("fr-FR"), icon: Eye },
     { label: "CTR (lien)", value: ctr(me?.linkClicks ?? 0, me?.impressions ?? 0), icon: MousePointerClick },
     { label: "Commandes", value: String(me?.orders ?? 0), icon: ShoppingCart },
@@ -105,7 +106,7 @@ export function VideosTable({ ctx, limit }: { ctx: EditorContext; limit?: number
             <th className="px-4 py-2">Code</th>
             <th className="px-4 py-2">Vidéo</th>
             <th className="px-4 py-2">Produit</th>
-            <th className="px-4 py-2">Statut</th>
+            <th className="px-4 py-2">Diffusion (direct)</th>
             <th className="px-4 py-2 text-right">Impr.</th>
             <th className="px-4 py-2 text-right">Clics</th>
             <th className="px-4 py-2 text-right">CTR</th>
@@ -129,7 +130,11 @@ export function VideosTable({ ctx, limit }: { ctx: EditorContext; limit?: number
                 ? <a href={c.videoUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">{c.title}</a>
                 : c.title}</td>
               <td className="px-4 py-2">{c.productName}</td>
-              <td className="px-4 py-2 text-xs">{STATUS[c.status] ?? c.status}</td>
+              <td className="px-4 py-2">
+                {(() => { const l = ctx.live.get(c.id); return l
+                  ? <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${TONE_CLS[l.tone]}`} title={l.detail}>{l.label}</span>
+                  : <span className="text-xs">{STATUS[c.status] ?? c.status}</span>; })()}
+              </td>
               <td className="px-4 py-2 text-right">{c.impressions.toLocaleString("fr-FR")}</td>
               <td className="px-4 py-2 text-right">{c.linkClicks.toLocaleString("fr-FR")}</td>
               <td className="px-4 py-2 text-right">{ctr(c.linkClicks, c.impressions)}</td>

@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/auth/session";
 import { getCreativesReport } from "@/lib/creatives/queries";
 import { getEditorBalances } from "@/lib/creatives/payment-queries";
 import { currentMonth } from "@/components/creatives/period-filter";
+import { getCreativesLiveStatus } from "@/lib/ads/meta-status";
 
 export async function loadEditorContext(sp: Record<string, string>) {
   const session = await requireRole(["video_editor", "super_admin", "admin", "manager"]);
@@ -19,6 +20,8 @@ export async function loadEditorContext(sp: Record<string, string>) {
     getCreativesReport({ month, editorId }),
     getEditorBalances(editorId),
   ]);
+  const live = await getCreativesLiveStatus(report.creatives.map((c) => c.id));
+  const liveInAds = [...live.values()].filter((l) => l.dbStatus === "in_ads").length;
   const me = report.editors[0];
   const bal = balances[0] ?? { earned: 0, paid: 0, remaining: 0 };
   const commissionLabel = me
@@ -27,7 +30,7 @@ export async function loadEditorContext(sp: Record<string, string>) {
       : `${me.commissionValue} MAD par commande livrée`
     : "—";
 
-  return { session, isEditor, editorId, month, report, me, bal, payments, commissionLabel };
+  return { session, isEditor, editorId, month, report, me, bal, payments, commissionLabel, live, liveInAds };
 }
 
 export type EditorContext = Awaited<ReturnType<typeof loadEditorContext>>;

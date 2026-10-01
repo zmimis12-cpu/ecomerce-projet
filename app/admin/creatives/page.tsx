@@ -5,11 +5,12 @@ import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getCreativesReport, adLink, getRecentAds, ctr, ago } from "@/lib/creatives/queries";
 import {
-  CreateCreativeForm, CreativeStatusSelect, CopyLinkButton, EditorCommissionForm,
+  CreateCreativeForm, CopyLinkButton, EditorCommissionForm,
   CreativeEditorSelect, DeleteCreativeButton, AdLinkSelect,
 } from "@/components/creatives/creative-controls";
 import { PeriodFilter, currentMonth, mad, rate } from "@/components/creatives/period-filter";
 import { getEditorBalances } from "@/lib/creatives/payment-queries";
+import { getCreativesLiveStatus, getMetaDeliveries, TONE_CLS } from "@/lib/ads/meta-status";
 import { AddPaymentForm } from "@/components/creatives/payment-controls";
 import { PaymentsList } from "@/components/creatives/payments-list";
 
@@ -32,6 +33,11 @@ export default async function CreativesAdminPage({
     getRecentAds(),
   ]);
   const totalRemaining = balances.reduce((s, b) => s + Math.max(0, b.remaining), 0);
+  // Statuts EN DIRECT depuis Meta (plus de choix manuel "En pub / En pause")
+  const [liveStatus, adDeliveries] = await Promise.all([
+    getCreativesLiveStatus(report.creatives.map((c) => c.id)),
+    getMetaDeliveries(recentAds.filter((a) => a.platform === "meta").map((a) => a.adId)),
+  ]);
   const editorNames = new Map(balances.map((b) => [b.editorId, b.name]));
   const products = (productsRaw ?? []) as { id: string; name: string }[];
   const totalEarnings = report.editors.reduce((s, e) => s + e.earnings, 0);
@@ -172,7 +178,7 @@ export default async function CreativesAdminPage({
                 <th className="px-4 py-2">Vidéo</th>
                 <th className="px-4 py-2">Éditeur</th>
                 <th className="px-4 py-2">Produit</th>
-                <th className="px-4 py-2">Statut</th>
+                <th className="px-4 py-2">Diffusion (Meta, en direct)</th>
                 <th className="px-4 py-2 text-right">Impr.</th>
                 <th className="px-4 py-2 text-right">CTR</th>
                 <th className="px-4 py-2 text-right">Leads pub</th>
@@ -208,7 +214,13 @@ export default async function CreativesAdminPage({
                     />
                   </td>
                   <td className="px-4 py-2">{c.productName}</td>
-                  <td className="px-4 py-2"><CreativeStatusSelect id={c.id} status={c.status} /></td>
+                  <td className="px-4 py-2">
+                    {(() => { const l = liveStatus.get(c.id); return l ? (
+                      <div>
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${TONE_CLS[l.tone]}`}>{l.label}</span>
+                        {l.detail && <div className="mt-0.5 text-[10px] text-muted-foreground">{l.detail}</div>}
+                      </div>) : "—"; })()}
+                  </td>
                   <td className="px-4 py-2 text-right" title={`${c.adsCount} pub(s) liée(s)`}>
                     {c.adsCount ? c.impressions.toLocaleString("fr-FR") : <span className="text-xs text-amber-600">0 pub liée</span>}
                   </td>
@@ -250,6 +262,7 @@ export default async function CreativesAdminPage({
               <tr>
                 <th className="px-4 py-2">Pub</th>
                 <th className="px-4 py-2">Campagne</th>
+                <th className="px-4 py-2">Diffusion</th>
                 <th className="px-4 py-2 text-right">Impr.</th>
                 <th className="px-4 py-2 text-right">Dépense</th>
                 <th className="px-4 py-2">Vidéo liée</th>
@@ -257,7 +270,7 @@ export default async function CreativesAdminPage({
             </thead>
             <tbody>
               {recentAds.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
                   Aucune donnée pub pour l&apos;instant (la synchro automatique tourne toutes les 15 min).
                 </td></tr>
               )}
@@ -268,6 +281,11 @@ export default async function CreativesAdminPage({
                     <div className="text-xs text-muted-foreground">{a.platform === "meta" ? "Meta" : "TikTok"} · {a.adId}</div>
                   </td>
                   <td className="px-4 py-2 text-xs">{a.campaignName}</td>
+                  <td className="px-4 py-2">
+                    {(() => { const d = adDeliveries.get(a.adId); return d
+                      ? <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${TONE_CLS[d.tone]}`}>{d.label}</span>
+                      : <span className="text-xs text-muted-foreground">—</span>; })()}
+                  </td>
                   <td className="px-4 py-2 text-right">{a.impressions.toLocaleString("fr-FR")}</td>
                   <td className="px-4 py-2 text-right">{mad(a.spend)}</td>
                   <td className="px-4 py-2">

@@ -3,13 +3,14 @@
  * avec les mêmes colonnes que Meta Ads Manager. Server-only.
  */
 import { readSettings } from "./sync-core";
+import { deriveDelivery, type Delivery } from "./meta-status";
 
 const META = "https://graph.facebook.com/v21.0";
 
 export type MetaLiveAd = {
   id: string;
   name: string;
-  delivery: string;              // effective_status
+  delivery: Delivery;            // comme la colonne "Diffusion" de Meta
   adsetName: string | null;
   attribution: string;
   resultLabel: string;
@@ -82,8 +83,8 @@ export async function getMetaAdsLive(adIds: string[], range: { since: string; un
     ? `insights.time_range(${JSON.stringify(range)})`
     : "insights.date_preset(maximum)";
   const fields = [
-    "name", "effective_status", "updated_time",
-    "adset{name,daily_budget,lifetime_budget,end_time,bid_strategy,attribution_spec,optimization_goal,promoted_object,campaign{bid_strategy,daily_budget,lifetime_budget}}",
+    "name", "effective_status", "updated_time", "issues_info",
+    "adset{name,daily_budget,lifetime_budget,start_time,end_time,learning_stage_info,bid_strategy,attribution_spec,optimization_goal,promoted_object,campaign{bid_strategy,daily_budget,lifetime_budget}}",
     `${insights}{spend,impressions,reach,frequency,clicks,actions,cost_per_action_type,quality_ranking,engagement_rate_ranking,conversion_rate_ranking,inline_link_clicks,video_thruplay_watched_actions}`,
   ].join(",");
 
@@ -123,7 +124,7 @@ export async function getMetaAdsLive(adIds: string[], range: { since: string; un
       ads.push({
         id,
         name: String(a.name ?? id),
-        delivery: String(a.effective_status ?? ""),
+        delivery: deriveDelivery(a),
         adsetName: (adset.name as string) ?? null,
         attribution: attributionLabel(adset.attribution_spec as { event_type: string; window_days: number }[]),
         resultLabel: spec.label,
