@@ -175,3 +175,19 @@ export async function getAccountAdIds(): Promise<string[]> {
   }
   return ids;
 }
+
+/** Dépense TOTALE du compte depuis sa création (exactement comme Meta, période "Maximum"). */
+export async function getAccountLifetimeSpend(): Promise<{ usd: number; since: string | null } | null> {
+  const s = await readSettings("meta");
+  if (!s?.access_token || !s.account_id) return null;
+  const acc = s.account_id.startsWith("act_") ? s.account_id : `act_${s.account_id}`;
+  const url = new URL(`${META}/${acc}/insights`);
+  url.searchParams.set("fields", "spend,date_start");
+  url.searchParams.set("date_preset", "maximum");
+  url.searchParams.set("access_token", s.access_token);
+  const res = await fetch(url.toString(), { cache: "no-store" });
+  const json = await res.json();
+  if (!res.ok || json.error) return null;
+  const row = (json.data ?? [])[0] as { spend?: string; date_start?: string } | undefined;
+  return { usd: Number(row?.spend ?? 0), since: row?.date_start ?? null };
+}
