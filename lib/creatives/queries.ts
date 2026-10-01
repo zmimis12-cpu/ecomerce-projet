@@ -344,3 +344,89 @@ export async function getRecentAds(): Promise<AdRow[]> {
   }
   return [...agg.values()].filter((a) => a.impressions > 0).sort((a, b) => b.spend - a.spend);
 }
+
+// ── Stats détaillées par pub pour l'espace éditeur (AUCUNE donnée d'argent) ──
+export type EditorAdStat = {
+  platform: string;
+  adId: string;
+  adName: string;
+  adsetName: string | null;
+  creativeCode: string;
+  creativeTitle: string;
+  status: string | null;
+  impressions: number;
+  linkClicks: number;
+  leads: number;
+  messages: number;
+  landingPageViews: number;
+  initiateCheckouts: number;
+  videoPlays: number;
+  thruplays: number;
+  reach: number | null;       // cumul depuis le début (Meta)
+  frequency: number | null;   // cumul depuis le début (Meta)
+  qualityRanking: string | null;
+  engagementRanking: string | null;
+  conversionRanking: string | null;
+};
+
+export async function getEditorAdStats(opts: { editorId: string; month?: string | null }): Promise<EditorAdStat[]> {
+  const { from, to } = periodRange(opts.month);
+  const { data: cr } = await supabaseAdmin
+    .from("creatives" as never).select("id, code, title").eq("editor_id", opts.editorId);
+  const creatives = (cr ?? []) as { id: string; code: string; title: string }[];
+  if (!creatives.length) return [];
+  const byId = new Map(creatives.map((c) => [c.id, c]));
+
+  const { data: links } = await supabaseAdmin
+    .from("creative_ads" as never).select("platform, ad_id, creative_id").in("creative_id", creatives.map((c) => c.id));
+  const linkRows = (links ?? []) as { platform: string; ad_id: string; creative_id: string }[];
+  if (!linkRows.length) return [];
+  const adIds = linkRows.map((l) => l.ad_id);
+
+  let iq = supabaseAdmin
+    .from("ad_insights_daily" as never)
+    .select("platform, ad_id, ad_name, impressions, link_clicks, leads, messages, landing_page_views, initiate_checkouts, video_plays, thruplays")
+    .in("ad_id", adIds);
+  if (from && to) iq = iq.gte("day", from.toISOString().slice(0, 10)).lt("day", to.toISOString().slice(0, 10));
+  const [{ data: ins }, { data: metaRows }] = await Promise.all([
+    iq.limit(20000),
+    supabaseAdmin.from("ad_meta" as never)
+      .select("platform, ad_id, ad_name, adset_name, effective_status, reach, frequency, quality_ranking, engagement_rate_ranking, conversion_rate_ranking")
+      .in("ad_id", adIds),
+  ]);
+  const meta = new Map(((metaRows ?? []) as Record<string, unknown>[]).map((m) => [`${m.platform}:${m.ad_id}`, m]));
+
+  const out = new Map<string, EditorAdStat>();
+  for (const l of linkRows) {
+    const c = byId.get(l.creative_id)!;
+    const m = meta.get(`${l.platform}:${l.ad_id}`);
+    out.set(`${l.platform}:${l.ad_id}`, {
+      platform: l.platform, adId: l.ad_id,
+      adName: (m?.ad_name as string) ?? l.ad_id,
+      adsetName: (m?.adset_name as string) ?? null,
+      creativeCode: c.code, creativeTitle: c.title,
+      status: (m?.effective_status as string) ?? null,
+      impressions: 0, linkClicks: 0, leads: 0, messages: 0, landingPageViews: 0,
+      initiateCheckouts: 0, videoPlays: 0, thruplays: 0,
+      reach: m?.reach != null ? Number(m.reach) : null,
+      frequency: m?.frequency != null ? Number(m.frequency) : null,
+      qualityRanking: (m?.quality_ranking as string) ?? null,
+      engagementRanking: (m?.engagement_rate_ranking as string) ?? null,
+      conversionRanking: (m?.conversion_rate_ranking as string) ?? null,
+    });
+  }
+  for (const r of (ins ?? []) as Record<string, unknown>[]) {
+    const a = out.get(`${r.platform}:${r.ad_id}`);
+    if (!a) continue;
+    if (a.adName === a.adId && r.ad_name) a.adName = String(r.ad_name);
+    a.impressions += Number(r.impressions ?? 0);
+    a.linkClicks += Number(r.link_clicks ?? 0);
+    a.leads += Number(r.leads ?? 0);
+    a.messages += Number(r.messages ?? 0);
+    a.landingPageViews += Number(r.landing_page_views ?? 0);
+    a.initiateCheckouts += Number(r.initiate_checkouts ?? 0);
+    a.videoPlays += Number(r.video_plays ?? 0);
+    a.thruplays += Number(r.thruplays ?? 0);
+  }
+  return [...out.values()].sort((a, b) => b.impressions - a.impressions);
+}

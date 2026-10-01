@@ -10,6 +10,7 @@ const STATUS: Record<string, string> = { in_ads: "🟢 En pub", paused: "⏸️ 
 const TABS = [
   { href: "/admin/editor",          label: "Tableau de bord" },
   { href: "/admin/editor/videos",   label: "Vidéos" },
+  { href: "/admin/editor/ads",      label: "Stats pubs" },
   { href: "/admin/editor/orders",   label: "Commandes livrées" },
   { href: "/admin/editor/payments", label: "Paiements" },
 ];

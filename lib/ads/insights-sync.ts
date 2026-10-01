@@ -24,6 +24,10 @@ type Row = {
   link_clicks: number;
   leads: number;
   messages: number;
+  landing_page_views: number;
+  initiate_checkouts: number;
+  video_plays: number;
+  thruplays: number;
   spend_mad: number;
   updated_at: string;
 };
@@ -88,7 +92,7 @@ export async function syncMetaAdInsights(since: string, until: string) {
   const url = new URL(`${META_BASE}/${acc}/insights`);
   url.searchParams.set("level", "ad");
   url.searchParams.set("time_increment", "1");
-  url.searchParams.set("fields", "ad_id,ad_name,campaign_id,campaign_name,impressions,clicks,inline_link_clicks,spend,actions,date_start");
+  url.searchParams.set("fields", "ad_id,ad_name,campaign_id,campaign_name,impressions,clicks,inline_link_clicks,spend,actions,video_thruplay_watched_actions,date_start");
   url.searchParams.set("time_range", JSON.stringify({ since, until }));
   url.searchParams.set("limit", "500");
   url.searchParams.set("access_token", s.access_token);
@@ -114,6 +118,10 @@ export async function syncMetaAdInsights(since: string, until: string) {
         link_clicks: Number(r.inline_link_clicks ?? 0),
         leads: actionValue(actions, ["lead", "offsite_conversion.fb_pixel_lead", "onsite_web_lead"]),
         messages: actionValue(actions, ["onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.total_messaging_connection"]),
+        landing_page_views: actionValue(actions, ["landing_page_view", "omni_landing_page_view"]),
+        initiate_checkouts: actionValue(actions, ["initiate_checkout", "offsite_conversion.fb_pixel_initiate_checkout"]),
+        video_plays: actionValue(actions, ["video_view"]),
+        thruplays: actionValue(r.video_thruplay_watched_actions as { action_type: string; value: string }[] | undefined, ["video_view"]),
         spend_mad: Math.round(Number(r.spend ?? 0) * usdToMad * 100) / 100,
         updated_at: now,
       });
@@ -122,7 +130,58 @@ export async function syncMetaAdInsights(since: string, until: string) {
   }
   await upsertRows(rows);
   const linked = await autoLink(rows);
-  return { ok: true, rows: rows.length, linked };
+  const meta = await syncMetaAdMeta(acc, s.access_token).catch((e) => ({ ok: false, error: String(e) }));
+  return { ok: true, rows: rows.length, linked, meta };
+}
+
+/** Portée, fréquence, classements Meta (depuis le début) + statut de diffusion. */
+async function syncMetaAdMeta(acc: string, token: string) {
+  const out = new Map<string, Record<string, unknown>>();
+  const now = new Date().toISOString();
+
+  const ins = new URL(`${META_BASE}/${acc}/insights`);
+  ins.searchParams.set("level", "ad");
+  ins.searchParams.set("date_preset", "maximum");
+  ins.searchParams.set("fields", "ad_id,ad_name,adset_name,campaign_name,reach,frequency,quality_ranking,engagement_rate_ranking,conversion_rate_ranking");
+  ins.searchParams.set("limit", "500");
+  ins.searchParams.set("access_token", token);
+  let next: string | undefined = ins.toString();
+  for (let g = 0; next && g < 10; g++) {
+    const res: Response = await fetch(next, { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok || json.error) break;
+    for (const r of (json.data ?? []) as Record<string, string>[]) {
+      out.set(r.ad_id, {
+        platform: "meta", ad_id: r.ad_id, ad_name: r.ad_name ?? null, adset_name: r.adset_name ?? null,
+        campaign_name: r.campaign_name ?? null, reach: Number(r.reach ?? 0), frequency: Number(r.frequency ?? 0),
+        quality_ranking: r.quality_ranking ?? null, engagement_rate_ranking: r.engagement_rate_ranking ?? null,
+        conversion_rate_ranking: r.conversion_rate_ranking ?? null, effective_status: null, updated_at: now,
+      });
+    }
+    next = json.paging?.next;
+  }
+
+  const ads = new URL(`${META_BASE}/${acc}/ads`);
+  ads.searchParams.set("fields", "id,effective_status");
+  ads.searchParams.set("limit", "500");
+  ads.searchParams.set("access_token", token);
+  next = ads.toString();
+  for (let g = 0; next && g < 10; g++) {
+    const res: Response = await fetch(next, { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok || json.error) break;
+    for (const a of (json.data ?? []) as { id: string; effective_status: string }[]) {
+      const row = out.get(a.id);
+      if (row) row.effective_status = a.effective_status;
+    }
+    next = json.paging?.next;
+  }
+
+  const rows = [...out.values()];
+  if (rows.length) {
+    await supabaseAdmin.from("ad_meta" as never).upsert(rows as never, { onConflict: "platform,ad_id" });
+  }
+  return { ok: true, ads: rows.length };
 }
 
 export async function syncTikTokAdInsights(since: string, until: string) {
@@ -142,7 +201,7 @@ export async function syncTikTokAdInsights(since: string, until: string) {
     url.searchParams.set("report_type", "BASIC");
     url.searchParams.set("data_level", "AUCTION_AD");
     url.searchParams.set("dimensions", JSON.stringify(["ad_id", "stat_time_day"]));
-    url.searchParams.set("metrics", JSON.stringify(["ad_name", "campaign_id", "campaign_name", "spend", "impressions", "clicks", "conversion"]));
+    url.searchParams.set("metrics", JSON.stringify(["ad_name", "campaign_id", "campaign_name", "spend", "impressions", "clicks", "conversion", "video_play_actions", "video_watched_6s"]));
     url.searchParams.set("start_date", since);
     url.searchParams.set("end_date", until);
     url.searchParams.set("page_size", "1000");
@@ -164,6 +223,10 @@ export async function syncTikTokAdInsights(since: string, until: string) {
         link_clicks: Number(r.metrics.clicks ?? 0),
         leads: Number(r.metrics.conversion ?? 0),
         messages: 0,
+        landing_page_views: 0,
+        initiate_checkouts: 0,
+        video_plays: Number(r.metrics.video_play_actions ?? 0),
+        thruplays: Number(r.metrics.video_watched_6s ?? 0),
         spend_mad: Math.round(Number(r.metrics.spend ?? 0) * toMad * 100) / 100,
         updated_at: now,
       });
