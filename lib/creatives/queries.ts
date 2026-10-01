@@ -441,3 +441,23 @@ export async function getEditorAdStats(opts: { editorId: string; month?: string 
   }
   return [...out.values()].sort((a, b) => b.impressions - a.impressions);
 }
+
+/** Pubs liées aux vidéos d'un éditeur → { platform, adId, code, title } */
+export async function getEditorLinkedAds(editorId: string) {
+  const { data: cr } = await supabaseAdmin.from("creatives" as never).select("id, code, title").eq("editor_id", editorId);
+  const creatives = (cr ?? []) as { id: string; code: string; title: string }[];
+  if (!creatives.length) return [];
+  const byId = new Map(creatives.map((c) => [c.id, c]));
+  const { data: links } = await supabaseAdmin
+    .from("creative_ads" as never).select("platform, ad_id, creative_id").in("creative_id", creatives.map((c) => c.id));
+  return ((links ?? []) as { platform: string; ad_id: string; creative_id: string }[])
+    .map((l) => ({ platform: l.platform, adId: l.ad_id, code: byId.get(l.creative_id)!.code, title: byId.get(l.creative_id)!.title }));
+}
+
+/** Période du filtre → plage de dates Meta (null = depuis le début). */
+export function periodToRange(period: string): { since: string; until: string } | null {
+  const { from, to } = periodRange(period);
+  if (!from || !to) return null;
+  const until = new Date(to.getTime() - 86400_000);
+  return { since: from.toISOString().slice(0, 10), until: until.toISOString().slice(0, 10) };
+}

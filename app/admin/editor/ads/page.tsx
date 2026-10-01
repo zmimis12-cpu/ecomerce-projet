@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { BarChart3 } from "lucide-react";
 import { loadEditorContext } from "@/lib/creatives/editor-context";
-import { getEditorAdStats, ctr } from "@/lib/creatives/queries";
+import { getEditorAdStats, ctr, getEditorLinkedAds, periodToRange } from "@/lib/creatives/queries";
+import { getMetaAdsLive } from "@/lib/ads/meta-live";
+import { getUsdToMad } from "@/lib/ads/fx";
+import { LiveRefresh } from "@/components/creatives/live-refresh";
 import { EditorHeader } from "@/components/creatives/editor-sections";
 
 export const metadata: Metadata = { title: "Stats pubs" };
@@ -32,7 +35,23 @@ export default async function EditorAdsPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string>> }) {
   const ctx = await loadEditorContext(await searchParams);
-  const ads = await getEditorAdStats({ editorId: ctx.editorId, month: ctx.report.period });
+  const linked = await getEditorLinkedAds(ctx.editorId);
+  const metaLinks = linked.filter((l) => l.platform === "meta");
+  const codeByAd = new Map(linked.map((l) => [l.adId, l.code]));
+  const [live, ads, fx] = await Promise.all([
+    getMetaAdsLive(metaLinks.map((l) => l.adId), periodToRange(ctx.report.period)),
+    getEditorAdStats({ editorId: ctx.editorId, month: ctx.report.period }),
+    getUsdToMad(),
+  ]);
+  const usd = (x: number | null) => (x == null ? "—" : `$${x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  const madOf = (x: number | null) => (x == null ? "" : `${Math.round(x * fx.rate).toLocaleString("fr-FR")} MAD`);
+  const date = (iso: string | null) => (iso ? new Date(iso).toLocaleString("fr-FR", { timeZone: "Africa/Casablanca", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
+  const liveCols = [
+    "Vidéo", "Pub", "Diffusion", "Paramètre d'attribution", "Résultats", "Coût par résultat", "Budget",
+    "Montant dépensé", "Impressions", "Portée", "Fréquence", "Clics lien", "CTR", "Hook rate", "Hold rate",
+    "Fin", "Stratégie d'enchère", "Dernière modification", "Classement qualité", "Classement engagement",
+    "Classement conversion", "Ensemble de pubs",
+  ];
 
   const cols = [
     "Vidéo", "Pub", "Diffusion", "Leads (Meta)", "Coût / lead", "Messages", "Impressions", "Portée*", "Fréquence*",
@@ -44,9 +63,73 @@ export default async function EditorAdsPage({
     <div className="space-y-6">
       <EditorHeader ctx={ctx} title="Stats pubs" icon={BarChart3} current="/admin/editor/ads" />
 
+      {/* ── EN DIRECT DE META : mêmes colonnes que Meta Ads Manager ── */}
+      <section className="rounded-xl border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+          <h2 className="font-medium">Meta Ads Manager — en direct ({live.ok ? live.ads.length : 0})</h2>
+          {live.ok && <LiveRefresh fetchedAt={live.fetchedAt} />}
+        </div>
+        {!live.ok ? (
+          <p className="px-4 py-4 text-sm text-red-600">Lecture Meta impossible : {live.error}. Les chiffres ci-dessous (synchro 15 min) restent disponibles.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full whitespace-nowrap text-xs">
+              <thead className="bg-muted/40 text-left text-[11px] text-muted-foreground">
+                <tr>{liveCols.map((c) => <th key={c} className="px-3 py-2">{c}</th>)}</tr>
+              </thead>
+              <tbody>
+                {live.ads.length === 0 && (
+                  <tr><td colSpan={liveCols.length} className="px-4 py-6 text-center text-muted-foreground">
+                    Aucune pub Meta liée à tes vidéos.
+                  </td></tr>
+                )}
+                {live.ads.map((a) => (
+                  <tr key={a.id} className="border-t">
+                    <td className="px-3 py-2 font-mono font-semibold">{codeByAd.get(a.id) ?? "—"}</td>
+                    <td className="px-3 py-2 font-medium">{a.name}</td>
+                    <td className="px-3 py-2">{STATUS[a.delivery] ?? a.delivery}</td>
+                    <td className="px-3 py-2">{a.attribution}</td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="font-semibold">{a.results ?? "—"}</div>
+                      <div className="text-[10px] text-muted-foreground">{a.resultLabel}</div>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <div>{usd(a.costPerResultUsd)}</div>
+                      <div className="text-[10px] text-muted-foreground">{madOf(a.costPerResultUsd)}</div>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {a.budget ? (<><div>{usd(a.budget.usd)}</div>
+                        <div className="text-[10px] text-muted-foreground">{a.budget.kind} · {a.budget.level}</div></>) : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="font-semibold">{usd(a.spendUsd)}</div>
+                      <div className="text-[10px] text-muted-foreground">{madOf(a.spendUsd)}</div>
+                    </td>
+                    <td className="px-3 py-2 text-right">{n(a.impressions)}</td>
+                    <td className="px-3 py-2 text-right">{n(a.reach)}</td>
+                    <td className="px-3 py-2 text-right">{a.frequency ? a.frequency.toFixed(2) : "—"}</td>
+                    <td className="px-3 py-2 text-right">{n(a.linkClicks)}</td>
+                    <td className="px-3 py-2 text-right">{ctr(a.linkClicks, a.impressions)}</td>
+                    <td className="px-3 py-2 text-right">{pct(a.videoPlays, a.impressions)}</td>
+                    <td className="px-3 py-2 text-right">{pct(a.thruplays, a.videoPlays)}</td>
+                    <td className="px-3 py-2">{a.ends ? date(a.ends) : "En continu"}</td>
+                    <td className="px-3 py-2">{a.bidStrategy}</td>
+                    <td className="px-3 py-2">{date(a.lastEdit)}</td>
+                    <td className="px-3 py-2"><Rank v={a.quality} /></td>
+                    <td className="px-3 py-2"><Rank v={a.engagement} /></td>
+                    <td className="px-3 py-2"><Rank v={a.conversion} /></td>
+                    <td className="px-3 py-2">{a.adsetName ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       <section className="rounded-xl border bg-card">
         <div className="border-b px-4 py-3">
-          <h2 className="font-medium">Pubs de mes vidéos ({ads.length})</h2>
+          <h2 className="font-medium">Détail vidéo & engagement — synchro 15 min ({ads.length})</h2>
           <p className="mt-1 text-xs text-muted-foreground">
             Mêmes chiffres que Meta Ads Manager, sans les montants. * = cumul depuis le lancement de la pub.
             Hook rate = vues 3 s ÷ impressions · Hold rate = ThruPlays ÷ vues 3 s.
