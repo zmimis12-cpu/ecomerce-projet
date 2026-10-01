@@ -48,7 +48,7 @@ export default async function EditorAdsPage({
   const date = (iso: string | null) => (iso ? new Date(iso).toLocaleString("fr-FR", { timeZone: "Africa/Casablanca", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
   const liveCols = [
     "Vidéo", "Pub", "Diffusion", "Paramètre d'attribution", "Résultats", "Coût par résultat", "Budget",
-    "Montant dépensé", "Impressions", "Portée", "Fréquence", "Clics lien", "CTR", "Hook rate", "Hold rate",
+    "Montant dépensé", "Impressions", "Portée", "Fréquence", "Clics (tous)", "CTR (tous)", "Clics lien", "CTR lien", "CPC lien", "Hook rate", "Hold rate",
     "Fin", "Stratégie d'enchère", "Dernière modification", "Classement qualité", "Classement engagement",
     "Classement conversion", "Ensemble de pubs",
   ];
@@ -108,8 +108,14 @@ export default async function EditorAdsPage({
                     <td className="px-3 py-2 text-right">{n(a.impressions)}</td>
                     <td className="px-3 py-2 text-right">{n(a.reach)}</td>
                     <td className="px-3 py-2 text-right">{a.frequency ? a.frequency.toFixed(2) : "—"}</td>
+                    <td className="px-3 py-2 text-right">{n(a.clicks)}</td>
+                    <td className="px-3 py-2 text-right">{ctr(a.clicks, a.impressions)}</td>
                     <td className="px-3 py-2 text-right">{n(a.linkClicks)}</td>
                     <td className="px-3 py-2 text-right">{ctr(a.linkClicks, a.impressions)}</td>
+                    <td className="px-3 py-2 text-right">
+                      <div>{usd(a.linkClicks ? a.spendUsd / a.linkClicks : null)}</div>
+                      <div className="text-[10px] text-muted-foreground">{madOf(a.linkClicks ? a.spendUsd / a.linkClicks : null)}</div>
+                    </td>
                     <td className="px-3 py-2 text-right">{pct(a.videoPlays, a.impressions)}</td>
                     <td className="px-3 py-2 text-right">{pct(a.thruplays, a.videoPlays)}</td>
                     <td className="px-3 py-2">{a.ends ? date(a.ends) : "En continu"}</td>

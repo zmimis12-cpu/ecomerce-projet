@@ -20,6 +20,7 @@ export type MetaLiveAd = {
   impressions: number;
   reach: number;
   frequency: number;
+  clicks: number;              // Clics (tous)
   linkClicks: number;
   videoPlays: number;
   thruplays: number;
@@ -83,7 +84,7 @@ export async function getMetaAdsLive(adIds: string[], range: { since: string; un
   const fields = [
     "name", "effective_status", "updated_time",
     "adset{name,daily_budget,lifetime_budget,end_time,bid_strategy,attribution_spec,optimization_goal,promoted_object,campaign{bid_strategy,daily_budget,lifetime_budget}}",
-    `${insights}{spend,impressions,reach,frequency,actions,cost_per_action_type,quality_ranking,engagement_rate_ranking,conversion_rate_ranking,inline_link_clicks,video_thruplay_watched_actions}`,
+    `${insights}{spend,impressions,reach,frequency,clicks,actions,cost_per_action_type,quality_ranking,engagement_rate_ranking,conversion_rate_ranking,inline_link_clicks,video_thruplay_watched_actions}`,
   ].join(",");
 
   const ads: MetaLiveAd[] = [];
@@ -133,6 +134,7 @@ export async function getMetaAdsLive(adIds: string[], range: { since: string; un
         impressions: Number(ins.impressions ?? 0),
         reach: Number(ins.reach ?? 0),
         frequency: Number(ins.frequency ?? 0),
+        clicks: Number(ins.clicks ?? 0),
         linkClicks: Number(ins.inline_link_clicks ?? 0),
         videoPlays: val(actions, ["video_view"]) ?? 0,
         thruplays: thru,
