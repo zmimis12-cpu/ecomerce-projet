@@ -390,7 +390,12 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   // ── Commissions call center: réglage GLOBAL (app_settings.cc_commission_per_order),
   // même valeur que celle configurée dans Réglages — PAS le champ per-agent cc_agents.commission
   // qui n'est jamais rempli et retombe sur un défaut trompeur.
-  const paidOrdersCount = rows.filter((r) => r.status === "paid" && r.is_paid).length;
+  // Commission seulement si la commande a été traitée par un AGENT call center
+  // (avant : toutes les commandes payées × commission, même sans agent).
+  const { data: ccAgents } = await supabaseAdmin.from("call_center_agents").select("user_id");
+  const agentIds = new Set(((ccAgents ?? []) as { user_id: string }[]).map((a) => a.user_id));
+  const paidOrdersCount = rows.filter((r) =>
+    r.status === "paid" && r.is_paid && r.assigned_to && agentIds.has(r.assigned_to)).length;
   const { data: commissionSetting } = await supabaseAdmin
     .from("app_settings").select("value").eq("key", "cc_commission_per_order").maybeSingle();
   const commissionPerOrder = Number((commissionSetting as { value?: string } | null)?.value ?? 3);
