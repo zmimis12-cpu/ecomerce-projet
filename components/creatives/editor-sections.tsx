@@ -12,6 +12,7 @@ const TABS = [
   { href: "/admin/editor",          label: "Tableau de bord" },
   { href: "/admin/editor/videos",   label: "Vidéos" },
   { href: "/admin/editor/ads",      label: "Stats pubs" },
+  { href: "/admin/editor/deliveries", label: "Suivi livraisons" },
   { href: "/admin/editor/orders",   label: "Commandes livrées" },
   { href: "/admin/editor/payments", label: "Paiements" },
 ];

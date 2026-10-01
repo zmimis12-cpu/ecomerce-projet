@@ -466,3 +466,63 @@ export function periodToRange(period: string): { since: string; until: string } 
   const until = new Date(to.getTime() - 86400_000);
   return { since: from.toISOString().slice(0, 10), until: until.toISOString().slice(0, 10) };
 }
+
+// ── Suivi des livraisons pour l'éditeur — SANS aucune donnée client ──────────
+export type EditorDeliveryRow = {
+  orderNumber: string;
+  createdAt: string;
+  code: string;
+  productName: string;
+  status: string;
+  dgLabel: string | null;
+  dgId: number | null;
+  reportedTo: string | null;
+  deliveredAt: string | null;
+  earning: number | null;
+};
+
+export async function getEditorDeliveries(opts: { editorId: string; month?: string | null }): Promise<EditorDeliveryRow[]> {
+  const { from, to } = periodRange(opts.month);
+  const { data: cr } = await supabaseAdmin.from("creatives" as never)
+    .select("id, code, product_id").eq("editor_id", opts.editorId);
+  const creatives = (cr ?? []) as { id: string; code: string; product_id: string | null }[];
+  if (!creatives.length) return [];
+  const byId = new Map(creatives.map((c) => [c.id, c]));
+
+  // ⚠️ On ne sélectionne volontairement AUCUN champ client (nom, téléphone,
+  // adresse, ville) ni le tracking / téléphone livreur.
+  let q = supabaseAdmin.from("orders")
+    .select("id, order_number, created_at, status, creative_id, delivered_at, delivery_external_status, delivery_external_status_id, delivery_reported_to, editor_earning_mad")
+    .in("creative_id" as never, creatives.map((c) => c.id))
+    .order("created_at", { ascending: false })
+    .limit(1000);
+  if (from && to) q = q.gte("created_at", from.toISOString()).lt("created_at", to.toISOString());
+  const { data } = await q;
+  const rows = (data ?? []) as unknown as {
+    id: string; order_number: string; created_at: string; status: string; creative_id: string;
+    delivered_at: string | null; delivery_external_status: string | null; delivery_external_status_id: number | null;
+    delivery_reported_to: string | null; editor_earning_mad: number | null;
+  }[];
+
+  const pids = [...new Set(creatives.map((c) => c.product_id).filter(Boolean))] as string[];
+  const { data: prods } = pids.length
+    ? await supabaseAdmin.from("products").select("id, name").in("id", pids)
+    : { data: [] };
+  const pname = new Map(((prods ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
+
+  return rows.map((r) => {
+    const c = byId.get(r.creative_id);
+    return {
+      orderNumber: r.order_number,
+      createdAt: r.created_at,
+      code: c?.code ?? "—",
+      productName: c?.product_id ? pname.get(c.product_id) ?? "—" : "—",
+      status: r.status,
+      dgLabel: r.delivery_external_status,
+      dgId: r.delivery_external_status_id,
+      reportedTo: r.delivery_reported_to,
+      deliveredAt: r.delivered_at,
+      earning: (r.status === "delivered" || r.status === "paid") ? r.editor_earning_mad : null,
+    };
+  });
+}

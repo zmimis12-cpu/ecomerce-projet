@@ -150,3 +150,28 @@ export async function getMetaAdsLive(adIds: string[], range: { since: string; un
   }
   return { ok: true, ads: ads.sort((x, y) => y.spendUsd - x.spendUsd), fetchedAt: new Date().toISOString() };
 }
+
+/** Toutes les pubs du compte (hors supprimées/archivées) — pour la vue admin. */
+export async function getAccountAdIds(): Promise<string[]> {
+  const s = await readSettings("meta");
+  if (!s?.access_token || !s.account_id) return [];
+  const acc = s.account_id.startsWith("act_") ? s.account_id : `act_${s.account_id}`;
+  const url = new URL(`${META}/${acc}/ads`);
+  url.searchParams.set("fields", "id");
+  url.searchParams.set("limit", "500");
+  url.searchParams.set("effective_status", JSON.stringify([
+    "ACTIVE", "PAUSED", "ADSET_PAUSED", "CAMPAIGN_PAUSED", "IN_PROCESS", "PENDING_REVIEW",
+    "WITH_ISSUES", "DISAPPROVED", "PREAPPROVED", "PENDING_BILLING_INFO",
+  ]));
+  url.searchParams.set("access_token", s.access_token);
+  const ids: string[] = [];
+  let next: string | undefined = url.toString();
+  for (let g = 0; next && g < 10; g++) {
+    const res: Response = await fetch(next, { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok || json.error) break;
+    ids.push(...((json.data ?? []) as { id: string }[]).map((a) => a.id));
+    next = json.paging?.next;
+  }
+  return ids;
+}

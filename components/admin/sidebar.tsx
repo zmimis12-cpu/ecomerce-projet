@@ -65,6 +65,7 @@ const ADMIN_NAV: NavGroup[] = [
     items: [
       { href: "/admin/settings/delivery-providers", label: "Transporteurs", icon: Truck },
       { href: "/admin/settings/ads",  label: "Publicité",   icon: BarChart3 },
+      { href: "/admin/ads/stats",     label: "Stats pubs",  icon: BarChart3 },
       { href: "/admin/ads/rules",     label: "Règles auto pub", icon: Shield },
       { href: "/admin/settings/whatsapp", label: "WhatsApp", icon: PhoneCall },
       { href: "/admin/audit-logs", label: "Audit Logs",  icon: Shield   },
@@ -106,6 +107,7 @@ const VIDEO_EDITOR_NAV: NavGroup[] = [
       { href: "/admin/editor",          label: "Tableau de bord",   icon: LayoutDashboard, exact: true },
       { href: "/admin/editor/videos",   label: "Mes vidéos",        icon: Clapperboard },
       { href: "/admin/editor/ads",      label: "Stats pubs",        icon: BarChart3 },
+      { href: "/admin/editor/deliveries", label: "Suivi livraisons", icon: Truck },
       { href: "/admin/editor/orders",   label: "Commandes livrées", icon: PackageCheck },
       { href: "/admin/editor/payments", label: "Mes paiements",     icon: Wallet },
     ],
