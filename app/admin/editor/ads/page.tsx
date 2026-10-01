@@ -35,7 +35,7 @@ export default async function EditorAdsPage({
   const ads = await getEditorAdStats({ editorId: ctx.editorId, month: ctx.report.period });
 
   const cols = [
-    "Vidéo", "Pub", "Diffusion", "Leads (Meta)", "Messages", "Impressions", "Portée*", "Fréquence*",
+    "Vidéo", "Pub", "Diffusion", "Leads (Meta)", "Coût / lead", "Messages", "Impressions", "Portée*", "Fréquence*",
     "Clics lien", "CTR", "Vues page", "Checkouts", "Vues 3 s", "Hook rate", "ThruPlays", "Hold rate",
     "Qualité*", "Engagement*", "Conversion*",
   ];
@@ -72,6 +72,7 @@ export default async function EditorAdsPage({
                   </td>
                   <td className="px-3 py-2">{a.status ? STATUS[a.status] ?? a.status : "—"}</td>
                   <td className="px-3 py-2 text-right font-semibold">{a.leads}</td>
+                  <td className="px-3 py-2 text-right">{a.leads > 0 ? `${Math.round(a.spend / a.leads)} MAD` : "—"}</td>
                   <td className="px-3 py-2 text-right">{a.messages}</td>
                   <td className="px-3 py-2 text-right">{n(a.impressions)}</td>
                   <td className="px-3 py-2 text-right">{n(a.reach)}</td>

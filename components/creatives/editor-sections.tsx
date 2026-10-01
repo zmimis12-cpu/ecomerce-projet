@@ -110,7 +110,9 @@ export function VideosTable({ ctx, limit }: { ctx: EditorContext; limit?: number
             <th className="px-4 py-2 text-right">Clics</th>
             <th className="px-4 py-2 text-right">CTR</th>
             <th className="px-4 py-2 text-right">Leads pub</th>
+            <th className="px-4 py-2 text-right">Coût / lead</th>
             <th className="px-4 py-2 text-right">Commandes</th>
+            <th className="px-4 py-2 text-right">Coût / commande</th>
             <th className="px-4 py-2 text-right">Livrées</th>
             <th className="px-4 py-2 text-right">Taux</th>
             <th className="px-4 py-2 text-right">Gain</th>
@@ -118,7 +120,7 @@ export function VideosTable({ ctx, limit }: { ctx: EditorContext; limit?: number
         </thead>
         <tbody>
           {rows.length === 0 && (
-            <tr><td colSpan={12} className="px-4 py-6 text-center text-muted-foreground">Aucune vidéo pour le moment.</td></tr>
+            <tr><td colSpan={14} className="px-4 py-6 text-center text-muted-foreground">Aucune vidéo pour le moment.</td></tr>
           )}
           {rows.map((c) => (
             <tr key={c.id} className="border-t">
@@ -132,7 +134,9 @@ export function VideosTable({ ctx, limit }: { ctx: EditorContext; limit?: number
               <td className="px-4 py-2 text-right">{c.linkClicks.toLocaleString("fr-FR")}</td>
               <td className="px-4 py-2 text-right">{ctr(c.linkClicks, c.impressions)}</td>
               <td className="px-4 py-2 text-right">{c.adLeads}{c.messages ? <span className="text-xs text-muted-foreground"> +{c.messages} msg</span> : null}</td>
+              <td className="px-4 py-2 text-right">{c.adLeads > 0 ? `${Math.round(c.spend / c.adLeads)} MAD` : "—"}</td>
               <td className="px-4 py-2 text-right">{c.orders}</td>
+              <td className="px-4 py-2 text-right">{c.orders > 0 && c.spend > 0 ? `${Math.round(c.spend / c.orders)} MAD` : "—"}</td>
               <td className="px-4 py-2 text-right">{c.delivered}</td>
               <td className="px-4 py-2 text-right">{rate(c.delivered, c.orders)}</td>
               <td className="px-4 py-2 text-right font-semibold text-emerald-700">{mad(c.earnings)}</td>

@@ -70,7 +70,16 @@ export type DeliveredOrderRow = {
 
 /** "2026-09" → bornes du mois. "all" ou vide → pas de filtre. */
 export function periodRange(month?: string | null): { from: Date | null; to: Date | null; key: string } {
-  if (!month || month === "all" || !/^\d{4}-\d{2}$/.test(month)) {
+  // Périodes glissantes : "7d", "30d" (défaut). Avant, le défaut était le mois
+  // en cours → le 1er du mois tout affichait 0.
+  const rolling = /^(\d{1,3})d$/.exec(month ?? "30d");
+  if (rolling) {
+    const days = Number(rolling[1]);
+    const to = new Date(); to.setUTCHours(0, 0, 0, 0); to.setUTCDate(to.getUTCDate() + 1);
+    const from = new Date(to); from.setUTCDate(from.getUTCDate() - days);
+    return { from, to, key: `${days}d` };
+  }
+  if (month === "all" || !month || !/^\d{4}-\d{2}$/.test(month)) {
     return { from: null, to: null, key: "all" };
   }
   const [y, m] = month.split("-").map(Number);
@@ -362,6 +371,7 @@ export type EditorAdStat = {
   initiateCheckouts: number;
   videoPlays: number;
   thruplays: number;
+  spend: number;              // utilisé seulement pour le coût par lead (pas affiché seul)
   reach: number | null;       // cumul depuis le début (Meta)
   frequency: number | null;   // cumul depuis le début (Meta)
   qualityRanking: string | null;
@@ -385,7 +395,7 @@ export async function getEditorAdStats(opts: { editorId: string; month?: string 
 
   let iq = supabaseAdmin
     .from("ad_insights_daily" as never)
-    .select("platform, ad_id, ad_name, impressions, link_clicks, leads, messages, landing_page_views, initiate_checkouts, video_plays, thruplays")
+    .select("platform, ad_id, ad_name, impressions, link_clicks, leads, messages, landing_page_views, initiate_checkouts, video_plays, thruplays, spend_mad")
     .in("ad_id", adIds);
   if (from && to) iq = iq.gte("day", from.toISOString().slice(0, 10)).lt("day", to.toISOString().slice(0, 10));
   const [{ data: ins }, { data: metaRows }] = await Promise.all([
@@ -407,7 +417,7 @@ export async function getEditorAdStats(opts: { editorId: string; month?: string 
       creativeCode: c.code, creativeTitle: c.title,
       status: (m?.effective_status as string) ?? null,
       impressions: 0, linkClicks: 0, leads: 0, messages: 0, landingPageViews: 0,
-      initiateCheckouts: 0, videoPlays: 0, thruplays: 0,
+      initiateCheckouts: 0, videoPlays: 0, thruplays: 0, spend: 0,
       reach: m?.reach != null ? Number(m.reach) : null,
       frequency: m?.frequency != null ? Number(m.frequency) : null,
       qualityRanking: (m?.quality_ranking as string) ?? null,
@@ -427,6 +437,7 @@ export async function getEditorAdStats(opts: { editorId: string; month?: string 
     a.initiateCheckouts += Number(r.initiate_checkouts ?? 0);
     a.videoPlays += Number(r.video_plays ?? 0);
     a.thruplays += Number(r.thruplays ?? 0);
+    a.spend += Number(r.spend_mad ?? 0);
   }
   return [...out.values()].sort((a, b) => b.impressions - a.impressions);
 }

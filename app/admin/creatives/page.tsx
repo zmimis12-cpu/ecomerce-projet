@@ -177,7 +177,9 @@ export default async function CreativesAdminPage({
                 <th className="px-4 py-2 text-right">CTR</th>
                 <th className="px-4 py-2 text-right">Leads pub</th>
                 <th className="px-4 py-2 text-right">Dépense</th>
+                <th className="px-4 py-2 text-right">Coût / lead</th>
                 <th className="px-4 py-2 text-right">Commandes</th>
+                <th className="px-4 py-2 text-right">Coût / commande</th>
                 <th className="px-4 py-2 text-right">Livrées</th>
                 <th className="px-4 py-2 text-right">Taux</th>
                 <th className="px-4 py-2 text-right">Coût / livrée</th>
@@ -187,7 +189,7 @@ export default async function CreativesAdminPage({
             </thead>
             <tbody>
               {report.creatives.length === 0 && (
-                <tr><td colSpan={15} className="px-4 py-6 text-center text-muted-foreground">Aucune vidéo.</td></tr>
+                <tr><td colSpan={17} className="px-4 py-6 text-center text-muted-foreground">Aucune vidéo.</td></tr>
               )}
               {report.creatives.map((c) => (
                 <tr key={c.id} className="border-t">
@@ -213,7 +215,9 @@ export default async function CreativesAdminPage({
                   <td className="px-4 py-2 text-right">{ctr(c.linkClicks, c.impressions)}</td>
                   <td className="px-4 py-2 text-right">{c.adLeads}{c.messages ? <span className="text-xs text-muted-foreground"> +{c.messages} msg</span> : null}</td>
                   <td className="px-4 py-2 text-right">{c.spend ? mad(c.spend) : "—"}</td>
+                  <td className="px-4 py-2 text-right">{c.adLeads && c.spend ? mad(Math.round(c.spend / c.adLeads)) : "—"}</td>
                   <td className="px-4 py-2 text-right">{c.orders}</td>
+                  <td className="px-4 py-2 text-right">{c.orders && c.spend ? mad(Math.round(c.spend / c.orders)) : "—"}</td>
                   <td className="px-4 py-2 text-right">{c.delivered}</td>
                   <td className="px-4 py-2 text-right">{rate(c.delivered, c.orders)}</td>
                   <td className="px-4 py-2 text-right">{c.delivered && c.spend ? mad(Math.round(c.spend / c.delivered)) : "—"}</td>

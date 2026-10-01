@@ -10,6 +10,8 @@ export function PeriodFilter({ period, extra }: { period: string; extra?: Record
     <form method="get" className="flex items-center gap-2">
       {extra && Object.entries(extra).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
       <select name="month" defaultValue={period} className="h-9 rounded-md border bg-background px-3 text-sm">
+        <option value="7d">7 derniers jours</option>
+        <option value="30d">30 derniers jours</option>
         <option value="all">Tout</option>
         {months.map((m) => (
           <option key={m} value={m}>
@@ -22,9 +24,9 @@ export function PeriodFilter({ period, extra }: { period: string; extra?: Record
   );
 }
 
+/** Période par défaut : 30 derniers jours (glissant). */
 export function currentMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return "30d";
 }
 
 export function mad(n: number) {
