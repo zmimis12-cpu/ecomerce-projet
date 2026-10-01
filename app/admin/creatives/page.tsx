@@ -12,6 +12,7 @@ import { PeriodFilter, currentMonth, mad, rate } from "@/components/creatives/pe
 import { getEditorBalances } from "@/lib/creatives/payment-queries";
 import { getCreativesLiveStatus, getMetaDeliveries, TONE_CLS } from "@/lib/ads/meta-status";
 import { AddPaymentForm } from "@/components/creatives/payment-controls";
+import { RateForm, DeleteRateButton } from "@/components/creatives/rate-controls";
 import { PaymentsList } from "@/components/creatives/payments-list";
 
 export const metadata: Metadata = { title: "Vidéos & Éditeurs" };
@@ -32,6 +33,11 @@ export default async function CreativesAdminPage({
     getEditorBalances(),
     getRecentAds(),
   ]);
+  const { data: ratesRaw } = await supabaseAdmin
+    .from("video_editor_rates" as never)
+    .select("id, editor_id, product_id, commission_type, commission_value")
+    .order("created_at", { ascending: false });
+  const rates = (ratesRaw ?? []) as { id: string; editor_id: string | null; product_id: string; commission_type: string; commission_value: number }[];
   const totalRemaining = balances.reduce((s, b) => s + Math.max(0, b.remaining), 0);
   // Statuts EN DIRECT depuis Meta (plus de choix manuel "En pub / En pause")
   const [liveStatus, adDeliveries] = await Promise.all([
@@ -114,6 +120,37 @@ export default async function CreativesAdminPage({
               ))}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      {/* Tarifs flexibles */}
+      <section className="rounded-xl border bg-card">
+        <div className="border-b px-4 py-3">
+          <h2 className="font-medium">Tarifs par produit</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Priorité : tarif (éditeur + produit) → tarif produit pour tous → tarif de base de l&apos;éditeur (tableau Éditeurs).
+            Le gain est <b>figé au moment de la livraison</b> : changer un tarif ne modifie pas ce qui est déjà gagné.
+          </p>
+        </div>
+        <div className="space-y-3 p-4">
+          <RateForm editors={report.editors.map((e) => ({ id: e.id, name: e.name }))} products={products} />
+          {rates.length > 0 && (
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs text-muted-foreground">
+                <tr><th className="py-1">Éditeur</th><th className="py-1">Produit</th><th className="py-1">Tarif</th><th /></tr>
+              </thead>
+              <tbody>
+                {rates.map((r) => (
+                  <tr key={r.id} className="border-t">
+                    <td className="py-1.5">{r.editor_id ? report.editors.find((e) => e.id === r.editor_id)?.name ?? "—" : <i>Tous</i>}</td>
+                    <td className="py-1.5">{products.find((p) => p.id === r.product_id)?.name ?? "—"}</td>
+                    <td className="py-1.5 font-semibold">{r.commission_type === "percent" ? `${r.commission_value} %` : `${r.commission_value} MAD / livrée`}</td>
+                    <td className="py-1.5 text-right"><DeleteRateButton id={r.id} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </section>
 

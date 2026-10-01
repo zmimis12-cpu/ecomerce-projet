@@ -149,7 +149,7 @@ export async function getCreativesReport(opts: { month?: string | null; editorId
     creativeIds.length
       ? supabaseAdmin
           .from("orders")
-          .select("id, order_number, creative_id, status, total_amount_mad, created_at, delivered_at, updated_at")
+          .select("id, order_number, creative_id, status, total_amount_mad, created_at, delivered_at, updated_at, editor_earning_mad, editor_rate_label")
           .in("creative_id" as never, creativeIds)
       : Promise.resolve({ data: [] }),
   ]);
@@ -163,7 +163,10 @@ export async function getCreativesReport(opts: { month?: string | null; editorId
   type ORow = {
     id: string; order_number: string; creative_id: string; status: string;
     total_amount_mad: number; created_at: string; delivered_at: string | null; updated_at: string;
+    editor_earning_mad: number | null; editor_rate_label: string | null;
   };
+  const { loadRateBook, resolveRate, earningFor } = await import("@/lib/creatives/rates");
+  const book = await loadRateBook();
   const orders = (ordersRaw ?? []) as unknown as ORow[];
 
   const stats = new Map<string, CreativeStat>();
@@ -226,9 +229,11 @@ export async function getCreativesReport(opts: { month?: string | null; editorId
     if (inRange(o.created_at, from, to)) s.orders++;
     const deliveredAt = o.delivered_at ?? o.updated_at;
     if (DELIVERED_STATUSES.includes(o.status) && inRange(deliveredAt, from, to)) {
-      const ed = editorMap.get(s.editorId);
       const amount = Number(o.total_amount_mad ?? 0);
-      const earning = computeEarning(amount, ed?.commissionType ?? "fixed", ed?.commissionValue ?? 0);
+      // Gain FIGÉ à la livraison s'il existe, sinon tarif actuel (produit > éditeur)
+      const earning = o.editor_earning_mad != null
+        ? Number(o.editor_earning_mad)
+        : earningFor(resolveRate(book, s.editorId, s.productId), amount);
       s.delivered++;
       s.revenue += amount;
       s.earnings += earning;

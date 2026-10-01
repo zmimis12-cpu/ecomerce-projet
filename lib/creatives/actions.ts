@@ -120,3 +120,31 @@ export async function linkAdToCreative(platform: string, adId: string, creativeI
   revalidatePath("/admin/creatives");
   return { success: true };
 }
+
+/** Ajoute / remplace un tarif par produit (editorId vide = tous les éditeurs). */
+export async function saveEditorRate(input: {
+  editorId: string | null; productId: string; type: "fixed" | "percent"; value: number;
+}): Promise<Result> {
+  await requireRole([...MANAGERS]);
+  if (!input.productId) return { success: false, error: "Choisis un produit." };
+  if (!(input.value >= 0)) return { success: false, error: "Montant invalide." };
+  if (input.type === "percent" && input.value > 100) return { success: false, error: "Max 100%." };
+  let del = supabaseAdmin.from("video_editor_rates" as never).delete().eq("product_id", input.productId);
+  del = input.editorId ? del.eq("editor_id", input.editorId) : del.is("editor_id", null);
+  await del;
+  const { error } = await supabaseAdmin.from("video_editor_rates" as never).insert({
+    editor_id: input.editorId || null, product_id: input.productId,
+    commission_type: input.type, commission_value: input.value,
+  } as never);
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/creatives");
+  return { success: true };
+}
+
+export async function deleteEditorRate(id: string): Promise<Result> {
+  await requireRole([...MANAGERS]);
+  const { error } = await supabaseAdmin.from("video_editor_rates" as never).delete().eq("id", id);
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/creatives");
+  return { success: true };
+}

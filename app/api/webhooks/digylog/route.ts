@@ -104,6 +104,9 @@ async function processWebhook(params: {
     if (Object.keys(extra).length) {
       await supabaseAdmin.from("orders").update(extra as never).eq("delivery_tracking_number", tracking);
     }
+    // Commande livrée venant d'une vidéo → gain éditeur figé tout de suite
+    const { snapshotEditorEarnings } = await import("@/lib/creatives/rates");
+    await snapshotEditorEarnings().catch(() => {});
     await log("processed", payload, { tracking, idStatus });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown";

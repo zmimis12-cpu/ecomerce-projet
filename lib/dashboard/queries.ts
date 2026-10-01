@@ -41,6 +41,7 @@ export interface DashboardSummary {
   real_profit_before_ads: number;  // profit des commandes payées AVANT pub et confirmation
   pending_profit:         number;  // marge des commandes livrées non payées + en transit (pas encore encaissée)
   pending_orders_count:   number;
+  total_editor_cost:      number;  // gains éditeurs vidéo sur commandes payées
   confirmation_rate:      number;  // Confirmés / Leads
   cancellation_rate:      number;  // Annulés après confirmation / Confirmés
   shipping_rate:          number;  // Expédiés / Confirmés
@@ -211,7 +212,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
       "id","status","is_paid","total_amount_mad","estimated_profit",
       "real_profit_mad","cogs_total","delivery_cost_real_mad","return_cost_mad",
       "customer_city","expected_delivery_cost","delivery_margin","actual_delivery_cost",
-      "assigned_to","actual_cod_collected_mad","fulfillment_type",
+      "assigned_to","actual_cod_collected_mad","fulfillment_type","editor_earning_mad",
     ].join(","));
   // Note: on n'exclut PLUS "cancelled" ici — on en a besoin pour calculer le
   // taux d'annulation après confirmation. Elles sont juste exclues du profit/CA.
@@ -237,6 +238,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     actual_cod_collected_mad: number | null;
     fulfillment_type: string | null;
     assigned_to: string | null;
+    editor_earning_mad: number | null;
   }[];
 
   // ── "Confirmés" = commandes qui SONT PASSÉES par une confirmation, même si
@@ -446,8 +448,13 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   const real_profit_before_ads = Math.round(
     activeRows.filter((r) => r.is_paid).reduce((s, r) => s + orderMargin(r), 0) * 100) / 100;
 
+  // Gains éditeurs vidéo (figés à la livraison) des commandes payées de la période
+  const total_editor_cost = Math.round(activeRows
+    .filter((r) => r.is_paid)
+    .reduce((s, r) => s + Number(r.editor_earning_mad ?? 0), 0) * 100) / 100;
+
   const true_final_profit = Math.round(
-    (real_profit_before_ads - total_ads_spend - total_call_center_cost) * 100
+    (real_profit_before_ads - total_ads_spend - total_call_center_cost - total_editor_cost) * 100
   ) / 100;
 
   // Marge pas encore encaissée (la pub de ces commandes est déjà dépensée)
@@ -463,7 +470,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     net_collected, total_ads_spend, real_profit_net_ads,
     self_delivery_count, self_delivery_revenue, digylog_count,
     total_call_center_cost, total_other_expenses, true_final_profit,
-    real_profit_before_ads, pending_profit, pending_orders_count,
+    real_profit_before_ads, pending_profit, pending_orders_count, total_editor_cost,
     confirmation_rate, cancellation_rate, shipping_rate, delivery_rate, return_rate,
     total_delivery_margin, total_delivery_overcharge, casa_orders_count,
     net_margin_pct, roi,

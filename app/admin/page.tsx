@@ -174,13 +174,16 @@ export default async function AdminDashboardPage({
               <KpiCard label="Call Center"     value={mad((summary as {total_call_center_cost?:number}).total_call_center_cost ?? 0)}
                 icon={PhoneCall} variant="red"
                 sub="Commissions agents (commandes payées)" />
+              <KpiCard label="Éditeurs vidéo"  value={mad((summary as {total_editor_cost?:number}).total_editor_cost ?? 0)}
+                icon={PhoneCall} variant="red"
+                sub="Gains éditeurs (commandes payées venant de leurs vidéos)" />
               <KpiCard label="Autres Charges"  value={mad((summary as {total_other_expenses?:number}).total_other_expenses ?? 0)}
                 icon={CreditCard} variant="red"
                 sub="Frais généraux (Dépenses & Cartes) — informatif, pas déduit ci-dessus" />
               <KpiCard label="Profit Net Final" value={mad((summary as {true_final_profit?:number}).true_final_profit ?? 0)}
                 variant={((summary as {true_final_profit?:number}).true_final_profit ?? 0) >= 0 ? "green" : "red"}
                 icon={TrendingUp} highlight
-                sub="Profit Réel (avant pub) − Pub réelle − Call Center" />
+                sub="Profit Réel (avant pub) − Pub réelle − Call Center − Éditeurs" />
               <KpiCard label="Profit en attente" value={mad((summary as {pending_profit?:number}).pending_profit ?? 0)}
                 icon={Truck} variant="amber"
                 sub={`${(summary as {pending_orders_count?:number}).pending_orders_count ?? 0} commandes livrées non payées / en transit — pub déjà dépensée, argent pas encore reçu`} />
