@@ -102,8 +102,12 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { session } } = await supabase.auth.getSession();
-  const isAuthenticated = !!session?.user;
+  // getUser() VÉRIFIE la session auprès de Supabase. Avant, getSession() lisait
+  // juste le cookie : avec un token expiré ou un compte supprimé, le middleware
+  // croyait l'utilisateur connecté (/login → /admin) alors que la page le
+  // renvoyait vers /login → boucle "trop de redirections".
+  const { data: { user } } = await supabase.auth.getUser();
+  const isAuthenticated = !!user;
 
   // ── Protect /admin ─────────────────────────────────────────────────────────
   if (pathname.startsWith("/admin") && !isAuthenticated) {

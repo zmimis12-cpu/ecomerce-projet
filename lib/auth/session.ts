@@ -56,17 +56,13 @@ export async function ensureProfile(): Promise<SessionUser | null> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
-    let profile = await fetchProfile(user.id);
+    const profile = await fetchProfile(user.id);
     let wasCreated = false;
 
     if (!profile) {
-      // Profile missing — insert via admin client then re-fetch
-      const { supabaseAdmin } = await import("@/lib/supabase/admin");
-      await supabaseAdmin.from("users" as never).upsert(
-        { id: user.id, email: user.email, full_name: user.email, role: "viewer", is_active: true } as never,
-        { onConflict: "id", ignoreDuplicates: true }
-      );
-      profile = await fetchProfile(user.id);
+      // Sécurité : on ne crée PLUS de profil automatiquement (un compte créé
+      // par inscription publique obtenait un accès "viewer"). Seuls les
+      // utilisateurs créés dans Paramètres → Utilisateurs ont accès.
       wasCreated = true;
     }
 
@@ -87,23 +83,28 @@ export async function ensureProfile(): Promise<SessionUser | null> {
 export async function requireUser(): Promise<SessionUser> {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.profile && session.profile.is_active === false) redirect("/admin/unauthorized?reason=inactive");
   return session;
 }
 
 export async function requireAdmin(): Promise<SessionUser> {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (!["super_admin", "admin"].includes(session.role)) redirect("/admin?error=unauthorized");
+  if (session.profile && session.profile.is_active === false) redirect("/admin/unauthorized?reason=inactive");
+  if (!["super_admin", "admin"].includes(session.role)) redirect("/admin/unauthorized");
   return session;
 }
 
 export async function requireRole(allowedRoles: UserRole[]): Promise<SessionUser> {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.profile && session.profile.is_active === false) redirect("/admin/unauthorized?reason=inactive");
+  if (!session.hasProfile) redirect("/admin/unauthorized?reason=no-profile");
   if (!allowedRoles.includes(session.role)) {
-    // L'éditeur vidéo n'a accès qu'à son espace — évite une boucle vers /admin
+    // L'éditeur vidéo n'a accès qu'à son espace
     if (session.role === "video_editor") redirect("/admin/editor");
-    redirect("/admin?error=unauthorized");
+    // Avant : redirect vers /admin → si /admin refuse aussi ce rôle → boucle infinie
+    redirect("/admin/unauthorized");
   }
   return session;
 }
