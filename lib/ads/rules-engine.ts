@@ -1,0 +1,246 @@
+/**
+ * lib/ads/rules-engine.ts — moteur des règles automatiques (cron toutes les 15 min).
+ * Niveau "produit" : chiffres du produit (toutes ses campagnes Meta + vraies
+ *   commandes du système) → action sur toutes ses campagnes.
+ * Niveau "pub" : chiffres de chaque pub (Meta + commandes de sa vidéo) → action sur la pub.
+ * Toutes les conditions doivent être vraies (ET). Server-only.
+ */
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { readSettings } from "./sync-core";
+import { getUsdToMad } from "./fx";
+import type { RuleCondition, RuleMetric, RuleWindow, RuleAction, RuleLevel } from "./rules-types";
+
+const META = "https://graph.facebook.com/v21.0";
+const LEAD_TYPES = ["lead", "offsite_conversion.fb_pixel_lead", "onsite_web_lead"];
+
+type Rule = {
+  id: string; name: string; enabled: boolean; simulate: boolean; level: RuleLevel;
+  product_id: string | null; time_window: RuleWindow; conditions: RuleCondition[];
+  action: RuleAction; cooldown_minutes: number;
+};
+type Metrics = Record<RuleMetric, number>;
+
+function casaDay(offset = 0) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Casablanca" }).format(new Date(Date.now() - offset * 86400_000));
+}
+export function windowRange(w: RuleWindow): { since: string; until: string } {
+  switch (w) {
+    case "today": return { since: casaDay(0), until: casaDay(0) };
+    case "yesterday": return { since: casaDay(1), until: casaDay(1) };
+    case "3d": return { since: casaDay(2), until: casaDay(0) };
+    case "7d": return { since: casaDay(6), until: casaDay(0) };
+  }
+}
+
+async function metaGet(path: string, params: Record<string, string>, token: string) {
+  const out: Record<string, unknown>[] = [];
+  const url = new URL(`${META}/${path}`);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  url.searchParams.set("access_token", token);
+  let next: string | undefined = url.toString();
+  for (let g = 0; next && g < 20; g++) {
+    const res: Response = await fetch(next, { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok || json.error) throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
+    out.push(...((json.data ?? []) as Record<string, unknown>[]));
+    next = json.paging?.next;
+  }
+  return out;
+}
+
+async function setStatus(id: string, status: "PAUSED" | "ACTIVE", token: string) {
+  const res = await fetch(`${META}/${id}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ status, access_token: token }).toString(),
+  });
+  const json = await res.json();
+  if (!res.ok || json.error) throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
+}
+
+const leadsOf = (actions: unknown) => {
+  const arr = actions as { action_type: string; value: string }[] | undefined;
+  for (const t of LEAD_TYPES) { const a = arr?.find((x) => x.action_type === t); if (a) return Number(a.value); }
+  return 0;
+};
+
+function finish(m: Omit<Metrics, "cost_per_order" | "cost_per_delivered" | "cost_per_result" | "ctr">, linkClicks: number): Metrics {
+  const div = (a: number, b: number) => (b > 0 ? a / b : a > 0 ? Infinity : 0);
+  return {
+    ...m,
+    cost_per_order: div(m.spend, m.orders),
+    cost_per_delivered: div(m.spend, m.delivered),
+    cost_per_result: div(m.spend, m.meta_results),
+    ctr: m.impressions > 0 ? (linkClicks / m.impressions) * 100 : 0,
+  };
+}
+
+function check(c: RuleCondition, m: Metrics) {
+  const v = m[c.metric];
+  switch (c.op) {
+    case ">": return v > c.value;
+    case ">=": return v >= c.value;
+    case "<": return v < c.value;
+    case "<=": return v <= c.value;
+  }
+}
+
+/** Commandes du système par produit / par vidéo sur la période. */
+async function ordersInWindow(range: { since: string; until: string }) {
+  const { data: o } = await supabaseAdmin
+    .from("orders")
+    .select("id, status, creative_id, is_duplicate")
+    .gte("created_at", `${range.since}T00:00:00+01:00`)
+    .lte("created_at", `${range.until}T23:59:59+01:00`)
+    .limit(5000);
+  const orders = ((o ?? []) as { id: string; status: string; creative_id: string | null; is_duplicate: boolean }[])
+    .filter((r) => !r.is_duplicate);
+  const byProduct = new Map<string, { orders: number; delivered: number }>();
+  const byCreative = new Map<string, { orders: number; delivered: number }>();
+  const ids = orders.map((r) => r.id);
+  const productOf = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 150) {
+    const { data: it } = await supabaseAdmin.from("order_items").select("order_id, product_id").in("order_id", ids.slice(i, i + 150));
+    for (const x of (it ?? []) as { order_id: string; product_id: string | null }[]) if (x.product_id) productOf.set(x.order_id, x.product_id);
+  }
+  for (const r of orders) {
+    const done = r.status === "delivered" || r.status === "paid";
+    const pid = productOf.get(r.id);
+    if (pid) { const a = byProduct.get(pid) ?? { orders: 0, delivered: 0 }; a.orders++; if (done) a.delivered++; byProduct.set(pid, a); }
+    if (r.creative_id) { const a = byCreative.get(r.creative_id) ?? { orders: 0, delivered: 0 }; a.orders++; if (done) a.delivered++; byCreative.set(r.creative_id, a); }
+  }
+  return { byProduct, byCreative };
+}
+
+async function campaignProductMap(campaigns: { id: string; name: string }[]) {
+  const [{ data: assigns }, { data: products }] = await Promise.all([
+    supabaseAdmin.from("campaign_product_assignments").select("campaign_id, product_id").eq("platform", "meta"),
+    supabaseAdmin.from("products").select("id, sku"),
+  ]);
+  const map = new Map(((assigns ?? []) as { campaign_id: string; product_id: string }[]).map((a) => [a.campaign_id, a.product_id]));
+  const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+  for (const c of campaigns) {
+    if (map.has(c.id)) continue;
+    const p = ((products ?? []) as { id: string; sku: string }[]).find((x) => x.sku && norm(c.name).includes(norm(x.sku)));
+    if (p) map.set(c.id, p.id);
+  }
+  return map;
+}
+
+async function inCooldown(rule: Rule, objectId: string) {
+  const since = new Date(Date.now() - rule.cooldown_minutes * 60_000).toISOString();
+  const { data } = await supabaseAdmin.from("ad_rule_logs" as never)
+    .select("id").eq("rule_id", rule.id).eq("object_id", objectId).gte("created_at", since).limit(1);
+  return ((data ?? []) as unknown[]).length > 0;
+}
+
+/** Réactivation autorisée seulement si la DERNIÈRE action d'une règle sur cet objet était une pause. */
+async function pausedByRule(objectId: string) {
+  const { data } = await supabaseAdmin.from("ad_rule_logs" as never)
+    .select("action, simulated, success").eq("object_id", objectId).eq("simulated", false).eq("success", true)
+    .in("action", ["pause", "activate"]).order("created_at", { ascending: false }).limit(1);
+  const last = ((data ?? []) as { action: string }[])[0];
+  return last?.action === "pause";
+}
+
+async function act(rule: Rule, obj: { id: string; name: string; status: string; productId: string | null }, m: Metrics, token: string) {
+  const want = rule.action === "pause" ? "PAUSED" : rule.action === "activate" ? "ACTIVE" : null;
+  if (want === "PAUSED" && obj.status !== "ACTIVE") return null;
+  if (want === "ACTIVE" && (obj.status !== "PAUSED" || !(await pausedByRule(obj.id)))) return null;
+  if (await inCooldown(rule, obj.id)) return null;
+
+  let success = true, error: string | null = null;
+  if (want && !rule.simulate) {
+    try { await setStatus(obj.id, want, token); } catch (e) { success = false; error = e instanceof Error ? e.message : String(e); }
+  }
+  const clean = Object.fromEntries(Object.entries(m).map(([k, v]) => [k, Number.isFinite(v) ? Math.round(v * 100) / 100 : null]));
+  await supabaseAdmin.from("ad_rule_logs" as never).insert({
+    rule_id: rule.id, rule_name: rule.name, level: rule.level, object_id: obj.id, object_name: obj.name,
+    product_id: obj.productId, action: rule.action, simulated: rule.simulate, success, error, metrics: clean,
+  } as never);
+  return { object: obj.name, success };
+}
+
+export async function runAdRules() {
+  const { data: r } = await supabaseAdmin.from("ad_rules" as never).select("*").eq("enabled", true);
+  const rules = (r ?? []) as unknown as Rule[];
+  if (!rules.length) return { ok: true, rules: 0, actions: 0 };
+  const s = await readSettings("meta");
+  if (!s?.access_token || !s.account_id) return { ok: false, error: "Meta non configuré" };
+  const acc = s.account_id.startsWith("act_") ? s.account_id : `act_${s.account_id}`;
+  const { rate } = await getUsdToMad();
+
+  const campaigns = (await metaGet(`${acc}/campaigns`, { fields: "id,name,effective_status", limit: "500" }, s.access_token))
+    .map((c) => ({ id: String(c.id), name: String(c.name), status: String(c.effective_status) }));
+  const campProduct = await campaignProductMap(campaigns);
+  const { data: links } = await supabaseAdmin.from("creative_ads" as never).select("ad_id, creative_id").eq("platform", "meta");
+  const adCreative = new Map(((links ?? []) as { ad_id: string; creative_id: string }[]).map((l) => [l.ad_id, l.creative_id]));
+
+  let actions = 0;
+  const cache = new Map<string, { camp: Record<string, unknown>[]; ads: Record<string, unknown>[]; orders: Awaited<ReturnType<typeof ordersInWindow>> }>();
+
+  for (const rule of rules) {
+    try {
+      const range = windowRange(rule.time_window);
+      if (!cache.has(rule.time_window)) {
+        const tr = JSON.stringify(range);
+        const [camp, ads, orders] = await Promise.all([
+          metaGet(`${acc}/insights`, { level: "campaign", fields: "campaign_id,spend,impressions,inline_link_clicks,frequency,actions", time_range: tr, limit: "500" }, s.access_token),
+          metaGet(`${acc}/insights`, { level: "ad", fields: "ad_id,ad_name,campaign_id,spend,impressions,inline_link_clicks,frequency,actions", time_range: tr, limit: "500" }, s.access_token),
+          ordersInWindow(range),
+        ]);
+        cache.set(rule.time_window, { camp, ads, orders });
+      }
+      const { camp, ads, orders } = cache.get(rule.time_window)!;
+      const conds = Array.isArray(rule.conditions) ? rule.conditions : [];
+      if (!conds.length) continue;
+
+      if (rule.level === "product") {
+        const productIds = rule.product_id ? [rule.product_id] : [...new Set(campProduct.values())];
+        for (const pid of productIds) {
+          const myCamps = campaigns.filter((c) => campProduct.get(c.id) === pid);
+          if (!myCamps.length) continue;
+          const ins = camp.filter((x) => myCamps.some((c) => c.id === x.campaign_id));
+          const spendUsd = ins.reduce((a, x) => a + Number(x.spend ?? 0), 0);
+          const impressions = ins.reduce((a, x) => a + Number(x.impressions ?? 0), 0);
+          const clicks = ins.reduce((a, x) => a + Number(x.inline_link_clicks ?? 0), 0);
+          const freq = ins.length ? Math.max(...ins.map((x) => Number(x.frequency ?? 0))) : 0;
+          const o = orders.byProduct.get(pid) ?? { orders: 0, delivered: 0 };
+          const m = finish({
+            spend: spendUsd * rate, orders: o.orders, delivered: o.delivered,
+            meta_results: ins.reduce((a, x) => a + leadsOf(x.actions), 0), impressions, frequency: freq,
+          }, clicks);
+          if (!conds.every((c) => check(c, m))) continue;
+          for (const c of myCamps) {
+            const done = await act(rule, { id: c.id, name: `Campagne « ${c.name} »`, status: c.status, productId: pid }, m, s.access_token);
+            if (done) actions++;
+          }
+        }
+      } else {
+        const statuses = new Map((await metaGet(`${acc}/ads`, { fields: "id,effective_status", limit: "500" }, s.access_token))
+          .map((a) => [String(a.id), String(a.effective_status)]));
+        for (const x of ads) {
+          const adId = String(x.ad_id);
+          const pid = campProduct.get(String(x.campaign_id)) ?? null;
+          if (rule.product_id && pid !== rule.product_id) continue;
+          const cr = adCreative.get(adId);
+          const o = cr ? orders.byCreative.get(cr) ?? { orders: 0, delivered: 0 } : { orders: 0, delivered: 0 };
+          const m = finish({
+            spend: Number(x.spend ?? 0) * rate, orders: o.orders, delivered: o.delivered,
+            meta_results: leadsOf(x.actions), impressions: Number(x.impressions ?? 0), frequency: Number(x.frequency ?? 0),
+          }, Number(x.inline_link_clicks ?? 0));
+          if (!conds.every((c) => check(c, m))) continue;
+          const done = await act(rule, { id: adId, name: `Pub « ${x.ad_name} »`, status: statuses.get(adId) ?? "", productId: pid }, m, s.access_token);
+          if (done) actions++;
+        }
+      }
+      await supabaseAdmin.from("ad_rules" as never).update({ last_run_at: new Date().toISOString() } as never).eq("id", rule.id);
+    } catch (e) {
+      await supabaseAdmin.from("ad_rule_logs" as never).insert({
+        rule_id: rule.id, rule_name: rule.name, level: rule.level, action: rule.action,
+        simulated: rule.simulate, success: false, error: e instanceof Error ? e.message : String(e),
+      } as never);
+    }
+  }
+  return { ok: true, rules: rules.length, actions };
+}

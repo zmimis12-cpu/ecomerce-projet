@@ -65,6 +65,7 @@ const ADMIN_NAV: NavGroup[] = [
     items: [
       { href: "/admin/settings/delivery-providers", label: "Transporteurs", icon: Truck },
       { href: "/admin/settings/ads",  label: "Publicité",   icon: BarChart3 },
+      { href: "/admin/ads/rules",     label: "Règles auto pub", icon: Shield },
       { href: "/admin/settings/whatsapp", label: "WhatsApp", icon: PhoneCall },
       { href: "/admin/audit-logs", label: "Audit Logs",  icon: Shield   },
       { href: "/admin/settings",   label: "Paramètres",  icon: Settings },
