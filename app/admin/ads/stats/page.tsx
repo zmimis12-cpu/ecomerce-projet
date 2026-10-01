@@ -30,17 +30,6 @@ export default async function AdminAdStatsPage({
     .map((l) => [l.ad_id, codeOf.get(l.creative_id) ?? ""]));
 
   const live = await getMetaAdsLive(adIds, periodToRange(period));
-  const ads = live.ok ? live.ads : [];
-  const spend = ads.reduce((s, a) => s + a.spendUsd, 0);
-  const results = ads.reduce((s, a) => s + (a.results ?? 0), 0);
-  const impressions = ads.reduce((s, a) => s + a.impressions, 0);
-  const clicks = ads.reduce((s, a) => s + a.linkClicks, 0);
-  const cards = [
-    { label: "Dépensé (période)", value: `$${spend.toFixed(2)}`, sub: `${Math.round(spend * fx.rate).toLocaleString("fr-FR")} MAD` },
-    { label: "Résultats", value: results.toLocaleString("fr-FR"), sub: results ? `$${(spend / results).toFixed(2)} / résultat` : "—" },
-    { label: "Impressions", value: impressions.toLocaleString("fr-FR"), sub: "" },
-    { label: "Clics lien", value: clicks.toLocaleString("fr-FR"), sub: impressions ? `CTR ${((clicks / impressions) * 100).toFixed(2)} %` : "" },
-  ];
 
   return (
     <div className="space-y-6">
@@ -67,16 +56,7 @@ export default async function AdminAdStatsPage({
           </div>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {cards.map((c) => (
-          <div key={c.label} className="rounded-xl border bg-card p-4">
-            <div className="text-xs text-muted-foreground">{c.label}</div>
-            <div className="mt-1 text-lg font-semibold">{c.value}</div>
-            {c.sub && <div className="text-xs text-muted-foreground">{c.sub}</div>}
-          </div>
-        ))}
-      </div>
-      <MetaLiveSection live={live} codeByAd={codeByAd} rate={fx.rate} title="Toutes les pubs Meta — en direct" />
+      <MetaLiveSection live={live} codeByAd={Object.fromEntries(codeByAd)} rate={fx.rate} title="Toutes les pubs Meta — en direct" showTotals />
     </div>
   );
 }

@@ -54,7 +54,7 @@ export default async function EditorAdsPage({
     <div className="space-y-6">
       <EditorHeader ctx={ctx} title="Stats pubs" icon={BarChart3} current="/admin/editor/ads" />
 
-      <MetaLiveSection live={live} codeByAd={codeByAd} rate={fx.rate} />
+      <MetaLiveSection live={live} codeByAd={Object.fromEntries(codeByAd)} rate={fx.rate} showTotals />
 
       <section className="rounded-xl border bg-card">
         <div className="border-b px-4 py-3">

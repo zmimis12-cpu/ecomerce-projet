@@ -12,6 +12,9 @@ export type MetaLiveAd = {
   name: string;
   delivery: Delivery;            // comme la colonne "Diffusion" de Meta
   adsetName: string | null;
+  adsetId: string | null;
+  campaignId: string | null;
+  campaignName: string | null;
   attribution: string;
   resultLabel: string;
   results: number | null;
@@ -83,8 +86,8 @@ export async function getMetaAdsLive(adIds: string[], range: { since: string; un
     ? `insights.time_range(${JSON.stringify(range)})`
     : "insights.date_preset(maximum)";
   const fields = [
-    "name", "effective_status", "updated_time", "issues_info",
-    "adset{name,daily_budget,lifetime_budget,start_time,end_time,learning_stage_info,bid_strategy,attribution_spec,optimization_goal,promoted_object,campaign{bid_strategy,daily_budget,lifetime_budget}}",
+    "name", "effective_status", "updated_time", "issues_info", "campaign{id,name}",
+    "adset{id,name,daily_budget,lifetime_budget,start_time,end_time,learning_stage_info,bid_strategy,attribution_spec,optimization_goal,promoted_object,campaign{bid_strategy,daily_budget,lifetime_budget}}",
     `${insights}{spend,impressions,reach,frequency,clicks,actions,cost_per_action_type,quality_ranking,engagement_rate_ranking,conversion_rate_ranking,inline_link_clicks,video_thruplay_watched_actions}`,
   ].join(",");
 
@@ -126,6 +129,9 @@ export async function getMetaAdsLive(adIds: string[], range: { since: string; un
         name: String(a.name ?? id),
         delivery: deriveDelivery(a),
         adsetName: (adset.name as string) ?? null,
+        adsetId: (adset.id as string) ?? null,
+        campaignId: ((a.campaign as Record<string, string> | undefined)?.id) ?? null,
+        campaignName: ((a.campaign as Record<string, string> | undefined)?.name) ?? null,
         attribution: attributionLabel(adset.attribution_spec as { event_type: string; window_days: number }[]),
         resultLabel: spec.label,
         results,
