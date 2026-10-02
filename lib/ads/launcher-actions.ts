@@ -16,7 +16,15 @@ export async function getProductEconomics(productId: string): Promise<Result<{ e
   } catch (e) { return { success: false, error: e instanceof Error ? e.message : String(e) }; }
 }
 
-export async function createLaunch(input: { name: string; productId: string; budgetUsd: number; ageMin: number; ageMax: number }): Promise<Result<{ id: string }>> {
+/** Coût max voulu par LIVRAISON → plafond Meta par LEAD (× taux commande→livraison). */
+async function costCapFor(productId: string, maxPerDelivered?: number | null) {
+  if (!maxPerDelivered || maxPerDelivered <= 0) return {};
+  const eco = await productEconomics(productId);
+  const perOrderMad = maxPerDelivered * eco.ordersToDelivered;
+  return { max_cost_per_delivered_mad: maxPerDelivered, cost_cap_usd: Math.max(0.5, Math.round((perOrderMad / eco.fxRate) * 100) / 100) };
+}
+
+export async function createLaunch(input: { name: string; productId: string; budgetUsd: number; ageMin: number; ageMax: number; maxCostPerDeliveredMad?: number | null }): Promise<Result<{ id: string }>> {
   const session = await requireRole([...MANAGERS]);
   if (!input.productId) return { success: false, error: "Choisis un produit." };
   if (!input.name.trim()) return { success: false, error: "Donne un nom à la campagne." };
@@ -24,6 +32,7 @@ export async function createLaunch(input: { name: string; productId: string; bud
   const { data, error } = await supabaseAdmin.from("campaign_launches" as never).insert({
     name: input.name.trim(), product_id: input.productId, daily_budget_usd: input.budgetUsd,
     age_min: Math.max(18, input.ageMin || 18), age_max: Math.min(65, input.ageMax || 65), created_by: session.authId,
+    ...(await costCapFor(input.productId, input.maxCostPerDeliveredMad)),
   } as never).select("id").single();
   if (error) return { success: false, error: error.message };
   revalidatePath("/admin/ads/launch");

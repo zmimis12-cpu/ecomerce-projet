@@ -141,6 +141,7 @@ async function landingLink(productId: string | null, code: string | null) {
 
 type Launch = {
   id: string; name: string; product_id: string | null; daily_budget_usd: number; age_min: number; age_max: number;
+  cost_cap_usd: number | null;
   status: string; meta_campaign_id: string | null; meta_adset_id: string | null;
 };
 type Item = {
@@ -189,7 +190,10 @@ export async function processLaunch(launchId: string) {
         daily_budget: String(Math.round(Number(launch.daily_budget_usd) * 100)),
         billing_event: "IMPRESSIONS",
         optimization_goal: "OFFSITE_CONVERSIONS",
-        bid_strategy: "LOWEST_COST_WITHOUT_CAP",
+        // Coût max par livraison demandé → plafond de coût par lead (Cost Cap)
+        ...(launch.cost_cap_usd
+          ? { bid_strategy: "COST_CAP", bid_amount: String(Math.round(Number(launch.cost_cap_usd) * 100)) }
+          : { bid_strategy: "LOWEST_COST_WITHOUT_CAP" }),
         promoted_object: { pixel_id: id.pixelId, custom_event_type: "LEAD" },
         targeting: {
           geo_locations: { countries: ["MA"], location_types: ["home", "recent"] },

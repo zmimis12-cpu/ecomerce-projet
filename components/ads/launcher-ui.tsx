@@ -21,6 +21,7 @@ export function NewLaunchForm({ products }: { products: { id: string; name: stri
   const [budget, setBudget] = useState(20);
   const [ageMin, setAgeMin] = useState(18);
   const [ageMax, setAgeMax] = useState(65);
+  const [maxDelivered, setMaxDelivered] = useState<number | "">("");
   const [msg, setMsg] = useState("");
   const [pending, start] = useTransition();
 
@@ -73,8 +74,18 @@ export function NewLaunchForm({ products }: { products: { id: string; name: stri
           <label className="flex items-center gap-1 text-sm">Âge
             <input className={INPUT + " w-16"} type="number" min={18} max={65} value={ageMin} onChange={(e) => setAgeMin(Number(e.target.value))} />–
             <input className={INPUT + " w-16"} type="number" min={18} max={65} value={ageMax} onChange={(e) => setAgeMax(Number(e.target.value))} /></label>
+          <label className="flex items-center gap-1 text-sm">Pub max / livraison
+            <input className={INPUT + " w-20"} type="number" min={0} placeholder="libre" value={maxDelivered}
+              onChange={(e) => setMaxDelivered(e.target.value === "" ? "" : Number(e.target.value))} /> MAD</label>
+          {maxDelivered !== "" && eco && (
+            <span className={`text-xs ${Number(maxDelivered) * eco.ordersToDelivered < 25 ? "text-red-600" : "text-muted-foreground"}`}>
+              = max {Math.round(Number(maxDelivered) * eco.ordersToDelivered)} MAD par commande
+              (≈ ${(Number(maxDelivered) * eco.ordersToDelivered / eco.fxRate).toFixed(2)} par lead, plafond Meta « Cost Cap »)
+              {Number(maxDelivered) * eco.ordersToDelivered < 25 && " — très bas : Meta risque de ne presque pas diffuser"}
+            </span>
+          )}
           <button className={BTN} disabled={pending} onClick={() => start(async () => {
-            const r = await createLaunch({ name, productId, budgetUsd: budget, ageMin, ageMax });
+            const r = await createLaunch({ name, productId, budgetUsd: budget, ageMin, ageMax, maxCostPerDeliveredMad: maxDelivered === "" ? null : Number(maxDelivered) });
             if (r.success && r.data) router.push(`/admin/ads/launch/${r.data.id}`); else setMsg(r.error ?? "Erreur");
           })}><Rocket className="h-4 w-4" /> Continuer : ajouter les vidéos / images</button>
         </div>
