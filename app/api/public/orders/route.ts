@@ -9,6 +9,7 @@
  *  5. Service role never exposed to client
  */
 import { type NextRequest, NextResponse, after } from "next/server";
+import { orderCost } from "@/lib/orders/cost";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { validateOrderInput, isHoneypotTriggered } from "@/lib/public/validation";
 import { checkRateLimit, recordRequest, getClientIp, hashIp } from "@/lib/public/rate-limit";
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
 
   let query = supabaseAdmin
     .from("products")
-    .select("id, name, sku, sale_price_mad, total_cost_mad, estimated_profit_mad, slug")
+    .select("id, name, sku, sale_price_mad, total_cost_mad, ads_cost_mad, confirmation_cost_mad, shipping_cost_mad, estimated_profit_mad, slug")
     .eq("is_active", true);
   query = (pid ? query.eq("id", pid) : query.eq("slug", pslug)) as typeof query;
 
@@ -147,6 +148,7 @@ export async function POST(request: NextRequest) {
   const p = product as unknown as {
     id: string; name: string; sku: string;
     sale_price_mad: number; total_cost_mad: number;
+    ads_cost_mad: number | null; confirmation_cost_mad: number | null; shipping_cost_mad: number | null;
     estimated_profit_mad: number; slug: string;
   };
 
@@ -159,7 +161,6 @@ export async function POST(request: NextRequest) {
   const chosenOffer = offerId ? lpOffers.find((o) => String(o.id) === offerId && Number(o.price) > 0) : undefined;
   const qty        = chosenOffer ? Math.min(10, Math.max(1, Math.round(Number(chosenOffer.qty)))) : Math.min(10, Math.max(1, Number(quantity) || 1));
   const unitPrice  = p.sale_price_mad;
-  const unitCost   = p.total_cost_mad ?? 0;
 
   // ── Bundle pricing ─────────────────────────────────────────────────────────
   // On va chercher les VRAIS prix de bundle configurés par le vendeur sur la
@@ -180,7 +181,7 @@ export async function POST(request: NextRequest) {
 
   // Validate client-submitted bundle_price (must be within 5% of expected and >= cost)
   const clientBundlePrice = Number(bundle_price);
-  const minAcceptable     = unitCost * qty; // never sell below cost
+  const minAcceptable     = orderCost(p, qty).total; // never sell below cost
   let subtotal: number;
 
   if (chosenOffer) {
@@ -198,7 +199,8 @@ export async function POST(request: NextRequest) {
     subtotal = expectedTotal;
   }
 
-  const cogs      = unitCost * qty;
+  // Livraison / pub / confirmation comptées UNE fois par commande, pas par pièce
+  const cogs      = orderCost(p, qty).total;
   const estProfit = subtotal - cogs;
 
   // ── 5. Duplicate detection ────────────────────────────────────────────────────
@@ -284,7 +286,7 @@ export async function POST(request: NextRequest) {
     product_name:  p.name,
     product_sku:   p.sku,
     unit_price:    effectiveUnitPrice,
-    unit_cost_mad: unitCost,
+    unit_cost_mad: orderCost(p, qty).unitEffective,
     quantity:      qty,
     discount_pct:  0,
   } as never);

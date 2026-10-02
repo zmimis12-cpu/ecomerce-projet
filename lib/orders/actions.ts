@@ -11,6 +11,7 @@ import { checkOrderDuplicate } from "./duplicate";
 import { findAvailableAgent } from "./auto-assign";
 import type { OrderStatus } from "@/types/orders";
 import { AGENT_ALLOWED_STATUSES } from "@/types/orders";
+import { orderCost, type CostProduct } from "@/lib/orders/cost";
 
 const MANAGER_ROLES = ["super_admin", "admin", "manager"] as const;
 const ALL_ORDER_ROLES = ["super_admin", "admin", "manager", "call_center_agent"] as const;
@@ -123,7 +124,7 @@ export async function createOrder(formData: FormData) {
   // Fetch product for pricing snapshot
   const { data: product, error: pErr } = await supabase
     .from("products")
-    .select("id, name, sku, sale_price_mad, total_cost_mad")
+    .select("id, name, sku, sale_price_mad, total_cost_mad, ads_cost_mad, confirmation_cost_mad, shipping_cost_mad")
     .eq("id", productId)
     .single();
 
@@ -134,14 +135,15 @@ export async function createOrder(formData: FormData) {
   const p = product as unknown as {
     id: string; name: string; sku: string;
     sale_price_mad: number; total_cost_mad: number;
+    ads_cost_mad: number | null; confirmation_cost_mad: number | null; shipping_cost_mad: number | null;
   };
 
-  const unitCost    = p.total_cost_mad ?? 0;
+  const unitCost    = orderCost(p, qty).unitEffective;
   const subtotal    = customSubtotal !== null
     ? Math.round(customSubtotal * 100) / 100
     : (p.sale_price_mad ?? 0) * qty;
   const unitPrice   = Math.round((subtotal / qty) * 100) / 100;
-  const cogs        = unitCost * qty;
+  const cogs        = orderCost(p, qty).total; // livraison/pub/confirmation 1 fois par commande
   const estProfit   = subtotal + shippingCharge - cogs;
 
   // Check for duplicate (same phone + same product + last 24h)
@@ -436,13 +438,14 @@ export async function updateOrder(orderId: string, formData: FormData) {
 
   // Fetch product if provided
   let unitPrice = 0, unitCost = 0, productName = "", productSku = "";
+  let costProduct: CostProduct | null = null;
   if (productId) {
     const { data: prod } = await supabase
-      .from("products").select("id,name,sku,sale_price_mad,total_cost_mad").eq("id", productId).single();
+      .from("products").select("id,name,sku,sale_price_mad,total_cost_mad,ads_cost_mad,confirmation_cost_mad,shipping_cost_mad").eq("id", productId).single();
     if (!prod) return { success: false, errors: { product_id: "Produit introuvable." } };
-    const p = prod as { id:string; name:string; sku:string; sale_price_mad:number; total_cost_mad:number };
+    const p = prod as { id:string; name:string; sku:string; sale_price_mad:number; total_cost_mad:number; ads_cost_mad:number|null; confirmation_cost_mad:number|null; shipping_cost_mad:number|null };
     unitPrice   = p.sale_price_mad ?? 0;
-    unitCost    = p.total_cost_mad ?? 0;
+    costProduct = p;
     productName = p.name;
     productSku  = p.sku;
   }
@@ -450,7 +453,8 @@ export async function updateOrder(orderId: string, formData: FormData) {
   // Prix saisi à la main → prioritaire sur le prix catalogue
   const subtotal    = customSubtotal !== null ? Math.round(customSubtotal * 100) / 100 : unitPrice * qty;
   if (customSubtotal !== null) unitPrice = Math.round((subtotal / qty) * 100) / 100;
-  const cogs        = unitCost * qty;
+  if (costProduct) unitCost = orderCost(costProduct, qty).unitEffective;
+  const cogs        = costProduct ? orderCost(costProduct, qty).total : unitCost * qty;
   const estProfit   = subtotal + shippingCharge - cogs;
 
   const updatePayload: Record<string, unknown> = {
