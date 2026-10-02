@@ -20,9 +20,10 @@ export default async function AdRulesPage() {
   const prods = (products ?? []) as { id: string; name: string }[];
   const pname = (id: string | null) => (id ? prods.find((p) => p.id === id)?.name ?? "—" : "Tous les produits");
   type R = { id: string; name: string; enabled: boolean; simulate: boolean; level: string; product_id: string | null;
-    time_window: string; conditions: { metric: string; op: string; value: number }[]; action: string; cooldown_minutes: number; last_run_at: string | null };
+    time_window: string; conditions: { metric: string; op: string; value: number }[]; action: string; cooldown_minutes: number; last_run_at: string | null;
+    budget_pct: number | null; budget_max_usd: number | null; budget_min_usd: number | null };
   type L = { id: string; created_at: string; rule_name: string; object_name: string | null; action: string; simulated: boolean;
-    success: boolean; error: string | null; metrics: Record<string, number | null> | null };
+    success: boolean; error: string | null; metrics: Record<string, number | null> | null; detail: string | null };
 
   return (
     <div className="space-y-6">
@@ -59,6 +60,9 @@ export default async function AdRulesPage() {
                 <div className="text-xs">
                   <b>SI</b> {r.conditions.map((c, i) => <span key={i}>{i > 0 && <b> ET </b>}{metricLabel(c.metric)} {c.op} {c.value}</span>)}
                   {" "}<b>ALORS</b> {ACTIONS.find((a) => a.key === r.action)?.label}
+                  {r.action === "increase_budget" && <> de {r.budget_pct} % (max ${r.budget_max_usd}/jour)</>}
+                  {r.action === "decrease_budget" && <> de {r.budget_pct} %{r.budget_min_usd ? ` (min $${r.budget_min_usd}/jour)` : ""}</>}
+                  <span className="text-muted-foreground"> · max 1 fois / {r.cooldown_minutes >= 60 ? `${Math.round(r.cooldown_minutes / 60)} h` : `${r.cooldown_minutes} min`}</span>
                 </div>
                 <div className="text-[10px] text-muted-foreground">
                   Dernière vérification : {r.last_run_at ? new Date(r.last_run_at).toLocaleString("fr-FR", { timeZone: "Africa/Casablanca" }) : "jamais"}
@@ -89,6 +93,7 @@ export default async function AdRulesPage() {
                     {l.simulated ? <span className="text-blue-700">🧪 aurait fait : {l.action}</span>
                       : l.success ? <span className="font-semibold text-emerald-700">✅ {l.action}</span>
                       : <span className="text-red-600">❌ {l.error}</span>}
+                    {l.detail && <div className="text-[10px] text-muted-foreground">{l.detail}</div>}
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">
                     {l.metrics ? Object.entries(l.metrics).filter(([, v]) => v !== 0).map(([k, v]) => `${metricLabel(k)} ${fmtVal(k, v)}`).join(" · ") : ""}

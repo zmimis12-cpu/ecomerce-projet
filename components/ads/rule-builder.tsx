@@ -14,6 +14,10 @@ export function RuleBuilder({ products }: { products: { id: string; name: string
   const [action, setAction] = useState<RuleAction>("pause");
   const [simulate, setSimulate] = useState(true);
   const [cooldown, setCooldown] = useState(60);
+  const [budgetPct, setBudgetPct] = useState(20);
+  const [budgetMax, setBudgetMax] = useState(150);
+  const [budgetMin, setBudgetMin] = useState(20);
+  const isBudget = action === "increase_budget" || action === "decrease_budget";
   const [conds, setConds] = useState<RuleCondition[]>([
     { metric: "spend", op: ">=", value: 200 },
     { metric: "orders", op: "<", value: 1 },
@@ -66,9 +70,28 @@ export function RuleBuilder({ products }: { products: { id: string; name: string
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-semibold text-muted-foreground">ALORS</span>
-        <select className={INPUT} value={action} onChange={(e) => setAction(e.target.value as RuleAction)}>
+        <select className={INPUT} value={action} onChange={(e) => {
+          const v = e.target.value as RuleAction; setAction(v);
+          if (v === "increase_budget" || v === "decrease_budget") setCooldown(2880); // 48 h conseillé
+        }}>
           {ACTIONS.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
         </select>
+        {isBudget && (
+          <>
+            <label className="flex items-center gap-1 text-xs">de
+              <input className={INPUT + " w-16"} type="number" min={1} max={100} value={budgetPct} onChange={(e) => setBudgetPct(Number(e.target.value))} /> %
+            </label>
+            {action === "increase_budget" ? (
+              <label className="flex items-center gap-1 text-xs">sans dépasser
+                <input className={INPUT + " w-20"} type="number" min={1} value={budgetMax} onChange={(e) => setBudgetMax(Number(e.target.value))} /> $/jour
+              </label>
+            ) : (
+              <label className="flex items-center gap-1 text-xs">sans descendre sous
+                <input className={INPUT + " w-20"} type="number" min={1} value={budgetMin} onChange={(e) => setBudgetMin(Number(e.target.value))} /> $/jour
+              </label>
+            )}
+          </>
+        )}
         <label className="flex items-center gap-1 text-xs">
           Pas plus d&apos;une fois toutes les
           <input className={INPUT + " w-16"} type="number" min={15} value={cooldown} onChange={(e) => setCooldown(Number(e.target.value))} /> min
@@ -83,7 +106,8 @@ export function RuleBuilder({ products }: { products: { id: string; name: string
         <button disabled={pending}
           className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-50"
           onClick={() => start(async () => {
-            const r = await saveAdRule({ name, level, productId: productId || null, window, conditions: conds, action, simulate, cooldown });
+            const r = await saveAdRule({ name, level, productId: productId || null, window, conditions: conds, action, simulate, cooldown,
+              budgetPct, budgetMaxUsd: budgetMax, budgetMinUsd: budgetMin });
             setMsg(r.success ? { ok: true, text: "Règle enregistrée." } : { ok: false, text: r.error ?? "Erreur" });
             if (r.success) setName("");
           })}>

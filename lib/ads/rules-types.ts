@@ -5,7 +5,7 @@ export type RuleMetric =
 export type RuleOp = ">" | ">=" | "<" | "<=";
 export type RuleCondition = { metric: RuleMetric; op: RuleOp; value: number };
 export type RuleWindow = "today" | "yesterday" | "3d" | "7d";
-export type RuleAction = "pause" | "activate" | "notify";
+export type RuleAction = "pause" | "activate" | "notify" | "increase_budget" | "decrease_budget";
 export type RuleLevel = "product" | "ad";
 
 export const METRICS: { key: RuleMetric; label: string; unit: string }[] = [
@@ -31,6 +31,8 @@ export const WINDOWS: { key: RuleWindow; label: string }[] = [
 export const ACTIONS: { key: RuleAction; label: string }[] = [
   { key: "pause", label: "Mettre en pause" },
   { key: "activate", label: "Réactiver (seulement ce qu'une règle a mis en pause)" },
+  { key: "increase_budget", label: "📈 Augmenter le budget (scaling)" },
+  { key: "decrease_budget", label: "📉 Baisser le budget" },
   { key: "notify", label: "Juste noter dans le journal" },
 ];
 

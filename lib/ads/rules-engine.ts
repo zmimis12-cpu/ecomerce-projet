@@ -17,7 +17,9 @@ type Rule = {
   id: string; name: string; enabled: boolean; simulate: boolean; level: RuleLevel;
   product_id: string | null; time_window: RuleWindow; conditions: RuleCondition[];
   action: RuleAction; cooldown_minutes: number;
+  budget_pct: number | null; budget_max_usd: number | null; budget_min_usd: number | null;
 };
+type BudgetTarget = { id: string; name: string; dailyCents: number; status: string };
 type Metrics = Record<RuleMetric, number>;
 
 function casaDay(offset = 0) {
@@ -143,6 +145,47 @@ async function pausedByRule(objectId: string) {
   return last?.action === "pause";
 }
 
+/**
+ * Scaling : change le budget QUOTIDIEN (campagne si budget campagne, sinon
+ * chaque ensemble actif). Hausse plafonnée par budget_max_usd, baisse limitée
+ * par budget_min_usd. Une seule modif par objet pendant le délai de la règle.
+ */
+async function changeBudget(rule: Rule, targets: BudgetTarget[], m: Metrics, productId: string | null, token: string) {
+  const pct = Math.max(1, Math.min(100, Number(rule.budget_pct ?? 20))) / 100;
+  const up = rule.action === "increase_budget";
+  let done = 0;
+  for (const t of targets) {
+    if (t.status !== "ACTIVE" || !t.dailyCents) continue;
+    if (await inCooldown(rule, t.id)) continue;
+    const cur = t.dailyCents / 100;
+    let next = up ? cur * (1 + pct) : cur * (1 - pct);
+    if (up && rule.budget_max_usd) next = Math.min(next, Number(rule.budget_max_usd));
+    if (!up && rule.budget_min_usd) next = Math.max(next, Number(rule.budget_min_usd));
+    next = Math.max(1, Math.round(next * 100) / 100);
+    if (Math.abs(next - cur) < 0.5) continue; // déjà au plafond / plancher
+    let success = true, error: string | null = null;
+    if (!rule.simulate) {
+      try {
+        const res = await fetch(`${META}/${t.id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ daily_budget: String(Math.round(next * 100)), access_token: token }).toString(),
+        });
+        const json = await res.json();
+        if (!res.ok || json.error) throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
+      } catch (e) { success = false; error = e instanceof Error ? e.message : String(e); }
+    }
+    const clean = Object.fromEntries(Object.entries(m).map(([k, v]) => [k, Number.isFinite(v) ? Math.round(v * 100) / 100 : null]));
+    await supabaseAdmin.from("ad_rule_logs" as never).insert({
+      rule_id: rule.id, rule_name: rule.name, level: rule.level, object_id: t.id, object_name: t.name,
+      product_id: productId, action: rule.action, simulated: rule.simulate, success, error, metrics: clean,
+      detail: `Budget quotidien $${cur.toFixed(2)} → $${next.toFixed(2)} (${up ? "+" : "-"}${Math.round(pct * 100)} %)`,
+    } as never);
+    done++;
+  }
+  return done;
+}
+
 async function act(rule: Rule, obj: { id: string; name: string; status: string; productId: string | null }, m: Metrics, token: string) {
   const want = rule.action === "pause" ? "PAUSED" : rule.action === "activate" ? "ACTIVE" : null;
   if (want === "PAUSED" && obj.status !== "ACTIVE") return null;
@@ -170,8 +213,19 @@ export async function runAdRules() {
   const acc = s.account_id.startsWith("act_") ? s.account_id : `act_${s.account_id}`;
   const { rate } = await getUsdToMad();
 
-  const campaigns = (await metaGet(`${acc}/campaigns`, { fields: "id,name,effective_status", limit: "500" }, s.access_token))
-    .map((c) => ({ id: String(c.id), name: String(c.name), status: String(c.effective_status) }));
+  const campaigns = (await metaGet(`${acc}/campaigns`, { fields: "id,name,effective_status,daily_budget", limit: "500" }, s.access_token))
+    .map((c) => ({ id: String(c.id), name: String(c.name), status: String(c.effective_status), dailyCents: Number(c.daily_budget ?? 0) }));
+  const needAdsets = rules.some((r) => r.action === "increase_budget" || r.action === "decrease_budget");
+  const adsets = needAdsets
+    ? (await metaGet(`${acc}/adsets`, { fields: "id,name,campaign_id,daily_budget,effective_status", limit: "500" }, s.access_token))
+        .map((a) => ({ id: String(a.id), name: String(a.name), campaignId: String(a.campaign_id), status: String(a.effective_status), dailyCents: Number(a.daily_budget ?? 0) }))
+    : [];
+  const budgetTargetsForCampaign = (c: { id: string; name: string; status: string; dailyCents: number }): BudgetTarget[] =>
+    c.dailyCents > 0
+      ? [{ id: c.id, name: `Campagne « ${c.name} »`, dailyCents: c.dailyCents, status: c.status }]
+      : adsets.filter((a) => a.campaignId === c.id && a.dailyCents > 0)
+          .map((a) => ({ id: a.id, name: `Ensemble « ${a.name} »`, dailyCents: a.dailyCents, status: a.status }));
+  const isBudget = (r: Rule) => r.action === "increase_budget" || r.action === "decrease_budget";
   const campProduct = await campaignProductMap(campaigns);
   const { data: links } = await supabaseAdmin.from("creative_ads" as never).select("ad_id, creative_id").eq("platform", "meta");
   const adCreative = new Map(((links ?? []) as { ad_id: string; creative_id: string }[]).map((l) => [l.ad_id, l.creative_id]));
@@ -186,7 +240,7 @@ export async function runAdRules() {
         const tr = JSON.stringify(range);
         const [camp, ads, orders] = await Promise.all([
           metaGet(`${acc}/insights`, { level: "campaign", fields: "campaign_id,spend,impressions,inline_link_clicks,frequency,actions", time_range: tr, limit: "500" }, s.access_token),
-          metaGet(`${acc}/insights`, { level: "ad", fields: "ad_id,ad_name,campaign_id,spend,impressions,inline_link_clicks,frequency,actions", time_range: tr, limit: "500" }, s.access_token),
+          metaGet(`${acc}/insights`, { level: "ad", fields: "ad_id,ad_name,adset_id,campaign_id,spend,impressions,inline_link_clicks,frequency,actions", time_range: tr, limit: "500" }, s.access_token),
           ordersInWindow(range),
         ]);
         cache.set(rule.time_window, { camp, ads, orders });
@@ -212,6 +266,10 @@ export async function runAdRules() {
           }, clicks);
           if (!conds.every((c) => check(c, m))) continue;
           for (const c of myCamps) {
+            if (isBudget(rule)) {
+              actions += await changeBudget(rule, budgetTargetsForCampaign(c), m, pid, s.access_token);
+              continue;
+            }
             const done = await act(rule, { id: c.id, name: `Campagne « ${c.name} »`, status: c.status, productId: pid }, m, s.access_token);
             if (done) actions++;
           }
@@ -230,6 +288,16 @@ export async function runAdRules() {
             meta_results: leadsOf(x.actions), impressions: Number(x.impressions ?? 0), frequency: Number(x.frequency ?? 0),
           }, Number(x.inline_link_clicks ?? 0));
           if (!conds.every((c) => check(c, m))) continue;
+          if (isBudget(rule)) {
+            // Niveau pub : le budget est porté par son ensemble (ou sa campagne en CBO)
+            const camp = campaigns.find((c) => c.id === String(x.campaign_id));
+            const targets = camp && camp.dailyCents > 0
+              ? budgetTargetsForCampaign(camp)
+              : adsets.filter((a) => a.id === String(x.adset_id) && a.dailyCents > 0)
+                  .map((a) => ({ id: a.id, name: `Ensemble « ${a.name} »`, dailyCents: a.dailyCents, status: a.status }));
+            actions += await changeBudget(rule, targets, m, pid, s.access_token);
+            continue;
+          }
           const done = await act(rule, { id: adId, name: `Pub « ${x.ad_name} »`, status: statuses.get(adId) ?? "", productId: pid }, m, s.access_token);
           if (done) actions++;
         }
