@@ -12,7 +12,7 @@ export async function getProductEconomics(productId: string): Promise<Result<{ e
   try {
     const eco = await productEconomics(productId);
     const { data: p } = await supabaseAdmin.from("products").select("name").eq("id", productId).single();
-    return { success: true, data: { eco, texts: textSuggestions((p as unknown as { name: string }).name, eco.price) } };
+    return { success: true, data: { eco, texts: textSuggestions((p as unknown as { name: string }).name, eco.price, eco.offer) } };
   } catch (e) { return { success: false, error: e instanceof Error ? e.message : String(e) }; }
 }
 

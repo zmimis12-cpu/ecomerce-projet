@@ -9,6 +9,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { readSettings } from "./sync-core";
 import { getUsdToMad } from "./fx";
+import { normalizeOffers, defaultLabel, type Offer } from "@/lib/landing-pages/offers";
 
 const META = "https://graph.facebook.com/v21.0";
 const BUCKET = "ad-media";
@@ -75,6 +76,7 @@ export async function getMetaIdentity() {
 }
 
 export type Economics = {
+  offer: { qty: number; price: number; label: string; slug: string | null } ;
   price: number; goodsCost: number; deliveryFee: number; marginPerDelivered: number;
   confirmRate: number; deliveryRate: number; ordersToDelivered: number;
   breakEvenCpoMad: number; targetCpoMad: number; suggestedBudgetUsd: number; fxRate: number; history: number;
@@ -88,6 +90,7 @@ export async function productEconomics(productId: string): Promise<Economics> {
     getUsdToMad(),
   ]);
   const prod = p as unknown as { sale_price_mad: number; total_cost_mad: number; ads_cost_mad: number | null; confirmation_cost_mad: number | null; shipping_cost_mad: number | null };
+  const offer = await mainOffer(productId, Number(prod.sale_price_mad ?? 0));
   const goodsCost = (prod.total_cost_mad ?? 0) - (prod.ads_cost_mad ?? 0) - (prod.confirmation_cost_mad ?? 0) - (prod.shipping_cost_mad ?? 0);
   const ids = ((items ?? []) as { order_id: string }[]).map((i) => i.order_id);
   let all = 0, shipped = 0, delivered = 0, closed = 0, fees = 0, feeN = 0;
@@ -106,23 +109,43 @@ export async function productEconomics(productId: string): Promise<Economics> {
   const confirmRate = all >= 10 ? shipped / all : 0.6;
   const deliveryRate = closed >= 10 ? delivered / closed : 0.8;
   const deliveryFee = feeN ? fees / feeN : 35;
-  const price = Number(prod.sale_price_mad ?? 0);
-  const marginPerDelivered = price - goodsCost - deliveryFee;
+  // L'économie se calcule sur l'OFFRE principale de la landing page
+  // (ex : 4 pièces à 299), pas sur le prix d'une pièce.
+  const price = offer.price;
+  const marginPerDelivered = price - goodsCost * offer.qty - deliveryFee;
   const ordersToDelivered = confirmRate * deliveryRate;
   const breakEvenCpoMad = Math.max(0, marginPerDelivered * ordersToDelivered);
   const targetCpoMad = Math.round(breakEvenCpoMad * 0.8);
   // Budget de test : ~3 commandes/jour au coût cible, minimum 10 $
   const suggestedBudgetUsd = Math.max(10, Math.round((targetCpoMad * 3) / fx.rate));
   return {
-    price, goodsCost: Math.round(goodsCost), deliveryFee: Math.round(deliveryFee), marginPerDelivered: Math.round(marginPerDelivered),
+    offer, price, goodsCost: Math.round(goodsCost * offer.qty), deliveryFee: Math.round(deliveryFee), marginPerDelivered: Math.round(marginPerDelivered),
     confirmRate, deliveryRate, ordersToDelivered, breakEvenCpoMad: Math.round(breakEvenCpoMad), targetCpoMad,
     suggestedBudgetUsd, fxRate: fx.rate, history: all,
   };
 }
 
-/** Textes de départ (arabe / darija), à modifier librement. */
-export function textSuggestions(name: string, price: number) {
+/** Offre principale de la LP du produit (celle présélectionnée, sinon la 1re). */
+export async function mainOffer(productId: string, unitPrice: number) {
+  const { data } = await supabaseAdmin.from("landing_pages" as never)
+    .select("slug, offers, bundle_1_price, bundle_2_price, bundle_3_price, is_active")
+    .eq("product_id", productId).order("is_active", { ascending: false }).limit(1).maybeSingle();
+  const lp = data as { slug: string; offers: unknown; bundle_1_price: number | null; bundle_2_price: number | null; bundle_3_price: number | null } | null;
+  const offers: Offer[] = normalizeOffers(lp?.offers, { price: unitPrice, b1: lp?.bundle_1_price, b2: lp?.bundle_2_price, b3: lp?.bundle_3_price });
+  const o = offers.find((x) => x.isDefault) ?? offers[0];
+  return { qty: o.qty, price: o.price, label: o.label || defaultLabel(o.qty), slug: lp?.slug ?? null };
+}
+
+/** Textes de départ (arabe / darija) basés sur l'OFFRE, à modifier librement. */
+export function textSuggestions(name: string, price: number, offer?: { qty: number; label: string }) {
   const p = Math.round(price);
+  if (offer && offer.qty > 1) {
+    return [
+      { headline: `${offer.label} — ${p} درهم`, primary: `🔥 عرض خاص على ${name}!\n🎁 ${offer.label} بـ ${p} درهم فقط\n✅ الدفع عند الاستلام\n🚚 توصيل سريع لجميع مدن المغرب\n⏳ العرض محدود — اطلب دابا 👇` },
+      { headline: `${offer.qty} قطع بـ ${p} درهم فقط`, primary: `واش بغيتي ${name} ليك ولعائلتك؟ 😍\n👉 ${offer.label} غير بـ ${p} درهم\n📦 خلّص ملي توصلك السلعة\n🇲🇦 التوصيل لجميع المدن\nالكمية محدودة 👇` },
+      { headline: `عرض محدود: ${offer.label}`, primary: `⭐ ${name} — أحسن هدية\n🔥 ${offer.label} بـ ${p} درهم\n✔️ الدفع عند الاستلام\n✔️ التوصيل فـ 24-72 ساعة\n🎁 كليكي على "اطلب الآن" قبل ما يسالي العرض` },
+    ];
+  }
   return [
     { headline: `${name} — ${p} درهم فقط`, primary: `🔥 ${name} وصل!\n✅ الدفع عند الاستلام\n🚚 توصيل سريع لجميع مدن المغرب\n💰 الثمن: ${p} درهم فقط\n👇 اطلب دابا قبل ما يسالي الستوك` },
     { headline: `اطلب دابا — الدفع عند الاستلام`, primary: `واش كتقلب على ${name} بثمن مناسب؟ 🤔\nجودة عالية وضمان 💯\n📦 خلّص غير ملي توصلك السلعة\n🇲🇦 التوصيل لجميع المدن\nالكمية محدودة — اطلب دابا 👇` },

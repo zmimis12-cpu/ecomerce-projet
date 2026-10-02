@@ -51,9 +51,13 @@ export function NewLaunchForm({ products }: { products: { id: string; name: stri
 
       {eco && (
         <div className="grid gap-3 rounded-lg border bg-muted/30 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <div className="sm:col-span-2 lg:col-span-4 rounded-md bg-white p-2 text-xs">
+            🎁 Offre utilisée (celle présélectionnée sur ta landing page) : <b>{eco.offer.label}</b> à <b>{eco.offer.price} MAD</b>
+            {eco.offer.qty > 1 && <> — {eco.offer.qty} pièces</>}. Pour changer d&apos;offre : Landing Pages → Offres.
+          </div>
           <div><div className="text-xs text-muted-foreground">Marge par livraison</div>
             <div className="font-semibold">{eco.marginPerDelivered} MAD</div>
-            <div className="text-[10px] text-muted-foreground">{eco.price} − {eco.goodsCost} achat − {eco.deliveryFee} livraison</div></div>
+            <div className="text-[10px] text-muted-foreground">{eco.price} − {eco.goodsCost} achat ({eco.offer.qty} pc) − {eco.deliveryFee} livraison</div></div>
           <div><div className="text-xs text-muted-foreground">Confirmation × livraison</div>
             <div className="font-semibold">{pct(eco.confirmRate)} × {pct(eco.deliveryRate)} = {pct(eco.ordersToDelivered)}</div>
             <div className="text-[10px] text-muted-foreground">{eco.history >= 10 ? `sur ${eco.history} commandes réelles` : "valeurs par défaut (peu d'historique)"}</div></div>

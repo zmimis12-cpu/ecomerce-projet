@@ -39,7 +39,7 @@ export default async function LaunchPage({ params }: { params: Promise<{ id: str
   }[];
   const creatives = (cr ?? []) as { id: string; code: string; title: string }[];
   const productName = (prod as { name: string } | null)?.name ?? "Produit";
-  const texts = textSuggestions(productName, eco.price);
+  const texts = textSuggestions(productName, eco.price, eco.offer);
   const created = items.filter((i) => i.status === "created").length;
   const publicUrl = (p: string) => supabaseAdmin.storage.from("ad-media").getPublicUrl(p).data.publicUrl;
 
@@ -63,6 +63,7 @@ export default async function LaunchPage({ params }: { params: Promise<{ id: str
           {launch.error && <p className="mt-1 text-sm text-red-600">{launch.error}</p>}
         </div>
         <div className="rounded-lg border bg-muted/30 p-3 text-xs">
+          <div>Offre de la landing page : <b>{eco.offer.label}</b> à <b>{eco.offer.price} MAD</b>{eco.offer.slug && <> (/lp/{eco.offer.slug})</>}</div>
           <div>Coût / commande max rentable : <b className="text-red-700">{eco.breakEvenCpoMad} MAD</b></div>
           <div>Objectif : <b>{eco.targetCpoMad} MAD</b> · Marge / livraison : <b>{eco.marginPerDelivered} MAD</b></div>
           <div className="mt-1 text-muted-foreground">Les règles auto du produit (protection + scaling) s&apos;appliquent à cette campagne.</div>
