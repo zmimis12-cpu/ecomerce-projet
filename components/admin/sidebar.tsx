@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, PhoneCall,
   Truck, Layers, FileSpreadsheet, FileText, FolderOpen,
   ScanLine, RotateCcw, BarChart3, Globe, Settings,
-  Shield, Phone, Award, Users, ListOrdered, CreditCard, Clapperboard, PackageCheck, Wallet,
+  Shield, Phone, Award, Users, ListOrdered, CreditCard, Clapperboard, PackageCheck, Wallet, Rocket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/lib/settings/users-constants";
@@ -65,6 +65,7 @@ const ADMIN_NAV: NavGroup[] = [
     items: [
       { href: "/admin/settings/delivery-providers", label: "Transporteurs", icon: Truck },
       { href: "/admin/settings/ads",  label: "Publicité",   icon: BarChart3 },
+      { href: "/admin/ads/launch",    label: "Lancer campagne", icon: Rocket },
       { href: "/admin/ads/stats",     label: "Stats pubs",  icon: BarChart3 },
       { href: "/admin/ads/rules",     label: "Règles auto pub", icon: Shield },
       { href: "/admin/settings/whatsapp", label: "WhatsApp", icon: PhoneCall },

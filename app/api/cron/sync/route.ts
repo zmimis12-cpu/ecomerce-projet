@@ -14,6 +14,7 @@ import { syncCreativeStatuses } from "@/lib/ads/meta-status";
 import { snapshotEditorEarnings } from "@/lib/creatives/rates";
 import { runAdRules } from "@/lib/ads/rules-engine";
 import { reportDeliveredToMeta, syncBuyersAudience } from "@/lib/meta/reporting";
+import { continuePendingLaunches } from "@/lib/ads/launcher";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -66,6 +67,8 @@ export async function GET(req: NextRequest) {
     result.creativeStatuses = await safe(() => syncCreativeStatuses());
     // Règles automatiques (protection contre les pertes)
     result.adRules = await safe(() => runAdRules());
+    // Lancements en attente (vidéos en cours de traitement chez Meta)
+    result.launches = await safe(() => continuePendingLaunches());
 
     if (backfill && result.metaSpend === "ok") {
       await supabaseAdmin.from("app_settings")
