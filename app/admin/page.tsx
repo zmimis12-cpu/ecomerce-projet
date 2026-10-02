@@ -186,7 +186,10 @@ export default async function AdminDashboardPage({
                 sub="Profit Réel (avant pub) − Pub réelle − Call Center − Éditeurs" />
               <KpiCard label="Profit en attente" value={mad((summary as {pending_profit?:number}).pending_profit ?? 0)}
                 icon={Truck} variant="amber"
-                sub={`${(summary as {pending_orders_count?:number}).pending_orders_count ?? 0} commandes livrées non payées / en transit — pub déjà dépensée, argent pas encore reçu`} />
+                sub={`${(summary as {pending_orders_count?:number}).pending_orders_count ?? 0} commandes LIVRÉES pas encore payées par Digylog — argent sûr, en attente de virement`} />
+              <KpiCard label="En transit (non compté)" value={mad((summary as {transit_margin?:number}).transit_margin ?? 0)}
+                icon={Truck} variant="default"
+                sub={`${(summary as {transit_count?:number}).transit_count ?? 0} commandes encore en route — pas comptées tant qu'elles ne sont pas livrées`} />
               <KpiCard label="Pertes Retours"  value={mad(summary.total_return_losses)}
                 icon={RotateCcw} variant="red" />
             </div>

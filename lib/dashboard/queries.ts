@@ -42,6 +42,8 @@ export interface DashboardSummary {
   pending_profit:         number;  // marge des commandes livrées non payées + en transit (pas encore encaissée)
   pending_orders_count:   number;
   total_editor_cost:      number;  // gains éditeurs vidéo sur commandes payées
+  transit_margin:         number;  // info : marge possible des commandes en transit (NON comptée)
+  transit_count:          number;
   confirmation_rate:      number;  // Confirmés / Leads
   cancellation_rate:      number;  // Annulés après confirmation / Confirmés
   shipping_rate:          number;  // Expédiés / Confirmés
@@ -417,15 +419,19 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   // avant, la pub et la confirmation étaient comptées DEUX fois.
   // On rajoute donc la part estimée avant de soustraire le réel.
   const paidIds    = activeRows.filter((r) => r.is_paid).map((r) => r.id);
-  const pendingRows = activeRows.filter((r) =>
-    !r.is_paid && (r.status === "delivered" || r.status === "in_transit" || r.status === "sent_to_delivery"));
+  // Profit en attente = UNIQUEMENT les commandes LIVRÉES pas encore payées
+  // (argent réellement gagné, en attente de virement Digylog).
+  // Les commandes en transit ne sont PAS comptées : on ne sait pas si elles seront livrées.
+  const pendingRows = activeRows.filter((r) => !r.is_paid && r.status === "delivered");
+  const transitRows = activeRows.filter((r) =>
+    !r.is_paid && (r.status === "in_transit" || r.status === "sent_to_delivery"));
   const pendingIds = pendingRows.map((r) => r.id);
   // Marge RÉELLE de chaque commande, recalculée depuis le coût d'ACHAT :
   //   vente − (achat + emballage) × quantité − vrai frais de livraison Digylog
   // On n'utilise PAS cogs_total : selon la date de la commande il contient
   // (ou pas) une pub estimée, une confirmation et une livraison forfaitaire →
   // rajouter/retirer ces parts donnait un résultat faux sur les anciennes commandes.
-  const idsForItems = [...paidIds, ...pendingIds];
+  const idsForItems = [...paidIds, ...pendingIds, ...transitRows.map((r) => r.id)];
   const goodsCost = new Map<string, number>(); // order_id → (achat + emballage) × qté
   if (idsForItems.length) {
     const { data: prodCosts } = await supabaseAdmin
@@ -464,6 +470,9 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
 
   // Marge pas encore encaissée (la pub de ces commandes est déjà dépensée)
   const pending_profit = Math.round(pendingRows.reduce((s, r) => s + orderMargin(r), 0) * 100) / 100;
+  // Info seulement (pas compté) : marge possible des commandes encore en route
+  const transit_margin = Math.round(transitRows.reduce((s, r) => s + orderMargin(r), 0) * 100) / 100;
+  const transit_count = transitRows.length;
   const pending_orders_count = pendingRows.length;
 
   return {
@@ -476,6 +485,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     self_delivery_count, self_delivery_revenue, digylog_count,
     total_call_center_cost, total_other_expenses, true_final_profit,
     real_profit_before_ads, pending_profit, pending_orders_count, total_editor_cost,
+    transit_margin, transit_count,
     confirmation_rate, cancellation_rate, shipping_rate, delivery_rate, return_rate,
     total_delivery_margin, total_delivery_overcharge, casa_orders_count,
     net_margin_pct, roi,
