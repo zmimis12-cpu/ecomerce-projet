@@ -43,6 +43,8 @@ export function MetaLiveSection({
   const ads = live.ok ? live.ads : [];
   const [q, setQ] = useState("");
   const [campaign, setCampaign] = useState("");
+  const [account, setAccount] = useState("");
+  const accountNames = useMemo(() => [...new Set(ads.map((a) => a.accountLabel).filter(Boolean))] as string[], [ads]);
   const [adset, setAdset] = useState("");
   const [delivery, setDelivery] = useState<"all" | "live" | "off" | "issues">("all");
   const [video, setVideo] = useState<"all" | "linked" | "unlinked">("all");
@@ -63,6 +65,7 @@ export function MetaLiveSection({
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
     const list = ads.filter((a) => {
+      if (account && a.accountLabel !== account) return false;
       if (campaign && a.campaignId !== campaign) return false;
       if (adset && a.adsetId !== adset) return false;
       if (onlySpend && a.spendUsd === 0 && a.impressions === 0) return false;
@@ -88,7 +91,7 @@ export function MetaLiveSection({
         default: return y.spendUsd - x.spendUsd;
       }
     });
-  }, [ads, q, campaign, adset, delivery, video, onlySpend, sort, codeByAd]);
+  }, [ads, q, account, campaign, adset, delivery, video, onlySpend, sort, codeByAd]);
 
   const sum = (list: MetaLiveAd[]) => {
     const spend = list.reduce((s, a) => s + a.spendUsd, 0);
@@ -149,6 +152,12 @@ export function MetaLiveSection({
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <input className={SEL + " w-56 pl-8"} placeholder="Rechercher pub, ensemble, V001…" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
+          {accountNames.length > 1 && (
+            <select className={SEL} value={account} onChange={(e) => { setAccount(e.target.value); setCampaign(""); setAdset(""); }}>
+              <option value="">Tous les comptes Meta</option>
+              {accountNames.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          )}
           <select className={SEL} value={campaign} onChange={(e) => { setCampaign(e.target.value); setAdset(""); }}>
             <option value="">Toutes les campagnes</option>
             {campaigns.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
@@ -224,7 +233,7 @@ export function MetaLiveSection({
                       {!isClosed && g.items.map((a) => (
                         <tr key={a.id} className="border-t hover:bg-muted/30">
                           <td className="px-3 py-2 font-mono font-semibold">{codeByAd[a.id] || "—"}</td>
-                          <td className="px-3 py-2 font-medium">{a.name}</td>
+                          <td className="px-3 py-2 font-medium">{a.name}{accountNames.length > 1 && a.accountLabel && <div className="text-[10px] font-normal text-muted-foreground">{a.accountLabel}</div>}</td>
                           <td className="px-3 py-2"><span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${TONE[a.delivery.tone]}`}>{a.delivery.label}</span></td>
                           <td className="px-3 py-2 text-right">
                             <div className="font-semibold">{a.results ?? "—"}</div>

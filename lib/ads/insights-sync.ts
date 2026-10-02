@@ -6,7 +6,7 @@
  */
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { readSettings } from "./sync-core";
-import { getUsdToMad } from "./fx";
+import { getUsdToMad, getMetaTaxConfig, taxFactorFor } from "./fx";
 
 const META_BASE = "https://graph.facebook.com/v21.0";
 const TIKTOK_BASE = "https://business-api.tiktok.com/open_api/v1.3";
@@ -84,11 +84,25 @@ async function autoLink(rows: Row[]) {
 }
 
 export async function syncMetaAdInsights(since: string, until: string) {
-  const s = await readSettings("meta");
-  if (!s?.is_active || !s.access_token || !s.account_id) return { ok: false, error: "Meta non configuré" };
-  const acc = s.account_id.startsWith("act_") ? s.account_id : `act_${s.account_id}`;
-  const { rate: usdToMad } = await getUsdToMad();
+  // Multi-comptes : chaque compte Meta actif est synchronisé
+  const { activeMetaAccounts, adAccountMap, saveAdAccountMap, act } = await import("./meta-accounts");
+  const accounts = await activeMetaAccounts();
+  if (!accounts.length) return { ok: false, error: "Meta non configuré" };
+  const map = await adAccountMap();
+  const out: unknown[] = [];
+  for (const a of accounts) {
+    const r = await syncMetaAdInsightsFor(act(a), a.token, since, until);
+    out.push({ account: a.label, ...r });
+    for (const id of ((r as { adIds?: string[] }).adIds ?? [])) map[id] = a.key;
+  }
+  await saveAdAccountMap(map);
+  return { ok: true, accounts: out };
+}
 
+async function syncMetaAdInsightsFor(acc: string, token: string, since: string, until: string) {
+  const s = { access_token: token };
+  const { base: usdToMad } = await getUsdToMad();
+  const taxCfg = await getMetaTaxConfig();
   const url = new URL(`${META_BASE}/${acc}/insights`);
   url.searchParams.set("level", "ad");
   url.searchParams.set("time_increment", "1");
@@ -122,7 +136,7 @@ export async function syncMetaAdInsights(since: string, until: string) {
         initiate_checkouts: actionValue(actions, ["initiate_checkout", "offsite_conversion.fb_pixel_initiate_checkout"]),
         video_plays: actionValue(actions, ["video_view"]),
         thruplays: actionValue(r.video_thruplay_watched_actions as { action_type: string; value: string }[] | undefined, ["video_view"]),
-        spend_mad: Math.round(Number(r.spend ?? 0) * usdToMad * 100) / 100,
+        spend_mad: Math.round(Number(r.spend ?? 0) * usdToMad * taxFactorFor(String(r.date_start), taxCfg) * 100) / 100,
         updated_at: now,
       });
     }
@@ -131,7 +145,7 @@ export async function syncMetaAdInsights(since: string, until: string) {
   await upsertRows(rows);
   const linked = await autoLink(rows);
   const meta = await syncMetaAdMeta(acc, s.access_token).catch((e) => ({ ok: false, error: String(e) }));
-  return { ok: true, rows: rows.length, linked, meta };
+  return { ok: true, rows: rows.length, linked, meta, adIds: [...new Set(rows.map((r) => r.ad_id))] };
 }
 
 /** Portée, fréquence, classements Meta (depuis le début) + statut de diffusion. */

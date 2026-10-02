@@ -12,6 +12,12 @@ import { getUsdToMad } from "./fx";
 type Settings = { access_token: string; account_id: string; is_active: boolean };
 
 export async function readSettings(platform: "meta" | "tiktok"): Promise<Settings | null> {
+  if (platform === "meta") {
+    // Multi-comptes : renvoie le compte PRINCIPAL (Lanceur, audience…)
+    const { primaryMetaAccount } = await import("./meta-accounts");
+    const p = await primaryMetaAccount();
+    if (p) return { access_token: p.token, account_id: p.adAccountId!, is_active: true };
+  }
   const { data } = await supabaseAdmin
     .from("ad_platform_settings")
     .select("access_token, account_id, is_active")
@@ -22,13 +28,24 @@ export async function readSettings(platform: "meta" | "tiktok"): Promise<Setting
 
 async function syncMetaAdSpendOneRange(dateFrom: string, dateTo: string) {
 
-  const settings = await readSettings("meta");
-  if (!settings || !settings.is_active) {
+  // Multi-comptes : les campagnes de TOUS les comptes Meta actifs sont additionnées
+  const { activeMetaAccounts } = await import("./meta-accounts");
+  const accounts = await activeMetaAccounts();
+  if (!accounts.length) {
     return { ok: false as const, error: "Intégration Meta Ads non configurée." };
   }
-
-  const client = new MetaAdsClient(settings.access_token, settings.account_id);
-  const result = await client.getCampaignSpend(dateFrom, dateTo);
+  const merged: { campaign_id: string; campaign_name: string; spend: number }[] = [];
+  const errs: string[] = [];
+  for (const a of accounts) {
+    const client = new MetaAdsClient(a.token, a.adAccountId!);
+    const r = await client.getCampaignSpend(dateFrom, dateTo);
+    if (r.ok) merged.push(...(r.campaigns as { campaign_id: string; campaign_name: string; spend: number }[]));
+    else errs.push(`${a.label}: ${r.error}`);
+  }
+  // Si un compte échoue, on n'écrase PAS les chiffres déjà enregistrés (sinon sous-estimation)
+  const result = errs.length
+    ? { ok: false as const, error: errs.join(" | ") }
+    : { ok: true as const, campaigns: merged };
 
   if (!result.ok) {
     await supabaseAdmin.from("ad_platform_settings").update({
@@ -87,7 +104,7 @@ async function syncMetaAdSpendOneRange(dateFrom: string, dateTo: string) {
   const unmatchedSpendUsd = unmatchedCampaigns.reduce((s, c) => s + c.spend, 0);
 
   // Taux USD→MAD réel du jour (marché + frais bancaires éventuels)
-  const { rate: USD_TO_MAD } = await getUsdToMad();
+  const { rate: USD_TO_MAD } = await getUsdToMad(dateFrom); // taxe Meta incluse si applicable ce jour-là
 
   const rowsToUpsert = [...spendByProduct.entries()].map(([product_id, { spend, campaign_names }]) => ({
     product_id,

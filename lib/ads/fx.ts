@@ -21,7 +21,32 @@ async function writeSetting(key: string, value: number, label: string) {
   } as never, { onConflict: "key" });
 }
 
-export async function getUsdToMad(): Promise<{ rate: number; market: number; feePct: number; source: string }> {
+/** TVA / taxe facturée par Meta (non visible dans l'API) : saisie par toi. */
+export async function getMetaTaxConfig(): Promise<{ pct: number; since: string | null }> {
+  const [p, d] = await Promise.all([readSetting("meta_tax_pct"), readSetting("meta_tax_since")]);
+  const pct = Number(p?.value ?? 0) || 0;
+  const since = d?.value ? String(d.value).slice(0, 10) : null;
+  return { pct, since };
+}
+
+export function taxFactorFor(day: string | null | undefined, cfg: { pct: number; since: string | null }) {
+  if (!cfg.pct) return 1;
+  const d = (day ?? new Date().toISOString()).slice(0, 10);
+  return !cfg.since || d >= cfg.since ? 1 + cfg.pct / 100 : 1;
+}
+
+/**
+ * Taux USD → MAD appliqué à la pub = marché × (1 + frais banque) × (1 + taxe Meta).
+ * `day` (YYYY-MM-DD) : la taxe ne s'applique qu'à partir de sa date de début.
+ */
+export async function getUsdToMad(day?: string): Promise<{ rate: number; base: number; market: number; feePct: number; taxPct: number; source: string }> {
+  const r = await getUsdToMadBase();
+  const tax = await getMetaTaxConfig();
+  const f = taxFactorFor(day, tax);
+  return { ...r, base: r.rate, rate: Math.round(r.rate * f * 10000) / 10000, taxPct: f > 1 ? tax.pct : 0 };
+}
+
+async function getUsdToMadBase(): Promise<{ rate: number; market: number; feePct: number; source: string }> {
   const [cached, fee] = await Promise.all([readSetting(CACHE_KEY), readSetting("meta_bank_fee_pct")]);
   const feePct = Number(fee?.value ?? 0) || 0;
 

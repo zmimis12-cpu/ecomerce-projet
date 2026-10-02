@@ -6,6 +6,8 @@ import { AdsSettingsForm } from "@/components/ads-integration/ads-settings-form"
 import { CampaignAssignment } from "@/components/ads-integration/campaign-assignment";
 import { ManualAdSpendForm } from "@/components/ads-integration/manual-ad-spend-form";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getMetaAccounts } from "@/lib/ads/meta-accounts";
+import { MetaAccountsManager } from "@/components/ads-integration/meta-accounts-manager";
 
 export const metadata: Metadata = { title: "Paramètres Publicité" };
 export const dynamic = "force-dynamic";
@@ -20,6 +22,8 @@ export default async function AdsSettingsPage() {
     supabaseAdmin.from("products").select("id, name, sku").order("name"),
     listManualAdSpend(),
   ]);
+  // Jamais de token renvoyé au navigateur
+  const metaAccounts = (await getMetaAccounts()).map(({ token: _t, ...a }) => { void _t; return a; });
 
   const products = (productsData.data ?? []) as { id: string; name: string; sku: string }[];
 
@@ -31,6 +35,14 @@ export default async function AdsSettingsPage() {
           Connectez vos comptes publicitaires. Assignez chaque campagne à un produit pour un calcul exact des dépenses.
         </p>
       </div>
+
+      <section className="rounded-xl border bg-card p-4">
+        <h2 className="mb-1 font-semibold">Comptes Meta (plusieurs comptes)</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Synchro, stats, règles automatiques et taxe couvrent TOUS les comptes actifs. Le compte principal sert au Lanceur et à l&apos;audience Acheteurs.
+        </p>
+        <MetaAccountsManager accounts={metaAccounts} />
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <AdsSettingsForm platform="meta"   settings={metaSettings}   />

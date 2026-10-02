@@ -48,6 +48,10 @@ export async function reportDeliveredToMeta() {
   if (!orders.length) return { ok: true, sent: 0, failed: 0 };
 
   const pixel = await defaultPixel();
+  // Multi-comptes : le token dont le compte possède le pixel de la commande
+  const { getMetaAccounts } = await import("@/lib/ads/meta-accounts");
+  const accs = (await getMetaAccounts()).filter((x) => x.isActive && x.token);
+  const tokenFor = (pixelId: string) => accs.find((x) => x.pixelId === pixelId)?.token ?? s.access_token;
   const ids = orders.map((o) => o.id);
   const { data: items } = await supabaseAdmin.from("order_items").select("order_id, product_id").in("order_id", ids);
   const productsOf = new Map<string, string[]>();
@@ -57,28 +61,33 @@ export async function reportDeliveredToMeta() {
 
   let sent = 0, failed = 0;
   for (const o of orders) {
-    const pixelId = o.meta_pixel_id ?? pixel;
-    if (!pixelId) { failed++; continue; }
+    // Plusieurs pixels possibles ("ancien,nouveau") : l'achat est envoyé à chacun
+    const pixelIds = (o.meta_pixel_id ?? pixel ?? "").split(/[,\s]+/).filter(Boolean);
+    if (!pixelIds.length) { failed++; continue; }
     const when = Date.parse(o.delivered_at ?? o.updated_at);
     const eventTime = Math.floor(Math.min(Date.now(), Math.max(when, Date.now() - 7 * DAY + 3600_000)) / 1000);
-    const res = await sendMetaPurchaseEvent({
-      pixelId,
-      accessToken: s.access_token,
-      value: Number(o.total_amount_mad ?? 0),
-      currency: "MAD",
-      phone: o.customer_phone,
-      city: o.customer_city ?? "",
-      fullName: o.customer_name,
-      fbp: o.meta_fbp,
-      fbc: o.meta_fbc,
-      clientIp: o.meta_client_ip,
-      clientUserAgent: o.meta_client_ua,
-      eventId: o.id,
-      eventTime,
-      // Commande sans navigateur connu (WhatsApp, téléphone…) → "other"
-      actionSource: o.meta_client_ua ? "website" : "other",
-      contentIds: productsOf.get(o.id),
-    });
+    let res: { ok: boolean; error?: string } = { ok: false, error: "aucun pixel" };
+    for (const pixelId of pixelIds) {
+      const r = await sendMetaPurchaseEvent({
+        pixelId,
+        accessToken: tokenFor(pixelId),
+        value: Number(o.total_amount_mad ?? 0),
+        currency: "MAD",
+        phone: o.customer_phone,
+        city: o.customer_city ?? "",
+        fullName: o.customer_name,
+        fbp: o.meta_fbp,
+        fbc: o.meta_fbc,
+        clientIp: o.meta_client_ip,
+        clientUserAgent: o.meta_client_ua,
+        eventId: o.id,
+        eventTime,
+        // Commande sans navigateur connu (WhatsApp, téléphone…) → "other"
+        actionSource: o.meta_client_ua ? "website" : "other",
+        contentIds: productsOf.get(o.id),
+      });
+      if (r.ok) res = r; else if (!res.ok) res = r;
+    }
     const patch = res.ok
       ? { meta_purchase_sent: true, meta_purchase_sent_at: new Date().toISOString(), meta_purchase_error: null }
       : { meta_purchase_error: (res.error ?? "erreur").slice(0, 500) };
@@ -94,8 +103,22 @@ export async function syncBuyersAudience() {
   if (!s?.access_token || !s.is_active || !s.account_id) return { ok: false, error: "Meta non configuré" };
   const acc = s.account_id.startsWith("act_") ? s.account_id : `act_${s.account_id}`;
 
-  const { data: setting } = await supabaseAdmin.from("app_settings").select("value").eq("key", "meta_buyers_audience_id").maybeSingle();
+  // Une audience par compte principal : si le compte principal change, on
+  // recrée l'audience dans le nouveau compte et on renvoie tous les acheteurs.
+  const audKey = `meta_buyers_audience_id:${acc}`;
+  const { data: setting } = await supabaseAdmin.from("app_settings").select("value").eq("key", audKey).maybeSingle();
   let audienceId = (setting as { value: string } | null)?.value ?? null;
+  if (!audienceId) {
+    const { data: legacy } = await supabaseAdmin.from("app_settings").select("value").eq("key", "meta_buyers_audience_id").maybeSingle();
+    const { data: legacyAcc } = await supabaseAdmin.from("app_settings").select("value").eq("key", "meta_buyers_audience_account").maybeSingle();
+    const lv = (legacy as { value: string } | null)?.value;
+    const la = (legacyAcc as { value: string } | null)?.value;
+    if (lv && (!la || la === acc)) audienceId = lv; // audience déjà créée dans ce compte
+    else if (lv && la && la !== acc) {
+      // Nouveau compte principal → tout renvoyer
+      await supabaseAdmin.from("orders").update({ meta_audience_added: false } as never).eq("meta_audience_added" as never, true);
+    }
+  }
 
   if (!audienceId) {
     const res = await fetch(`${META}/${acc}/customaudiences`, {
@@ -112,9 +135,9 @@ export async function syncBuyersAudience() {
     const json = await res.json();
     if (!res.ok || json.error) return { ok: false, error: json?.error?.message ?? `HTTP ${res.status}` };
     audienceId = String(json.id);
-    await supabaseAdmin.from("app_settings").upsert({
-      key: "meta_buyers_audience_id", value: audienceId, category: "ads", label: "Audience Meta « Acheteurs livrés »",
-    } as never, { onConflict: "key" });
+    await supabaseAdmin.from("app_settings").upsert({ key: audKey, value: audienceId, category: "ads", label: "Audience Meta « Acheteurs livrés »" } as never, { onConflict: "key" });
+    await supabaseAdmin.from("app_settings").upsert({ key: "meta_buyers_audience_id", value: audienceId, category: "ads", label: "Audience Meta « Acheteurs livrés » (compte principal)" } as never, { onConflict: "key" });
+    await supabaseAdmin.from("app_settings").upsert({ key: "meta_buyers_audience_account", value: acc, category: "ads", label: "Compte de l'audience Acheteurs" } as never, { onConflict: "key" });
   }
 
   const { data } = await supabaseAdmin.from("orders")

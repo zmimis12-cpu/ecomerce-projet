@@ -157,8 +157,9 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
             // Le téléphone doit être au format international (212XXXXXXXXX),
             // pas local (0XXXXXXXXX), sinon Meta ne peut pas matcher.
             const phone = toInternationalMorocco(form.customer_phone).replace("+", "");
-            if (pixelId) {
-              w.fbq?.("init", pixelId, {
+            // Plusieurs pixels possibles ("ancien,nouveau") : chacun reçoit le Lead
+            for (const id of (pixelId ?? "").split(/[,\s]+/).filter(Boolean)) {
+              w.fbq?.("init", id, {
                 ph: phone,
                 fn: form.customer_name.split(" ")[0] ?? "",
                 ln: form.customer_name.split(" ").slice(1).join(" ") ?? "",

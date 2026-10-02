@@ -11,7 +11,7 @@ import { readSettings } from "./sync-core";
 const META = "https://graph.facebook.com/v21.0";
 
 export type TaxVerdict = "none" | "tax" | "missing" | "unclear";
-export type ChargeRow = { time: string; amountUsd: number; spendUsd: number; ratio: number | null; verdict: TaxVerdict };
+export type ChargeRow = { time: string; amountUsd: number; spendUsd: number; ratio: number | null; verdict: TaxVerdict; account?: string };
 export type TaxReport = {
   paidUsd: number; unbilledUsd: number; spendUsd: number; ratio: number | null;
   verdict: TaxVerdict; estimatedTaxPct: number | null; since: string | null; charges: ChargeRow[];
@@ -41,11 +41,34 @@ async function getAll(url: string) {
   return out;
 }
 
+/** Multi-comptes : contrôle de chaque compte, puis total. */
 export async function getMetaTaxReport(): Promise<TaxReport | { error: string }> {
-  const s = await readSettings("meta");
-  if (!s?.access_token || !s.account_id) return { error: "Meta non configuré" };
-  const acc = s.account_id.startsWith("act_") ? s.account_id : `act_${s.account_id}`;
-  const tok = encodeURIComponent(s.access_token);
+  const { activeMetaAccounts, act } = await import("./meta-accounts");
+  const accounts = await activeMetaAccounts();
+  if (!accounts.length) return { error: "Meta non configuré" };
+  const reps: (TaxReport & { label: string })[] = [];
+  for (const a of accounts) {
+    const r = await getMetaTaxReportFor(act(a), a.token);
+    if (!("error" in r)) reps.push({ ...r, label: a.label });
+  }
+  if (!reps.length) return { error: "Lecture impossible" };
+  if (reps.length === 1) return { ...reps[0], charges: reps[0].charges.map((c) => ({ ...c, account: reps[0].label })) };
+  const paidUsd = reps.reduce((x, r) => x + r.paidUsd, 0);
+  const unbilledUsd = reps.reduce((x, r) => x + r.unbilledUsd, 0);
+  const spendUsd = reps.reduce((x, r) => x + r.spendUsd, 0);
+  const ratio = spendUsd > 0 ? (paidUsd + unbilledUsd) / spendUsd : null;
+  return {
+    paidUsd: Math.round(paidUsd * 100) / 100, unbilledUsd, spendUsd: Math.round(spendUsd * 100) / 100, ratio,
+    verdict: verdictOf(ratio), estimatedTaxPct: null,
+    since: reps.map((r) => r.since).filter(Boolean).sort()[0] ?? null,
+    charges: reps.flatMap((r) => r.charges.map((c) => ({ ...c, account: r.label }))).sort((x, y) => y.time.localeCompare(x.time)),
+    recentRatio: null, taxAlert: reps.some((r) => r.taxAlert),
+    missingUsd: reps.reduce((x, r) => x + r.missingUsd, 0),
+  };
+}
+
+async function getMetaTaxReportFor(acc: string, token: string): Promise<TaxReport | { error: string }> {
+  const tok = encodeURIComponent(token);
   try {
     // 1. Prélèvements sur la carte (historique de facturation)
     const acts = await getAll(`${META}/${acc}/activities?fields=event_type,event_time,extra_data&limit=500&since=2023-01-01&access_token=${tok}`);

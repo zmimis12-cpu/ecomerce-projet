@@ -51,6 +51,9 @@ export async function GET(req: NextRequest) {
   result.metaAudience  = await safe(() => syncBuyersAudience());
 
   if (!only || only === "ads") {
+    // Comptes Meta : détecte tout seul les nouveaux accès (compte pub, pixel, Page)
+    const { checkMetaAccounts } = await import("@/lib/ads/meta-accounts");
+    result.metaAccounts = await safe(() => checkMetaAccounts());
     // Dépenses par produit : une ligne par jour → pas de double comptage
     // 1ère exécution : on reconstruit 31 jours jour par jour (remplace
     // l'ancienne ligne "1 mois"), ensuite seulement les 3 derniers jours.

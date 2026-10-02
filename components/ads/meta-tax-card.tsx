@@ -1,4 +1,5 @@
 import type { TaxReport } from "@/lib/ads/meta-tax";
+import { MetaTaxForm } from "@/components/ads/meta-tax-form";
 
 const V: Record<string, { label: string; cls: string }> = {
   none:    { label: "✅ Sans taxe",           cls: "bg-green-100 text-green-800" },
@@ -10,18 +11,32 @@ const usd = (x: number) => `$${x.toLocaleString("en-US", { minimumFractionDigits
 const r = (x: number | null) => (x == null ? "—" : x.toFixed(2));
 
 /** Carte "Taxe Meta" : compare chaque prélèvement carte avec la dépense pub réelle. */
-export function MetaTaxCard({ report, rate }: { report: TaxReport | { error: string }; rate: number }) {
+export function MetaTaxCard({ report, rate, tax }: { report: TaxReport | { error: string }; rate: number; tax: { pct: number; since: string | null } }) {
   if ("error" in report) {
     return <div className="rounded-xl border bg-card p-4 text-sm text-red-600">Taxe Meta : lecture impossible ({report.error})</div>;
   }
-  const tax = report.taxAlert;
+  const taxSet = tax.pct > 0;
   return (
-    <div className={`rounded-xl border-2 p-4 ${tax ? "border-red-300 bg-red-50" : "border-green-300 bg-green-50"}`}>
+    <div className={`rounded-xl border-2 p-4 ${taxSet ? "border-amber-300 bg-amber-50" : "border-red-300 bg-red-50"}`}>
+      <div className="mb-3 rounded-lg border bg-white p-3">
+        <p className="mb-2 text-xs text-muted-foreground">
+          ⚠️ <b>Meta ne donne pas la taxe dans son API</b> : les prélèvements ci-dessous sont <b>hors taxe</b>.
+          Ta banque prélève plus (ex : 50 $ → 60 $ avec 20 % de TVA). Indique la taxe ici : elle sera ajoutée à
+          <b> toutes</b> les dépenses pub (dashboard, coût par commande, règles, éditeurs…).
+        </p>
+        <MetaTaxForm pct={tax.pct} since={tax.since} />
+        {taxSet && (
+          <p className="mt-2 text-xs font-medium text-amber-800">
+            ✅ Taxe de {tax.pct} % appliquée depuis le {tax.since ? new Date(tax.since).toLocaleDateString("fr-FR") : "début"} —
+            prélevé réellement ≈ {usd(report.paidUsd * (1 + tax.pct / 100))} (au lieu de {usd(report.paidUsd)} hors taxe).
+          </p>
+        )}
+      </div>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className={`text-xs font-semibold uppercase tracking-wide ${tax ? "text-red-800" : "text-green-800"}`}>Taxe Meta</div>
-          <div className={`mt-1 text-xl font-bold ${tax ? "text-red-900" : "text-green-900"}`}>
-            {tax ? `🔴 Taxe détectée ≈ ${report.estimatedTaxPct ?? Math.round(((report.recentRatio ?? 1) - 1) * 100)} %` : "✅ Aucune taxe appliquée"}
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Contrôle des prélèvements (hors taxe)</div>
+          <div className="mt-1 text-base font-semibold">
+            {report.taxAlert ? "Écart anormal détecté entre prélèvements et dépense" : "Prélèvements Meta cohérents avec la dépense (hors taxe)"}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
             Rapport payé ÷ dépensé : <b>{r(report.ratio)}</b> (tout) · <b>{r(report.recentRatio)}</b> (30 derniers jours) — 1,00 = sans taxe · 1,20 = taxe 20 %
@@ -47,7 +62,8 @@ export function MetaTaxCard({ report, rate }: { report: TaxReport | { error: str
             <thead className="sticky top-0 bg-muted/60 text-left text-muted-foreground">
               <tr>
                 <th className="px-3 py-2">Date</th>
-                <th className="px-3 py-2 text-right">Prélevé</th>
+                <th className="px-3 py-2 text-right">Prélevé (HT)</th>
+                {taxSet && <th className="px-3 py-2 text-right">Avec taxe</th>}
                 <th className="px-3 py-2 text-right">Dépense pub depuis le précédent</th>
                 <th className="px-3 py-2 text-right">Rapport</th>
                 <th className="px-3 py-2">Résultat</th>
@@ -58,6 +74,7 @@ export function MetaTaxCard({ report, rate }: { report: TaxReport | { error: str
                 <tr key={c.time} className="border-t">
                   <td className="px-3 py-1.5">{new Date(c.time).toLocaleString("fr-FR", { timeZone: "Africa/Casablanca", day: "2-digit", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" })}</td>
                   <td className="px-3 py-1.5 text-right font-semibold">{usd(c.amountUsd)}</td>
+                  {taxSet && <td className="px-3 py-1.5 text-right">{tax.since && c.time.slice(0, 10) < tax.since ? usd(c.amountUsd) : usd(c.amountUsd * (1 + tax.pct / 100))}</td>}
                   <td className="px-3 py-1.5 text-right">{usd(c.spendUsd)}</td>
                   <td className="px-3 py-1.5 text-right">{r(c.ratio)}</td>
                   <td className="px-3 py-1.5"><span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${V[c.verdict].cls}`}>{V[c.verdict].label}</span></td>

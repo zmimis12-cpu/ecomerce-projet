@@ -19,7 +19,7 @@ type Rule = {
   action: RuleAction; cooldown_minutes: number;
   budget_pct: number | null; budget_max_usd: number | null; budget_min_usd: number | null;
 };
-type BudgetTarget = { id: string; name: string; dailyCents: number; status: string };
+type BudgetTarget = { id: string; name: string; dailyCents: number; status: string; token?: string };
 type Metrics = Record<RuleMetric, number>;
 
 function casaDay(offset = 0) {
@@ -169,7 +169,7 @@ async function changeBudget(rule: Rule, targets: BudgetTarget[], m: Metrics, pro
         const res = await fetch(`${META}/${t.id}`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ daily_budget: String(Math.round(next * 100)), access_token: token }).toString(),
+          body: new URLSearchParams({ daily_budget: String(Math.round(next * 100)), access_token: t.token ?? token }).toString(),
         });
         const json = await res.json();
         if (!res.ok || json.error) throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
@@ -208,23 +208,34 @@ export async function runAdRules() {
   const { data: r } = await supabaseAdmin.from("ad_rules" as never).select("*").eq("enabled", true);
   const rules = (r ?? []) as unknown as Rule[];
   if (!rules.length) return { ok: true, rules: 0, actions: 0 };
-  const s = await readSettings("meta");
-  if (!s?.access_token || !s.account_id) return { ok: false, error: "Meta non configuré" };
-  const acc = s.account_id.startsWith("act_") ? s.account_id : `act_${s.account_id}`;
+  // Multi-comptes : campagnes / ensembles / pubs de TOUS les comptes Meta actifs,
+  // chaque objet garde le token de son compte pour agir dessus.
+  const { activeMetaAccounts, act: actOf } = await import("./meta-accounts");
+  const accounts = await activeMetaAccounts();
+  if (!accounts.length) return { ok: false, error: "Meta non configuré" };
+  const s = { access_token: accounts[0].token };
+  const all = async (path: (acc: string) => string, params: Record<string, string>) => {
+    const out: (Record<string, unknown> & { _token: string })[] = [];
+    for (const a of accounts) {
+      const rows = await metaGet(path(actOf(a)), params, a.token);
+      out.push(...rows.map((r) => ({ ...r, _token: a.token })));
+    }
+    return out;
+  };
   const { rate } = await getUsdToMad();
 
-  const campaigns = (await metaGet(`${acc}/campaigns`, { fields: "id,name,effective_status,daily_budget", limit: "500" }, s.access_token))
-    .map((c) => ({ id: String(c.id), name: String(c.name), status: String(c.effective_status), dailyCents: Number(c.daily_budget ?? 0) }));
+  const campaigns = (await all((acc) => `${acc}/campaigns`, { fields: "id,name,effective_status,daily_budget", limit: "500" }))
+    .map((c) => ({ id: String(c.id), name: String(c.name), status: String(c.effective_status), dailyCents: Number(c.daily_budget ?? 0), token: c._token }));
   const needAdsets = rules.some((r) => r.action === "increase_budget" || r.action === "decrease_budget");
   const adsets = needAdsets
-    ? (await metaGet(`${acc}/adsets`, { fields: "id,name,campaign_id,daily_budget,effective_status", limit: "500" }, s.access_token))
-        .map((a) => ({ id: String(a.id), name: String(a.name), campaignId: String(a.campaign_id), status: String(a.effective_status), dailyCents: Number(a.daily_budget ?? 0) }))
+    ? (await all((acc) => `${acc}/adsets`, { fields: "id,name,campaign_id,daily_budget,effective_status", limit: "500" }))
+        .map((a) => ({ id: String(a.id), name: String(a.name), campaignId: String(a.campaign_id), status: String(a.effective_status), dailyCents: Number(a.daily_budget ?? 0), token: a._token }))
     : [];
-  const budgetTargetsForCampaign = (c: { id: string; name: string; status: string; dailyCents: number }): BudgetTarget[] =>
+  const budgetTargetsForCampaign = (c: { id: string; name: string; status: string; dailyCents: number; token: string }): BudgetTarget[] =>
     c.dailyCents > 0
-      ? [{ id: c.id, name: `Campagne « ${c.name} »`, dailyCents: c.dailyCents, status: c.status }]
+      ? [{ id: c.id, name: `Campagne « ${c.name} »`, dailyCents: c.dailyCents, status: c.status, token: c.token }]
       : adsets.filter((a) => a.campaignId === c.id && a.dailyCents > 0)
-          .map((a) => ({ id: a.id, name: `Ensemble « ${a.name} »`, dailyCents: a.dailyCents, status: a.status }));
+          .map((a) => ({ id: a.id, name: `Ensemble « ${a.name} »`, dailyCents: a.dailyCents, status: a.status, token: a.token }));
   const isBudget = (r: Rule) => r.action === "increase_budget" || r.action === "decrease_budget";
   const campProduct = await campaignProductMap(campaigns);
   const { data: links } = await supabaseAdmin.from("creative_ads" as never).select("ad_id, creative_id").eq("platform", "meta");
@@ -239,8 +250,8 @@ export async function runAdRules() {
       if (!cache.has(rule.time_window)) {
         const tr = JSON.stringify(range);
         const [camp, ads, orders] = await Promise.all([
-          metaGet(`${acc}/insights`, { level: "campaign", fields: "campaign_id,spend,impressions,inline_link_clicks,frequency,actions", time_range: tr, limit: "500" }, s.access_token),
-          metaGet(`${acc}/insights`, { level: "ad", fields: "ad_id,ad_name,adset_id,campaign_id,spend,impressions,inline_link_clicks,frequency,actions", time_range: tr, limit: "500" }, s.access_token),
+          all((acc) => `${acc}/insights`, { level: "campaign", fields: "campaign_id,spend,impressions,inline_link_clicks,frequency,actions", time_range: tr, limit: "500" }),
+          all((acc) => `${acc}/insights`, { level: "ad", fields: "ad_id,ad_name,adset_id,campaign_id,spend,impressions,inline_link_clicks,frequency,actions", time_range: tr, limit: "500" }),
           ordersInWindow(range),
         ]);
         cache.set(rule.time_window, { camp, ads, orders });
@@ -267,15 +278,15 @@ export async function runAdRules() {
           if (!conds.every((c) => check(c, m))) continue;
           for (const c of myCamps) {
             if (isBudget(rule)) {
-              actions += await changeBudget(rule, budgetTargetsForCampaign(c), m, pid, s.access_token);
+              actions += await changeBudget(rule, budgetTargetsForCampaign(c), m, pid, c.token);
               continue;
             }
-            const done = await act(rule, { id: c.id, name: `Campagne « ${c.name} »`, status: c.status, productId: pid }, m, s.access_token);
+            const done = await act(rule, { id: c.id, name: `Campagne « ${c.name} »`, status: c.status, productId: pid }, m, c.token);
             if (done) actions++;
           }
         }
       } else {
-        const statuses = new Map((await metaGet(`${acc}/ads`, { fields: "id,effective_status", limit: "500" }, s.access_token))
+        const statuses = new Map((await all((acc) => `${acc}/ads`, { fields: "id,effective_status", limit: "500" }))
           .map((a) => [String(a.id), String(a.effective_status)]));
         for (const x of ads) {
           const adId = String(x.ad_id);
@@ -294,11 +305,11 @@ export async function runAdRules() {
             const targets = camp && camp.dailyCents > 0
               ? budgetTargetsForCampaign(camp)
               : adsets.filter((a) => a.id === String(x.adset_id) && a.dailyCents > 0)
-                  .map((a) => ({ id: a.id, name: `Ensemble « ${a.name} »`, dailyCents: a.dailyCents, status: a.status }));
-            actions += await changeBudget(rule, targets, m, pid, s.access_token);
+                  .map((a) => ({ id: a.id, name: `Ensemble « ${a.name} »`, dailyCents: a.dailyCents, status: a.status, token: a.token }));
+            actions += await changeBudget(rule, targets, m, pid, String(x._token));
             continue;
           }
-          const done = await act(rule, { id: adId, name: `Pub « ${x.ad_name} »`, status: statuses.get(adId) ?? "", productId: pid }, m, s.access_token);
+          const done = await act(rule, { id: adId, name: `Pub « ${x.ad_name} »`, status: statuses.get(adId) ?? "", productId: pid }, m, String(x._token));
           if (done) actions++;
         }
       }

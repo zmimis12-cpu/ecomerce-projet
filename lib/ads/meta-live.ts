@@ -32,6 +32,7 @@ export type MetaLiveAd = {
   bidStrategy: string;
   lastEdit: string | null;
   quality: string | null;
+  accountLabel?: string;
   engagement: string | null;
   conversion: string | null;
 };
@@ -76,11 +77,27 @@ const val = (arr: { action_type: string; value: string }[] | undefined, types: s
   return null;
 };
 
+/** Multi-comptes : chaque pub est lue avec le token de SON compte Meta. */
 export async function getMetaAdsLive(adIds: string[], range: { since: string; until: string } | null):
   Promise<{ ok: true; ads: MetaLiveAd[]; fetchedAt: string } | { ok: false; error: string }> {
   if (!adIds.length) return { ok: true, ads: [], fetchedAt: new Date().toISOString() };
-  const s = await readSettings("meta");
-  if (!s?.access_token) return { ok: false, error: "Meta non configuré" };
+  const { groupAdsByAccount } = await import("./meta-accounts");
+  const groups = await groupAdsByAccount(adIds);
+  if (!groups.length) return { ok: false, error: "Meta non configuré" };
+  const all: MetaLiveAd[] = [];
+  const errors: string[] = [];
+  for (const g of groups) {
+    const r = await getMetaAdsLiveFor(g.account.token, g.ids, range);
+    if (r.ok) all.push(...r.ads.map((a) => ({ ...a, accountLabel: g.account.label })));
+    else errors.push(`${g.account.label} : ${r.error}`);
+  }
+  if (!all.length && errors.length) return { ok: false, error: errors.join(" | ") };
+  return { ok: true, ads: all.sort((x, y) => y.spendUsd - x.spendUsd), fetchedAt: new Date().toISOString() };
+}
+
+async function getMetaAdsLiveFor(token: string, adIds: string[], range: { since: string; until: string } | null):
+  Promise<{ ok: true; ads: MetaLiveAd[]; fetchedAt: string } | { ok: false; error: string }> {
+  const s = { access_token: token };
 
   const insights = range
     ? `insights.time_range(${JSON.stringify(range)})`
@@ -157,11 +174,23 @@ export async function getMetaAdsLive(adIds: string[], range: { since: string; un
   return { ok: true, ads: ads.sort((x, y) => y.spendUsd - x.spendUsd), fetchedAt: new Date().toISOString() };
 }
 
-/** Toutes les pubs du compte (hors supprimées/archivées) — pour la vue admin. */
+/** Toutes les pubs de TOUS les comptes (hors supprimées/archivées) — vue admin. */
 export async function getAccountAdIds(): Promise<string[]> {
-  const s = await readSettings("meta");
-  if (!s?.access_token || !s.account_id) return [];
-  const acc = s.account_id.startsWith("act_") ? s.account_id : `act_${s.account_id}`;
+  const { activeMetaAccounts, act, adAccountMap, saveAdAccountMap } = await import("./meta-accounts");
+  const accounts = await activeMetaAccounts();
+  const map = await adAccountMap();
+  const ids: string[] = [];
+  for (const a of accounts) {
+    const got = await getAccountAdIdsFor(act(a), a.token);
+    for (const id of got) map[id] = a.key;
+    ids.push(...got);
+  }
+  await saveAdAccountMap(map);
+  return ids;
+}
+
+async function getAccountAdIdsFor(acc: string, token: string): Promise<string[]> {
+  const s = { access_token: token };
   const url = new URL(`${META}/${acc}/ads`);
   url.searchParams.set("fields", "id");
   url.searchParams.set("limit", "500");
@@ -182,11 +211,24 @@ export async function getAccountAdIds(): Promise<string[]> {
   return ids;
 }
 
-/** Dépense TOTALE du compte depuis sa création (exactement comme Meta, période "Maximum"). */
-export async function getAccountLifetimeSpend(): Promise<{ usd: number; since: string | null } | null> {
-  const s = await readSettings("meta");
-  if (!s?.access_token || !s.account_id) return null;
-  const acc = s.account_id.startsWith("act_") ? s.account_id : `act_${s.account_id}`;
+/** Dépense TOTALE depuis le début, additionnée sur TOUS les comptes Meta. */
+export async function getAccountLifetimeSpend(): Promise<{ usd: number; since: string | null; accounts: { label: string; usd: number }[] } | null> {
+  const { activeMetaAccounts, act } = await import("./meta-accounts");
+  const accounts = await activeMetaAccounts();
+  if (!accounts.length) return null;
+  let usd = 0; let since: string | null = null;
+  const per: { label: string; usd: number }[] = [];
+  for (const a of accounts) {
+    const r = await lifetimeFor(act(a), a.token);
+    if (!r) continue;
+    usd += r.usd; per.push({ label: a.label, usd: r.usd });
+    if (r.since && (!since || r.since < since)) since = r.since;
+  }
+  return { usd, since, accounts: per };
+}
+
+async function lifetimeFor(acc: string, token: string): Promise<{ usd: number; since: string | null } | null> {
+  const s = { access_token: token };
   const url = new URL(`${META}/${acc}/insights`);
   url.searchParams.set("fields", "spend,date_start");
   url.searchParams.set("date_preset", "maximum");

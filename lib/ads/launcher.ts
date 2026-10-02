@@ -57,6 +57,12 @@ async function saveSetting(key: string, value: string, label: string) {
 /** Page Facebook, compte Instagram et pixel — détectés depuis tes pubs existantes. */
 export async function getMetaIdentity() {
   let [pageId, igUserId, pixelId] = await Promise.all([setting("meta_page_id"), setting("meta_ig_user_id"), setting("meta_pixel_id")]);
+  // Multi-comptes : Page / pixel détectés sur le compte principal
+  const { primaryMetaAccount } = await import("./meta-accounts");
+  const p = await primaryMetaAccount();
+  if (p?.pageId) pageId = p.pageId;
+  if (p?.pixelId) pixelId = p.pixelId;
+  if (p?.igUserId) igUserId = p.igUserId;
   if (pageId && pixelId) return { pageId, igUserId, pixelId };
   const { token, acc } = await tokenAndAccount();
   const ads = await metaGet(`${acc}/ads`, { fields: "creative{object_story_spec,instagram_user_id}", limit: "25" }, token);

@@ -3,7 +3,7 @@ import { BarChart3 } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getMetaAdsLive, getAccountAdIds, getAccountLifetimeSpend } from "@/lib/ads/meta-live";
-import { getUsdToMad } from "@/lib/ads/fx";
+import { getUsdToMad, getMetaTaxConfig } from "@/lib/ads/fx";
 import { periodToRange } from "@/lib/creatives/queries";
 import { PeriodFilter, currentMonth } from "@/components/creatives/period-filter";
 import { MetaLiveSection } from "@/components/ads/meta-live-section";
@@ -29,7 +29,7 @@ export default async function AdminAdStatsPage({
     getUsdToMad(),
     getAccountLifetimeSpend(),
   ]);
-  const [taxReport, reporting] = await Promise.all([getMetaTaxReport(), getMetaReportingStatus()]);
+  const [taxReport, reporting, taxCfg] = await Promise.all([getMetaTaxReport(), getMetaReportingStatus(), getMetaTaxConfig()]);
   const codeOf = new Map(((creatives ?? []) as { id: string; code: string }[]).map((c) => [c.id, c.code]));
   const codeByAd = new Map(((links ?? []) as { ad_id: string; creative_id: string }[])
     .map((l) => [l.ad_id, codeOf.get(l.creative_id) ?? ""]));
@@ -62,7 +62,7 @@ export default async function AdminAdStatsPage({
         </div>
       )}
       <MetaReportingCard status={reporting} />
-      <MetaTaxCard report={taxReport} rate={fx.rate} />
+      <MetaTaxCard report={taxReport} rate={fx.rate} tax={taxCfg} />
       <MetaLiveSection live={live} codeByAd={Object.fromEntries(codeByAd)} rate={fx.rate} title="Toutes les pubs Meta — en direct" showTotals />
     </div>
   );

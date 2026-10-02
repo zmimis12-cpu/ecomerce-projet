@@ -59,8 +59,14 @@ export const DELIVERY_FIELDS =
 export async function getMetaDeliveries(adIds: string[]): Promise<Map<string, Delivery>> {
   const out = new Map<string, Delivery>();
   if (!adIds.length) return out;
-  const s = await readSettings("meta");
-  if (!s?.access_token) return out;
+  // Multi-comptes : chaque pub avec le token de son compte
+  const { groupAdsByAccount } = await import("./meta-accounts");
+  for (const grp of await groupAdsByAccount(adIds)) await deliveriesFor(grp.account.token, grp.ids, out);
+  return out;
+}
+
+async function deliveriesFor(token: string, adIds: string[], out: Map<string, Delivery>) {
+  const s = { access_token: token };
   for (let i = 0; i < adIds.length; i += 50) {
     const url = new URL(`${META}/`);
     url.searchParams.set("ids", adIds.slice(i, i + 50).join(","));
@@ -73,7 +79,6 @@ export async function getMetaDeliveries(adIds: string[]): Promise<Map<string, De
       for (const [id, ad] of Object.entries(json as Record<string, Record<string, unknown>>)) out.set(id, deriveDelivery(ad));
     } catch { /* réseau : on garde ce qu'on a */ }
   }
-  return out;
 }
 
 export type CreativeLive = { label: string; tone: Tone; detail: string; dbStatus: "in_ads" | "paused" | "draft" };
