@@ -1,4 +1,6 @@
 "use client";
+import { OffersEditor } from "@/components/landing-builder/offers-editor";
+import { normalizeOffers, type Offer } from "@/lib/landing-pages/offers";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { upsertLandingPage } from "@/lib/landing-pages/actions";
@@ -14,7 +16,10 @@ import type { GeneratedContent } from "@/lib/ai/generator";
 import { cn } from "@/lib/utils";
 import { Globe, Phone, Eye } from "lucide-react";
 
-interface Product { id: string; name: string; slug: string; sale_price_mad: number; }
+interface Product {
+  id: string; name: string; slug: string; sale_price_mad: number;
+  total_cost_mad?: number | null; ads_cost_mad?: number | null; confirmation_cost_mad?: number | null; shipping_cost_mad?: number | null;
+}
 
 interface LPBuilderFormProps {
   products: Product[];
@@ -54,6 +59,14 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
   const [b1,           setB1]           = useState<string>(String(defaultValues?.bundle_1_price ?? ""));
   const [b2,           setB2]           = useState<string>(String(defaultValues?.bundle_2_price ?? ""));
   const [b3,           setB3]           = useState<string>(String(defaultValues?.bundle_3_price ?? ""));
+  // Offres flexibles (n'importe quelle quantité / prix)
+  const [offers, setOffers] = useState<Offer[]>(() => {
+    const pr = products.find((x) => x.id === String(defaultValues?.product_id ?? ""));
+    return normalizeOffers(defaultValues?.offers, {
+      price: pr?.sale_price_mad ?? 0,
+      b1: defaultValues?.bundle_1_price as number | null, b2: defaultValues?.bundle_2_price as number | null, b3: defaultValues?.bundle_3_price as number | null,
+    });
+  });
   const [variantOptions, setVariantOptions] = useState<VariantGroup[]>(
     (defaultValues?.variant_options as VariantGroup[] | undefined) ?? []
   );
@@ -140,10 +153,11 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
           sections,
           is_active:        isActive,
           ai_analysis:     aiAnalysis ?? undefined,
-          bundle_1_price:   b1 ? parseFloat(b1) : null,
+          bundle_1_price:   offers.find((o) => o.qty === 1)?.price ?? (b1 ? parseFloat(b1) : null),
           variant_options:  variantOptions.filter((g) => g.name.trim() && g.options.some((o) => o.label.trim())),
-          bundle_2_price:   b2 ? parseFloat(b2) : null,
-          bundle_3_price:   b3 ? parseFloat(b3) : null,
+          bundle_2_price:   offers.find((o) => o.qty === 2)?.price ?? (b2 ? parseFloat(b2) : null),
+          bundle_3_price:   offers.find((o) => o.qty === 3)?.price ?? (b3 ? parseFloat(b3) : null),
+          offers:           offers.filter((o) => o.price > 0),
         }
       );
 
@@ -285,21 +299,17 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
             </Field>
           </Card>
 
-          <Card title="Offres Bundle">
-            <p className="text-xs text-muted-foreground">Laissez vide pour auto-calculer depuis le prix produit.</p>
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: "1 pièce (MAD)", val: b1, set: setB1 },
-                { label: "2 pièces (MAD)", val: b2, set: setB2 },
-                { label: "3 pièces (MAD)", val: b3, set: setB3 },
-              ].map(({ label, val, set }) => (
-                <Field key={label} label={label}>
-                  <input type="number" min="0" step="0.01" value={val}
-                    onChange={(e) => set(e.target.value)}
-                    placeholder="Auto" className={inputCls(false)} />
-                </Field>
-              ))}
-            </div>
+          <Card title="Offres (quantité / prix libres)">
+            <p className="text-xs text-muted-foreground">
+              Crée autant d&apos;offres que tu veux : 1 pièce, 4 pièces au prix d&apos;une, 3 pour le prix de 2… Le prix est vérifié par le serveur (le client ne peut pas le modifier).
+            </p>
+            {(() => {
+              const pr = products.find((x) => x.id === productId);
+              const goods = pr && pr.total_cost_mad != null
+                ? (pr.total_cost_mad ?? 0) - (pr.ads_cost_mad ?? 0) - (pr.confirmation_cost_mad ?? 0) - (pr.shipping_cost_mad ?? 0)
+                : null;
+              return <OffersEditor value={offers} onChange={setOffers} unitPrice={pr?.sale_price_mad ?? 0} unitGoodsCost={goods} />;
+            })()}
           </Card>
 
           <Card title="اختيارات المنتج (المقاس / اللون)">

@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     pslug
       ? supabaseAdmin
           .from("landing_pages")
-          .select("bundle_1_price, bundle_2_price, bundle_3_price")
+          .select("bundle_1_price, bundle_2_price, bundle_3_price, offers")
           .eq("slug", pslug.toLowerCase())
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -150,7 +150,14 @@ export async function POST(request: NextRequest) {
     estimated_profit_mad: number; slug: string;
   };
 
-  const qty        = Number(quantity);
+  // Offre choisie : quantité + prix lus dans la config de la LP (jamais
+  // ceux envoyés par le navigateur, qui pourraient être modifiés).
+  const offerId = String((body as Record<string, unknown>).offer_id ?? "");
+  const lpOffers = Array.isArray((lpRes.data as unknown as { offers?: unknown } | null)?.offers)
+    ? ((lpRes.data as unknown as { offers: { id: string; qty: number; price: number }[] }).offers)
+    : [];
+  const chosenOffer = offerId ? lpOffers.find((o) => String(o.id) === offerId && Number(o.price) > 0) : undefined;
+  const qty        = chosenOffer ? Math.min(10, Math.max(1, Math.round(Number(chosenOffer.qty)))) : Math.min(10, Math.max(1, Number(quantity) || 1));
   const unitPrice  = p.sale_price_mad;
   const unitCost   = p.total_cost_mad ?? 0;
 
@@ -176,7 +183,10 @@ export async function POST(request: NextRequest) {
   const minAcceptable     = unitCost * qty; // never sell below cost
   let subtotal: number;
 
-  if (
+  if (chosenOffer) {
+    // Prix fixé par le vendeur dans l'offre (ex : 4 pièces au prix d'une)
+    subtotal = Number(chosenOffer.price);
+  } else if (
     clientBundlePrice > 0 &&
     clientBundlePrice >= minAcceptable &&
     Math.abs(clientBundlePrice - expectedTotal) / expectedTotal < 0.05

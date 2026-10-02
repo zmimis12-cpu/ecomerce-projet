@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { FALLBACK_CITIES } from "@/components/landing/order-form-public";
 import { getLandingPage } from "@/lib/public/queries";
 import { OrderFormPublic } from "@/components/landing/order-form-public";
+import { normalizeOffers } from "@/lib/landing-pages/offers";
 import { StockCounter } from "@/components/landing/stock-counter";
 import { CountdownTimer } from "@/components/landing/countdown-timer";
 import { FaqAccordion } from "@/components/landing/faq-accordion";
@@ -136,6 +137,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const b2 = Number(lp.bundle_2_price || Math.round(price * 2 * 0.9));
   const customerPhotos = (lp.customer_photos as string[] | undefined) ?? [];
   const b3 = Number(lp.bundle_3_price || Math.round(price * 3 * 0.8));
+  const offers = normalizeOffers(lp.offers, { price, b1: lp.bundle_1_price as number | null, b2: lp.bundle_2_price as number | null, b3: lp.bundle_3_price as number | null });
 
   const psSection   = getSection("problem_solution");
   const statsSection= getSection("stats_bar");
@@ -359,7 +361,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             <div id="lp-form" className="lp-form-inline">
               <p className="lp-form-note green">{formNote}</p>
               <OrderFormPublic product={product} productSlug={slug}
-                ctaText={ctaText} b1={b1} b2={b2} b3={b3}
+                ctaText={ctaText} b1={b1} b2={b2} b3={b3} offers={offers}
                 pixelId={page.meta_pixel_id?.trim() || undefined}
                 tiktokPixelId={page.tiktok_pixel_id?.trim() || undefined}
                 variants={(Array.isArray(lp.variant_options) ? lp.variant_options : []) as { name: string; options: { label: string; image?: string }[] }[]}

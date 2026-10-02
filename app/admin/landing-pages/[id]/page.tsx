@@ -24,7 +24,7 @@ export default async function EditLandingPage({ params }: { params: Promise<{ id
 
   const { data: products } = await supabase
     .from("products")
-    .select("id, name, slug, sale_price_mad")
+    .select("id, name, slug, sale_price_mad, total_cost_mad, ads_cost_mad, confirmation_cost_mad, shipping_cost_mad")
     .eq("is_active", true)
     .order("name");
 
@@ -40,7 +40,7 @@ export default async function EditLandingPage({ params }: { params: Promise<{ id
       </div>
       <h1 className="text-xl font-semibold tracking-tight">Modifier la page</h1>
       <LPBuilderForm
-        products={(products ?? []) as unknown as { id: string; name: string; slug: string; sale_price_mad: number }[]}
+        products={(products ?? []) as unknown as { id: string; name: string; slug: string; sale_price_mad: number; total_cost_mad: number | null; ads_cost_mad: number | null; confirmation_cost_mad: number | null; shipping_cost_mad: number | null }[]}
         mode="edit"
         defaultValues={lp as unknown as Record<string, unknown>}
       />

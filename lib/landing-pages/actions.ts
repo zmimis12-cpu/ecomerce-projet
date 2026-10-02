@@ -115,6 +115,7 @@ export async function upsertLandingPage(id: string | null, data: {
   bundle_1_price?: number | null;
   bundle_2_price?: number | null;
   bundle_3_price?: number | null;
+  offers?: unknown;
   ai_analysis?: unknown;
   customer_photos?: string[];
 }) {

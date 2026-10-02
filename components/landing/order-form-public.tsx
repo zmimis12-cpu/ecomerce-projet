@@ -1,4 +1,5 @@
 "use client";
+import { normalizeOffers, savings, defaultLabel, type Offer } from "@/lib/landing-pages/offers";
 import { useState, useTransition, useRef, useEffect } from "react";
 import type { PublicProduct } from "@/lib/public/queries";
 import { toInternationalMorocco } from "@/lib/delivery/phone-utils";
@@ -34,13 +35,14 @@ interface Props {
   productSlug: string;
   ctaText?: string;
   b1: number; b2: number; b3: number;
+  offers?: Offer[];
   cities?: string[];
   variants?: {name:string; options:{label:string; image?:string}[]}[];
   pixelId?: string;
   tiktokPixelId?: string;
 }
 
-export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId }: Props) {
+export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId }: Props) {
   const [isPending, startTransition] = useTransition();
   useEffect(() => { getCreativeCode(); }, []); // mémorise ?cr= dès l'arrivée
   const [submitted, setSubmitted]    = useState(false);
@@ -50,7 +52,10 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   // Une sélection de variantes par pièce (index 0 = pièce 1, etc.)
   const [selectedVariants, setSelectedVariants] = useState<Record<string,string>[]>([{}]);
   const [cityOpen, setCityOpen]      = useState(false);
-  const [bundle, setBundle]          = useState(1);
+  const [bundle, setBundle]          = useState<number>(() => {
+    const list = offersProp?.length ? offersProp : [];
+    return (list.find((o) => o.isDefault) ?? list[0])?.qty ?? 1;
+  });
   const hasFiredInitiateCheckout = useRef(false);
   const [form, setForm] = useState({
     customer_name:"", customer_phone:"", customer_city:"",
@@ -68,22 +73,17 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     w.ttq?.track("InitiateCheckout", { value: b1, currency: "MAD", content_id: product.id, content_name: product.name });
   }
 
-  // Standard COD e-commerce bundle discounts: -10% for 2x, -20% for 3x
-  // These match the server-side calculation in /api/public/orders so prices
-  // are consistent between what the customer sees and what the order records.
-  const unitPrice = b1; // sale_price_mad
-  const bundles = [
-    { qty:1, label:"1×", price: unitPrice,
-      note:"قطعة واحدة" },
-    { qty:2, label:"2×", price: b2 || Math.round(unitPrice * 2 * 0.90),
-      note:`وفّر ${Math.round(unitPrice * 2 - (b2 || Math.round(unitPrice * 2 * 0.90)))} درهم`, pop:true },
-    { qty:3, label:"3×", price: b3 || Math.round(unitPrice * 3 * 0.80),
-      note:`وفّر ${Math.round(unitPrice * 3 - (b3 || Math.round(unitPrice * 3 * 0.80)))} درهم` },
-  ];
-  const total = bundles.find((b) => b.qty === bundle)?.price ?? unitPrice;
+  // Offres flexibles configurées sur la landing page (sinon 1/2/3 pièces).
+  const unitPrice = b1; // prix d'une pièce
+  const offers: Offer[] = offersProp?.length ? offersProp : normalizeOffers([], { price: b1, b1, b2, b3 });
+  const [offerId, setOfferId] = useState<string>(() => (offers.find((o) => o.isDefault) ?? offers[0]).id);
+  const offer = offers.find((o) => o.id === offerId) ?? offers[0];
+  const total = offer.price;
   const activeVariants = variants.filter(v => v.options.some(o => o.label.trim()));
 
-  function changeBundle(qty: number) {
+  function changeOffer(o: Offer) {
+    setOfferId(o.id);
+    const qty = o.qty;
     setBundle(qty);
     setSelectedVariants(prev => {
       const next = prev.slice(0, qty);
@@ -126,7 +126,8 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           method:"POST", headers:{"Content-Type":"application/json"},
           body: JSON.stringify({
             ...form,
-            quantity:     bundle,
+            quantity:     offer.qty,
+            offer_id:     offer.id,
             bundle_price: total,   // send the bundle total so API applies correct pricing
             variants:     selectedVariants.slice(0, bundle),
             product_id:   product.id,
@@ -227,44 +228,45 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         style={{ position:"absolute", left:"-9999px", opacity:0 }}
         tabIndex={-1} aria-hidden="true" />
 
-      {/* Bundle selector */}
+      {/* Offres */}
       <div style={{ marginBottom:"18px" }}>
-        <label style={LBL}>الكمية</label>
+        <label style={LBL}>اختار العرض</label>
         <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
-          {bundles.map((b) => (
-            <button key={b.qty} type="button" onClick={() => changeBundle(b.qty)}
-              style={{ display:"flex", justifyContent:"space-between",
-                alignItems:"center", padding:"12px 14px", borderRadius:"12px",
-                border:`2px solid ${bundle===b.qty ? "#16a34a" : "#e5e7eb"}`,
-                background: bundle===b.qty ? "#f0fdf4" : "#fff",
-                cursor:"pointer", fontFamily:"var(--font-cairo),sans-serif",
-                transition:"border-color .15s,background .15s" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                <div style={{ width:"18px", height:"18px", borderRadius:"50%",
-                  border:`2px solid ${bundle===b.qty ? "#16a34a" : "#d1d5db"}`,
-                  background: bundle===b.qty ? "#16a34a" : "transparent",
-                  display:"flex", alignItems:"center", justifyContent:"center",
-                  flexShrink:0 }}>
-                  {bundle===b.qty && (
-                    <div style={{ width:"7px", height:"7px",
-                      borderRadius:"50%", background:"#fff" }} />
-                  )}
+          {offers.map((o) => {
+            const on = o.id === offer.id;
+            const save = savings(o, unitPrice);
+            return (
+              <button key={o.id} type="button" onClick={() => changeOffer(o)}
+                style={{ position:"relative", display:"flex", justifyContent:"space-between", alignItems:"center",
+                  padding:"12px 14px", borderRadius:"12px",
+                  border:`2px solid ${on ? "#16a34a" : "#e5e7eb"}`, background: on ? "#f0fdf4" : "#fff",
+                  cursor:"pointer", fontFamily:"var(--font-cairo),sans-serif", transition:"border-color .15s,background .15s", textAlign:"right" }}>
+                {o.badge && (
+                  <span style={{ position:"absolute", top:"-9px", left:"12px", background:"#dc2626", color:"#fff",
+                    fontSize:"10px", fontWeight:800, padding:"2px 8px", borderRadius:"9999px" }}>{o.badge}</span>
+                )}
+                <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                  <div style={{ width:"18px", height:"18px", borderRadius:"50%", flexShrink:0,
+                    border:`2px solid ${on ? "#16a34a" : "#d1d5db"}`, background: on ? "#16a34a" : "transparent",
+                    display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    {on && <div style={{ width:"7px", height:"7px", borderRadius:"50%", background:"#fff" }} />}
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-start" }}>
+                    <span style={{ fontSize:"14px", fontWeight:800, color:"#111827" }}>{o.label || defaultLabel(o.qty)}</span>
+                    {(o.note || save > 0) && (
+                      <span style={{ fontSize:"11px", color:"#16a34a", fontWeight:700 }}>
+                        {o.note || `وفّر ${save} درهم`}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <span style={{ fontSize:"14px", fontWeight:700, color:"#111827" }}>
-                  {b.label} — {b.note}
-                  {b.pop && <span style={{ marginRight:"6px",
-                    background:"#fef3c7", color:"#92400e",
-                    fontSize:"10px", fontWeight:700,
-                    padding:"1px 6px", borderRadius:"9999px" }}>
-                    الأوفر
-                  </span>}
-                </span>
-              </div>
-              <span style={{ fontSize:"16px", fontWeight:900, color:"#16a34a" }}>
-                {b.price.toFixed(0)} درهم
-              </span>
-            </button>
-          ))}
+                <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end" }}>
+                  <span style={{ fontSize:"17px", fontWeight:900, color:"#16a34a" }}>{o.price.toFixed(0)} درهم</span>
+                  {save > 0 && <span style={{ fontSize:"11px", color:"#9ca3af", textDecoration:"line-through" }}>{(unitPrice * o.qty).toFixed(0)} درهم</span>}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
