@@ -13,6 +13,7 @@ import { syncMetaAdInsights, syncTikTokAdInsights } from "@/lib/ads/insights-syn
 import { syncCreativeStatuses } from "@/lib/ads/meta-status";
 import { snapshotEditorEarnings } from "@/lib/creatives/rates";
 import { runAdRules } from "@/lib/ads/rules-engine";
+import { reportDeliveredToMeta, syncBuyersAudience } from "@/lib/meta/reporting";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -44,6 +45,9 @@ export async function GET(req: NextRequest) {
   }
   // Gains éditeurs figés dès qu'une commande vidéo est livrée
   result.editorEarnings = await safe(() => snapshotEditorEarnings());
+  // Livraisons → Meta (Purchase) + audience "Acheteurs livrés"
+  result.metaPurchases = await safe(() => reportDeliveredToMeta());
+  result.metaAudience  = await safe(() => syncBuyersAudience());
 
   if (!only || only === "ads") {
     // Dépenses par produit : une ligne par jour → pas de double comptage

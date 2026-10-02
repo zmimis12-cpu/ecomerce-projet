@@ -33,6 +33,9 @@ export interface PurchaseEventInput {
   clientIp?: string | null;
   clientUserAgent?: string | null;
   eventId: string;        // = order id, pour dédupliquer si rejoué
+  eventTime?: number;     // secondes UNIX (défaut : maintenant) — Meta refuse > 7 jours
+  actionSource?: "website" | "other" | "chat";
+  contentIds?: string[];
 }
 
 export async function sendMetaPurchaseEvent(input: PurchaseEventInput): Promise<{ ok: boolean; error?: string }> {
@@ -57,11 +60,11 @@ export async function sendMetaPurchaseEvent(input: PurchaseEventInput): Promise<
   const body = {
     data: [{
       event_name: "Purchase",
-      event_time: Math.floor(Date.now() / 1000),
+      event_time: input.eventTime ?? Math.floor(Date.now() / 1000),
       event_id: input.eventId, // dédup avec un éventuel pixel navigateur qui aurait aussi tracké
-      action_source: "website",
+      action_source: input.actionSource ?? "website",
       user_data: userData,
-      custom_data: { value: input.value, currency: input.currency },
+      custom_data: { value: input.value, currency: input.currency, ...(input.contentIds?.length ? { content_ids: input.contentIds, content_type: "product" } : {}) },
     }],
   };
 
@@ -78,3 +81,5 @@ export async function sendMetaPurchaseEvent(input: PurchaseEventInput): Promise<
   }
   return { ok: true };
 }
+
+export { sha256 as sha256Meta, normalizeForMeta };

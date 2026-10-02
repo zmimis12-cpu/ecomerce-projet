@@ -107,6 +107,9 @@ async function processWebhook(params: {
     // Commande livrée venant d'une vidéo → gain éditeur figé tout de suite
     const { snapshotEditorEarnings } = await import("@/lib/creatives/rates");
     await snapshotEditorEarnings().catch(() => {});
+    // Livrée → "Purchase" envoyé à Meta tout de suite
+    const { reportDeliveredToMeta } = await import("@/lib/meta/reporting");
+    await reportDeliveredToMeta().catch(() => {});
     await log("processed", payload, { tracking, idStatus });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown";
