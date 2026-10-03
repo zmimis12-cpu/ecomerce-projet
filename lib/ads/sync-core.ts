@@ -39,7 +39,10 @@ async function syncMetaAdSpendOneRange(dateFrom: string, dateTo: string) {
   for (const a of accounts) {
     const client = new MetaAdsClient(a.token, a.adAccountId!);
     const r = await client.getCampaignSpend(dateFrom, dateTo);
-    if (r.ok) merged.push(...(r.campaigns as { campaign_id: string; campaign_name: string; spend: number }[]));
+    // Taxe propre à chaque compte (ex : 20 % Maroc, 0 % compte USA)
+    const { getAccountTaxConfig, taxFactorFor } = await import("./fx");
+    const f = taxFactorFor(dateFrom, await getAccountTaxConfig(a));
+    if (r.ok) merged.push(...(r.campaigns as { campaign_id: string; campaign_name: string; spend: number }[]).map((c) => ({ ...c, spend: Number(c.spend) * f })));
     else errs.push(`${a.label}: ${r.error}`);
   }
   // Si un compte échoue, on n'écrase PAS les chiffres déjà enregistrés (sinon sous-estimation)
@@ -104,7 +107,7 @@ async function syncMetaAdSpendOneRange(dateFrom: string, dateTo: string) {
   const unmatchedSpendUsd = unmatchedCampaigns.reduce((s, c) => s + c.spend, 0);
 
   // Taux USD→MAD réel du jour (marché + frais bancaires éventuels)
-  const { rate: USD_TO_MAD } = await getUsdToMad(dateFrom); // taxe Meta incluse si applicable ce jour-là
+  const { base: USD_TO_MAD } = await getUsdToMad(dateFrom); // taxe appliquée compte par compte ci-dessus
 
   const rowsToUpsert = [...spendByProduct.entries()].map(([product_id, { spend, campaign_names }]) => ({
     product_id,

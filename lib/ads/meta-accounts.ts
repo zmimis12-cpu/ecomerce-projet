@@ -20,6 +20,8 @@ export type MetaAccount = {
   pixelId?: string | null;
   pageId?: string | null;
   igUserId?: string | null;
+  taxPct?: number | null;       // TVA facturée par Meta sur CE compte (ex : 20 au Maroc, 0 aux USA)
+  taxSince?: string | null;     // YYYY-MM-DD
   status?: "ok" | "pending" | "error";
   lastError?: string | null;
   checkedAt?: string | null;

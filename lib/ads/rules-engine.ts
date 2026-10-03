@@ -214,15 +214,18 @@ export async function runAdRules() {
   const accounts = await activeMetaAccounts();
   if (!accounts.length) return { ok: false, error: "Meta non configuré" };
   const s = { access_token: accounts[0].token };
+  const { getAccountTaxConfig, taxFactorFor } = await import("./fx");
+  const taxOf = new Map<string, number>();
+  for (const a of accounts) taxOf.set(a.token, taxFactorFor(null, await getAccountTaxConfig(a)));
   const all = async (path: (acc: string) => string, params: Record<string, string>) => {
-    const out: (Record<string, unknown> & { _token: string })[] = [];
+    const out: (Record<string, unknown> & { _token: string; _tax: number })[] = [];
     for (const a of accounts) {
       const rows = await metaGet(path(actOf(a)), params, a.token);
-      out.push(...rows.map((r) => ({ ...r, _token: a.token })));
+      out.push(...rows.map((r) => ({ ...r, _token: a.token, _tax: taxOf.get(a.token) ?? 1 })));
     }
     return out;
   };
-  const { rate } = await getUsdToMad();
+  const { base: rate } = await getUsdToMad(); // taxe appliquée ligne par ligne (_tax)
 
   const campaigns = (await all((acc) => `${acc}/campaigns`, { fields: "id,name,effective_status,daily_budget", limit: "500" }))
     .map((c) => ({ id: String(c.id), name: String(c.name), status: String(c.effective_status), dailyCents: Number(c.daily_budget ?? 0), token: c._token }));
@@ -266,7 +269,7 @@ export async function runAdRules() {
           const myCamps = campaigns.filter((c) => campProduct.get(c.id) === pid);
           if (!myCamps.length) continue;
           const ins = camp.filter((x) => myCamps.some((c) => c.id === x.campaign_id));
-          const spendUsd = ins.reduce((a, x) => a + Number(x.spend ?? 0), 0);
+          const spendUsd = ins.reduce((a, x) => a + Number(x.spend ?? 0) * Number((x as { _tax?: number })._tax ?? 1), 0);
           const impressions = ins.reduce((a, x) => a + Number(x.impressions ?? 0), 0);
           const clicks = ins.reduce((a, x) => a + Number(x.inline_link_clicks ?? 0), 0);
           const freq = ins.length ? Math.max(...ins.map((x) => Number(x.frequency ?? 0))) : 0;
@@ -295,7 +298,7 @@ export async function runAdRules() {
           const cr = adCreative.get(adId);
           const o = cr ? orders.byCreative.get(cr) ?? { orders: 0, delivered: 0 } : { orders: 0, delivered: 0 };
           const m = finish({
-            spend: Number(x.spend ?? 0) * rate, orders: o.orders, delivered: o.delivered,
+            spend: Number(x.spend ?? 0) * Number((x as { _tax?: number })._tax ?? 1) * rate, orders: o.orders, delivered: o.delivered,
             meta_results: leadsOf(x.actions), impressions: Number(x.impressions ?? 0), frequency: Number(x.frequency ?? 0),
           }, Number(x.inline_link_clicks ?? 0));
           if (!conds.every((c) => check(c, m))) continue;

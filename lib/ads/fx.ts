@@ -22,6 +22,12 @@ async function writeSetting(key: string, value: number, label: string) {
 }
 
 /** TVA / taxe facturée par Meta (non visible dans l'API) : saisie par toi. */
+/** Taxe d'UN compte Meta : réglage propre au compte, sinon réglage général. */
+export async function getAccountTaxConfig(acc: { taxPct?: number | null; taxSince?: string | null }) {
+  if (acc.taxPct !== undefined && acc.taxPct !== null) return { pct: Number(acc.taxPct) || 0, since: acc.taxSince ?? null };
+  return getMetaTaxConfig();
+}
+
 export async function getMetaTaxConfig(): Promise<{ pct: number; since: string | null }> {
   const [p, d] = await Promise.all([readSetting("meta_tax_pct"), readSetting("meta_tax_since")]);
   const pct = Number(p?.value ?? 0) || 0;

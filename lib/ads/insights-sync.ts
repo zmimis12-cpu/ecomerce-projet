@@ -6,7 +6,7 @@
  */
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { readSettings } from "./sync-core";
-import { getUsdToMad, getMetaTaxConfig, taxFactorFor } from "./fx";
+import { getUsdToMad, getAccountTaxConfig, taxFactorFor } from "./fx";
 
 const META_BASE = "https://graph.facebook.com/v21.0";
 const TIKTOK_BASE = "https://business-api.tiktok.com/open_api/v1.3";
@@ -91,7 +91,7 @@ export async function syncMetaAdInsights(since: string, until: string) {
   const map = await adAccountMap();
   const out: unknown[] = [];
   for (const a of accounts) {
-    const r = await syncMetaAdInsightsFor(act(a), a.token, since, until);
+    const r = await syncMetaAdInsightsFor(act(a), a.token, since, until, await getAccountTaxConfig(a));
     out.push({ account: a.label, ...r });
     for (const id of ((r as { adIds?: string[] }).adIds ?? [])) map[id] = a.key;
   }
@@ -99,10 +99,9 @@ export async function syncMetaAdInsights(since: string, until: string) {
   return { ok: true, accounts: out };
 }
 
-async function syncMetaAdInsightsFor(acc: string, token: string, since: string, until: string) {
+async function syncMetaAdInsightsFor(acc: string, token: string, since: string, until: string, taxCfg: { pct: number; since: string | null }) {
   const s = { access_token: token };
   const { base: usdToMad } = await getUsdToMad();
-  const taxCfg = await getMetaTaxConfig();
   const url = new URL(`${META_BASE}/${acc}/insights`);
   url.searchParams.set("level", "ad");
   url.searchParams.set("time_increment", "1");
