@@ -3,6 +3,7 @@
  * avec les mêmes colonnes que Meta Ads Manager. Server-only.
  */
 import { readSettings } from "./sync-core";
+import { fetchMetaByIds } from "./meta-fetch";
 import { deriveDelivery, type Delivery } from "./meta-status";
 
 const META = "https://graph.facebook.com/v21.0";
@@ -109,15 +110,10 @@ async function getMetaAdsLiveFor(token: string, adIds: string[], range: { since:
   ].join(",");
 
   const ads: MetaLiveAd[] = [];
-  for (let i = 0; i < adIds.length; i += 50) {
-    const url = new URL(`${META}/`);
-    url.searchParams.set("ids", adIds.slice(i, i + 50).join(","));
-    url.searchParams.set("fields", fields);
-    url.searchParams.set("access_token", s.access_token);
-    const res = await fetch(url.toString(), { cache: "no-store" });
-    const json = await res.json();
-    if (!res.ok || json.error) return { ok: false, error: json?.error?.message ?? `HTTP ${res.status}` };
-
+  {
+    const got = await fetchMetaByIds(adIds, fields, s.access_token);
+    if (!got.ok) return { ok: false, error: got.error };
+    const json = got.data;
     for (const [id, a] of Object.entries(json as Record<string, Record<string, unknown>>)) {
       const adset = (a.adset ?? {}) as Record<string, unknown>;
       const campaign = (adset.campaign ?? {}) as Record<string, unknown>;

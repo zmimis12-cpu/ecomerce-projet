@@ -67,18 +67,12 @@ export async function getMetaDeliveries(adIds: string[]): Promise<Map<string, De
 
 async function deliveriesFor(token: string, adIds: string[], out: Map<string, Delivery>) {
   const s = { access_token: token };
-  for (let i = 0; i < adIds.length; i += 50) {
-    const url = new URL(`${META}/`);
-    url.searchParams.set("ids", adIds.slice(i, i + 50).join(","));
-    url.searchParams.set("fields", DELIVERY_FIELDS);
-    url.searchParams.set("access_token", s.access_token);
-    try {
-      const res = await fetch(url.toString(), { cache: "no-store" });
-      const json = await res.json();
-      if (!res.ok || json.error) continue;
-      for (const [id, ad] of Object.entries(json as Record<string, Record<string, unknown>>)) out.set(id, deriveDelivery(ad));
-    } catch { /* réseau : on garde ce qu'on a */ }
-  }
+  try {
+    const { fetchMetaByIds } = await import("./meta-fetch");
+    const got = await fetchMetaByIds(adIds, DELIVERY_FIELDS, s.access_token);
+    if (!got.ok) return;
+    for (const [id, ad] of Object.entries(got.data)) out.set(id, deriveDelivery(ad));
+  } catch { /* réseau : on garde ce qu'on a */ }
 }
 
 export type CreativeLive = { label: string; tone: Tone; detail: string; dbStatus: "in_ads" | "paused" | "draft" };
