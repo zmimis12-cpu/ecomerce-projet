@@ -41,7 +41,7 @@ export default async function AdminAdStatsPage({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold"><BarChart3 className="h-5 w-5 text-blue-600" /> Stats pubs (toutes)</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Toutes les pubs de ton compte Meta, en direct, mêmes colonnes que Meta Ads Manager.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Toutes les pubs de TOUS tes comptes Meta, en direct, mêmes colonnes que Meta Ads Manager.</p>
         </div>
         <PeriodFilter period={period} />
       </div>
@@ -54,8 +54,18 @@ export default async function AdminAdStatsPage({
             <span className="text-2xl font-bold text-blue-900">
               ${lifetime.usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
-            <span className="text-sm text-blue-800">≈ {Math.round(lifetime.usd * fx.rate).toLocaleString("fr-FR")} MAD (taux {fx.rate})</span>
+            <span className="text-sm text-blue-800">≈ {lifetime.mad.toLocaleString("fr-FR")} MAD (taxe de chaque compte incluse)</span>
           </div>
+          {lifetime.accounts.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {lifetime.accounts.map((x) => (
+                <span key={x.label} className="rounded-md bg-white px-2 py-1 text-xs text-blue-900">
+                  {x.label} : <b>${x.usd.toLocaleString("en-US", { minimumFractionDigits: 2 })}</b> · {x.mad.toLocaleString("fr-FR")} MAD
+                  {x.taxPct > 0 ? ` (TVA ${x.taxPct} %)` : " (sans TVA)"}
+                </span>
+              ))}
+            </div>
+          )}
           <div className="mt-0.5 text-xs text-blue-700">
             Compte publicitaire Meta, depuis le {lifetime.since ? new Date(lifetime.since).toLocaleDateString("fr-FR") : "—"} — toutes campagnes, y compris supprimées. Identique à Meta Ads Manager (période « Maximum »).
           </div>

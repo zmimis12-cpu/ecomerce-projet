@@ -34,6 +34,7 @@ export interface PurchaseEventInput {
   clientUserAgent?: string | null;
   eventId: string;        // = order id, pour dédupliquer si rejoué
   eventTime?: number;     // secondes UNIX (défaut : maintenant) — Meta refuse > 7 jours
+  eventName?: "Purchase" | "Lead";
   actionSource?: "website" | "other" | "chat";
   contentIds?: string[];
 }
@@ -59,7 +60,7 @@ export async function sendMetaPurchaseEvent(input: PurchaseEventInput): Promise<
 
   const body = {
     data: [{
-      event_name: "Purchase",
+      event_name: input.eventName ?? "Purchase",
       event_time: input.eventTime ?? Math.floor(Date.now() / 1000),
       event_id: input.eventId, // dédup avec un éventuel pixel navigateur qui aurait aussi tracké
       action_source: input.actionSource ?? "website",

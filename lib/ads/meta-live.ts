@@ -212,19 +212,24 @@ async function getAccountAdIdsFor(acc: string, token: string): Promise<string[]>
 }
 
 /** Dépense TOTALE depuis le début, additionnée sur TOUS les comptes Meta. */
-export async function getAccountLifetimeSpend(): Promise<{ usd: number; since: string | null; accounts: { label: string; usd: number }[] } | null> {
+export async function getAccountLifetimeSpend(): Promise<{ usd: number; since: string | null; accounts: { label: string; usd: number; taxPct: number; mad: number }[]; mad: number } | null> {
   const { activeMetaAccounts, act } = await import("./meta-accounts");
   const accounts = await activeMetaAccounts();
   if (!accounts.length) return null;
-  let usd = 0; let since: string | null = null;
-  const per: { label: string; usd: number }[] = [];
+  let usd = 0; let since: string | null = null; let mad = 0;
+  const per: { label: string; usd: number; taxPct: number; mad: number }[] = [];
+  const { getUsdToMad, getAccountTaxConfig } = await import("./fx");
+  const { base } = await getUsdToMad();
   for (const a of accounts) {
     const r = await lifetimeFor(act(a), a.token);
     if (!r) continue;
-    usd += r.usd; per.push({ label: a.label, usd: r.usd });
+    const tax = await getAccountTaxConfig(a);
+    const m = Math.round(r.usd * base * (1 + tax.pct / 100));
+    usd += r.usd; mad += m;
+    per.push({ label: a.label, usd: r.usd, taxPct: tax.pct, mad: m });
     if (r.since && (!since || r.since < since)) since = r.since;
   }
-  return { usd, since, accounts: per };
+  return { usd, since, accounts: per, mad };
 }
 
 async function lifetimeFor(acc: string, token: string): Promise<{ usd: number; since: string | null } | null> {
