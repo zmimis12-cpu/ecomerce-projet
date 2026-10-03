@@ -100,8 +100,9 @@ export function NewLaunchForm({ products }: { products: { id: string; name: stri
 }
 
 /* ─────────────── 2. Ajout d'une pub (vidéo / image + textes) ─────────────── */
-export function ItemEditor({ launchId, creatives, texts }: {
+export function ItemEditor({ launchId, creatives, texts, adsets = [] }: {
   launchId: string;
+  adsets?: { id: string; name: string }[];
   creatives: { id: string; code: string; title: string }[];
   texts: { headline: string; primary: string }[];
 }) {
@@ -110,6 +111,9 @@ export function ItemEditor({ launchId, creatives, texts }: {
   const [headline, setHeadline] = useState(texts[0]?.headline ?? "");
   const [primary, setPrimary] = useState(texts[0]?.primary ?? "");
   const [cta, setCta] = useState("ORDER_NOW");
+  const [adsetRef, setAdsetRef] = useState(adsets[0]?.id ?? "");
+  const [description, setDescription] = useState("الدفع عند الاستلام — توصيل مجاني");
+  const [adName, setAdName] = useState("");
   const [progress, setProgress] = useState("");
   const [pending, start] = useTransition();
 
@@ -122,7 +126,7 @@ export function ItemEditor({ launchId, creatives, texts }: {
     if (!u.success || !u.data) { setProgress(u.error ?? "Erreur d'envoi"); return; }
     const { error } = await createClient().storage.from("ad-media").uploadToSignedUrl(u.data.path, u.data.token, file, { contentType: file.type });
     if (error) { setProgress(`Envoi échoué : ${error.message}`); return; }
-    const r = await addLaunchItem(launchId, { creativeId: creativeId || null, mediaType: type, mediaPath: u.data.path, primaryText: primary, headline, cta });
+    const r = await addLaunchItem(launchId, { creativeId: creativeId || null, mediaType: type, mediaPath: u.data.path, primaryText: primary, headline, cta, adsetRef: adsetRef || null, description, adName });
     setProgress(r.success ? "✅ Pub ajoutée." : r.error ?? "Erreur");
     if (r.success) { setFile(null); setCreativeId(""); }
   });
@@ -152,7 +156,16 @@ export function ItemEditor({ launchId, creatives, texts }: {
             onClick={() => { setHeadline(t.headline); setPrimary(t.primary); }}>Modèle {i + 1}</button>
         ))}
       </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {adsets.length > 0 && (
+          <select className={INPUT} value={adsetRef} onChange={(e) => setAdsetRef(e.target.value)}>
+            {adsets.map((a) => <option key={a.id} value={a.id}>Ensemble : {a.name}</option>)}
+          </select>
+        )}
+        <input className={INPUT} value={adName} onChange={(e) => setAdName(e.target.value)} placeholder="Nom de la pub (auto si vide)" />
+      </div>
       <input dir="auto" className={INPUT + " w-full"} value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Titre" />
+      <input dir="auto" className={INPUT + " w-full"} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" />
       <textarea dir="auto" className="min-h-[110px] w-full rounded-md border bg-background p-3 text-sm" value={primary} onChange={(e) => setPrimary(e.target.value)} placeholder="Texte principal" />
       <div className="flex items-center gap-3">
         <button className={BTN} disabled={pending} onClick={add}><Upload className="h-4 w-4" /> Ajouter cette pub</button>

@@ -170,14 +170,44 @@ async function landingLink(productId: string | null, code: string | null) {
 
 type Launch = {
   id: string; name: string; product_id: string | null; daily_budget_usd: number; age_min: number; age_max: number;
-  cost_cap_usd: number | null;
+  cost_cap_usd: number | null; objective: string | null; budget_mode: string | null; campaign_budget_usd: number | null;
   status: string; meta_campaign_id: string | null; meta_adset_id: string | null;
 };
 type Item = {
   id: string; creative_id: string | null; media_type: "video" | "image"; media_path: string; primary_text: string;
   headline: string; cta: string; status: string; meta_video_id: string | null; meta_image_hash: string | null;
   meta_creative_id: string | null; meta_ad_id: string | null;
+  adset_ref: string | null; ad_name: string | null; description: string | null; display_link: string | null; url_override: string | null;
 };
+export type AdsetRow = {
+  id: string; name: string; daily_budget_usd: number; optimization_event: string; bid_strategy: string; cost_cap_usd: number | null;
+  age_min: number; age_max: number; genders: string; advantage_audience: boolean; placements: unknown;
+  start_time: string | null; end_time: string | null; meta_adset_id: string | null; status: string; error: string | null; position: number;
+};
+
+/** Événement d'optimisation → paramètres Meta (comme dans Ads Manager). */
+function optimization(ev: string, pixelId: string) {
+  switch (ev) {
+    case "PURCHASE": return { optimization_goal: "OFFSITE_CONVERSIONS", promoted_object: { pixel_id: pixelId, custom_event_type: "PURCHASE" } };
+    case "INITIATED_CHECKOUT": return { optimization_goal: "OFFSITE_CONVERSIONS", promoted_object: { pixel_id: pixelId, custom_event_type: "INITIATED_CHECKOUT" } };
+    case "LANDING_PAGE_VIEWS": return { optimization_goal: "LANDING_PAGE_VIEWS" };
+    case "LINK_CLICKS": return { optimization_goal: "LINK_CLICKS" };
+    default: return { optimization_goal: "OFFSITE_CONVERSIONS", promoted_object: { pixel_id: pixelId, custom_event_type: "LEAD" } };
+  }
+}
+
+/** Emplacements : "auto" (Advantage+) ou choix manuel Facebook / Instagram. */
+function placementTargeting(p: unknown) {
+  if (!p || p === "auto") return {};
+  const pl = p as { facebook?: string[]; instagram?: string[] };
+  const platforms = [...(pl.facebook?.length ? ["facebook"] : []), ...(pl.instagram?.length ? ["instagram"] : [])];
+  if (!platforms.length) return {};
+  return {
+    publisher_platforms: platforms,
+    ...(pl.facebook?.length ? { facebook_positions: pl.facebook } : {}),
+    ...(pl.instagram?.length ? { instagram_positions: pl.instagram } : {}),
+  };
+}
 
 /** Crée (ou reprend) la campagne dans Meta, étape par étape. Rejouable sans doublon. */
 export async function processLaunch(launchId: string) {
@@ -196,9 +226,13 @@ export async function processLaunch(launchId: string) {
     // 1. Campagne
     let campaignId = launch.meta_campaign_id;
     if (!campaignId) {
+      const cbo = launch.budget_mode === "cbo" && Number(launch.campaign_budget_usd) > 0;
       const c = await metaPost(`${acc}/campaigns`, {
-        name: launch.name, objective: "OUTCOME_LEADS", status: "PAUSED",
-        special_ad_categories: [], buying_type: "AUCTION", is_adset_budget_sharing_enabled: false,
+        name: launch.name, objective: launch.objective || "OUTCOME_LEADS", status: "PAUSED",
+        special_ad_categories: [], buying_type: "AUCTION",
+        ...(cbo
+          ? { daily_budget: String(Math.round(Number(launch.campaign_budget_usd) * 100)), bid_strategy: "LOWEST_COST_WITHOUT_CAP" }
+          : { is_adset_budget_sharing_enabled: false }),
       }, token);
       campaignId = String(c.id);
       await upd({ meta_campaign_id: campaignId });
@@ -210,31 +244,43 @@ export async function processLaunch(launchId: string) {
       }
     }
 
-    // 2. Ensemble de pubs : large Maroc, Advantage+ audience, optimisé Lead pixel
-    let adsetId = launch.meta_adset_id;
-    if (!adsetId) {
-      const a = await metaPost(`${acc}/adsets`, {
-        name: `${launch.name} — Large Maroc`,
-        campaign_id: campaignId,
-        daily_budget: String(Math.round(Number(launch.daily_budget_usd) * 100)),
-        billing_event: "IMPRESSIONS",
-        optimization_goal: "OFFSITE_CONVERSIONS",
-        // Coût max par livraison demandé → plafond de coût par lead (Cost Cap)
-        ...(launch.cost_cap_usd
-          ? { bid_strategy: "COST_CAP", bid_amount: String(Math.round(Number(launch.cost_cap_usd) * 100)) }
-          : { bid_strategy: "LOWEST_COST_WITHOUT_CAP" }),
-        promoted_object: { pixel_id: id.pixelId, custom_event_type: "LEAD" },
-        targeting: {
-          geo_locations: { countries: ["MA"], location_types: ["home", "recent"] },
-          age_min: launch.age_min, age_max: launch.age_max,
-          targeting_automation: { advantage_audience: 1 },
-        },
-        attribution_spec: [{ event_type: "CLICK_THROUGH", window_days: 7 }, { event_type: "VIEW_THROUGH", window_days: 1 }],
-        status: "PAUSED",
-      }, token);
-      adsetId = String(a.id);
-      await upd({ meta_adset_id: adsetId });
+    // 2. Ensembles de pubs (comme dans Ads Manager)
+    const { data: setsRaw } = await supabaseAdmin.from("campaign_launch_adsets" as never).select("*").eq("launch_id", launchId).order("position");
+    const adsets = (setsRaw ?? []) as unknown as AdsetRow[];
+    if (!adsets.length) throw new Error("Ajoute au moins un ensemble de pubs.");
+    const cbo = launch.budget_mode === "cbo" && Number(launch.campaign_budget_usd) > 0;
+    for (const st of adsets) {
+      if (st.meta_adset_id) continue;
+      try {
+        const gender = st.genders === "male" ? { genders: [1] } : st.genders === "female" ? { genders: [2] } : {};
+        const a = await metaPost(`${acc}/adsets`, {
+          name: st.name,
+          campaign_id: campaignId,
+          ...(cbo ? {} : { daily_budget: String(Math.round(Number(st.daily_budget_usd) * 100)) }),
+          billing_event: "IMPRESSIONS",
+          ...optimization(st.optimization_event, id.pixelId),
+          ...(cbo ? {} : st.bid_strategy === "COST_CAP" && st.cost_cap_usd
+            ? { bid_strategy: "COST_CAP", bid_amount: String(Math.round(Number(st.cost_cap_usd) * 100)) }
+            : { bid_strategy: "LOWEST_COST_WITHOUT_CAP" }),
+          targeting: {
+            geo_locations: { countries: ["MA"], location_types: ["home", "recent"] },
+            age_min: st.age_min, age_max: st.age_max, ...gender,
+            ...placementTargeting(st.placements),
+            targeting_automation: { advantage_audience: st.advantage_audience ? 1 : 0 },
+          },
+          attribution_spec: [{ event_type: "CLICK_THROUGH", window_days: 7 }, { event_type: "VIEW_THROUGH", window_days: 1 }],
+          ...(st.start_time ? { start_time: st.start_time } : {}),
+          ...(st.end_time ? { end_time: st.end_time } : {}),
+          status: "PAUSED",
+        }, token);
+        st.meta_adset_id = String(a.id);
+        await supabaseAdmin.from("campaign_launch_adsets" as never).update({ meta_adset_id: st.meta_adset_id, status: "created", error: null } as never).eq("id", st.id);
+      } catch (e) {
+        await supabaseAdmin.from("campaign_launch_adsets" as never).update({ status: "error", error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } as never).eq("id", st.id);
+      }
     }
+    const adsetMeta = new Map(adsets.map((x) => [x.id, x.meta_adset_id]));
+    if (adsets[0]?.meta_adset_id) await upd({ meta_adset_id: adsets[0].meta_adset_id });
 
     // 3. Pubs
     const { data: its } = await supabaseAdmin.from("campaign_launch_items" as never).select("*").eq("launch_id", launchId).order("created_at");
@@ -250,7 +296,10 @@ export async function processLaunch(launchId: string) {
       try {
         const fileUrl = supabaseAdmin.storage.from(BUCKET).getPublicUrl(it.media_path).data.publicUrl;
         const code = it.creative_id ? codeOf.get(it.creative_id) ?? null : null;
-        const link = await landingLink(launch.product_id, code);
+        const adsetId = adsetMeta.get(it.adset_ref ?? "") ?? adsets[0]?.meta_adset_id;
+        if (!adsetId) throw new Error("Son ensemble de pubs n'a pas pu être créé (voir l'erreur de l'ensemble).");
+        const link = it.url_override?.trim() || await landingLink(launch.product_id, code);
+        const ctaValue = { link, ...(it.display_link ? { link_caption: it.display_link } : {}) };
         let storySpec: Record<string, unknown>;
 
         if (it.media_type === "video") {
@@ -272,7 +321,8 @@ export async function processLaunch(launchId: string) {
             video_data: {
               video_id: videoId, ...(thumb ? { image_url: thumb } : {}),
               message: it.primary_text, title: it.headline,
-              call_to_action: { type: it.cta, value: { link } },
+              ...(it.description ? { link_description: it.description } : {}),
+              call_to_action: { type: it.cta, value: ctaValue },
             },
           };
         } else {
@@ -289,7 +339,9 @@ export async function processLaunch(launchId: string) {
             page_id: id.pageId, ...(id.igUserId ? { instagram_user_id: id.igUserId } : {}),
             link_data: {
               image_hash: hash, link, message: it.primary_text, name: it.headline,
-              call_to_action: { type: it.cta, value: { link } },
+              ...(it.description ? { description: it.description } : {}),
+              ...(it.display_link ? { caption: it.display_link } : {}),
+              call_to_action: { type: it.cta, value: ctaValue },
             },
           };
         }
@@ -301,7 +353,7 @@ export async function processLaunch(launchId: string) {
           await updItem({ meta_creative_id: creativeId });
         }
         const ad = await metaPost(`${acc}/ads`, {
-          name: `${code ? code + " - " : ""}${it.headline}`.slice(0, 100),
+          name: (it.ad_name?.trim() || `${code ? code + " - " : ""}${it.headline}`).slice(0, 100),
           adset_id: adsetId, creative: { creative_id: creativeId }, status: "PAUSED",
         }, token);
         await updItem({ meta_ad_id: String(ad.id), status: "created", error: null });
@@ -331,10 +383,11 @@ export async function activateLaunch(launchId: string) {
   const { token } = await tokenAndAccount();
   const { data: l } = await supabaseAdmin.from("campaign_launches" as never).select("*").eq("id", launchId).single();
   const launch = l as unknown as Launch;
-  if (!launch.meta_campaign_id || !launch.meta_adset_id) throw new Error("Campagne pas encore créée.");
+  if (!launch.meta_campaign_id) throw new Error("Campagne pas encore créée.");
   const { data: its } = await supabaseAdmin.from("campaign_launch_items" as never).select("meta_ad_id").eq("launch_id", launchId).eq("status", "created");
   for (const it of (its ?? []) as { meta_ad_id: string }[]) await metaPost(it.meta_ad_id, { status: "ACTIVE" }, token);
-  await metaPost(launch.meta_adset_id, { status: "ACTIVE" }, token);
+  const { data: sets } = await supabaseAdmin.from("campaign_launch_adsets" as never).select("meta_adset_id").eq("launch_id", launchId);
+  for (const x of (sets ?? []) as { meta_adset_id: string | null }[]) if (x.meta_adset_id) await metaPost(x.meta_adset_id, { status: "ACTIVE" }, token);
   await metaPost(launch.meta_campaign_id, { status: "ACTIVE" }, token);
   await supabaseAdmin.from("campaign_launches" as never).update({ status: "active", updated_at: new Date().toISOString() } as never).eq("id", launchId);
 }
