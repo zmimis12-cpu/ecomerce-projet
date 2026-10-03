@@ -61,7 +61,9 @@ export default async function AdminAdStatsPage({
               {lifetime.accounts.map((x) => (
                 <span key={x.label} className="rounded-md bg-white px-2 py-1 text-xs text-blue-900">
                   {x.label} : <b>${x.usd.toLocaleString("en-US", { minimumFractionDigits: 2 })}</b> · {x.mad.toLocaleString("fr-FR")} MAD
-                  {x.taxPct > 0 ? ` (TVA ${x.taxPct} %)` : " (sans TVA)"}
+                  {x.taxPct > 0
+                    ? ` — dont TVA ${x.taxPct} % sur $${(x.taxedUsd ?? 0).toFixed(2)} dépensés${x.taxSince ? ` depuis le ${new Date(x.taxSince).toLocaleDateString("fr-FR")}` : ""} = +$${(x.taxUsd ?? 0).toFixed(2)}`
+                    : " (sans TVA)"}
                 </span>
               ))}
             </div>

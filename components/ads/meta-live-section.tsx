@@ -103,14 +103,15 @@ export function MetaLiveSection({
   const total = sum(filtered);
 
   const groups = useMemo(() => {
-    if (!group) return [{ key: "_all", name: "", items: filtered }];
-    const m = new Map<string, { key: string; name: string; items: MetaLiveAd[] }>();
+    if (!group) return [{ key: "_all", name: "", account: "", items: filtered }];
+    const m = new Map<string, { key: string; name: string; account: string; items: MetaLiveAd[] }>();
     for (const a of filtered) {
-      const k = a.campaignId ?? "_none";
-      if (!m.has(k)) m.set(k, { key: k, name: a.campaignName ?? "Sans campagne", items: [] });
+      const k = `${a.accountLabel ?? ""}::${a.campaignId ?? "_none"}`;
+      if (!m.has(k)) m.set(k, { key: k, name: a.campaignName ?? "Sans campagne", account: a.accountLabel ?? "", items: [] });
       m.get(k)!.items.push(a);
     }
-    return [...m.values()].sort((x, y) => sum(y.items).spend - sum(x.items).spend);
+    // Trié par compte, puis par dépense
+    return [...m.values()].sort((x, y) => x.account.localeCompare(y.account) || sum(y.items).spend - sum(x.items).spend);
   }, [filtered, group]);
 
   const cols = [
@@ -152,7 +153,7 @@ export function MetaLiveSection({
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <input className={SEL + " w-56 pl-8"} placeholder="Rechercher pub, ensemble, V001…" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
-          {accountNames.length > 1 && (
+          {accountNames.length > 0 && (
             <select className={SEL} value={account} onChange={(e) => { setAccount(e.target.value); setCampaign(""); setAdset(""); }}>
               <option value="">Tous les comptes Meta</option>
               {accountNames.map((n) => <option key={n} value={n}>{n}</option>)}
@@ -186,7 +187,7 @@ export function MetaLiveSection({
             <option value="name">Trier : nom A→Z</option>
           </select>
           <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={onlySpend} onChange={(e) => setOnlySpend(e.target.checked)} /> Masquer sans diffusion</label>
-          <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={group} onChange={(e) => setGroup(e.target.checked)} /> Grouper par campagne</label>
+          <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={group} onChange={(e) => setGroup(e.target.checked)} /> Grouper par compte › campagne</label>
           {(q || campaign || adset || delivery !== "all" || video !== "all") && (
             <button className="text-xs text-primary hover:underline"
               onClick={() => { setQ(""); setCampaign(""); setAdset(""); setDelivery("all"); setVideo("all"); }}>Réinitialiser</button>
@@ -205,11 +206,25 @@ export function MetaLiveSection({
                 {filtered.length === 0 && (
                   <tr><td colSpan={cols.length} className="px-4 py-6 text-center text-muted-foreground">Aucune pub pour ces filtres.</td></tr>
                 )}
-                {groups.map((g) => {
+                {groups.map((g, gi) => {
                   const st = sum(g.items);
                   const isClosed = closed[g.key];
+                  const newAccount = group && !!g.account && (gi === 0 || groups[gi - 1].account !== g.account);
+                  const accItems = filtered.filter((a) => a.accountLabel === g.account);
+                  const accSum = sum(accItems);
                   return (
                     <FragmentRows key={g.key}>
+                      {newAccount && (
+                        <tr className="border-t-2 border-slate-300 bg-slate-100 font-bold">
+                          <td className="px-3 py-2" colSpan={3}>🏢 Compte : {g.account}</td>
+                          <td className="px-3 py-2 text-right">{n(accSum.results)}</td>
+                          <td className="px-3 py-2 text-right">{usd(accSum.cpr)}</td>
+                          <td />
+                          <td className="px-3 py-2 text-right">{usd(accSum.spend)}<div className="text-[10px] font-normal text-muted-foreground">{madOf(accSum.spend)}</div></td>
+                          <td className="px-3 py-2 text-right">{n(accSum.imp)}</td>
+                          <td colSpan={cols.length - 8} className="px-3 py-2 text-xs font-normal text-muted-foreground">{accItems.length} pub(s)</td>
+                        </tr>
+                      )}
                       {group && (
                         <tr className="cursor-pointer border-t bg-blue-50/60 font-semibold hover:bg-blue-50"
                           onClick={() => setClosed((c) => ({ ...c, [g.key]: !c[g.key] }))}>
@@ -233,7 +248,7 @@ export function MetaLiveSection({
                       {!isClosed && g.items.map((a) => (
                         <tr key={a.id} className="border-t hover:bg-muted/30">
                           <td className="px-3 py-2 font-mono font-semibold">{codeByAd[a.id] || "—"}</td>
-                          <td className="px-3 py-2 font-medium">{a.name}{accountNames.length > 1 && a.accountLabel && <div className="text-[10px] font-normal text-muted-foreground">{a.accountLabel}</div>}</td>
+                          <td className="px-3 py-2 font-medium">{a.name}{!group && a.accountLabel && <div className="text-[10px] font-normal text-muted-foreground">{a.accountLabel}</div>}</td>
                           <td className="px-3 py-2"><span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${TONE[a.delivery.tone]}`}>{a.delivery.label}</span></td>
                           <td className="px-3 py-2 text-right">
                             <div className="font-semibold">{a.results ?? "—"}</div>

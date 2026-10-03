@@ -212,21 +212,26 @@ async function getAccountAdIdsFor(acc: string, token: string): Promise<string[]>
 }
 
 /** Dépense TOTALE depuis le début, additionnée sur TOUS les comptes Meta. */
-export async function getAccountLifetimeSpend(): Promise<{ usd: number; since: string | null; accounts: { label: string; usd: number; taxPct: number; mad: number }[]; mad: number } | null> {
+export async function getAccountLifetimeSpend(): Promise<{ usd: number; since: string | null; accounts: { label: string; usd: number; taxPct: number; mad: number; taxSince?: string | null; taxedUsd?: number; taxUsd?: number }[]; mad: number } | null> {
   const { activeMetaAccounts, act } = await import("./meta-accounts");
   const accounts = await activeMetaAccounts();
   if (!accounts.length) return null;
   let usd = 0; let since: string | null = null; let mad = 0;
-  const per: { label: string; usd: number; taxPct: number; mad: number }[] = [];
+  const per: { label: string; usd: number; taxPct: number; mad: number; taxSince?: string | null; taxedUsd?: number; taxUsd?: number }[] = [];
   const { getUsdToMad, getAccountTaxConfig } = await import("./fx");
   const { base } = await getUsdToMad();
   for (const a of accounts) {
     const r = await lifetimeFor(act(a), a.token);
     if (!r) continue;
+    // TVA seulement sur la dépense DEPUIS sa date de début, pas sur tout l'historique
     const tax = await getAccountTaxConfig(a);
-    const m = Math.round(r.usd * base * (1 + tax.pct / 100));
+    let taxedUsd = 0;
+    if (tax.pct > 0) {
+      taxedUsd = tax.since ? await spendSince(act(a), a.token, tax.since) : r.usd;
+    }
+    const m = Math.round((r.usd + taxedUsd * tax.pct / 100) * base);
     usd += r.usd; mad += m;
-    per.push({ label: a.label, usd: r.usd, taxPct: tax.pct, mad: m });
+    per.push({ label: a.label, usd: r.usd, taxPct: tax.pct, mad: m, taxSince: tax.since, taxedUsd, taxUsd: Math.round(taxedUsd * tax.pct) / 100 });
     if (r.since && (!since || r.since < since)) since = r.since;
   }
   return { usd, since, accounts: per, mad };
@@ -243,4 +248,16 @@ async function lifetimeFor(acc: string, token: string): Promise<{ usd: number; s
   if (!res.ok || json.error) return null;
   const row = (json.data ?? [])[0] as { spend?: string; date_start?: string } | undefined;
   return { usd: Number(row?.spend ?? 0), since: row?.date_start ?? null };
+}
+
+
+/** Dépense d'un compte depuis une date (incluse) jusqu'à aujourd'hui. */
+async function spendSince(acc: string, token: string, since: string) {
+  const url = new URL(`${META}/${acc}/insights`);
+  url.searchParams.set("fields", "spend");
+  url.searchParams.set("time_range", JSON.stringify({ since, until: new Date().toISOString().slice(0, 10) }));
+  url.searchParams.set("access_token", token);
+  const res = await fetch(url.toString(), { cache: "no-store" });
+  const json = await res.json();
+  return Number(json?.data?.[0]?.spend ?? 0);
 }

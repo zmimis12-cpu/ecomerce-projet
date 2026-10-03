@@ -12,6 +12,7 @@ export async function saveAdRule(input: {
   id?: string; name: string; level: RuleLevel; productId: string | null; window: RuleWindow;
   conditions: RuleCondition[]; action: RuleAction; simulate: boolean; cooldown: number;
   budgetPct?: number | null; budgetMaxUsd?: number | null; budgetMinUsd?: number | null;
+  accountKey?: string | null;
 }): Promise<Result> {
   const session = await requireRole([...MANAGERS]);
   if (!input.name.trim()) return { success: false, error: "Donne un nom à la règle." };
@@ -27,6 +28,7 @@ export async function saveAdRule(input: {
     budget_pct: isBudget ? Number(input.budgetPct) : null,
     budget_max_usd: input.action === "increase_budget" ? Number(input.budgetMaxUsd) : null,
     budget_min_usd: input.action === "decrease_budget" ? (Number(input.budgetMinUsd) || null) : null,
+    account_key: input.accountKey || null,
   };
   const q = input.id
     ? supabaseAdmin.from("ad_rules" as never).update(row as never).eq("id", input.id)

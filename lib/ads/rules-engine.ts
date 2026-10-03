@@ -18,7 +18,10 @@ type Rule = {
   product_id: string | null; time_window: RuleWindow; conditions: RuleCondition[];
   action: RuleAction; cooldown_minutes: number;
   budget_pct: number | null; budget_max_usd: number | null; budget_min_usd: number | null;
+  account_key: string | null;
 };
+/** Compte Meta (libellé) de chaque token — rempli au début de runAdRules, pour le journal. */
+const labelOfToken = new Map<string, string>();
 type BudgetTarget = { id: string; name: string; dailyCents: number; status: string; token?: string };
 type Metrics = Record<RuleMetric, number>;
 
@@ -179,6 +182,7 @@ async function changeBudget(rule: Rule, targets: BudgetTarget[], m: Metrics, pro
     await supabaseAdmin.from("ad_rule_logs" as never).insert({
       rule_id: rule.id, rule_name: rule.name, level: rule.level, object_id: t.id, object_name: t.name,
       product_id: productId, action: rule.action, simulated: rule.simulate, success, error, metrics: clean,
+      account_label: t.token ? (labelOfToken.get(t.token) ?? null) : null,
       detail: `Budget quotidien $${cur.toFixed(2)} → $${next.toFixed(2)} (${up ? "+" : "-"}${Math.round(pct * 100)} %)`,
     } as never);
     done++;
@@ -200,6 +204,7 @@ async function act(rule: Rule, obj: { id: string; name: string; status: string; 
   await supabaseAdmin.from("ad_rule_logs" as never).insert({
     rule_id: rule.id, rule_name: rule.name, level: rule.level, object_id: obj.id, object_name: obj.name,
     product_id: obj.productId, action: rule.action, simulated: rule.simulate, success, error, metrics: clean,
+    account_label: labelOfToken.get(token) ?? null,
   } as never);
   return { object: obj.name, success };
 }
@@ -216,6 +221,8 @@ export async function runAdRules() {
   const s = { access_token: accounts[0].token };
   const { getAccountTaxConfig, taxFactorFor } = await import("./fx");
   const taxOf = new Map<string, number>();
+  const accOfToken = new Map(accounts.map((a) => [a.token, { key: a.key, label: a.label }]));
+  for (const a of accounts) labelOfToken.set(a.token, a.label);
   for (const a of accounts) taxOf.set(a.token, taxFactorFor(null, await getAccountTaxConfig(a)));
   const all = async (path: (acc: string) => string, params: Record<string, string>) => {
     const out: (Record<string, unknown> & { _token: string; _tax: number })[] = [];
@@ -266,7 +273,8 @@ export async function runAdRules() {
       if (rule.level === "product") {
         const productIds = rule.product_id ? [rule.product_id] : [...new Set(campProduct.values())];
         for (const pid of productIds) {
-          const myCamps = campaigns.filter((c) => campProduct.get(c.id) === pid);
+          const myCamps = campaigns.filter((c) => campProduct.get(c.id) === pid
+            && (!rule.account_key || accOfToken.get(c.token)?.key === rule.account_key));
           if (!myCamps.length) continue;
           const ins = camp.filter((x) => myCamps.some((c) => c.id === x.campaign_id));
           const spendUsd = ins.reduce((a, x) => a + Number(x.spend ?? 0) * Number((x as { _tax?: number })._tax ?? 1), 0);
@@ -293,6 +301,7 @@ export async function runAdRules() {
           .map((a) => [String(a.id), String(a.effective_status)]));
         for (const x of ads) {
           const adId = String(x.ad_id);
+          if (rule.account_key && accOfToken.get(String(x._token))?.key !== rule.account_key) continue;
           const pid = campProduct.get(String(x.campaign_id)) ?? null;
           if (rule.product_id && pid !== rule.product_id) continue;
           const cr = adCreative.get(adId);

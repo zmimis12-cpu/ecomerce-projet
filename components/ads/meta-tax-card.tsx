@@ -16,6 +16,11 @@ export function MetaTaxCard({ report, rate, tax }: { report: TaxReport | { error
     return <div className="rounded-xl border bg-card p-4 text-sm text-red-600">Taxe Meta : lecture impossible ({report.error})</div>;
   }
   const taxSet = tax.pct > 0;
+  // TVA seulement sur les prélèvements DEPUIS la date de début
+  const taxedPaid = report.charges
+    .filter((c) => !tax.since || c.time.slice(0, 10) >= tax.since)
+    .reduce((x, c) => x + c.amountUsd, 0);
+  const realPaid = report.paidUsd + taxedPaid * tax.pct / 100;
   return (
     <div className={`rounded-xl border-2 p-4 ${taxSet ? "border-amber-300 bg-amber-50" : "border-red-300 bg-red-50"}`}>
       <div className="mb-3 rounded-lg border bg-white p-3">
@@ -28,7 +33,8 @@ export function MetaTaxCard({ report, rate, tax }: { report: TaxReport | { error
         {taxSet && (
           <p className="mt-2 text-xs font-medium text-amber-800">
             ✅ Taxe de {tax.pct} % appliquée depuis le {tax.since ? new Date(tax.since).toLocaleDateString("fr-FR") : "début"} —
-            prélevé réellement ≈ {usd(report.paidUsd * (1 + tax.pct / 100))} (au lieu de {usd(report.paidUsd)} hors taxe).
+            TVA sur {usd(taxedPaid)} prélevés depuis cette date = +{usd(taxedPaid * tax.pct / 100)} ·
+            prélevé réellement ≈ {usd(realPaid)} (au lieu de {usd(report.paidUsd)} hors taxe).
           </p>
         )}
       </div>

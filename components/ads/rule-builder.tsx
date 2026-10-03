@@ -6,7 +6,8 @@ import { METRICS, WINDOWS, ACTIONS, type RuleCondition, type RuleMetric, type Ru
 
 const INPUT = "h-9 rounded-md border bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-primary/30";
 
-export function RuleBuilder({ products }: { products: { id: string; name: string }[] }) {
+export function RuleBuilder({ products, accounts = [] }: { products: { id: string; name: string }[]; accounts?: { key: string; label: string }[] }) {
+  const [accountKey, setAccountKey] = useState("");
   const [name, setName] = useState("");
   const [level, setLevel] = useState<RuleLevel>("product");
   const [productId, setProductId] = useState("");
@@ -35,6 +36,12 @@ export function RuleBuilder({ products }: { products: { id: string; name: string
           <option value="product">Niveau produit → agit sur ses campagnes</option>
           <option value="ad">Niveau pub → agit sur chaque pub</option>
         </select>
+        {accounts.length > 1 && (
+          <select className={INPUT} value={accountKey} onChange={(e) => setAccountKey(e.target.value)}>
+            <option value="">Tous les comptes Meta</option>
+            {accounts.map((a) => <option key={a.key} value={a.key}>Compte : {a.label}</option>)}
+          </select>
+        )}
         <select className={INPUT} value={productId} onChange={(e) => setProductId(e.target.value)}>
           <option value="">Tous les produits</option>
           {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -107,7 +114,7 @@ export function RuleBuilder({ products }: { products: { id: string; name: string
           className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-50"
           onClick={() => start(async () => {
             const r = await saveAdRule({ name, level, productId: productId || null, window, conditions: conds, action, simulate, cooldown,
-              budgetPct, budgetMaxUsd: budgetMax, budgetMinUsd: budgetMin });
+              budgetPct, budgetMaxUsd: budgetMax, budgetMinUsd: budgetMin, accountKey: accountKey || null });
             setMsg(r.success ? { ok: true, text: "Règle enregistrée." } : { ok: false, text: r.error ?? "Erreur" });
             if (r.success) setName("");
           })}>
