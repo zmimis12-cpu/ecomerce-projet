@@ -68,7 +68,10 @@ export function MetaLiveSection({
       if (account && a.accountLabel !== account) return false;
       if (campaign && a.campaignId !== campaign) return false;
       if (adset && a.adsetId !== adset) return false;
-      if (onlySpend && a.spendUsd === 0 && a.impressions === 0) return false;
+      // Masque seulement les pubs ARRÊTÉES qui n'ont jamais diffusé :
+      // une pub active / en examen / en préparation reste visible même à 0 impression.
+      if (onlySpend && a.spendUsd === 0 && a.impressions === 0
+        && ![...LIVE_STATES, "IN_REVIEW", "PREPARING", "SCHEDULED"].includes(a.delivery.key)) return false;
       const k = a.delivery.key;
       if (delivery === "live" && !LIVE_STATES.includes(k)) return false;
       if (delivery === "off" && LIVE_STATES.includes(k)) return false;
@@ -186,7 +189,7 @@ export function MetaLiveSection({
             <option value="impressions">Trier : impressions ↓</option>
             <option value="name">Trier : nom A→Z</option>
           </select>
-          <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={onlySpend} onChange={(e) => setOnlySpend(e.target.checked)} /> Masquer sans diffusion</label>
+          <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={onlySpend} onChange={(e) => setOnlySpend(e.target.checked)} /> Masquer les pubs arrêtées sans diffusion</label>
           <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={group} onChange={(e) => setGroup(e.target.checked)} /> Grouper par compte › campagne</label>
           {(q || campaign || adset || delivery !== "all" || video !== "all") && (
             <button className="text-xs text-primary hover:underline"
