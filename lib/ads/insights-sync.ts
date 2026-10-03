@@ -198,6 +198,22 @@ async function syncMetaAdMeta(acc: string, token: string) {
 }
 
 export async function syncTikTokAdInsights(since: string, until: string) {
+  const { activeTikTokAccounts, tiktokToMad } = await import("./tiktok-accounts");
+  const accounts = await activeTikTokAccounts();
+  if (accounts.length) {
+    const out: unknown[] = [];
+    for (const a of accounts) out.push({ account: a.label, ...(await syncTikTokAdInsightsFor(a.token, a.advertiserId, since, until, await tiktokToMad(a))) });
+    return { ok: true, accounts: out };
+  }
+  return syncTikTokAdInsightsLegacy(since, until);
+}
+
+async function syncTikTokAdInsightsFor(token: string, advertiserId: string, since: string, until: string, toMad: number) {
+  const s = { access_token: token, account_id: advertiserId, is_active: true };
+  return runTikTokInsights(s, since, until, toMad);
+}
+
+async function syncTikTokAdInsightsLegacy(since: string, until: string) {
   const s = await readSettings("tiktok");
   if (!s?.is_active || !s.access_token || !s.account_id) return { ok: false, error: "TikTok non configuré" };
   const advertiserId = s.account_id.trim();
@@ -206,6 +222,11 @@ export async function syncTikTokAdInsights(since: string, until: string) {
   }
   const toMad = await rate("tiktok_currency_to_mad", 1);
 
+  return runTikTokInsights({ access_token: s.access_token, account_id: advertiserId, is_active: true }, since, until, toMad);
+}
+
+async function runTikTokInsights(s: { access_token: string; account_id: string; is_active: boolean }, since: string, until: string, toMad: number) {
+  const advertiserId = s.account_id;
   const rows: Row[] = [];
   const now = new Date().toISOString();
   for (let page = 1; page <= 20; page++) {

@@ -8,11 +8,14 @@ import { ManualAdSpendForm } from "@/components/ads-integration/manual-ad-spend-
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getMetaAccounts } from "@/lib/ads/meta-accounts";
 import { MetaAccountsManager } from "@/components/ads-integration/meta-accounts-manager";
+import { TikTokConnect } from "@/components/ads-integration/tiktok-connect";
+import { getTikTokApp, getTikTokAccounts, TIKTOK_REDIRECT } from "@/lib/ads/tiktok-accounts";
 
 export const metadata: Metadata = { title: "Paramètres Publicité" };
 export const dynamic = "force-dynamic";
 
-export default async function AdsSettingsPage() {
+export default async function AdsSettingsPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
+  const sp = await searchParams;
   await requireRole(["super_admin", "admin"]);
 
   const [metaSettings, googleSettings, tiktokSettings, productsData, manualEntries] = await Promise.all([
@@ -24,6 +27,8 @@ export default async function AdsSettingsPage() {
   ]);
   // Jamais de token renvoyé au navigateur
   const metaAccounts = (await getMetaAccounts()).map(({ token: _t, ...a }) => { void _t; return a; });
+  const ttApp = await getTikTokApp();
+  const ttAccounts = (await getTikTokAccounts()).map(({ token: _t, ...a }) => { void _t; return a; });
 
   const products = (productsData.data ?? []) as { id: string; name: string; sku: string }[];
 
@@ -35,6 +40,13 @@ export default async function AdsSettingsPage() {
           Connectez vos comptes publicitaires. Assignez chaque campagne à un produit pour un calcul exact des dépenses.
         </p>
       </div>
+
+      <section className="rounded-xl border bg-card p-4">
+        <h2 className="mb-1 font-semibold">TikTok Ads (API Marketing)</h2>
+        <p className="mb-3 text-sm text-muted-foreground">Connecte ton app TikTok approuvée : token permanent, plusieurs comptes, dépenses synchronisées automatiquement.</p>
+        <TikTokConnect hasApp={!!ttApp} appId={ttApp?.appId ?? null} accounts={ttAccounts} redirectUrl={TIKTOK_REDIRECT}
+          flash={sp?.tiktok ? { ok: sp.tiktok === "ok", msg: sp.msg ?? "" } : null} />
+      </section>
 
       <section className="rounded-xl border bg-card p-4">
         <h2 className="mb-1 font-semibold">Comptes Meta (plusieurs comptes)</h2>

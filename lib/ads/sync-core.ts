@@ -179,14 +179,27 @@ async function syncMetaAdSpendOneRange(dateFrom: string, dateTo: string) {
 
 async function syncTikTokAdSpendOneRange(dateFrom: string, dateTo: string) {
 
-  const settings = await readSettings("tiktok");
-  if (!settings || !settings.is_active) {
-    return { ok: false as const, error: "Intégration TikTok Ads non configurée." };
-  }
-
+  // Multi-comptes TikTok (connexion OAuth) ; sinon ancien réglage unique
+  const { activeTikTokAccounts, tiktokToMad } = await import("./tiktok-accounts");
   const { TikTokAdsClient } = await import("./tiktok/client");
-  const client = new TikTokAdsClient(settings.access_token, settings.account_id);
-  const result = await client.getCampaignSpend(dateFrom, dateTo);
+  const ttAccounts = await activeTikTokAccounts();
+  let result: { ok: true; campaigns: { campaign_id: string; campaign_name: string; spend: number }[] } | { ok: false; error: string };
+  if (ttAccounts.length) {
+    const merged: { campaign_id: string; campaign_name: string; spend: number }[] = [];
+    const errs: string[] = [];
+    for (const a of ttAccounts) {
+      const r = await new TikTokAdsClient(a.token, a.advertiserId).getCampaignSpend(dateFrom, dateTo);
+      // Converti en "devise réglée" ensuite : on ramène tout en MAD / taux TikTok = 1
+      const toMad = await tiktokToMad(a, dateFrom);
+      if (r.ok) merged.push(...r.campaigns.map((c) => ({ ...c, spend: Number(c.spend) * toMad })));
+      else errs.push(`${a.label}: ${r.error}`);
+    }
+    result = errs.length ? { ok: false, error: errs.join(" | ") } : { ok: true, campaigns: merged };
+  } else {
+    const settings = await readSettings("tiktok");
+    if (!settings || !settings.is_active) return { ok: false as const, error: "Intégration TikTok Ads non configurée." };
+    result = await new TikTokAdsClient(settings.access_token, settings.account_id).getCampaignSpend(dateFrom, dateTo);
+  }
 
   if (!result.ok) {
     await supabaseAdmin.from("ad_platform_settings").update({
@@ -241,7 +254,8 @@ async function syncTikTokAdSpendOneRange(dateFrom: string, dateTo: string) {
   // plupart des comptes TikTok Ads Maroc facturent déjà directement en MAD,
   // contrairement à Meta qui est souvent en USD).
   const { data: rateRow } = await supabaseAdmin.from("app_settings").select("value").eq("key", "tiktok_currency_to_mad").maybeSingle();
-  const RATE_TO_MAD = Number((rateRow as { value?: string } | null)?.value ?? 1);
+  // Comptes OAuth : déjà convertis en MAD (devise + taxe du compte) plus haut
+  const RATE_TO_MAD = ttAccounts.length ? 1 : Number((rateRow as { value?: string } | null)?.value ?? 1);
 
   const rowsToUpsert = [...spendByProduct.entries()].map(([product_id, { spend, campaign_names }]) => ({
     product_id,
