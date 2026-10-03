@@ -35,6 +35,7 @@ export async function middleware(request: NextRequest) {
     if (
       pathname !== "/" &&
       !pathname.startsWith("/lp/") &&
+      pathname !== "/confidentialite" && pathname !== "/suppression-donnees" &&
       !pathname.startsWith("/_next/") &&
       !pathname.startsWith("/api/") &&
       !pathname.match(/\.(ico|png|jpg|jpeg|gif|svg|webp|css|js|woff2?)$/)
@@ -67,6 +68,7 @@ export async function middleware(request: NextRequest) {
   // ── Public routes on admin domain — bypass entirely, no Supabase call ───────
   if (
     pathname.startsWith("/lp/") || pathname === "/lp" ||
+    pathname === "/confidentialite" || pathname === "/suppression-donnees" ||
     pathname.startsWith("/api/public/") ||
     pathname.startsWith("/api/webhooks/")
   ) {
