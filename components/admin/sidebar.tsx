@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, PhoneCall,
   Truck, Layers, FileSpreadsheet, FileText, FolderOpen,
   ScanLine, RotateCcw, BarChart3, Globe, Settings,
-  Shield, Phone, Award, Users, ListOrdered, CreditCard, Clapperboard, PackageCheck, Wallet, Rocket,
+  Shield, Phone, Award, Users, ListOrdered, CreditCard, Clapperboard, PackageCheck, Wallet, Calculator, Rocket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/lib/settings/users-constants";
@@ -21,6 +21,7 @@ const ADMIN_NAV: NavGroup[] = [
       { href: "/admin",          label: "Dashboard", icon: LayoutDashboard, exact: true },
       { href: "/admin/products",          label: "Produits",          icon: Package          },
       { href: "/admin/products/overview", label: "Vue d'ensemble",    icon: BarChart3        },
+      { href: "/admin/products/calculs", label: "Calculs par produit", icon: Calculator       },
       { href: "/admin/orders",   label: "Commandes", icon: ShoppingCart     },
     ],
   },
