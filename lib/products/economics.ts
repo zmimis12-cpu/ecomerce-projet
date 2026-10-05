@@ -53,9 +53,9 @@ export async function productEconomicsDetail(productId: string, period: string) 
   const leads = orders.length;
   const pendingCall = c(["new", "no_answer", "callback"]);
   const cancelled = c(["cancelled"]);
-  const shipped = c(["sent_to_delivery", "in_transit", "delivered", "paid", "returned", "refused_delivery"]);
+  const shipped = c(["sent_to_delivery", "in_transit", "delivered", "paid", "exchanged", "returned", "refused_delivery"]);
   const inTransit = c(["sent_to_delivery", "in_transit"]);
-  const delivered = c(["delivered", "paid"]);
+  const delivered = c(["delivered", "paid", "exchanged"]); // échangée = livrée puis échangée
   const returned = c(["returned", "refused_delivery"]);
   const paid = orders.filter((o) => o.is_paid).length;
   const closed = delivered + returned;

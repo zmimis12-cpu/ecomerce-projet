@@ -262,8 +262,8 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     }
   }
 
-  const SHIPPED_STATUSES  = new Set(["sent_to_delivery","in_transit","delivered","paid","returned","refused_delivery"]);
-  const DELIVERED_STATUSES = new Set(["delivered","paid"]);
+  const SHIPPED_STATUSES  = new Set(["sent_to_delivery","in_transit","delivered","paid","exchanged","returned","refused_delivery"]);
+  const DELIVERED_STATUSES = new Set(["delivered","paid","exchanged"]);
   const RETURNED_STATUSES  = new Set(["returned","refused_delivery"]);
 
   const activeRows = rows.filter((r) => r.status !== "cancelled"); // pour CA/profit uniquement
@@ -317,7 +317,11 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
       // seules les commandes Digylog ont un vrai frais de 20/35 MAD à soustraire.
       const isSelfDelivery = r.fulfillment_type === "self_delivery";
       const city   = (r.customer_city ?? "").toLowerCase();
+      // Vrai frais Digylog de la commande (synchronisé depuis Digylog : 20 / 30 / 35),
+      // sinon estimation par ville. Avant : toujours l'estimation → Rabat à 30 MAD
+      // comptée 35 → Net Collecté un peu plus bas que les virements Digylog.
       const livFee = isSelfDelivery ? 0
+        : r.actual_delivery_cost != null ? Number(r.actual_delivery_cost)
         : city.includes("casablanca") || city.includes("casa") || city === "الدار البيضاء" ? 20 : 35;
       // Priorité au vrai montant collecté par Digylog (réconciliation) — sinon
       // le prix système par défaut. Sans ça, un surplus collecté (ex: 600 MAD
@@ -734,8 +738,8 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
       cogs_total: number; delivery_cost_real_mad: number; return_cost_mad: number;
     }[];
 
-    const SHIPPED  = new Set(["sent_to_delivery","in_transit","delivered","paid","returned","refused_delivery"]);
-    const DELV     = new Set(["delivered","paid"]);
+    const SHIPPED  = new Set(["sent_to_delivery","in_transit","delivered","paid","exchanged","returned","refused_delivery"]);
+    const DELV     = new Set(["delivered","paid","exchanged"]);
     const RETOURS  = new Set(["returned","refused_delivery"]);
     const activeRows = rows.filter((r) => r.status !== "cancelled"); // CA/profit: hors annulées
 
@@ -879,8 +883,8 @@ export async function getDailyFinance(days = 30, storeId?: string): Promise<Dail
     .neq("status", "cancelled");
 
   const map = new Map<string, DailyFinance>();
-  const CONF = new Set(["confirmed","sent_to_delivery","in_transit","delivered","paid","returned","refused_delivery"]);
-  const DELV = new Set(["delivered","paid"]);
+  const CONF = new Set(["confirmed","sent_to_delivery","in_transit","delivered","paid","exchanged","returned","refused_delivery"]);
+  const DELV = new Set(["delivered","paid","exchanged"]);
 
   for (const o of (data ?? []) as {
     created_at: string; status: string; is_paid: boolean;
