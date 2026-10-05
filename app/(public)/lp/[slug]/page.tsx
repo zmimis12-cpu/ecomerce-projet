@@ -123,7 +123,9 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const oldPriceNum = Number(lp.old_price_num) || price * 1.3;
   const oldPrice  = String(lp.old_price_text   ?? `${oldPriceNum.toFixed(0)} درهم`);
   const discountPct = oldPriceNum > price ? Math.round((1 - price / oldPriceNum) * 100) : 0;
-  const whatsapp  = String(lp.whatsapp_number  ?? "");
+  // wa.me exige le format international sans "+" ni 0 initial : 0664… → 212664…
+  const waRaw     = String(lp.whatsapp_number ?? "").replace(/[^\d]/g, "");
+  const whatsapp  = !waRaw ? "" : waRaw.startsWith("00") ? waRaw.slice(2) : waRaw.startsWith("0") ? `212${waRaw.slice(1)}` : waRaw;
   // What customers actually need to know about the product — falls back
   // through whatever real content exists instead of a generic empty line,
   // since page.description is empty for most products today.

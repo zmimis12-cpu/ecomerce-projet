@@ -105,7 +105,7 @@ export async function upsertLandingPage(id: string | null, data: {
   old_price_text?: string;
   stock_text?: string;
   cta_text?: string;
-  whatsapp_number?: string;
+  whatsapp_number?: string | null;
   meta_pixel_id?: string;
   tiktok_pixel_id?: string;
   google_gtm_id?: string;

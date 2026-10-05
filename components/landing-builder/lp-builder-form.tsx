@@ -144,7 +144,7 @@ export function LPBuilderForm({ products, mode, defaultValues }: LPBuilderFormPr
           old_price_text:   oldPrice,
           stock_text:       stockText,
           cta_text:         ctaText,
-          whatsapp_number:  whatsapp || undefined,
+          whatsapp_number:  whatsapp.trim() || null,
           customer_photos:  customerPhotos ? customerPhotos.split("\n").map(s => s.trim()).filter(Boolean) : [],
           meta_pixel_id:    metaPixel.trim() || undefined,
           tiktok_pixel_id:  tiktokPixel.trim() || undefined,
