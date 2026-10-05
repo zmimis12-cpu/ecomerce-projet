@@ -12,7 +12,9 @@ import { FaqAccordion } from "@/components/landing/faq-accordion";
 import { ProductGallery } from "@/components/landing/product-gallery";
 import type { LPSection } from "@/lib/templates";
 
-export const revalidate = 3600;
+// Servie depuis le cache CDN (instantané) et régénérée au plus toutes les 60 s
+// → une modification dans l'éditeur est visible en ligne en moins d'une minute.
+export const revalidate = 60;
 
 const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://ecomerce-projet.vercel.app").replace(/\/$/, "");
 
@@ -94,7 +96,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
   if (!page) notFound();
 
-  supabaseAdmin.rpc("increment_lp_views" as never, { p_slug: slug } as never).then(() => {}, () => {});
+  // Vues comptées par le navigateur (/api/public/lp-view) : la page est en cache CDN.
 
   // Load Digylog cities from cached settings (updated via sync in admin)
   let digylogCities: string[] = [];
@@ -140,6 +142,14 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const customerPhotos = (lp.customer_photos as string[] | undefined) ?? [];
   const b3 = Number(lp.bundle_3_price || Math.round(price * 3 * 0.8));
   const offers = normalizeOffers(lp.offers, { price, b1: lp.bundle_1_price as number | null, b2: lp.bundle_2_price as number | null, b3: lp.bundle_3_price as number | null });
+  // Prix affiché en haut = l'OFFRE présélectionnée (ex : 4 pièces à 349), pas 1 pièce
+  const heroOffer  = offers.find((o) => o.isDefault) ?? offers[0];
+  const heroPrice  = heroOffer?.price ?? price;
+  const heroQty    = heroOffer?.qty ?? 1;
+  const heroOldNum = heroQty > 1 ? price * heroQty : oldPriceNum;
+  const heroOld    = heroQty > 1 ? `${heroOldNum.toFixed(0)} درهم` : oldPrice;
+  const heroLabel  = heroQty > 1 ? (heroOffer?.label || `${heroQty} قطع`) : "السعر";
+  const heroDiscount = heroOldNum > heroPrice ? Math.round((1 - heroPrice / heroOldNum) * 100) : 0;
 
   const psSection   = getSection("problem_solution");
   const statsSection= getSection("stats_bar");
@@ -222,6 +232,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           `!function (w, d, t) {w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<e.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var a=document.createElement("script");a.type="text/javascript",a.async=!0,a.src=i+"?sdkid="+e+"&lib="+t;var s=document.getElementsByTagName("script")[0];s.parentNode.insertBefore(a,s)};ttq.load('${page.tiktok_pixel_id.trim()}');ttq.page();ttq.track('ViewContent',{content_id:'${product.id}',content_name:'${product.name.replace(/'/g, "\\'")}',value:${price},currency:'MAD'});}(window, document, 'ttq');`
         }} />
       )}
+      <script dangerouslySetInnerHTML={{ __html: `document.documentElement.lang="ar";document.documentElement.dir="rtl";try{navigator.sendBeacon("/api/public/lp-view",JSON.stringify({slug:${JSON.stringify(slug)}}))}catch(e){}` }} />
+      <link rel="preconnect" href="https://nccufqvnxoftzovfsako.supabase.co" />
       <link rel="preconnect" href="https://connect.facebook.net" />
       <link rel="preconnect" href="https://www.googletagmanager.com" />
       <link rel="dns-prefetch" href="https://wa.me" />
@@ -292,7 +304,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <div className="lp-store-brand">
             {storeLogoUrl && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={storeLogoUrl} alt={storeName ?? ""} className="lp-store-logo" />
+              <img src={storeLogoUrl} alt={storeName ?? ""} className="lp-store-logo" decoding="async" />
             )}
             {storeName && <span className="lp-store-name">{storeName}</span>}
           </div>
@@ -326,7 +338,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             {/* Hero image (bannière marketing optionnelle, différente de la galerie produit) */}
             {heroImage && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={heroImage} alt={headline} className="lp-hero-banner" />
+              <img src={heroImage} alt={headline} className="lp-hero-banner" fetchPriority="high" loading="eager" decoding="async" />
             )}
 
             {/* Gallery — multiple photos build trust for COD customers */}
@@ -335,7 +347,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                 <ProductGallery
                   images={product.images}
                   productName={product.name}
-                  discountPct={discountPct}
+                  discountPct={heroDiscount}
                 />
               </div>
             )}
@@ -343,11 +355,11 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             {/* Price row */}
             <div className="lp-price-card lp-fade-in">
               <div className="lp-price-left">
-                <span className="lp-price-label">السعر</span>
+                <span className="lp-price-label">{heroLabel}</span>
                 <div className="lp-price-row">
-                  <span className="lp-price-num">{price.toFixed(0)}</span>
+                  <span className="lp-price-num">{heroPrice.toFixed(0)}</span>
                   <span className="lp-price-cur">درهم</span>
-                  <span className="lp-price-old">{oldPrice}</span>
+                  <span className="lp-price-old">{heroOld}</span>
                 </div>
                 <span className="lp-price-note">شامل التوصيل المجاني</span>
               </div>
@@ -377,7 +389,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
             {/* WhatsApp */}
             {whatsapp && (
-              <a href={`https://wa.me/${whatsapp.replace(/\+/g,"")}?text=${encodeURIComponent(`مرحبا 👋\nأريد الاستفسار عن المنتج التالي:\n\n🛒 المنتج: ${product.name}\n💰 السعر: ${price.toFixed(0)} درهم\n📦 الدفع عند الاستلام`)}`}
+              <a href={`https://wa.me/${whatsapp.replace(/\+/g,"")}?text=${encodeURIComponent(`مرحبا 👋\nأريد الاستفسار عن المنتج التالي:\n\n🛒 المنتج: ${product.name}\n💰 العرض: ${heroQty > 1 ? `${heroQty} قطع بـ ` : ""}${heroPrice.toFixed(0)} درهم\n📦 الدفع عند الاستلام`)}`}
                 target="_blank" rel="noopener noreferrer"
                 className="lp-wa">
                 واتساب — تواصل معنا
@@ -474,7 +486,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                   <div key={i} className="lp-card lp-step">
                     {s.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={s.image_url} alt="" className="lp-step-img" />
+                      <img src={s.image_url} alt="" className="lp-step-img" loading="lazy" decoding="async" />
                     ) : (
                       <span className="lp-step-num">{s.number}</span>
                     )}
@@ -569,7 +581,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                 <div className="lp-box-included">
                   <p className="lp-box-included-title">📦 كلشي واجد فالطلبية</p>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={String(gtySection.box_image)} alt="محتوى الطلبية" className="lp-box-included-img" />
+                  <img src={String(gtySection.box_image)} alt="محتوى الطلبية" className="lp-box-included-img" loading="lazy" decoding="async" />
                 </div>
               )}
               <h2 className="lp-h2">{String(gtySection.title ?? "ليه تثق فينا؟")}</h2>
@@ -674,7 +686,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         {/* ── FLOATING WHATSAPP BUTTON ── */}
         {whatsapp && (
           <a
-            href={`https://wa.me/${whatsapp.replace(/\+/g,"")}?text=${encodeURIComponent(`مرحبا 👋\nأريد الاستفسار عن المنتج التالي:\n\n🛒 المنتج: ${product.name}\n💰 السعر: ${price.toFixed(0)} درهم\n📦 الدفع عند الاستلام`)}`}
+            href={`https://wa.me/${whatsapp.replace(/\+/g,"")}?text=${encodeURIComponent(`مرحبا 👋\nأريد الاستفسار عن المنتج التالي:\n\n🛒 المنتج: ${product.name}\n💰 العرض: ${heroQty > 1 ? `${heroQty} قطع بـ ` : ""}${heroPrice.toFixed(0)} درهم\n📦 الدفع عند الاستلام`)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="lp-wa-float"

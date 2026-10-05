@@ -23,13 +23,19 @@ export async function uploadSectionMedia(formData: FormData): Promise<{
   const ext = file.name.split(".").pop() || (isGif ? "gif" : "jpg");
   const path = `sections/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-  const buffer = Buffer.from(await file.arrayBuffer());
+  let buffer: Buffer = Buffer.from(await file.arrayBuffer());
+  let contentType = file.type;
+  let finalPath = path;
+  // Optimisation automatique (WebP léger, GIF → WebP animé)
+  // Si l'optimiseur n'est pas disponible, on envoie le fichier tel quel (jamais bloquant)
+  const opt = await import("./optimize-media").then((m) => m.optimizeImageBuffer(buffer, file.type)).catch(() => null);
+  if (opt) { buffer = opt.buffer; contentType = opt.contentType; finalPath = path.replace(/\.[a-z0-9]+$/i, "") + ".webp"; }
   const { error: uploadError } = await supabaseAdmin.storage
     .from("lp-media")
-    .upload(path, buffer, { contentType: file.type, upsert: false, cacheControl: "31536000" });
+    .upload(finalPath, buffer, { contentType, upsert: false, cacheControl: "31536000" });
   if (uploadError) return { success: false, error: uploadError.message };
 
-  const { data: urlData } = supabaseAdmin.storage.from("lp-media").getPublicUrl(path);
+  const { data: urlData } = supabaseAdmin.storage.from("lp-media").getPublicUrl(finalPath);
   return { success: true, url: urlData.publicUrl };
 }
 
