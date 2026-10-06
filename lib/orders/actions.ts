@@ -124,7 +124,7 @@ export async function createOrder(formData: FormData) {
   // Fetch product for pricing snapshot
   const { data: product, error: pErr } = await supabase
     .from("products")
-    .select("id, name, sku, sale_price_mad, total_cost_mad, ads_cost_mad, confirmation_cost_mad, shipping_cost_mad")
+    .select("id, name, sku, sale_price_mad, total_cost_mad, ads_cost_mad, confirmation_cost_mad, shipping_cost_mad, purchase_price_mad, packaging_cost_mad")
     .eq("id", productId)
     .single();
 
@@ -135,7 +135,7 @@ export async function createOrder(formData: FormData) {
   const p = product as unknown as {
     id: string; name: string; sku: string;
     sale_price_mad: number; total_cost_mad: number;
-    ads_cost_mad: number | null; confirmation_cost_mad: number | null; shipping_cost_mad: number | null;
+    ads_cost_mad: number | null; confirmation_cost_mad: number | null; shipping_cost_mad: number | null; purchase_price_mad: number | null; packaging_cost_mad: number | null;
   };
 
   const unitCost    = orderCost(p, qty).unitEffective;
@@ -441,9 +441,9 @@ export async function updateOrder(orderId: string, formData: FormData) {
   let costProduct: CostProduct | null = null;
   if (productId) {
     const { data: prod } = await supabase
-      .from("products").select("id,name,sku,sale_price_mad,total_cost_mad,ads_cost_mad,confirmation_cost_mad,shipping_cost_mad").eq("id", productId).single();
+      .from("products").select("id,name,sku,sale_price_mad,total_cost_mad,ads_cost_mad,confirmation_cost_mad,shipping_cost_mad,purchase_price_mad,packaging_cost_mad").eq("id", productId).single();
     if (!prod) return { success: false, errors: { product_id: "Produit introuvable." } };
-    const p = prod as { id:string; name:string; sku:string; sale_price_mad:number; total_cost_mad:number; ads_cost_mad:number|null; confirmation_cost_mad:number|null; shipping_cost_mad:number|null };
+    const p = prod as { id:string; name:string; sku:string; sale_price_mad:number; total_cost_mad:number; ads_cost_mad:number|null; confirmation_cost_mad:number|null; shipping_cost_mad:number|null; purchase_price_mad:number|null; packaging_cost_mad:number|null };
     unitPrice   = p.sale_price_mad ?? 0;
     costProduct = p;
     productName = p.name;

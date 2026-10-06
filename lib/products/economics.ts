@@ -21,15 +21,19 @@ export async function productEconomicsDetail(productId: string, period: string) 
   const fromDay = from?.toISOString().slice(0, 10) ?? null, toDay = to ? new Date(to.getTime() - 86400_000).toISOString().slice(0, 10) : null;
 
   const { data: p } = await supabaseAdmin.from("products")
-    .select("id, name, sku, sale_price_mad, total_cost_mad, ads_cost_mad, confirmation_cost_mad, shipping_cost_mad, packaging_cost_mad")
+    .select("id, name, sku, sale_price_mad, total_cost_mad, ads_cost_mad, confirmation_cost_mad, shipping_cost_mad, packaging_cost_mad, purchase_price_mad")
     .eq("id", productId).single();
   const prod = p as unknown as {
     id: string; name: string; sku: string | null; sale_price_mad: number; total_cost_mad: number;
     ads_cost_mad: number | null; confirmation_cost_mad: number | null; shipping_cost_mad: number | null; packaging_cost_mad: number | null;
+    purchase_price_mad: number | null;
   };
   const packaging = Number(prod.packaging_cost_mad ?? 0);
-  const perPiece = Number(prod.total_cost_mad ?? 0) - Number(prod.ads_cost_mad ?? 0) - Number(prod.confirmation_cost_mad ?? 0) - Number(prod.shipping_cost_mad ?? 0);
-  const purchase = Math.max(0, perPiece - packaging);
+  // Valeurs EXACTES de la fiche produit : achat + emballage (les estimations ne sont pas utilisées)
+  const purchase = prod.purchase_price_mad != null ? Number(prod.purchase_price_mad)
+    : Math.max(0, Number(prod.total_cost_mad ?? 0) - Number(prod.ads_cost_mad ?? 0) - Number(prod.confirmation_cost_mad ?? 0) - Number(prod.shipping_cost_mad ?? 0) - packaging);
+  const perPiece = purchase + packaging;
+  const confirmation = Number(prod.confirmation_cost_mad ?? 0);
 
   // Commandes du produit (période = date de création)
   const { data: items } = await supabaseAdmin.from("order_items").select("order_id, quantity").eq("product_id", productId).limit(10000);
@@ -73,7 +77,7 @@ export async function productEconomicsDetail(productId: string, period: string) 
   const goods = sum(paidOrders, (o) => perPiece * (qtyOf.get(o.id) ?? 1));
   const deliveryCost = sum(paidOrders, delFee);
   const marginBeforeAds = revenue - goods - deliveryCost;
-  const pendingMargin = sum(pendingOrders, marginOf);
+  const pendingMargin = sum(pendingOrders, marginOf) - pendingOrders.length * Number(prod.confirmation_cost_mad ?? 0);
   const pendingRevenue = sum(pendingOrders, (o) => Number(o.total_amount_mad ?? 0));
 
   // Pub reliée au produit (Meta + TikTok, taxe de chaque compte incluse)
@@ -89,14 +93,16 @@ export async function productEconomicsDetail(productId: string, period: string) 
   const agentIds = new Set(((ag ?? []) as { user_id: string }[]).map((a) => a.user_id));
   const { data: ccSet } = await supabaseAdmin.from("app_settings").select("value").eq("key", "cc_commission_per_order").maybeSingle();
   const ccPer = Number((ccSet as { value?: unknown } | null)?.value ?? 0) || 0;
-  const ccOrders = paidOrders.filter((o) => o.status === "paid" && o.assigned_to && agentIds.has(o.assigned_to)).length;
-  const ccCost = ccOrders * ccPer;
+  // Confirmation = coût exact de la fiche produit × commandes payées
+  void agentIds;
+  const ccOrders = paidOrders.length;
+  const ccCost = ccOrders * confirmation;
   const editorCost = sum(paidOrders, (o) => Number(o.editor_earning_mad ?? 0));
 
   const netProfit = marginBeforeAds - adSpend - ccCost - editorCost;
   const avgFee = orders.filter((o) => o.actual_delivery_cost).length
     ? sum(orders.filter((o) => o.actual_delivery_cost), delFee) / orders.filter((o) => o.actual_delivery_cost).length : 35;
-  const unitMargin = Number(prod.sale_price_mad ?? 0) - perPiece - avgFee;
+  const unitMargin = Number(prod.sale_price_mad ?? 0) - perPiece - avgFee - confirmation;
   const ordersToDelivered = confirmRate * deliveryRate;
 
   return {
@@ -104,7 +110,7 @@ export async function productEconomicsDetail(productId: string, period: string) 
     counts: { leads, pendingCall, cancelled, shipped, inTransit, delivered, returned, paid, pending: pendingOrders.length },
     rates: { confirmRate, deliveryRate, ordersToDelivered },
     money: {
-      revenue, goods, deliveryCost, marginBeforeAds, adSpend, adsByPlatform, ccOrders, ccPer, ccCost, editorCost, netProfit,
+      revenue, goods, deliveryCost, marginBeforeAds, adSpend, adsByPlatform, ccOrders, ccPer: confirmation, ccCost, editorCost, netProfit,
       pendingMargin, pendingRevenue, netIfPendingPaid: netProfit + pendingMargin,
     },
     unit: {

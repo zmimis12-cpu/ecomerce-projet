@@ -405,7 +405,11 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   const { data: commissionSetting } = await supabaseAdmin
     .from("app_settings").select("value").eq("key", "cc_commission_per_order").maybeSingle();
   const commissionPerOrder = Number((commissionSetting as { value?: string } | null)?.value ?? 3);
-  const total_call_center_cost = Math.round(paidOrdersCount * commissionPerOrder * 100) / 100;
+  // Confirmation : désormais le coût EXACT de la fiche produit, déduit dans la
+  // marge de chaque commande (voir orderMargin). Commission agents conservée
+  // seulement si aucun coût de confirmation n'est saisi sur le produit.
+  void paidOrdersCount; void commissionPerOrder;
+  let total_call_center_cost = 0;
 
   // Autres charges (domaine, abonnements... table expenses) — affichées à part,
   // frais généraux business, PAS déduites du profit par commande (pas liées à une vente précise).
@@ -437,14 +441,21 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   // rajouter/retirer ces parts donnait un résultat faux sur les anciennes commandes.
   const idsForItems = [...paidIds, ...pendingIds, ...transitRows.map((r) => r.id)];
   const goodsCost = new Map<string, number>(); // order_id → (achat + emballage) × qté
+  const confCost  = new Map<string, number>(); // order_id → coût de confirmation (1 fois par commande)
   if (idsForItems.length) {
+    // ✅ Valeurs EXACTES de la fiche produit uniquement : prix d'achat + emballage
+    // (par pièce) et confirmation (par commande). Les estimations saisies à la
+    // création (pub estimée, livraison estimée, "total") ne sont PAS utilisées :
+    // la pub et la livraison sont les vraies dépenses (Meta / Digylog).
     const { data: prodCosts } = await supabaseAdmin
-      .from("products").select("id, total_cost_mad, ads_cost_mad, confirmation_cost_mad, shipping_cost_mad");
-    const unitGoods = new Map(((prodCosts ?? []) as {
-      id: string; total_cost_mad: number | null; ads_cost_mad: number | null;
-      confirmation_cost_mad: number | null; shipping_cost_mad: number | null;
-    }[]).map((p) => [p.id,
-      (p.total_cost_mad ?? 0) - (p.ads_cost_mad ?? 0) - (p.confirmation_cost_mad ?? 0) - (p.shipping_cost_mad ?? 0)]));
+      .from("products").select("id, purchase_price_mad, packaging_cost_mad, confirmation_cost_mad, total_cost_mad, ads_cost_mad, shipping_cost_mad");
+    type PC = { id: string; purchase_price_mad: number | null; packaging_cost_mad: number | null; confirmation_cost_mad: number | null;
+      total_cost_mad: number | null; ads_cost_mad: number | null; shipping_cost_mad: number | null };
+    const unitGoods = new Map(((prodCosts ?? []) as PC[]).map((p) => [p.id,
+      p.purchase_price_mad != null
+        ? Number(p.purchase_price_mad) + Number(p.packaging_cost_mad ?? 0)
+        : (p.total_cost_mad ?? 0) - (p.ads_cost_mad ?? 0) - (p.confirmation_cost_mad ?? 0) - (p.shipping_cost_mad ?? 0)]));
+    const unitConf = new Map(((prodCosts ?? []) as PC[]).map((p) => [p.id, Number(p.confirmation_cost_mad ?? 0)]));
     for (let i = 0; i < idsForItems.length; i += 150) {
       const { data: its } = await supabaseAdmin
         .from("order_items").select("order_id, product_id, quantity")
@@ -453,12 +464,16 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
         const u = it.product_id ? unitGoods.get(it.product_id) : undefined;
         if (u === undefined) continue;
         goodsCost.set(it.order_id, (goodsCost.get(it.order_id) ?? 0) + u * (it.quantity ?? 1));
+        confCost.set(it.order_id, Math.max(confCost.get(it.order_id) ?? 0, unitConf.get(it.product_id!) ?? 0));
       }
     }
   }
   const realDelivery = (r: (typeof activeRows)[number]) => r.actual_delivery_cost ?? r.expected_delivery_cost ?? 35;
   const orderMargin = (r: (typeof activeRows)[number]) =>
     (r.total_amount_mad ?? 0) - (goodsCost.get(r.id) ?? (r.cogs_total ?? 0)) - realDelivery(r);
+
+  // Confirmation (coût exact de la fiche produit, 1 fois par commande payée) → carte "Confirmation"
+  total_call_center_cost = Math.round(activeRows.filter((r) => r.is_paid).reduce((s2, r) => s2 + (confCost.get(r.id) ?? 0), 0) * 100) / 100;
 
   const real_profit_before_ads = Math.round(
     activeRows.filter((r) => r.is_paid).reduce((s, r) => s + orderMargin(r), 0) * 100) / 100;
@@ -473,7 +488,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   ) / 100;
 
   // Marge pas encore encaissée (la pub de ces commandes est déjà dépensée)
-  const pending_profit = Math.round(pendingRows.reduce((s, r) => s + orderMargin(r), 0) * 100) / 100;
+  const pending_profit = Math.round(pendingRows.reduce((s, r) => s + orderMargin(r) - (confCost.get(r.id) ?? 0), 0) * 100) / 100;
   // Info seulement (pas compté) : marge possible des commandes encore en route
   const transit_margin = Math.round(transitRows.reduce((s, r) => s + orderMargin(r), 0) * 100) / 100;
   const transit_count = transitRows.length;

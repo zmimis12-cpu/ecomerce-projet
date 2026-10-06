@@ -44,6 +44,7 @@ export default async function ProductCalcPage({ params, searchParams }: { params
           <Line label="− Prix d'achat" value={mad(p.purchase)} hint="Fiche produit — vérifie avec ta facture fournisseur" />
           <Line label="− Emballage" value={mad(p.packaging)} />
           <Line label="− Livraison Digylog (moyenne réelle)" value={mad(u.avgFee)} hint="20 MAD Casablanca · 35 MAD ailleurs" />
+          <Line label="− Confirmation" value={mad(m.ccPer)} hint="Fiche produit, par commande" />
           <Line label="= Marge par livraison (avant pub)" value={mad(u.unitMargin)} strong tone={u.unitMargin >= 0 ? "green" : "red"} />
         </section>
 
@@ -70,7 +71,7 @@ export default async function ProductCalcPage({ params, searchParams }: { params
             <Line key={pl} label={`− Pub ${pl === "meta" ? "Meta" : pl === "tiktok" ? "TikTok" : pl}`} value={mad(v)} hint="Dépense réelle, taxe de chaque compte incluse" />
           ))}
           {Object.keys(m.adsByPlatform).length === 0 && <Line label="− Pub" value={mad(0)} hint="Aucune campagne reliée à ce produit sur la période" />}
-          <Line label="− Call center" value={mad(m.ccCost)} hint={`${m.ccOrders} commandes traitées par un agent × ${m.ccPer} MAD`} />
+          <Line label="− Confirmation" value={mad(m.ccCost)} hint={`${m.ccOrders} commandes payées × ${m.ccPer} MAD (fiche produit)`} />
           <Line label="− Éditeurs vidéo" value={mad(m.editorCost)} />
           <Line label="= Profit net encaissé" value={mad(m.netProfit)} strong tone={m.netProfit >= 0 ? "green" : "red"} />
         </section>

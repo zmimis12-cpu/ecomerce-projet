@@ -171,9 +171,9 @@ export default async function AdminDashboardPage({
               <KpiCard label="Total Pub"       value={mad((summary as {total_ads_spend?:number}).total_ads_spend ?? 0)}
                 icon={AlertTriangle} variant="red"
                 sub="Meta (réel) + TikTok/Google (saisie manuelle)" />
-              <KpiCard label="Call Center"     value={mad((summary as {total_call_center_cost?:number}).total_call_center_cost ?? 0)}
+              <KpiCard label="Confirmation"     value={mad((summary as {total_call_center_cost?:number}).total_call_center_cost ?? 0)}
                 icon={PhoneCall} variant="red"
-                sub="Commissions agents (commandes payées traitées par un agent)" />
+                sub="Coût de confirmation de la fiche produit × commandes payées" />
               <KpiCard label="Éditeurs vidéo"  value={mad((summary as {total_editor_cost?:number}).total_editor_cost ?? 0)}
                 icon={PhoneCall} variant="red"
                 sub="Gains éditeurs (commandes payées venant de leurs vidéos)" />
@@ -183,7 +183,7 @@ export default async function AdminDashboardPage({
               <KpiCard label="Profit Net Final" value={mad((summary as {true_final_profit?:number}).true_final_profit ?? 0)}
                 variant={((summary as {true_final_profit?:number}).true_final_profit ?? 0) >= 0 ? "green" : "red"}
                 icon={TrendingUp} highlight
-                sub="Profit Réel (avant pub) − Pub réelle − Call Center − Éditeurs" />
+                sub="Profit Réel (avant pub) − Pub réelle − Confirmation − Éditeurs" />
               <KpiCard label="Profit en attente" value={mad((summary as {pending_profit?:number}).pending_profit ?? 0)}
                 icon={Truck} variant="amber"
                 sub={`${(summary as {pending_orders_count?:number}).pending_orders_count ?? 0} commandes LIVRÉES pas encore payées par Digylog — argent sûr, en attente de virement`} />

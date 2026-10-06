@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
 
   let query = supabaseAdmin
     .from("products")
-    .select("id, name, sku, sale_price_mad, total_cost_mad, ads_cost_mad, confirmation_cost_mad, shipping_cost_mad, estimated_profit_mad, slug")
+    .select("id, name, sku, sale_price_mad, total_cost_mad, ads_cost_mad, confirmation_cost_mad, shipping_cost_mad, purchase_price_mad, packaging_cost_mad, estimated_profit_mad, slug")
     .eq("is_active", true);
   query = (pid ? query.eq("id", pid) : query.eq("slug", pslug)) as typeof query;
 
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
   const p = product as unknown as {
     id: string; name: string; sku: string;
     sale_price_mad: number; total_cost_mad: number;
-    ads_cost_mad: number | null; confirmation_cost_mad: number | null; shipping_cost_mad: number | null;
+    ads_cost_mad: number | null; confirmation_cost_mad: number | null; shipping_cost_mad: number | null; purchase_price_mad: number | null; packaging_cost_mad: number | null;
     estimated_profit_mad: number; slug: string;
   };
 
@@ -293,6 +293,33 @@ export async function POST(request: NextRequest) {
 
   // ── 9. Log rate limit entry ───────────────────────────────────────────────────
   after(() => recordRequest(ip)); // ne bloque plus la réponse
+
+  // ── 9a. "Lead" envoyé à Meta CÔTÉ SERVEUR (Conversions API) pour chaque
+  // commande, vers chaque pixel de la LP. Fiable même si le navigateur bloque
+  // le pixel (iPhone, bloqueurs, navigateur Instagram/Facebook). Même event_id
+  // que le pixel navigateur → Meta déduplique, pas de double comptage.
+  const pixelList = typeof body.meta_pixel_id === "string" ? body.meta_pixel_id.split(/[,\s]+/).filter(Boolean) : [];
+  if (pixelList.length) {
+    after(async () => {
+      try {
+        const { getMetaAccounts } = await import("@/lib/ads/meta-accounts");
+        const { sendMetaPurchaseEvent } = await import("@/lib/meta/conversions-api");
+        const accs = (await getMetaAccounts()).filter((a) => a.isActive && a.token);
+        for (const pixelId of pixelList) {
+          const token = accs.find((a) => a.pixelId === pixelId)?.token ?? accs.find((a) => a.isPrimary)?.token;
+          if (!token) continue;
+          await sendMetaPurchaseEvent({
+            pixelId, accessToken: token, value: subtotal, currency: "MAD",
+            phone: normalizedPhone, city: String(customer_city ?? ""), fullName: String(customer_name ?? ""),
+            fbp: typeof body.meta_fbp === "string" ? body.meta_fbp : null,
+            fbc: typeof body.meta_fbc === "string" ? body.meta_fbc : null,
+            clientIp: ip, clientUserAgent: request.headers.get("user-agent"),
+            eventId: `lead_${orderNumber}`, eventName: "Lead", actionSource: "website", contentIds: [p.id],
+          }).catch(() => {});
+        }
+      } catch { /* ne bloque jamais la commande */ }
+    });
+  }
 
   // ── 9b. Envoi WhatsApp de confirmation — EN ARRIÈRE-PLAN, ne bloque plus
   // jamais la réponse au client. Avant: `await` ici faisait attendre le
