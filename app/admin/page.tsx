@@ -173,7 +173,7 @@ export default async function AdminDashboardPage({
                 sub="Meta (réel) + TikTok/Google (saisie manuelle)" />
               <KpiCard label="Confirmation"     value={mad((summary as {total_call_center_cost?:number}).total_call_center_cost ?? 0)}
                 icon={PhoneCall} variant="red"
-                sub="Coût de confirmation de la fiche produit × commandes payées" />
+                sub="Confirmation (fiche produit) × commandes payées traitées par un agent" />
               <KpiCard label="Éditeurs vidéo"  value={mad((summary as {total_editor_cost?:number}).total_editor_cost ?? 0)}
                 icon={PhoneCall} variant="red"
                 sub="Gains éditeurs (commandes payées venant de leurs vidéos)" />

@@ -77,7 +77,7 @@ export async function productEconomicsDetail(productId: string, period: string) 
   const goods = sum(paidOrders, (o) => perPiece * (qtyOf.get(o.id) ?? 1));
   const deliveryCost = sum(paidOrders, delFee);
   const marginBeforeAds = revenue - goods - deliveryCost;
-  const pendingMargin = sum(pendingOrders, marginOf) - pendingOrders.length * Number(prod.confirmation_cost_mad ?? 0);
+  const pendingMargin = sum(pendingOrders, marginOf) - pendingOrders.filter((o) => o.assigned_to && agentIds.has(o.assigned_to)).length * confirmation;
   const pendingRevenue = sum(pendingOrders, (o) => Number(o.total_amount_mad ?? 0));
 
   // Pub reliée au produit (Meta + TikTok, taxe de chaque compte incluse)
@@ -94,15 +94,14 @@ export async function productEconomicsDetail(productId: string, period: string) 
   const { data: ccSet } = await supabaseAdmin.from("app_settings").select("value").eq("key", "cc_commission_per_order").maybeSingle();
   const ccPer = Number((ccSet as { value?: unknown } | null)?.value ?? 0) || 0;
   // Confirmation = coût exact de la fiche produit × commandes payées
-  void agentIds;
-  const ccOrders = paidOrders.length;
+  const ccOrders = paidOrders.filter((o) => o.assigned_to && agentIds.has(o.assigned_to)).length;
   const ccCost = ccOrders * confirmation;
   const editorCost = sum(paidOrders, (o) => Number(o.editor_earning_mad ?? 0));
 
   const netProfit = marginBeforeAds - adSpend - ccCost - editorCost;
   const avgFee = orders.filter((o) => o.actual_delivery_cost).length
     ? sum(orders.filter((o) => o.actual_delivery_cost), delFee) / orders.filter((o) => o.actual_delivery_cost).length : 35;
-  const unitMargin = Number(prod.sale_price_mad ?? 0) - perPiece - avgFee - confirmation;
+  const unitMargin = Number(prod.sale_price_mad ?? 0) - perPiece - avgFee;
   const ordersToDelivered = confirmRate * deliveryRate;
 
   return {
