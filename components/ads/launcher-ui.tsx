@@ -194,7 +194,7 @@ export function LaunchControls({ launchId, status, itemsCount, createdCount }: {
   const [pending, start] = useTransition();
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {status !== "active" && (
+      {(status !== "active" || itemsCount > createdCount) && (
         <button className={BTN} disabled={pending || itemsCount === 0} onClick={() => start(async () => {
           setMsg("Création dans Meta… (les vidéos peuvent prendre quelques minutes)");
           const r = await runLaunch(launchId);
@@ -204,13 +204,13 @@ export function LaunchControls({ launchId, status, itemsCount, createdCount }: {
           <Play className="h-4 w-4" /> {createdCount ? "Continuer / créer les pubs restantes" : "Créer dans Meta (en pause)"}
         </button>
       )}
-      {createdCount > 0 && status !== "active" && (
+      {createdCount > 0 && (status !== "active" || itemsCount > 0) && (
         <button className="inline-flex h-9 items-center gap-1.5 rounded-md bg-emerald-600 px-3 text-sm font-medium text-white disabled:opacity-50"
           disabled={pending} onClick={() => {
             if (!confirm("Activer la campagne ? Elle va commencer à dépenser ton budget.")) return;
             start(async () => { const r = await activateLaunchAction(launchId); setMsg(r.success ? "🚀 Campagne ACTIVE." : `❌ ${r.error}`); router.refresh(); });
           }}>
-          <Power className="h-4 w-4" /> Activer la campagne
+          <Power className="h-4 w-4" /> {status === "active" ? "Activer les nouvelles pubs" : "Activer la campagne"}
         </button>
       )}
       {status === "draft" && (

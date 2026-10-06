@@ -150,10 +150,11 @@ export default async function LaunchPage({ params }: { params: Promise<{ id: str
         </section>
       )}
 
-      {launch.status !== "active" && adsets.length > 0 && (
+      {adsets.length > 0 && (
         <section className="rounded-xl border border-dashed bg-card p-4">
           <h2 className="mb-3 font-semibold">➕ Ajouter une pub (vidéo ou image)</h2>
-          <ItemEditor launchId={id} creatives={creatives} texts={texts} adsets={adsets.filter((a) => !a.meta_adset_id).map((a) => ({ id: a.id, name: a.name }))} />
+          <p className="mb-2 text-xs text-muted-foreground">Le lien de la landing page et le code vidéo (?cr=) sont ajoutés automatiquement. Ensuite : « Créer dans Meta » puis « Activer ».</p>
+          <ItemEditor launchId={id} creatives={creatives} texts={texts} adsets={adsets.map((a) => ({ id: a.id, name: a.name }))} />
         </section>
       )}
 
