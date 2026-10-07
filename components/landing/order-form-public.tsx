@@ -81,15 +81,31 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   const total = offer.price;
   const activeVariants = variants.filter(v => v.options.some(o => o.label.trim()));
 
+  // Pré-remplit chaque pièce avec une couleur différente (pièce 1 = 1re couleur,
+  // pièce 2 = 2e…) : le client peut commander sans rien choisir, ou changer
+  // (ex : 2 dorés + 2 cuivrés). Les choix déjà faits sont gardés.
+  function prefill(qty: number, prev: Record<string, string>[]) {
+    const next = prev.slice(0, qty);
+    while (next.length < qty) next.push({});
+    return next.map((sel, unit) => {
+      const out = { ...sel };
+      for (const v of activeVariants) {
+        const opts = v.options.filter((o) => o.label.trim());
+        if (!out[v.name] && opts.length) out[v.name] = opts[unit % opts.length].label;
+      }
+      return out;
+    });
+  }
+  useEffect(() => {
+    if (activeVariants.length) setSelectedVariants((prev) => prefill(bundle, prev));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function changeOffer(o: Offer) {
     setOfferId(o.id);
     const qty = o.qty;
     setBundle(qty);
-    setSelectedVariants(prev => {
-      const next = prev.slice(0, qty);
-      while (next.length < qty) next.push({ ...(next[next.length - 1] ?? {}) });
-      return next;
-    });
+    setSelectedVariants(prev => prefill(qty, prev));
     setErrors(e => { const n = { ...e }; delete n.variants; return n; });
   }
 
@@ -167,7 +183,8 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
                 country: "ma",
               });
             }
-            w.fbq?.("track", "Lead", { value: total, currency: "MAD", content_name: product.name });
+            w.fbq?.("track", "Lead", { value: total, currency: "MAD", content_name: product.name },
+              { eventID: `lead_${data.orderNumber ?? ""}` }); // = event_id serveur → dédupliqué
 
             const wt = window as unknown as { ttq?: { identify: (...args: unknown[]) => void; track: (...args: unknown[]) => void } };
             wt.ttq?.identify({ phone_number: toInternationalMorocco(form.customer_phone) });
@@ -271,8 +288,39 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         </div>
       </div>
 
-      {/* Variants — une sélection par pièce quand qty >= 2 */}
-      {activeVariants.length > 0 && Array.from({ length: bundle }).map((_, unit) => (
+      {/* Variants — plusieurs pièces : une ligne compacte par pièce, déjà pré-remplie */}
+      {activeVariants.length > 0 && bundle > 1 && (
+        <div style={{marginBottom:"14px",padding:"10px 12px",borderRadius:"14px",border:"1px solid #e5e7eb",background:"#fafafa"}}>
+          <div style={{fontSize:"12px",fontWeight:700,color:"#374151",marginBottom:"8px"}}>
+            {activeVariants[0].name} لكل قطعة <span style={{fontWeight:400,color:"#6b7280"}}>(مختار مسبقاً — تقدر تبدل)</span>
+          </div>
+          {Array.from({ length: bundle }).map((_, unit) => (
+            <div key={unit} style={{display:"flex",alignItems:"center",gap:"8px",marginBottom: unit < bundle - 1 ? "8px" : 0}}>
+              <span style={{minWidth:"58px",fontSize:"12px",fontWeight:700,color:"#111827"}}>القطعة {unit + 1}</span>
+              <div style={{display:"flex",gap:"6px",overflowX:"auto",paddingBottom:"2px"}}>
+                {activeVariants.map((v) => v.options.filter(o => o.label.trim()).map((opt, oi) => {
+                  const on = selectedVariants[unit]?.[v.name] === opt.label;
+                  return (
+                    <button key={v.name + oi} type="button" onClick={() => pickVariant(unit, v.name, opt.label)}
+                      style={{display:"flex",alignItems:"center",gap:"4px",flexShrink:0,padding:"4px 8px 4px 4px",borderRadius:"9999px",
+                        border:`2px solid ${on ? "#16a34a" : "#e5e7eb"}`,background:on ? "#f0fdf4" : "#fff",
+                        color:on ? "#16a34a" : "#374151",fontWeight:on ? 700 : 500,fontSize:"12px",cursor:"pointer",
+                        fontFamily:"var(--font-cairo),sans-serif"}}>
+                      {opt.image && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={opt.image} alt="" loading="lazy" style={{width:"26px",height:"26px",borderRadius:"50%",objectFit:"cover"}} />
+                      )}
+                      {opt.label.trim()}
+                    </button>
+                  );
+                }))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Une seule pièce : grandes cartes avec photo */}
+      {activeVariants.length > 0 && bundle === 1 && Array.from({ length: 1 }).map((_, unit) => (
         <div key={unit} style={bundle > 1 ? {
           marginBottom:"14px", padding:"12px", borderRadius:"14px",
           border:"1px dashed #d1d5db", background:"#fafafa",
