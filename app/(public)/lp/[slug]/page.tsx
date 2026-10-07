@@ -15,6 +15,9 @@ import type { LPSection } from "@/lib/templates";
 // Servie depuis le cache CDN (instantané) et régénérée au plus toutes les 60 s
 // → une modification dans l'éditeur est visible en ligne en moins d'une minute.
 export const revalidate = 60;
+// Force le mode statique (cache CDN) : sans ça, les requêtes Supabase rendaient la page dynamique.
+export const dynamic = "force-static";
+export const dynamicParams = true;
 
 const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://ecomerce-projet.vercel.app").replace(/\/$/, "");
 
