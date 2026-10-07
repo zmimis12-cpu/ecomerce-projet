@@ -295,14 +295,14 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
             {activeVariants[0].name} لكل قطعة <span style={{fontWeight:400,color:"#6b7280"}}>(مختار مسبقاً — تقدر تبدل)</span>
           </div>
           {Array.from({ length: bundle }).map((_, unit) => (
-            <div key={unit} style={{display:"flex",alignItems:"center",gap:"8px",marginBottom: unit < bundle - 1 ? "8px" : 0}}>
+            <div key={unit} style={{display:"flex",alignItems:"center",gap:"8px",marginBottom: unit < bundle - 1 ? "10px" : 0,paddingBottom: unit < bundle - 1 ? "10px" : 0,borderBottom: unit < bundle - 1 ? "1px dashed #e5e7eb" : "none"}}>
               <span style={{minWidth:"58px",fontSize:"12px",fontWeight:700,color:"#111827"}}>القطعة {unit + 1}</span>
-              <div style={{display:"flex",gap:"6px",overflowX:"auto",paddingBottom:"2px"}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:"6px",flex:1}}>
                 {activeVariants.map((v) => v.options.filter(o => o.label.trim()).map((opt, oi) => {
                   const on = selectedVariants[unit]?.[v.name] === opt.label;
                   return (
                     <button key={v.name + oi} type="button" onClick={() => pickVariant(unit, v.name, opt.label)}
-                      style={{display:"flex",alignItems:"center",gap:"4px",flexShrink:0,padding:"4px 8px 4px 4px",borderRadius:"9999px",
+                      style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:"6px",minWidth:0,padding:"5px 8px 5px 5px",borderRadius:"9999px",
                         border:`2px solid ${on ? "#16a34a" : "#e5e7eb"}`,background:on ? "#f0fdf4" : "#fff",
                         color:on ? "#16a34a" : "#374151",fontWeight:on ? 700 : 500,fontSize:"12px",cursor:"pointer",
                         fontFamily:"var(--font-cairo),sans-serif"}}>
