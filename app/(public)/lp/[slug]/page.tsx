@@ -683,6 +683,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </a>
         </div>
 
+        <script dangerouslySetInnerHTML={{ __html: `(function(){function go(){var f=document.getElementById("lp-form"),w=document.getElementById("lp-wa-float");if(!f||!w||!("IntersectionObserver" in window))return;new IntersectionObserver(function(e){w.classList.toggle("lp-wa-hidden",e[0].isIntersecting);},{threshold:0.05}).observe(f);}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",go);else go();})();` }} />
         {/* ── FLOATING WHATSAPP BUTTON ── */}
         {whatsapp && (
           <a
@@ -690,6 +691,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             target="_blank"
             rel="noopener noreferrer"
             className="lp-wa-float"
+            id="lp-wa-float"
             aria-label="تواصل عبر واتساب"
           >
             <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28" aria-hidden="true">
@@ -964,13 +966,11 @@ const GLOBAL_CSS = `
   .lp-wa-float{
     position:fixed;bottom:80px;left:16px;z-index:60;
     width:56px;height:56px;border-radius:50%;
-    background:#25d366;color:#fff;
-    display:flex;align-items:center;justify-content:center;
-    box-shadow:0 4px 16px rgba(37,211,102,.5);
-    text-decoration:none;
-    animation:wa-pulse 2s ease-in-out infinite;
-    transition:transform .15s;
+    background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 4px 14px rgba(0,0,0,.25);transition:opacity .2s,transform .2s;
   }
+  /* Caché quand le formulaire de commande est à l'écran (sinon il couvrait le bouton "اطلب") */
+  .lp-wa-float.lp-wa-hidden{opacity:0;pointer-events:none;transform:scale(.6);}
   .lp-wa-float:active{transform:scale(.92);}
   @keyframes wa-pulse{
     0%,100%{box-shadow:0 4px 16px rgba(37,211,102,.5);}
