@@ -265,6 +265,18 @@ export async function tryAutoDetectExchange(tracking: string): Promise<{
   const { createDigylogClientFromDB } = await import("@/lib/delivery/digylog/client");
   const { normalizePhone } = await import("@/lib/delivery/phone-utils");
 
+  // "EC-XXXX" = colis RETOUR d'un échange déjà créé (l'ancien produit qui
+  // revient). Ce n'est pas une nouvelle commande → on ne crée rien.
+  const base = tracking.replace(/^EC-/i, "");
+  {
+    const { data: existing } = await supabaseAdmin
+      .from("orders").select("order_number")
+      .in("delivery_tracking_number", [tracking, base]).limit(1);
+    if (existing && existing.length) {
+      return { linked: false, reason: `Retour d'échange déjà lié à ${(existing[0] as { order_number: string }).order_number} — rien à créer.` };
+    }
+  }
+
   const client = await createDigylogClientFromDB();
   if (!client.hasToken()) return { linked: false, reason: "Token Digylog manquant." };
 

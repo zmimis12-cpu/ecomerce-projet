@@ -467,6 +467,14 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
         confCost.set(it.order_id, Math.max(confCost.get(it.order_id) ?? 0, unitConf.get(it.product_id!) ?? 0));
       }
     }
+    // Échange = simple remplacement : l'ancien produit revient en stock, donc
+    // l'échange ne coûte PAS un produit de plus (seulement la livraison).
+    for (let i = 0; i < idsForItems.length; i += 150) {
+      const { data: exs } = await supabaseAdmin
+        .from("orders").select("id").eq("is_exchange", true)
+        .in("id", idsForItems.slice(i, i + 150));
+      for (const e of (exs ?? []) as { id: string }[]) { goodsCost.set(e.id, 0); confCost.set(e.id, 0); }
+    }
   }
   const realDelivery = (r: (typeof activeRows)[number]) => r.actual_delivery_cost ?? r.expected_delivery_cost ?? 35;
   const orderMargin = (r: (typeof activeRows)[number]) =>
