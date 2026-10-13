@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -52,7 +53,7 @@ export default async function HomePage() {
           <strong style={{ fontSize: 20 }}>Hajtek<span style={{ color: "#16a34a" }}>Zone</span></strong>
           <nav style={{ display: "flex", gap: 18, fontSize: 14 }}>
             <a href="#products" style={{ color: "#111827" }}>Products</a>
-            <a href="/a-propos" style={{ color: "#111827" }}>About</a>
+            <Link href="/a-propos" style={{ color: "#111827" }}>About</Link>
             <a href="#contact" style={{ color: "#111827" }}>Contact</a>
           </nav>
         </div>
@@ -78,7 +79,7 @@ export default async function HomePage() {
             const img = l.hero_image || (l.product_id ? imgs.get(l.product_id) : undefined);
             const price = l.product_id ? prices.get(l.product_id) : undefined;
             return (
-              <a key={l.slug} href={`/lp/${l.slug}`} style={{ border: "1px solid #e5e7eb", borderRadius: 14, overflow: "hidden", color: "inherit", textDecoration: "none", display: "block" }}>
+              <Link key={l.slug} href={`/lp/${l.slug}`} style={{ border: "1px solid #e5e7eb", borderRadius: 14, overflow: "hidden", color: "inherit", textDecoration: "none", display: "block" }}>
                 <div style={{ aspectRatio: "1 / 1", background: "#f3f4f6" }}>
                   {img && /* eslint-disable-next-line @next/next/no-img-element */ <img src={img} alt={l.title} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
                 </div>
@@ -87,7 +88,7 @@ export default async function HomePage() {
                   <div style={{ marginTop: 6, color: "#16a34a", fontWeight: 700 }}>{l.price_text || (price ? `${price} MAD` : "")}</div>
                   <div style={{ marginTop: 10, fontSize: 13, color: "#2563eb" }}>View product →</div>
                 </div>
-              </a>
+              </Link>
             );
           })}
         </div>
@@ -97,7 +98,7 @@ export default async function HomePage() {
         <div style={{ ...wrap, padding: "44px 20px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 28 }}>
           <div><h3 style={{ marginTop: 0 }}>How to order</h3><p style={{ color: "#4b5563" }}>Choose a product, fill in your name, phone and city. Our team calls you to confirm, then the order is shipped by our delivery partner. You pay on delivery.</p></div>
           <div><h3 style={{ marginTop: 0 }}>Delivery</h3><p style={{ color: "#4b5563" }}>We deliver to all cities in Morocco through professional delivery companies, usually within 24 to 72 hours after confirmation.</p></div>
-          <div><h3 style={{ marginTop: 0 }}>Returns &amp; exchange</h3><p style={{ color: "#4b5563" }}>If a product arrives damaged or defective, contact us and we exchange it. See our <a href="/conditions">terms</a>.</p></div>
+          <div><h3 style={{ marginTop: 0 }}>Returns &amp; exchange</h3><p style={{ color: "#4b5563" }}>If a product arrives damaged or defective, contact us and we exchange it. See our <Link href="/conditions">terms</Link>.</p></div>
         </div>
       </section>
 
@@ -109,11 +110,11 @@ export default async function HomePage() {
             Website: hajtek.ma
           </div>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <a href="/a-propos">About us</a>
-            <a href="/conditions">Terms of service</a>
-            <a href="/confidentialite">Privacy policy</a>
-            <a href="/suppression-donnees">Data deletion</a>
-            <a href="/login" style={{ color: "#9ca3af" }}>Staff login</a>
+            <Link href="/a-propos">About us</Link>
+            <Link href="/conditions">Terms of service</Link>
+            <Link href="/confidentialite">Privacy policy</Link>
+            <Link href="/suppression-donnees">Data deletion</Link>
+            <Link href="/login" style={{ color: "#9ca3af" }}>Staff login</Link>
           </div>
         </div>
         <div style={{ textAlign: "center", fontSize: 12, color: "#9ca3af", paddingBottom: 20 }}>© {new Date().getFullYear()} HajtekZone / ODT Deals. All rights reserved.</div>
