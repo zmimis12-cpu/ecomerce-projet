@@ -168,9 +168,9 @@ export default async function AdminDashboardPage({
                 variant={((summary as {real_profit_before_ads?:number}).real_profit_before_ads ?? 0) >= 0 ? "green" : "red"}
                 icon={TrendingUp} highlight
                 sub="Commandes payées : vente − produit − livraison − emballage" />
-              <KpiCard label="Total Pub"       value={mad((summary as {total_ads_spend?:number}).total_ads_spend ?? 0)}
+              <KpiCard label="Total Pub (prélevé)"       value={mad((summary as {total_ads_spend?:number}).total_ads_spend ?? 0)}
                 icon={AlertTriangle} variant="red"
-                sub="Meta (réel) + TikTok/Google (saisie manuelle)" />
+                sub={`Prélevé réellement par Meta (TVA incluse) + TikTok · dépensé dans Ads Manager : ${mad((summary as {ads_spent_info?:number}).ads_spent_info ?? 0)}${(summary as {ads_charged_error?:string|null}).ads_charged_error ? " · ⚠️ lecture Meta incomplète" : ""}`} />
               <KpiCard label="Confirmation"     value={mad((summary as {total_call_center_cost?:number}).total_call_center_cost ?? 0)}
                 icon={PhoneCall} variant="red"
                 sub="Confirmation (fiche produit) × commandes payées traitées par un agent" />

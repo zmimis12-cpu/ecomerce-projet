@@ -34,6 +34,9 @@ export interface DashboardSummary {
   self_delivery_revenue:  number;
   digylog_count:          number;
   total_ads_spend:        number;  // Meta (réel, synced) + TikTok/Google/autre (saisie manuelle)
+  ads_spent_info?:        number;  // dépense pub (Meta Ads Manager) — info
+  ads_charged_meta?:      number;  // prélevé réellement par Meta (MAD, TVA incluse)
+  ads_charged_error?:     string | null;
   real_profit_net_ads:    number;  // real_profit - total_ads_spend
   total_call_center_cost: number;  // commissions agents sur commandes payées de la période
   total_other_expenses:   number;  // domaine, abonnements, etc. (table expenses)
@@ -390,7 +393,32 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   const metaSpendTotal      = ((metaSpendRows ?? []) as { spend_mad: number }[]).reduce((s, r) => s + (r.spend_mad ?? 0), 0);
   const unmatchedSpendTotal = ((unmatchedSpendRows ?? []) as { spend_mad: number }[]).reduce((s, r) => s + (r.spend_mad ?? 0), 0);
   const manualSpendTotal    = ((manualSpendRows ?? []) as { amount_mad: number }[]).reduce((s, r) => s + (r.amount_mad ?? 0), 0);
-  const total_ads_spend     = Math.round((metaSpendTotal + unmatchedSpendTotal + manualSpendTotal) * 100) / 100;
+  // ✅ Pub = ce que Meta a RÉELLEMENT PRÉLEVÉ sur la carte (facturation), pas la
+  // dépense affichée. + TikTok/Google (pas de facturation API → dépense saisie/synchro).
+  const ads_spent_info = Math.round((metaSpendTotal + unmatchedSpendTotal + manualSpendTotal) * 100) / 100;
+  let ads_charged_meta = 0;
+  let ads_charged_error: string | null = null;
+  let nonMetaSpend = manualSpendTotal;
+  try {
+    let tq = supabaseAdmin.from("product_ad_spend").select("spend_mad").neq("platform", "meta");
+    let tu = supabaseAdmin.from("unmatched_ad_spend").select("spend_mad").neq("platform", "meta");
+    if (filter) {
+      tq = tq.gte("period_start", filter.from).lte("period_end", filter.to);
+      tu = tu.gte("period_start", filter.from).lte("period_end", filter.to);
+    }
+    const [{ data: tr }, { data: tur }] = await Promise.all([tq, tu]);
+    nonMetaSpend += [...((tr ?? []) as { spend_mad: number }[]), ...((tur ?? []) as { spend_mad: number }[])]
+      .reduce((s2, r) => s2 + Number(r.spend_mad ?? 0), 0);
+    const { getMetaChargedMad } = await import("@/lib/ads/meta-charges");
+    const ch = await getMetaChargedMad(filter?.from, filter?.to);
+    ads_charged_meta = ch.mad;
+    ads_charged_error = ch.error ?? null;
+  } catch (e) {
+    ads_charged_error = e instanceof Error ? e.message : String(e);
+  }
+  const total_ads_spend     = ads_charged_error && ads_charged_meta === 0
+    ? ads_spent_info // Meta illisible → on garde la dépense pour ne pas afficher 0
+    : Math.round((ads_charged_meta + nonMetaSpend) * 100) / 100;
   const real_profit_net_ads = Math.round((real_profit - total_ads_spend) * 100) / 100;
 
   // ── Commissions call center: réglage GLOBAL (app_settings.cc_commission_per_order),
@@ -510,7 +538,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     no_answer_count, cancelled_count, cancelled_after_confirm, shipped_count,
     estimated_revenue, real_revenue, estimated_profit, real_profit,
     total_cogs, total_delivery_cost, total_return_losses, pending_collection, net_a_recevoir,
-    net_collected, total_ads_spend, real_profit_net_ads,
+    net_collected, total_ads_spend, real_profit_net_ads, ads_spent_info, ads_charged_meta, ads_charged_error,
     self_delivery_count, self_delivery_revenue, digylog_count,
     total_call_center_cost, total_other_expenses, true_final_profit,
     real_profit_before_ads, pending_profit, pending_orders_count, total_editor_cost,
