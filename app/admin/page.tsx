@@ -11,6 +11,7 @@ import {
 } from "@/lib/dashboard/queries";
 import { KpiCard, RateBadge } from "@/components/dashboard/kpi-card";
 import { StoreFilter } from "@/components/shared/store-filter";
+import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
 import { getStoreOptions } from "@/lib/delivery/store-filter-helper";
 import { ProductPerformanceTable } from "@/components/dashboard/product-performance-table";
 import { FinanceChart } from "@/components/dashboard/finance-chart";
@@ -34,7 +35,18 @@ export default async function AdminDashboardPage({
   const canSeeFinance  = hasRole(session.role, ["super_admin","admin","manager","finance"]);
   const sp             = await searchParams;
   const storeId        = sp.store || undefined;
-  const filter         = storeId ? { from: "2020-01-01", to: "2099-12-31", storeId } : undefined;
+  // Période : par défaut le MOIS EN COURS · ?period=all = tout · ?from=&to= = période choisie
+  const isDate = (v?: string) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const todayMa = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Casablanca" });
+  const showAll = sp.period === "all";
+  const from = showAll ? undefined : isDate(sp.from) ? sp.from : todayMa.slice(0, 8) + "01";
+  const to   = showAll ? undefined : isDate(sp.to) ? sp.to : todayMa;
+  const filter = from && to
+    ? { from, to, storeId }
+    : storeId ? { from: "2020-01-01", to: "2099-12-31", storeId } : undefined;
+  const periodLabel = from && to
+    ? (from === to ? new Date(from).toLocaleDateString("fr-FR") : `du ${new Date(from).toLocaleDateString("fr-FR")} au ${new Date(to).toLocaleDateString("fr-FR")}`)
+    : "depuis le début";
 
   const [summary, products, daily, storeOptions, adSpendByPlatform] = await Promise.all([
     canSeeFinance ? getDashboardSummary(filter) : null,
@@ -76,6 +88,16 @@ export default async function AdminDashboardPage({
           {new Date().toLocaleDateString("fr-MA", { weekday:"long", day:"numeric", month:"long" })}
         </p>
       </div>
+
+      {canSeeFinance && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3">
+          <DateRangeFilter from={from ?? ""} to={to ?? ""} all={showAll} />
+          <StoreFilter stores={storeOptions} />
+          <span className="text-xs text-muted-foreground">
+            Période : <b>{periodLabel}</b>{selectedStore ? ` · ${selectedStore.name}` : ""}
+          </span>
+        </div>
+      )}
 
       {/* Restricted view */}
       {!canSeeFinance && (

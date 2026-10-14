@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { BarChart3 } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -22,14 +23,15 @@ export default async function AdminAdStatsPage({
   const sp = await searchParams;
   const period = sp.month ?? currentMonth();
 
-  const [adIds, { data: links }, { data: creatives }, fx, lifetime] = await Promise.all([
+  // ⚡ Rapide : seul le tableau des pubs est chargé ici. Les blocs lents
+  // (total all-time, contrôle TVA/prélèvements, reporting) s'affichent
+  // ensuite, chacun de son côté (Suspense) → la page s'ouvre tout de suite.
+  const [adIds, { data: links }, { data: creatives }, fx] = await Promise.all([
     getAccountAdIds(),
     supabaseAdmin.from("creative_ads" as never).select("ad_id, creative_id").eq("platform", "meta"),
     supabaseAdmin.from("creatives" as never).select("id, code"),
     getUsdToMad(),
-    getAccountLifetimeSpend(),
   ]);
-  const [taxReport, reporting, taxCfg] = await Promise.all([getMetaTaxReport(), getMetaReportingStatus(), getMetaTaxConfig()]);
   const codeOf = new Map(((creatives ?? []) as { id: string; code: string }[]).map((c) => [c.id, c.code]));
   const codeByAd = new Map(((links ?? []) as { ad_id: string; creative_id: string }[])
     .map((l) => [l.ad_id, codeOf.get(l.creative_id) ?? ""]));
@@ -45,37 +47,57 @@ export default async function AdminAdStatsPage({
         </div>
         <PeriodFilter period={period} />
       </div>
-      {lifetime && (
-        <div className="rounded-xl border-2 border-blue-300 bg-blue-50 p-4">
-          <div className="text-xs font-semibold uppercase tracking-wide text-blue-800">
-            Total dépensé depuis le début (all time)
-          </div>
-          <div className="mt-1 flex flex-wrap items-baseline gap-3">
-            <span className="text-2xl font-bold text-blue-900">
-              ${lifetime.usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      <MetaLiveSection live={live} codeByAd={Object.fromEntries(codeByAd)} rate={fx.rate} title="Toutes les pubs Meta — en direct" showTotals />
+      <Suspense fallback={<Loading label="Total dépensé depuis le début…" />}><LifetimeBlock /></Suspense>
+      <Suspense fallback={<Loading label="Reporting Meta…" />}><ReportingBlock /></Suspense>
+      <Suspense fallback={<Loading label="Contrôle des prélèvements et de la TVA…" />}><TaxBlock rate={fx.rate} /></Suspense>
+    </div>
+  );
+}
+
+function Loading({ label }: { label: string }) {
+  return <div className="animate-pulse rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">⏳ {label}</div>;
+}
+
+async function ReportingBlock() {
+  const reporting = await getMetaReportingStatus();
+  return <MetaReportingCard status={reporting} />;
+}
+
+async function TaxBlock({ rate }: { rate: number }) {
+  const [taxReport, taxCfg] = await Promise.all([getMetaTaxReport(), getMetaTaxConfig()]);
+  return <MetaTaxCard report={taxReport} rate={rate} tax={taxCfg} />;
+}
+
+async function LifetimeBlock() {
+  const lifetime = await getAccountLifetimeSpend();
+  if (!lifetime) return null;
+  return (
+    <div className="rounded-xl border-2 border-blue-300 bg-blue-50 p-4">
+      <div className="text-xs font-semibold uppercase tracking-wide text-blue-800">
+        Total dépensé depuis le début (all time)
+      </div>
+      <div className="mt-1 flex flex-wrap items-baseline gap-3">
+        <span className="text-2xl font-bold text-blue-900">
+          ${lifetime.usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+        <span className="text-sm text-blue-800">≈ {lifetime.mad.toLocaleString("fr-FR")} MAD (taxe de chaque compte incluse)</span>
+      </div>
+      {lifetime.accounts.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {lifetime.accounts.map((x) => (
+            <span key={x.label} className="rounded-md bg-white px-2 py-1 text-xs text-blue-900">
+              {x.label} : <b>${x.usd.toLocaleString("en-US", { minimumFractionDigits: 2 })}</b> · {x.mad.toLocaleString("fr-FR")} MAD
+              {x.taxPct > 0
+                ? ` — dont TVA ${x.taxPct} % sur $${(x.taxedUsd ?? 0).toFixed(2)} dépensés${x.taxSince ? ` depuis le ${new Date(x.taxSince).toLocaleDateString("fr-FR")}` : ""} = +$${(x.taxUsd ?? 0).toFixed(2)}`
+                : " (sans TVA)"}
             </span>
-            <span className="text-sm text-blue-800">≈ {lifetime.mad.toLocaleString("fr-FR")} MAD (taxe de chaque compte incluse)</span>
-          </div>
-          {lifetime.accounts.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {lifetime.accounts.map((x) => (
-                <span key={x.label} className="rounded-md bg-white px-2 py-1 text-xs text-blue-900">
-                  {x.label} : <b>${x.usd.toLocaleString("en-US", { minimumFractionDigits: 2 })}</b> · {x.mad.toLocaleString("fr-FR")} MAD
-                  {x.taxPct > 0
-                    ? ` — dont TVA ${x.taxPct} % sur $${(x.taxedUsd ?? 0).toFixed(2)} dépensés${x.taxSince ? ` depuis le ${new Date(x.taxSince).toLocaleDateString("fr-FR")}` : ""} = +$${(x.taxUsd ?? 0).toFixed(2)}`
-                    : " (sans TVA)"}
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="mt-0.5 text-xs text-blue-700">
-            Compte publicitaire Meta, depuis le {lifetime.since ? new Date(lifetime.since).toLocaleDateString("fr-FR") : "—"} — toutes campagnes, y compris supprimées. Identique à Meta Ads Manager (période « Maximum »).
-          </div>
+          ))}
         </div>
       )}
-      <MetaReportingCard status={reporting} />
-      <MetaTaxCard report={taxReport} rate={fx.rate} tax={taxCfg} />
-      <MetaLiveSection live={live} codeByAd={Object.fromEntries(codeByAd)} rate={fx.rate} title="Toutes les pubs Meta — en direct" showTotals />
+      <div className="mt-0.5 text-xs text-blue-700">
+        Tous tes comptes Meta, depuis le {lifetime.since ? new Date(lifetime.since).toLocaleDateString("fr-FR") : "—"} — toutes campagnes, y compris supprimées.
+      </div>
     </div>
   );
 }
