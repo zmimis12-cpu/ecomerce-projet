@@ -35,10 +35,33 @@ const config: Config = {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
+        brand: {
+          DEFAULT: "hsl(var(--brand))",
+          foreground: "hsl(var(--brand-foreground))",
+          soft: "hsl(var(--brand-soft))",
+        },
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          muted: "hsl(var(--sidebar-muted))",
+          accent: "hsl(var(--sidebar-accent))",
+        },
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+      },
+      keyframes: {
+        "fade-in-up": { "0%": { opacity: "0", transform: "translateY(8px)" }, "100%": { opacity: "1", transform: "translateY(0)" } },
+        "fade-in": { "0%": { opacity: "0" }, "100%": { opacity: "1" } },
+        "slide-in-left": { "0%": { transform: "translateX(-100%)" }, "100%": { transform: "translateX(0)" } },
+        shimmer: { "100%": { transform: "translateX(100%)" } },
+      },
+      animation: {
+        "fade-in-up": "fade-in-up .35s cubic-bezier(.2,.8,.2,1) both",
+        "fade-in": "fade-in .25s ease-out both",
+        "slide-in-left": "slide-in-left .25s cubic-bezier(.2,.8,.2,1) both",
+        shimmer: "shimmer 1.4s infinite",
       },
       borderRadius: {
         lg: "var(--radius)",

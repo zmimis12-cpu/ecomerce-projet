@@ -21,7 +21,15 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 20% 98%;
     --ring: 224 71.4% 4.1%;
-    --radius: 0.5rem;
+    --radius: 0.6rem;
+    /* HajtekZone — or + noir */
+    --brand: 41 63% 54%;
+    --brand-foreground: 0 0% 7%;
+    --brand-soft: 43 80% 95%;
+    --sidebar: 0 0% 7%;
+    --sidebar-foreground: 0 0% 93%;
+    --sidebar-muted: 0 0% 58%;
+    --sidebar-accent: 0 0% 13%;
   }
 
   .dark {
@@ -50,7 +58,18 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+}
+
+@layer components {
+  /* Barre de défilement discrète (sidebar + tableaux) */
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: hsl(0 0% 30%) transparent; }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(0 0% 30%); border-radius: 9999px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }

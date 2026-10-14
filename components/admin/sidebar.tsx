@@ -1,77 +1,94 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Package, ShoppingCart, PhoneCall,
-  Truck, Layers, FileSpreadsheet, FileText, FolderOpen,
+  Truck, Layers, FileText, FolderOpen,
   ScanLine, RotateCcw, BarChart3, Globe, Settings,
-  Shield, Phone, Award, Users, ListOrdered, CreditCard, Clapperboard, PackageCheck, Wallet, Calculator, Rocket,
+  Shield, Award, Users, ListOrdered, CreditCard, Clapperboard, PackageCheck, Wallet, Calculator, Rocket,
+  ChevronDown, Megaphone, Landmark, Menu, X, Boxes, Wand2, Music2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/lib/settings/users-constants";
+import { HajtekLogo } from "@/components/brand/logo";
 
 type NavItem = { href: string; label: string; icon: React.ElementType; exact?: boolean };
-type NavGroup = { label: string | null; items: NavItem[]; groupPrefix?: string };
+type NavGroup = { key?: string; label: string | null; icon?: React.ElementType; items: NavItem[] };
 
-// ─── Admin / Manager full nav ─────────────────────────────────────────────────
+// ─── Admin / Manager — regroupé par métier ────────────────────────────────────
 const ADMIN_NAV: NavGroup[] = [
   {
     label: null,
     items: [
-      { href: "/admin",          label: "Dashboard", icon: LayoutDashboard, exact: true },
-      { href: "/admin/products",          label: "Produits",          icon: Package          },
-      { href: "/admin/products/overview", label: "Vue d'ensemble",    icon: BarChart3        },
-      { href: "/admin/products/calculs", label: "Calculs par produit", icon: Calculator       },
-      { href: "/admin/orders",   label: "Commandes", icon: ShoppingCart     },
+      { href: "/admin",        label: "Dashboard", icon: LayoutDashboard, exact: true },
+      { href: "/admin/orders", label: "Commandes", icon: ShoppingCart },
     ],
   },
   {
-    label: "Call Center",
-    groupPrefix: "/admin/call-center",
+    key: "produits", label: "Produits", icon: Boxes,
     items: [
-      { href: "/admin/call-center",             label: "Vue globale",     icon: PhoneCall,    exact: true },
-      { href: "/admin/call-center/queue",        label: "File d'appels",   icon: ListOrdered   },
-      { href: "/admin/call-center/agents",       label: "Agents",          icon: Users         },
-      { href: "/admin/call-center/commissions",  label: "Commissions",     icon: Award         },
+      { href: "/admin/products",          label: "Produits",            icon: Package, exact: true },
+      { href: "/admin/products/overview", label: "Vue d'ensemble",      icon: BarChart3 },
+      { href: "/admin/products/calculs",  label: "Calculs par produit", icon: Calculator },
     ],
   },
   {
-    label: "Livraison",
-    groupPrefix: "/admin/delivery",
+    key: "callcenter", label: "Call Center", icon: PhoneCall,
     items: [
-      { href: "/admin/delivery",            label: "Suivi Livraison",    icon: Truck,          exact: true },
-      { href: "/admin/delivery/daily-bl",   label: "BL du Jour",         icon: FileText        },
-      { href: "/admin/delivery/batches",    label: "Tickets Impression", icon: Layers          },
-      { href: "/admin/delivery/notes",      label: "Récap Tickets",      icon: FileText        },
-      { href: "/admin/digylog/documents",   label: "Documents Livraison",  icon: FolderOpen      },
-      { href: "/admin/delivery/documents",  label: "Documents Sync",     icon: FolderOpen      },
-      { href: "/admin/delivery/invoices",   label: "Factures",           icon: FileText        },
-      { href: "/admin/scanner",             label: "Scanner",            icon: ScanLine        },
-      { href: "/admin/returns",             label: "Retours",            icon: RotateCcw       },
+      { href: "/admin/call-center",             label: "Vue globale",   icon: PhoneCall, exact: true },
+      { href: "/admin/call-center/queue",       label: "File d'appels", icon: ListOrdered },
+      { href: "/admin/call-center/agents",      label: "Agents",        icon: Users },
+      { href: "/admin/call-center/commissions", label: "Commissions",   icon: Award },
     ],
   },
   {
-    label: "Business",
+    key: "livraison", label: "Livraison", icon: Truck,
     items: [
-      { href: "/admin/finance",                    label: "Finance",          icon: BarChart3 },
-      { href: "/admin/finance/reconciliation", label: "Réconciliation",   icon: Shield },
-      { href: "/admin/profitability",           label: "Rentabilité",      icon: BarChart3 },
-      { href: "/admin/expenses",                label: "Dépenses & Cartes", icon: CreditCard },
-      { href: "/admin/landing-pages", label: "Landing Pages", icon: Globe     },
-      { href: "/admin/creatives",     label: "Vidéos & Éditeurs", icon: Clapperboard },
+      { href: "/admin/delivery",          label: "Suivi livraison",    icon: Truck, exact: true },
+      { href: "/admin/delivery/daily-bl", label: "BL du jour",         icon: FileText },
+      { href: "/admin/delivery/batches",  label: "Tickets impression", icon: Layers },
+      { href: "/admin/delivery/notes",    label: "Récap tickets",      icon: FileText },
+      { href: "/admin/scanner",           label: "Scanner",            icon: ScanLine },
+      { href: "/admin/returns",           label: "Retours",            icon: RotateCcw },
     ],
   },
   {
-    label: "Admin",
+    key: "documents", label: "Documents", icon: FolderOpen,
     items: [
+      { href: "/admin/digylog/documents",  label: "Documents livraison", icon: FolderOpen },
+      { href: "/admin/delivery/documents", label: "Documents sync",      icon: FolderOpen },
+      { href: "/admin/delivery/invoices",  label: "Factures",            icon: FileText },
+    ],
+  },
+  {
+    key: "finance", label: "Finance", icon: Landmark,
+    items: [
+      { href: "/admin/finance",                label: "Finance",           icon: BarChart3, exact: true },
+      { href: "/admin/finance/reconciliation", label: "Réconciliation",    icon: Shield },
+      { href: "/admin/profitability",          label: "Rentabilité",       icon: BarChart3 },
+      { href: "/admin/expenses",               label: "Dépenses & cartes", icon: CreditCard },
+    ],
+  },
+  {
+    key: "marketing", label: "Marketing", icon: Megaphone,
+    items: [
+      { href: "/admin/ads/stats",     label: "Stats pubs",        icon: BarChart3 },
+      { href: "/admin/ads/launch",    label: "Lancer campagne",   icon: Rocket },
+      { href: "/admin/ads/rules",     label: "Règles auto pub",   icon: Wand2 },
+      { href: "/admin/ads/tiktok",    label: "Dépenses TikTok",   icon: Music2 },
+      { href: "/admin/landing-pages", label: "Landing pages",     icon: Globe },
+      { href: "/admin/creatives",     label: "Vidéos & éditeurs", icon: Clapperboard },
+    ],
+  },
+  {
+    key: "parametres", label: "Paramètres", icon: Settings,
+    items: [
+      { href: "/admin/settings/ads",                label: "Comptes pub",   icon: Megaphone },
       { href: "/admin/settings/delivery-providers", label: "Transporteurs", icon: Truck },
-      { href: "/admin/settings/ads",  label: "Publicité",   icon: BarChart3 },
-      { href: "/admin/ads/launch",    label: "Lancer campagne", icon: Rocket },
-      { href: "/admin/ads/stats",     label: "Stats pubs",  icon: BarChart3 },
-      { href: "/admin/ads/rules",     label: "Règles auto pub", icon: Shield },
-      { href: "/admin/settings/whatsapp", label: "WhatsApp", icon: PhoneCall },
-      { href: "/admin/audit-logs", label: "Audit Logs",  icon: Shield   },
-      { href: "/admin/settings",   label: "Paramètres",  icon: Settings },
+      { href: "/admin/settings/whatsapp",           label: "WhatsApp",      icon: PhoneCall },
+      { href: "/admin/audit-logs",                  label: "Audit logs",    icon: Shield },
+      { href: "/admin/settings",                    label: "Paramètres",    icon: Settings, exact: true },
     ],
   },
 ];
@@ -120,79 +137,128 @@ function getNavForRole(role: AppRole): NavGroup[] {
   if (role === "video_editor")      return VIDEO_EDITOR_NAV;
   if (role === "call_center_agent") return CC_AGENT_NAV;
   if (role === "scanner_agent")     return SCANNER_AGENT_NAV;
-  // All management roles get admin nav (filtered if needed)
   return ADMIN_NAV;
 }
+
+const STORE_KEY = "hz.sidebar.open";
 
 export function AdminSidebar({ role }: { role: AppRole }) {
   const pathname  = usePathname();
   const navGroups = getNavForRole(role);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [open, setOpen] = useState<Record<string, boolean>>({});
 
   function isActive(href: string, exact?: boolean) {
-    // Always exact match for these special routes
-    if (href === "/admin")             return pathname === "/admin";
-    if (href === "/admin/call-center") return pathname === "/admin/call-center";
-    if (href === "/admin/delivery")    return pathname === "/admin/delivery";
+    if (href === "/admin") return pathname === "/admin";
     if (exact) return pathname === href;
-    // Segment-aware: active only if exact match OR pathname continues with "/"
-    // Prevents /admin/settings from highlighting when on /admin/settings/ads
     return pathname === href || pathname.startsWith(href + "/");
   }
+  const groupHasActive = (g: NavGroup) => g.items.some((i) => isActive(i.href, i.exact));
 
-  function isGroupActive(prefix?: string) {
-    if (!prefix) return false;
-    return pathname.startsWith(prefix);
+  // Groupes ouverts : mémorisés + le groupe de la page courante toujours ouvert
+  useEffect(() => {
+    let saved: Record<string, boolean> = {};
+    try { saved = JSON.parse(localStorage.getItem(STORE_KEY) ?? "{}"); } catch { /* ignore */ }
+    const next = { ...saved };
+    for (const g of navGroups) if (g.key && groupHasActive(g)) next[g.key] = true;
+    setOpen(next);
+    setMobileOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  function toggle(key: string) {
+    setOpen((o) => {
+      const n = { ...o, [key]: !o[key] };
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(n)); } catch { /* ignore */ }
+      return n;
+    });
   }
 
-  return (
-    <aside className="w-56 shrink-0 border-r bg-card flex flex-col">
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 px-4 py-5 border-b">
-        <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center shrink-0">
-          <span className="text-primary-foreground font-bold text-xs">GP</span>
-        </div>
-        <span className="font-semibold text-sm tracking-tight">GestionPro</span>
+  const nav = (
+    <>
+      <div className="flex items-center justify-between px-4 py-4">
+        <Link href="/admin" className="transition-opacity hover:opacity-90"><HajtekLogo /></Link>
+        <button onClick={() => setMobileOpen(false)} className="rounded-md p-1.5 text-sidebar-muted hover:bg-sidebar-accent hover:text-white md:hidden" aria-label="Fermer le menu">
+          <X className="h-5 w-5" />
+        </button>
       </div>
+      <div className="mx-4 h-px bg-gradient-to-r from-transparent via-brand/40 to-transparent" />
 
-      {/* Nav */}
-      <nav className="flex-1 px-2 py-3 overflow-y-auto space-y-1">
+      <nav className="scrollbar-thin flex-1 space-y-1 overflow-y-auto px-2.5 py-3">
         {navGroups.map((group, gi) => {
-          const groupActive = isGroupActive(group.groupPrefix);
+          const collapsible = !!group.key && !!group.label;
+          const isOpen = !collapsible || !!open[group.key!];
+          const active = groupHasActive(group);
+          const GIcon = group.icon;
           return (
-            <div key={gi} className={cn("space-y-0.5", gi > 0 && "pt-2")}>
-              {group.label && (
-                <p className={cn(
-                  "px-3 py-1 text-[10px] font-bold uppercase tracking-widest",
-                  groupActive
-                    ? "text-primary"
-                    : "text-muted-foreground/60"
-                )}>
-                  {group.label}
-                </p>
+            <div key={group.key ?? gi} className={cn(gi > 0 && "pt-1")}>
+              {collapsible && (
+                <button
+                  onClick={() => toggle(group.key!)}
+                  className={cn(
+                    "group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors",
+                    active ? "text-brand" : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-white",
+                  )}
+                >
+                  {GIcon && <GIcon className="h-4 w-4 shrink-0" />}
+                  <span className="flex-1 text-left">{group.label}</span>
+                  <ChevronDown className={cn("h-4 w-4 shrink-0 opacity-60 transition-transform duration-200", isOpen && "rotate-180")} />
+                </button>
               )}
-              {group.items.map(({ href, label, icon: Icon, exact }) => {
-                const active = isActive(href, exact);
-                return (
-                  <Link key={href} href={href}
-                    className={cn(
-                      "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                      active
-                        ? "bg-secondary text-foreground"
-                        : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
-                    )}>
-                    <Icon className="h-4 w-4 shrink-0" />
-                    {label}
-                  </Link>
-                );
-              })}
+              <div className={cn("grid transition-[grid-template-rows,opacity] duration-300 ease-out", isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
+                <div className="overflow-hidden">
+                  <div className={cn("space-y-0.5", collapsible && "ml-[18px] mt-0.5 border-l border-white/10 pl-2")}>
+                    {group.items.map(({ href, label, icon: Icon, exact }) => {
+                      const on = isActive(href, exact);
+                      return (
+                        <Link key={href} href={href}
+                          className={cn(
+                            "relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-200",
+                            on
+                              ? "bg-gradient-to-r from-brand/20 to-brand/5 text-white shadow-[inset_0_0_0_1px_hsl(var(--brand)/0.25)]"
+                              : "text-sidebar-muted hover:translate-x-0.5 hover:bg-sidebar-accent hover:text-white",
+                          )}>
+                          {on && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brand" />}
+                          <Icon className={cn("h-4 w-4 shrink-0", on ? "text-brand" : "")} />
+                          <span className="truncate">{label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
           );
         })}
       </nav>
 
-      <div className="px-4 py-3 border-t shrink-0">
-        <p className="text-xs text-muted-foreground">GestionPro v2.0</p>
+      <div className="shrink-0 border-t border-white/10 px-4 py-3">
+        <p className="text-[11px] text-sidebar-muted">© HajtekZone · GestionPro v2.1</p>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Bouton menu (mobile) */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="fixed left-3 top-2.5 z-40 rounded-lg border bg-card p-2 shadow-sm md:hidden"
+        aria-label="Ouvrir le menu"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+
+      {/* Sidebar bureau */}
+      <aside className="hidden w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">{nav}</aside>
+
+      {/* Tiroir mobile */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 animate-fade-in bg-black/50 backdrop-blur-[2px]" onClick={() => setMobileOpen(false)} />
+          <aside className="absolute inset-y-0 left-0 flex w-72 animate-slide-in-left flex-col bg-sidebar text-sidebar-foreground shadow-2xl">{nav}</aside>
+        </div>
+      )}
+    </>
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LoginForm } from "@/components/auth/login-form";
+import { HajtekLogo } from "@/components/brand/logo";
 
 export const metadata: Metadata = { title: "Connexion" };
 
@@ -13,12 +14,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">GP</span>
-          </div>
-          <span className="text-xl font-semibold tracking-tight">GestionPro</span>
-        </div>
+        <div className="mb-5 flex justify-center"><HajtekLogo tone="light" /></div>
         <h1 className="text-2xl font-bold tracking-tight">Connexion</h1>
         <p className="text-muted-foreground text-sm">
           Connectez-vous à votre espace de gestion

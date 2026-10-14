@@ -12,7 +12,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!session) redirect("/login");
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-[radial-gradient(ellipse_at_top_right,hsl(var(--brand-soft)),transparent_45%)] bg-background">
       <AdminSidebar role={session.role as AppRole} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <AdminHeader
@@ -22,7 +22,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         />
         <main className="flex-1 overflow-auto">
           {!session.hasProfile && <MissingProfileBanner email={session.authEmail} />}
-          <div className="p-6">{children}</div>
+          <div className="p-4 md:p-6">{children}</div>
         </main>
       </div>
     </div>

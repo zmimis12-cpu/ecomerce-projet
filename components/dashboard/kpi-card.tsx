@@ -30,13 +30,17 @@ export function KpiCard({ label, value, sub, icon: Icon, variant = "default", hi
 
   return (
     <div className={cn(
-      "rounded-xl border bg-card p-4 space-y-2",
+      "group rounded-xl border bg-card p-4 space-y-2 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
       variantClass,
-      highlight && "ring-2 ring-primary/20"
+      highlight && "ring-2 ring-brand/30"
     )}>
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
-        {Icon && <Icon className="h-4 w-4 text-muted-foreground/50" />}
+        {Icon && (
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted/70 transition-colors group-hover:bg-brand/15">
+            <Icon className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-brand" />
+          </span>
+        )}
       </div>
       <p className={cn("text-2xl font-bold tracking-tight", valueClass)}>{value}</p>
       {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
@@ -49,7 +53,7 @@ export function RateBadge({ rate, label, threshold = 50 }: { rate: number; label
   const good = rate >= threshold;
   return (
     <div className={cn(
-      "rounded-xl border p-4 space-y-2",
+      "rounded-xl border p-4 space-y-2 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
       good ? "border-green-200 bg-green-50/50" : "border-amber-200 bg-amber-50/50"
     )}>
       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>

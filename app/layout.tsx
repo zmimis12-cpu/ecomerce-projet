@@ -6,8 +6,8 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: {
-    default: "GestionPro",
-    template: "%s | GestionPro",
+    default: "HajtekZone — GestionPro",
+    template: "%s | HajtekZone",
   },
   description: "E-commerce Operations Management System",
   robots: { index: false, follow: false },
