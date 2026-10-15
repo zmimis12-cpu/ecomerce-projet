@@ -41,13 +41,14 @@ export const getStoreProducts = unstable_cache(async (): Promise<StoreProduct[]>
     const old = Number(String(l.old_price_text ?? "").replace(/[^\d.]/g, "")) || null;
     out.push({
       productId: l.product_id!, slug: l.slug, title: l.title,
-      image: l.hero_image || img.get(l.product_id!) || null,
+      // Photo du produit (pas le GIF/visuel « hero » de la landing page)
+      image: img.get(l.product_id!) || l.hero_image || null,
       price: one ? Number(one.price) : price.get(l.product_id!)!,
       oldPrice: old,
     });
   }
   return out;
-}, ["store-products-v1"], { revalidate: 300, tags: ["store"] });
+}, ["store-products-v2"], { revalidate: 300, tags: ["store"] });
 
 export async function getBumpConfig(): Promise<Record<string, BumpConfig[]>> {
   const { data } = await supabaseAdmin.from("app_settings").select("value").eq("key", "store_bumps").maybeSingle();

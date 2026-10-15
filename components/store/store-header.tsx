@@ -5,12 +5,12 @@
  */
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Menu, X, Home, ShieldCheck, Truck, Info, FileText } from "lucide-react";
+import { Menu, X, Home, ShieldCheck, Truck, Info, FileText, ShoppingBag, Mail } from "lucide-react";
 import { HajtekLogo } from "@/components/brand/logo";
 
 export type HeaderProduct = { slug: string; title: string; image: string | null; price: number };
 
-export function StoreHeader({ products, current }: { products: HeaderProduct[]; current?: string }) {
+export function StoreHeader(_props: { products?: HeaderProduct[]; current?: string }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -23,7 +23,7 @@ export function StoreHeader({ products, current }: { products: HeaderProduct[]; 
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-3">
           <button onClick={() => setOpen(true)} aria-label="القائمة"
             className="flex items-center gap-1.5 rounded-full bg-neutral-900 px-3 py-1.5 text-[13px] font-bold text-white shadow-sm active:scale-95">
-            <Menu className="h-4 w-4" /> منتجاتنا
+            <Menu className="h-4 w-4" /> القائمة
           </button>
           <Link href="/" aria-label="HajtekZone" dir="ltr"><HajtekLogo tone="light" sub={null} /></Link>
         </div>
@@ -43,21 +43,8 @@ export function StoreHeader({ products, current }: { products: HeaderProduct[]; 
             </div>
             <nav className="flex-1 overflow-y-auto p-3">
               <Link href="/" className="mb-2 flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold hover:bg-neutral-100"><Home className="h-4 w-4" /> الرئيسية</Link>
-              <p className="px-3 pb-2 pt-3 text-xs font-bold text-neutral-400">جميع المنتجات</p>
-              <div className="space-y-1.5">
-                {products.map((p) => (
-                  <Link key={p.slug} href={`/lp/${p.slug}`} onClick={() => setOpen(false)}
-                    className={`flex items-center gap-3 rounded-xl border p-2 transition hover:border-[#D4A93F] hover:bg-[#FBF5E6] ${current === p.slug ? "border-[#D4A93F] bg-[#FBF5E6]" : "border-neutral-100"}`}>
-                    <span className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-neutral-100">
-                      {p.image && /* eslint-disable-next-line @next/next/no-img-element */ <img src={p.image} alt="" loading="lazy" className="h-full w-full object-cover" />}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="line-clamp-2 text-[13px] font-bold leading-snug text-neutral-900">{p.title}</span>
-                      <span className="mt-0.5 block text-[13px] font-extrabold text-[#B8860B]">{p.price} درهم</span>
-                    </span>
-                  </Link>
-                ))}
-              </div>
+              <Link href="/#products" onClick={() => setOpen(false)} className="mb-2 flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold hover:bg-neutral-100"><ShoppingBag className="h-4 w-4" /> جميع المنتجات</Link>
+              <a href="mailto:contact@hajtek.ma" className="mb-2 flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold hover:bg-neutral-100"><Mail className="h-4 w-4" /> تواصل معنا</a>
               <div className="mt-4 space-y-1 border-t pt-3 text-sm">
                 <Link href="/a-propos" className="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-neutral-100"><Info className="h-4 w-4" /> من نحن</Link>
                 <Link href="/conditions" className="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-neutral-100"><FileText className="h-4 w-4" /> شروط البيع والاسترجاع</Link>
