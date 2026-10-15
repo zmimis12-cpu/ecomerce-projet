@@ -1,22 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Truck, ShieldCheck, PhoneCall, RefreshCcw } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getStoreProducts } from "@/lib/store/catalog";
+import { StoreHeader } from "@/components/store/store-header";
+import { ProductCard } from "@/components/store/cross-sell";
+import { Cairo } from "next/font/google";
+
+const cairo = Cairo({ subsets: ["arabic", "latin"], weight: ["400", "600", "700", "800", "900"], variable: "--font-cairo", display: "swap" });
 
 /**
- * Page d'accueil PUBLIQUE de hajtek.ma (exigée par TikTok/Meta : le site de
- * l'entreprise doit présenter les produits et l'entreprise SANS connexion).
- * Un utilisateur déjà connecté est envoyé directement sur /admin.
+ * Boutique HajtekZone — page d'accueil publique (catalogue + confiance).
+ * Un membre de l'équipe déjà connecté est envoyé directement sur /admin.
  */
 export const metadata: Metadata = {
-  title: "HajtekZone — Smart products, cash on delivery in Morocco",
-  description: "HajtekZone (ODT Deals) sells practical home, wellness and tech products in Morocco with cash on delivery.",
+  title: "HajtekZone — منتجات عملية، الدفع عند الاستلام",
+  description: "HajtekZone (ODT Deals) : produits maison, bien-être et tech livrés partout au Maroc, paiement à la livraison.",
   robots: { index: true, follow: true },
 };
 export const dynamic = "force-dynamic";
-
-type LP = { slug: string; title: string; hero_image: string | null; price_text: string | null; product_id: string | null };
 
 export default async function HomePage() {
   try {
@@ -26,98 +29,65 @@ export default async function HomePage() {
   } catch (e) {
     if ((e as { digest?: string })?.digest?.startsWith("NEXT_REDIRECT")) throw e;
   }
+  const products = await getStoreProducts().catch(() => []);
 
-  const { data: lps } = await supabaseAdmin
-    .from("landing_pages").select("slug, title, hero_image, price_text, product_id")
-    .eq("is_active", true).order("updated_at", { ascending: false }).limit(12);
-  const list = (lps ?? []) as LP[];
-  const pids = list.map((l) => l.product_id).filter(Boolean) as string[];
-  const imgs = new Map<string, string>();
-  const prices = new Map<string, number>();
-  if (pids.length) {
-    const [{ data: im }, { data: pr }] = await Promise.all([
-      supabaseAdmin.from("product_images").select("product_id, public_url, is_primary").in("product_id", pids),
-      supabaseAdmin.from("products").select("id, sale_price_mad").in("id", pids),
-    ]);
-    for (const i of (im ?? []) as { product_id: string; public_url: string; is_primary: boolean }[])
-      if (!imgs.has(i.product_id) || i.is_primary) imgs.set(i.product_id, i.public_url);
-    for (const p of (pr ?? []) as { id: string; sale_price_mad: number | null }[])
-      if (p.sale_price_mad) prices.set(p.id, Number(p.sale_price_mad));
-  }
-
-  const wrap: React.CSSProperties = { maxWidth: 1100, margin: "0 auto", padding: "0 20px" };
   return (
-    <main style={{ fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif", color: "#111827", background: "#fff" }}>
-      <header style={{ borderBottom: "1px solid #e5e7eb" }}>
-        <div style={{ ...wrap, display: "flex", alignItems: "center", justifyContent: "space-between", height: 64 }}>
-          <strong style={{ fontSize: 20 }}>Hajtek<span style={{ color: "#16a34a" }}>Zone</span></strong>
-          <nav style={{ display: "flex", gap: 18, fontSize: 14 }}>
-            <a href="#products" style={{ color: "#111827" }}>Products</a>
-            <Link href="/a-propos" style={{ color: "#111827" }}>About</Link>
-            <a href="#contact" style={{ color: "#111827" }}>Contact</a>
-          </nav>
-        </div>
-      </header>
+    <main dir="rtl" lang="ar" className={`${cairo.variable} min-h-screen bg-white text-neutral-900`} style={{ fontFamily: "var(--font-cairo), sans-serif" }}>
+      <StoreHeader products={products.map((p) => ({ slug: p.slug, title: p.title, image: p.image, price: p.price }))} />
 
-      <section style={{ background: "#f0fdf4" }}>
-        <div style={{ ...wrap, padding: "56px 20px" }}>
-          <h1 style={{ fontSize: 36, lineHeight: 1.2, margin: 0 }}>Smart everyday products,<br />delivered to your door in Morocco.</h1>
-          <p style={{ fontSize: 17, color: "#374151", maxWidth: 640, marginTop: 14 }}>
-            HajtekZone is an online store operated by <b>ODT Deals</b>. We select practical home, wellness and tech products
-            and deliver them everywhere in Morocco. You pay cash when you receive your order.
-          </p>
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginTop: 22, fontSize: 14, color: "#065f46" }}>
-            <span>✔ Cash on delivery</span><span>✔ Delivery in 24–72 h</span><span>✔ Phone confirmation before shipping</span><span>✔ Exchange if the product is defective</span>
-          </div>
+      {/* Hero */}
+      <section className="relative overflow-hidden bg-neutral-950 text-white">
+        <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#D4A93F]/25 blur-3xl" />
+        <div className="relative mx-auto max-w-5xl px-4 py-12 text-center sm:py-16">
+          <p className="mb-2 text-xs font-bold tracking-widest text-[#F3D98B]">HAJTEK ZONE</p>
+          <h1 className="text-[26px] font-black leading-tight sm:text-4xl">منتجات عملية لحياة أسهل</h1>
+          <p className="mx-auto mt-3 max-w-md text-sm text-white/70">اختر منتجك، أكد طلبك فالهاتف، وخلص غير ملي يوصلك. توصيل لجميع مدن المغرب.</p>
+          <a href="#products" className="mt-6 inline-block rounded-full bg-gradient-to-r from-[#F3D98B] to-[#B8860B] px-7 py-3 text-sm font-extrabold text-neutral-900 shadow-lg transition hover:scale-[1.03]">تسوق الآن</a>
         </div>
       </section>
 
-      <section id="products" style={{ ...wrap, padding: "44px 20px" }}>
-        <h2 style={{ fontSize: 26, margin: "0 0 20px" }}>Our products</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 18 }}>
-          {list.map((l) => {
-            const img = l.hero_image || (l.product_id ? imgs.get(l.product_id) : undefined);
-            const price = l.product_id ? prices.get(l.product_id) : undefined;
-            return (
-              <Link key={l.slug} href={`/lp/${l.slug}`} style={{ border: "1px solid #e5e7eb", borderRadius: 14, overflow: "hidden", color: "inherit", textDecoration: "none", display: "block" }}>
-                <div style={{ aspectRatio: "1 / 1", background: "#f3f4f6" }}>
-                  {img && /* eslint-disable-next-line @next/next/no-img-element */ <img src={img} alt={l.title} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
-                </div>
-                <div style={{ padding: 14 }}>
-                  <div style={{ fontWeight: 600, fontSize: 15, lineHeight: 1.35 }}>{l.title}</div>
-                  <div style={{ marginTop: 6, color: "#16a34a", fontWeight: 700 }}>{l.price_text || (price ? `${price} MAD` : "")}</div>
-                  <div style={{ marginTop: 10, fontSize: 13, color: "#2563eb" }}>View product →</div>
-                </div>
-              </Link>
-            );
-          })}
+      {/* Confiance */}
+      <section className="border-b bg-[#faf7f0]">
+        <div className="mx-auto grid max-w-5xl grid-cols-2 gap-3 px-4 py-5 text-center text-[12px] font-bold sm:grid-cols-4">
+          {[
+            { i: Truck, t: "توصيل 24–72 ساعة" },
+            { i: ShieldCheck, t: "الدفع عند الاستلام" },
+            { i: PhoneCall, t: "تأكيد بالهاتف" },
+            { i: RefreshCcw, t: "استبدال إلا كان عيب" },
+          ].map(({ i: I, t }) => (
+            <div key={t} className="flex flex-col items-center gap-1.5 rounded-xl bg-white p-3 shadow-sm">
+              <I className="h-5 w-5 text-[#B8860B]" />{t}
+            </div>
+          ))}
         </div>
       </section>
 
-      <section style={{ background: "#f9fafb" }}>
-        <div style={{ ...wrap, padding: "44px 20px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 28 }}>
-          <div><h3 style={{ marginTop: 0 }}>How to order</h3><p style={{ color: "#4b5563" }}>Choose a product, fill in your name, phone and city. Our team calls you to confirm, then the order is shipped by our delivery partner. You pay on delivery.</p></div>
-          <div><h3 style={{ marginTop: 0 }}>Delivery</h3><p style={{ color: "#4b5563" }}>We deliver to all cities in Morocco through professional delivery companies, usually within 24 to 72 hours after confirmation.</p></div>
-          <div><h3 style={{ marginTop: 0 }}>Returns &amp; exchange</h3><p style={{ color: "#4b5563" }}>If a product arrives damaged or defective, contact us and we exchange it. See our <Link href="/conditions">terms</Link>.</p></div>
+      {/* Produits */}
+      <section id="products" className="mx-auto max-w-5xl px-3 py-8">
+        <h2 className="mb-4 text-center text-xl font-extrabold">منتجاتنا</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {products.map((p) => <ProductCard key={p.slug} p={p} />)}
         </div>
       </section>
 
-      <footer id="contact" style={{ borderTop: "1px solid #e5e7eb" }}>
-        <div style={{ ...wrap, padding: "30px 20px", fontSize: 14, color: "#4b5563", display: "flex", flexWrap: "wrap", gap: 24, justifyContent: "space-between" }}>
-          <div>
-            <b style={{ color: "#111827" }}>HajtekZone</b> — operated by ODT Deals<br />
-            Email: <a href="mailto:contact@hajtek.ma">contact@hajtek.ma</a><br />
-            Website: hajtek.ma
-          </div>
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <Link href="/a-propos">About us</Link>
-            <Link href="/conditions">Terms of service</Link>
-            <Link href="/confidentialite">Privacy policy</Link>
-            <Link href="/suppression-donnees">Data deletion</Link>
-            <Link href="/login" style={{ color: "#9ca3af" }}>Staff login</Link>
-          </div>
+      {/* Entreprise (FR/EN — exigé par Meta / TikTok) */}
+      <section dir="ltr" className="bg-neutral-50">
+        <div className="mx-auto max-w-5xl px-4 py-8 text-sm leading-relaxed text-neutral-600">
+          <h3 className="mb-2 text-base font-bold text-neutral-900">About HajtekZone</h3>
+          <p>HajtekZone is an online store operated by <b>ODT Deals</b>. We sell practical home, wellness and tech products in Morocco,
+            delivered by professional carriers and paid in cash on delivery. Contact: <a className="underline" href="mailto:contact@hajtek.ma">contact@hajtek.ma</a>.</p>
         </div>
-        <div style={{ textAlign: "center", fontSize: 12, color: "#9ca3af", paddingBottom: 20 }}>© {new Date().getFullYear()} HajtekZone / ODT Deals. All rights reserved.</div>
+      </section>
+
+      <footer className="bg-neutral-950 px-4 py-8 text-center text-[12px] text-neutral-400">
+        <div className="mb-3 flex flex-wrap justify-center gap-x-4 gap-y-1 text-neutral-300">
+          <Link href="/a-propos">من نحن</Link>
+          <Link href="/conditions">شروط البيع والاسترجاع</Link>
+          <Link href="/confidentialite">سياسة الخصوصية</Link>
+          <Link href="/suppression-donnees">حذف المعطيات</Link>
+          <Link href="/login" className="text-neutral-500">Staff</Link>
+        </div>
+        © {new Date().getFullYear()} HajtekZone · ODT Deals
       </footer>
     </main>
   );
