@@ -35,6 +35,7 @@ export async function middleware(request: NextRequest) {
     if (
       pathname !== "/" &&
       !pathname.startsWith("/lp/") &&
+      !pathname.startsWith("/p/") &&
       pathname !== "/confidentialite" && pathname !== "/suppression-donnees" &&
       !pathname.startsWith("/_next/") &&
       !pathname.startsWith("/api/") &&
@@ -67,7 +68,7 @@ export async function middleware(request: NextRequest) {
 
   // ── Public routes on admin domain — bypass entirely, no Supabase call ───────
   if (
-    pathname.startsWith("/lp/") || pathname === "/lp" ||
+    pathname.startsWith("/lp/") || pathname === "/lp" || pathname.startsWith("/p/") ||
     pathname === "/confidentialite" || pathname === "/suppression-donnees" ||
     pathname.startsWith("/api/public/") ||
     pathname.startsWith("/api/webhooks/")
@@ -76,7 +77,7 @@ export async function middleware(request: NextRequest) {
     requestHeaders.set("x-pathname", pathname);
     const res = NextResponse.next({ request: { headers: requestHeaders } });
 
-    if (pathname.startsWith("/lp/")) {
+    if (pathname.startsWith("/lp/") || pathname.startsWith("/p/")) {
       // Même raison: pas de X-Frame-Options sur les landing pages publiques.
       res.headers.set("X-Content-Type-Options", "nosniff");
       res.headers.set("Referrer-Policy", "no-referrer");

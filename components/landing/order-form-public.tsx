@@ -256,8 +256,8 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         style={{ position:"absolute", left:"-9999px", opacity:0 }}
         tabIndex={-1} aria-hidden="true" />
 
-      {/* Offres */}
-      <div style={{ marginBottom:"18px" }}>
+      {/* Offres (masquées s'il n'y a qu'une seule offre) */}
+      <div style={{ marginBottom:"18px", display: offers.length > 1 ? undefined : "none" }}>
         <label style={LBL}>اختار العرض</label>
         <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
           {offers.map((o) => {
