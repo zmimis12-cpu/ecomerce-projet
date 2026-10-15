@@ -57,14 +57,23 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const sec = (t: string) => sections.find((s) => s.type === t && s.enabled !== false) as (LPSection & Record<string, unknown>) | undefined;
 
   const price = product.sale_price_mad;
-  const oldNum = Number(lp.old_price_num) || 0;
+  const oldNum = Number(lp.old_price_num) || parseInt(String(lp.old_price_text ?? "").replace(/[^\d]/g, "")) || price * 1.3;
   const title = String(lp.hero_headline ?? page.title);
-  const ctaText = "اضغط هنا للطلب";
+  // Textes = ceux de l'éditeur de la landing page (rien d'inventé)
+  const subline = String(lp.hero_subheadline ?? "توصيل سريع · الدفع عند الاستلام · ضمان الجودة");
+  const offerBar = String(lp.offer_text ?? "");
+  const ctaText = String(lp.cta_text ?? "اطلب الآن");
+  const formNote = String((sec("order_form")?.reassurance as string | undefined) ?? "معلوماتك محفوظة · لا دفع مسبق · توصيل مضمون");
+  const waRaw = String(lp.whatsapp_number ?? "").replace(/[^\d]/g, "");
+  const whatsapp = !waRaw ? "" : waRaw.startsWith("00") ? waRaw.slice(2) : waRaw.startsWith("0") ? `212${waRaw.slice(1)}` : waRaw;
+  const b1 = Number(lp.bundle_1_price || price);
+  const b2 = Number(lp.bundle_2_price || Math.round(price * 2 * 0.9));
+  const b3 = Number(lp.bundle_3_price || Math.round(price * 3 * 0.8));
 
-  // 1 seule offre (1 pièce) : formulaire court, pas de choix 2/3 pièces
-  const all = normalizeOffers(lp.offers, { price, b1: lp.bundle_1_price as number | null, b2: lp.bundle_2_price as number | null, b3: lp.bundle_3_price as number | null });
-  const one = all.find((o) => o.qty === 1) ?? { ...all[0], qty: 1, price };
-  const offers = [{ ...one, isDefault: true }];
+  // Offres X1 / X2 / X3… exactement comme configurées dans l'éditeur
+  const offers = normalizeOffers(lp.offers, { price, b1: lp.bundle_1_price as number | null, b2: lp.bundle_2_price as number | null, b3: lp.bundle_3_price as number | null });
+  const one = offers.find((o) => o.isDefault) ?? offers[0] ?? { id: "q1", qty: 1, price };
+  const oldShown = one.qty > 1 ? price * one.qty : oldNum;
 
   // Photo principale = photo produit (pas le GIF/vidéo) ; puis photos d'ambiance avec une phrase chacune
   const productImgs = product.images.map((i) => i.public_url).filter(Boolean);
@@ -109,7 +118,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       <style>{CSS}</style>
 
       <div className="sp" dir="rtl" lang="ar">
-        <div className="sp-top">🚚 توصيل مجاني · الدفع عند الاستلام</div>
+        <div className="sp-top">{offerBar || "🚚 توصيل مجاني · الدفع عند الاستلام"}</div>
         <StoreHeader current={slug} products={storeProducts.map((x) => ({ slug: x.slug, title: x.title, image: x.image, price: x.price }))} />
 
         <main className="sp-wrap">
@@ -119,20 +128,27 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           )}
 
           <h1 className="sp-title">{title}</h1>
+          <p className="sp-sub">{subline}</p>
           <div className="sp-price">
             <span className="sp-now">{one.price.toFixed(0)} د.م</span>
-            {oldNum > one.price && <span className="sp-old">{oldNum.toFixed(0)} د.م</span>}
+            {oldShown > one.price && <span className="sp-old">{oldShown.toFixed(0)} د.م</span>}
           </div>
 
           <div id="sp-form" className="sp-card">
-            <p className="sp-card-h">معلومات الزبون</p>
+            <p className="sp-note" style={{ marginTop: 0, marginBottom: 12 }}>{formNote}</p>
             <OrderFormPublic product={product} productSlug={slug} ctaText={ctaText}
-              b1={one.price} b2={one.price * 2} b3={one.price * 3} offers={offers}
+              b1={b1} b2={b2} b3={b3} offers={offers}
               pixelId={pixel || undefined} tiktokPixelId={tt || undefined}
               variants={(Array.isArray(lp.variant_options) ? lp.variant_options : []) as { name: string; options: { label: string; image?: string }[] }[]}
               bumps={bumps} cities={cities} />
-            <p className="sp-note">✔ ما كتخلص حتى توصلك · ✔ فريقنا يتصل بك للتأكيد</p>
           </div>
+
+          {whatsapp && (
+            <a className="sp-wa" target="_blank" rel="noopener noreferrer"
+              href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`مرحبا 👋\nأريد الاستفسار عن المنتج التالي:\n\n🛒 المنتج: ${product.name}\n💰 العرض: ${one.qty > 1 ? `${one.qty} قطع بـ ` : ""}${one.price.toFixed(0)} درهم\n📦 الدفع عند الاستلام`)}`}>
+              واتساب — تواصل معنا
+            </a>
+          )}
 
           {story.map((s, i) => (
             <div key={i} className="sp-story">
@@ -162,7 +178,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <div>HajtekZone © {new Date().getFullYear()}</div>
         </footer>
 
-        <a id="sp-sticky" href="#sp-form" className="sp-sticky">{ctaText} — {one.price.toFixed(0)} د.م</a>
+        <a id="sp-sticky" href="#sp-form" className="sp-sticky">{ctaText}</a>
       </div>
     </>
   );
@@ -176,6 +192,8 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 .sp-wrap{max-width:560px;margin:0 auto;padding:0 16px}
 .sp-main{display:block;width:100%;aspect-ratio:1/1;object-fit:contain;background:#f6f6f6;border-radius:14px;margin-top:12px}
 .sp-title{font-size:22px;line-height:1.5;font-weight:800;text-align:center;margin:16px 0 6px}
+.sp-sub{text-align:center;color:#4b5563;font-size:14.5px;line-height:1.7;margin:0 0 8px}
+.sp-wa{display:block;margin:14px 0 0;background:#22c55e;color:#fff;text-align:center;font-weight:800;font-size:16px;padding:13px;border-radius:12px;text-decoration:none}
 .sp-price{display:flex;justify-content:center;align-items:baseline;gap:10px;margin-bottom:14px}
 .sp-now{color:#15803d;font-size:30px;font-weight:900}
 .sp-old{color:#9ca3af;text-decoration:line-through;font-size:16px}
