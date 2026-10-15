@@ -1,25 +1,17 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Image from "next/image";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { FALLBACK_CITIES } from "@/components/landing/order-form-public";
 import { getLandingPage } from "@/lib/public/queries";
-import { OrderFormPublic } from "@/components/landing/order-form-public";
+import { OrderFormPublic, FALLBACK_CITIES } from "@/components/landing/order-form-public";
 import { normalizeOffers } from "@/lib/landing-pages/offers";
-import { StockCounter } from "@/components/landing/stock-counter";
-import { CountdownTimer } from "@/components/landing/countdown-timer";
-import { FaqAccordion } from "@/components/landing/faq-accordion";
-import { ProductGallery } from "@/components/landing/product-gallery";
-import type { LPSection } from "@/lib/templates";
-import Link from "next/link";
 import { getStoreProducts, getBumpsFor } from "@/lib/store/catalog";
 import { StoreHeader } from "@/components/store/store-header";
-import { CrossSell } from "@/components/store/cross-sell";
+import type { LPSection } from "@/lib/templates";
 
-// Servie depuis le cache CDN (instantané) et régénérée au plus toutes les 60 s
-// → une modification dans l'éditeur est visible en ligne en moins d'une minute.
+// Landing page « simple » (style boutique COD rapide) :
+// photo → titre → prix → formulaire tout de suite → photos + 1 phrase → re-CTA.
+// Utilisée pour TOUTES les /lp/. L'ancienne version longue reste sur /lp-classic/[slug].
 export const revalidate = 60;
-// Force le mode statique (cache CDN) : sans ça, les requêtes Supabase rendaient la page dynamique.
 export const dynamic = "force-static";
 export const dynamicParams = true;
 
@@ -29,1193 +21,178 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const page = await getLandingPage(slug);
   if (!page) return { title: "منتج غير موجود", robots: { index: false, follow: false } };
-
-  const canonicalUrl = `${SITE_URL}/lp/${slug}`;
-  const description  = page.description ?? `${page.product.name} — الدفع عند الاستلام، توصيل سريع لجميع مدن المغرب.`;
-  const image         = page.product.images[0]?.public_url;
-
+  const image = page.product.images[0]?.public_url;
   return {
     title: page.title,
-    description,
-    alternates: {
-      canonical: canonicalUrl,
-    },
-    // index:true so Google can list the page; follow:true so it crawls
-    // internal links/category pages reachable from here — follow:false was
-    // actively hurting discovery of the rest of the catalog.
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: { index: true, follow: true, "max-image-preview": "large" },
-    },
-    openGraph: {
-      type:        "website",
-      locale:      "ar_MA",
-      url:         canonicalUrl,
-      siteName:    "HajtekZone",
-      title:       page.title,
-      description,
-      images: image ? [{ url: image, width: 1200, height: 1200, alt: page.product.name }] : [],
-    },
-    twitter: {
-      card:        "summary_large_image",
-      title:       page.title,
-      description,
-      images: image ? [image] : [],
-    },
+    description: page.description ?? `${page.product.name} — الدفع عند الاستلام`,
+    alternates: { canonical: `${SITE_URL}/lp/${slug}` },
+    robots: { index: true, follow: true },
+    openGraph: { type: "website", locale: "ar_MA", title: page.title, images: image ? [image] : [] },
   };
 }
 
 export default async function LandingPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  // Les 3 requêtes ci-dessous sont totalement indépendantes — les lancer en
-  // PARALLÈLE au lieu de les enchaîner réduit fortement la latence cumulée.
-  // Sous trafic normal ça passait inaperçu, mais pendant un pic de trafic pub
-  // (Supabase plus lent sous charge), le cumul de 3 requêtes séquentielles
-  // pouvait dépasser la limite de temps d'exécution de Vercel → timeout côté
-  // client (ERR_CONNECTION_TIMED_OUT), exactement le symptôme observé.
-  const [
-    { data: lpData, error: lpDataError },
-    page,
-    dgSettingsResult,
-  ] = await Promise.all([
-    supabaseAdmin
-      .from("landing_pages")
-      .select("*")
-      .eq("slug", slug)
-      .eq("is_active", true)
-      .maybeSingle(),
+  const [{ data: lpData, error }, page, dg] = await Promise.all([
+    supabaseAdmin.from("landing_pages").select("*").eq("slug", slug).eq("is_active", true).maybeSingle(),
     getLandingPage(slug),
-    supabaseAdmin
-      .from("digylog_settings")
-      .select("config")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then((r) => r, () => ({ data: null, error: null })), // fallback silencieux comme avant (try/catch équivalent)
+    supabaseAdmin.from("digylog_settings").select("config").order("created_at", { ascending: false }).limit(1).maybeSingle()
+      .then((r) => r, () => ({ data: null, error: null })),
   ]);
-
-  if (lpDataError) {
-    console.error("[LandingPage] lpData query error, aborting render instead of showing an empty page:", lpDataError.message);
-    throw new Error(`lpData query failed: ${lpDataError.message}`);
-  }
-
+  if (error) throw new Error(`lpData query failed: ${error.message}`);
   if (!page) notFound();
 
-  // Boutique : menu produits + upsells « en même temps » (cache 2–5 min)
   const [storeProducts, bumps] = await Promise.all([
     getStoreProducts().catch(() => []),
     getBumpsFor(page.product.id).catch(() => []),
   ]);
 
-  // Vues comptées par le navigateur (/api/public/lp-view) : la page est en cache CDN.
+  const cfg = (dg?.data as { config?: { cities?: string[] } } | null)?.config;
+  const cities = Array.isArray(cfg?.cities) && cfg.cities.length > 0 ? cfg.cities : FALLBACK_CITIES;
 
-  // Load Digylog cities from cached settings (updated via sync in admin)
-  let digylogCities: string[] = [];
-  const dgSettings = dgSettingsResult?.data;
-  const config = (dgSettings as { config?: Record<string, unknown> } | null)?.config;
-  if (Array.isArray(config?.cities) && (config.cities as string[]).length > 0) {
-    digylogCities = config.cities as string[];
-  }
-
-  const lp      = (lpData ?? {}) as Record<string, unknown>;
+  const lp = (lpData ?? {}) as Record<string, unknown>;
   const product = page.product;
+  const sections = (lp.sections as LPSection[] | undefined) ?? [];
+  const sec = (t: string) => sections.find((s) => s.type === t && s.enabled !== false) as (LPSection & Record<string, unknown>) | undefined;
 
-  function getSection(type: string): LPSection | null {
-    const secs = (lp.sections as LPSection[]) ?? [];
-    return secs.find((s) => s.type === type && s.enabled !== false) ?? null;
-  }
+  const price = product.sale_price_mad;
+  const oldNum = Number(lp.old_price_num) || 0;
+  const title = String(lp.hero_headline ?? page.title);
+  const ctaText = "اضغط هنا للطلب";
 
-  const price     = product.sale_price_mad;
-  const headline  = String(lp.hero_headline    ?? page.title);
-  const subline   = String(lp.hero_subheadline ?? "توصيل سريع · الدفع عند الاستلام · ضمان الجودة");
-  const offerBar  = String(lp.offer_text       ?? "");
-  const ctaText   = String(lp.cta_text         ?? "اطلب الآن");
-  const storeName    = lp.store_name as string | null;
-  const heroImage    = lp.hero_image as string | null;
-  const oldPriceNum = Number(lp.old_price_num) || price * 1.3;
-  const oldPrice  = String(lp.old_price_text   ?? `${oldPriceNum.toFixed(0)} درهم`);
-  const discountPct = oldPriceNum > price ? Math.round((1 - price / oldPriceNum) * 100) : 0;
-  // wa.me exige le format international sans "+" ni 0 initial : 0664… → 212664…
-  const waRaw     = String(lp.whatsapp_number ?? "").replace(/[^\d]/g, "");
-  const whatsapp  = !waRaw ? "" : waRaw.startsWith("00") ? waRaw.slice(2) : waRaw.startsWith("0") ? `212${waRaw.slice(1)}` : waRaw;
-  // What customers actually need to know about the product — falls back
-  // through whatever real content exists instead of a generic empty line,
-  // since page.description is empty for most products today.
-  const aiAnalysis = (lp.ai_analysis as { main_benefit?: string; main_problem?: string } | undefined);
-  const description = page.description
-    || (lp.hero_subheadline ? String(lp.hero_subheadline) : "")
-    || aiAnalysis?.main_benefit
-    || product.description
-    || `${product.name} — جودة مضمونة وتوصيل سريع لجميع مدن المغرب.`;
-  const b1 = Number(lp.bundle_1_price || price);
-  const b2 = Number(lp.bundle_2_price || Math.round(price * 2 * 0.9));
-  const customerPhotos = (lp.customer_photos as string[] | undefined) ?? [];
-  const b3 = Number(lp.bundle_3_price || Math.round(price * 3 * 0.8));
-  const offers = normalizeOffers(lp.offers, { price, b1: lp.bundle_1_price as number | null, b2: lp.bundle_2_price as number | null, b3: lp.bundle_3_price as number | null });
-  // Prix affiché en haut = l'OFFRE présélectionnée (ex : 4 pièces à 349), pas 1 pièce
-  const heroOffer  = offers.find((o) => o.isDefault) ?? offers[0];
-  const heroPrice  = heroOffer?.price ?? price;
-  const heroQty    = heroOffer?.qty ?? 1;
-  const heroOldNum = heroQty > 1 ? price * heroQty : oldPriceNum;
-  const heroOld    = heroQty > 1 ? `${heroOldNum.toFixed(0)} درهم` : oldPrice;
-  const heroLabel  = heroQty > 1 ? (heroOffer?.label || `${heroQty} قطع`) : "السعر";
-  const heroDiscount = heroOldNum > heroPrice ? Math.round((1 - heroPrice / heroOldNum) * 100) : 0;
+  // 1 seule offre (1 pièce) : formulaire court, pas de choix 2/3 pièces
+  const all = normalizeOffers(lp.offers, { price, b1: lp.bundle_1_price as number | null, b2: lp.bundle_2_price as number | null, b3: lp.bundle_3_price as number | null });
+  const one = all.find((o) => o.qty === 1) ?? { ...all[0], qty: 1, price };
+  const offers = [{ ...one, isDefault: true }];
 
-  const psSection   = getSection("problem_solution");
-  const statsSection= getSection("stats_bar");
-  const benSection  = getSection("benefits");
-  const howSection  = getSection("how_to_use");
-  const cmpSection  = getSection("comparison_table");
-  const suitSection = getSection("suitable_for");
-  const gtySection  = getSection("guarantees");
-  const revSection  = getSection("reviews");
-  const faqSection  = getSection("faq");
-  const formSection = getSection("order_form");
+  // Photo principale = photo produit (pas le GIF/vidéo) ; puis photos d'ambiance avec une phrase chacune
+  const productImgs = product.images.map((i) => i.public_url).filter(Boolean);
+  const mainImg = productImgs[0] ?? (lp.hero_image as string | undefined) ?? null;
 
-  type Benefit  = { icon: string; title: string; desc: string };
-  type Review   = { name: string; city: string; stars: number; text: string };
-  type FaqItem  = { q: string; a: string };
+  const captions: string[] = [];
+  const life = sec("lifestyle")?.scenarios as { title?: string; desc?: string }[] | undefined;
+  life?.forEach((x) => x.desc && captions.push(x.desc));
+  const ben = sec("benefits")?.items as { title?: string; desc?: string }[] | undefined;
+  ben?.forEach((x) => x.desc && captions.push(x.desc));
+  const ps = sec("problem_solution");
+  (ps?.after_points as string[] | undefined)?.forEach((x) => captions.push(x));
 
-  const benefits:  Benefit[]  = (benSection?.items  as Benefit[])  ?? defaultBenefits;
-  const reviews:   Review[]   = (revSection?.items  as Review[])   ?? defaultReviews;
-  const faqItems:  FaqItem[]  = (faqSection?.items  as FaqItem[])  ?? defaultFaq;
+  const storyImgs: string[] = [];
+  const add = (u: unknown) => { if (typeof u === "string" && u && u !== mainImg && !storyImgs.includes(u)) storyImgs.push(u); };
+  add(lp.hero_image);
+  productImgs.slice(1).forEach(add);
+  const story = storyImgs.slice(0, 6).map((src, i) => ({ src, text: captions[i] ?? "" }));
 
-  const formNote  = String(formSection?.reassurance ?? "معلوماتك محفوظة · لا دفع مسبق · توصيل مضمون");
-
-  const canonicalUrl = `${SITE_URL}/lp/${slug}`;
-
-  // Structured data for Google (Product + Offer + AggregateRating).
-  // Numbers here MUST match what's visually shown on the page (4.8 / 200
-  // reviews) — Google can penalize mismatched structured data.
-  const productJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Product",
-    name: product.name,
-    description: page.description ?? product.name,
-    image: product.images.map((i) => i.public_url),
-    sku: product.id,
-    offers: {
-      "@type": "Offer",
-      url: canonicalUrl,
-      priceCurrency: "MAD",
-      price: price.toFixed(2),
-      availability: "https://schema.org/InStock",
-      itemCondition: "https://schema.org/NewCondition",
-    },
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: "4.8",
-      reviewCount: "200",
-    },
-  };
-
-  const breadcrumbJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "الرئيسية", item: SITE_URL },
-      { "@type": "ListItem", position: 2, name: product.name, item: canonicalUrl },
-    ],
-  };
+  const customerPhotos = ((lp.customer_photos as string[] | undefined) ?? []).slice(0, 6);
+  const pixel = page.meta_pixel_id?.trim();
+  const tt = page.tiktok_pixel_id?.trim();
+  const pname = product.name.replace(/'/g, "\\'");
 
   return (
     <>
-      <script type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
-      <script type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
-
-      {page.google_gtm_id && (
+      {pixel && (
         <script dangerouslySetInnerHTML={{ __html:
-          `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${page.google_gtm_id}');`
+          `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');${pixel.split(/[,\s]+/).filter(Boolean).map((id) => `fbq('init','${id}',{autoConfig:true});`).join("")}fbq('track','PageView');fbq('track','ViewContent',{content_name:'${pname}',content_ids:['${product.id}'],content_type:'product',value:${price},currency:'MAD'});`
         }} />
       )}
-
-      {page.meta_pixel_id?.trim() && (
+      {tt && (
         <script dangerouslySetInnerHTML={{ __html:
-          `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');${page.meta_pixel_id.split(/[,\s]+/).filter(Boolean).map((id) => `fbq('init','${id}',{autoConfig:true});`).join('')}fbq('track','PageView');fbq('track','ViewContent',{content_name:'${product.name.replace(/'/g, "\\'")}',content_ids:['${product.id}'],content_type:'product',value:${price},currency:'MAD'});`
+          `!function (w, d, t) {w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<e.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var a=document.createElement("script");a.type="text/javascript",a.async=!0,a.src=i+"?sdkid="+e+"&lib="+t;var s=document.getElementsByTagName("script")[0];s.parentNode.insertBefore(a,s)};ttq.load('${tt}');ttq.page();ttq.track('ViewContent',{content_id:'${product.id}',content_name:'${pname}',value:${price},currency:'MAD'});}(window, document, 'ttq');`
         }} />
       )}
-
-      {page.tiktok_pixel_id?.trim() && (
-        <script dangerouslySetInnerHTML={{ __html:
-          `!function (w, d, t) {w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<e.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var a=document.createElement("script");a.type="text/javascript",a.async=!0,a.src=i+"?sdkid="+e+"&lib="+t;var s=document.getElementsByTagName("script")[0];s.parentNode.insertBefore(a,s)};ttq.load('${page.tiktok_pixel_id.trim()}');ttq.page();ttq.track('ViewContent',{content_id:'${product.id}',content_name:'${product.name.replace(/'/g, "\\'")}',value:${price},currency:'MAD'});}(window, document, 'ttq');`
-        }} />
-      )}
-      <script dangerouslySetInnerHTML={{ __html: `document.documentElement.lang="ar";document.documentElement.dir="rtl";try{navigator.sendBeacon("/api/public/lp-view",JSON.stringify({slug:${JSON.stringify(slug)}}))}catch(e){}` }} />
+      <script dangerouslySetInnerHTML={{ __html:
+        `document.documentElement.lang="ar";document.documentElement.dir="rtl";try{navigator.sendBeacon("/api/public/lp-view",JSON.stringify({slug:${JSON.stringify(slug)}}))}catch(e){}
+        (function(){function go(){var b=document.getElementById('sp-sticky'),f=document.getElementById('sp-form');if(!b||!f||!('IntersectionObserver' in window))return;new IntersectionObserver(function(e){b.classList.toggle('sp-hide',e[0].isIntersecting);},{threshold:0.05}).observe(f);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`
+      }} />
       <link rel="preconnect" href="https://nccufqvnxoftzovfsako.supabase.co" />
-      <link rel="preconnect" href="https://connect.facebook.net" />
-      <link rel="preconnect" href="https://www.googletagmanager.com" />
-      <link rel="dns-prefetch" href="https://wa.me" />
+      <style>{CSS}</style>
 
-      {/* Code vidéo (?cr=V001) → ajouté au message WhatsApp pour attribuer la commande à l'éditeur */}
-      <script dangerouslySetInnerHTML={{ __html:
-        `(function(){function cr(){var c=null;try{var p=new URLSearchParams(location.search);c=p.get('cr');if(!c){var u=p.get('utm_content');if(u&&/^V\\d+$/i.test(u))c=u;}if(c&&/^[A-Za-z0-9_-]{1,20}$/.test(c)){c=c.toUpperCase();sessionStorage.setItem('hz_cr',c);}else{c=sessionStorage.getItem('hz_cr');}}catch(e){}return c;}function tag(){var c=cr();if(!c)return;document.querySelectorAll('a[href^="https://wa.me/"]').forEach(function(a){if(a.dataset.cr)return;try{var u=new URL(a.href);var t=u.searchParams.get('text')||'';u.searchParams.set('text',t+'\\n\\n🎬 '+c);a.href=u.toString();a.dataset.cr='1';}catch(e){}});}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',tag);}else{tag();}setTimeout(tag,1500);})();`
-      }} />
-      <script dangerouslySetInnerHTML={{ __html:
-        `if('IntersectionObserver' in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('lp-visible');io.unobserve(e.target);}});},{threshold:0.12});var hzObs=function(){document.querySelectorAll('.lp-root section').forEach(function(s){io.observe(s);});};if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',hzObs);}else{hzObs();}setTimeout(function(){document.querySelectorAll('.lp-root section').forEach(function(s){s.classList.add('lp-visible');});},2500);}else{document.querySelectorAll('.lp-root section').forEach(function(s){s.classList.add('lp-visible');});}
-        (function(){
-          function initSticky(){
-            var bar=document.getElementById('lp-sticky-bar');
-            var form=document.getElementById('lp-form');
-            if(!bar||!form||!('IntersectionObserver' in window))return;
-            var scrolledEnough=false, formVisible=false;
-            function update(){ bar.classList.toggle('lp-sticky-show', scrolledEnough && !formVisible); }
-            function onScroll(){
-              var doc=document.documentElement;
-              var pct=(window.scrollY)/(doc.scrollHeight-doc.clientHeight);
-              scrolledEnough = pct >= 0.25;
-              update();
-            }
-            window.addEventListener('scroll', onScroll, { passive:true });
-            onScroll();
-            new IntersectionObserver(function(es){ formVisible=es[0].isIntersecting; update(); },{threshold:0.15}).observe(form);
-          }
-          function initTikTokFunnelEvents(){
-            // TikTok exige AddToCart + InitiateCheckout dans le funnel e-commerce
-            // standard (Diagnostics → "Missing events") — ni l'un ni l'autre
-            // n'étaient déclenchés nulle part avant ce fix.
-            if(typeof window.ttq==='undefined')return;
-            var addToCartFired=false, checkoutFired=false;
-            document.querySelectorAll('.lp-cta').forEach(function(btn){
-              btn.addEventListener('click', function(){
-                if(addToCartFired)return; addToCartFired=true;
-                window.ttq.track('AddToCart',{content_id:'${product.id}',content_name:'${product.name.replace(/'/g, "\\'")}',value:${price},currency:'MAD'});
-              });
-            });
-            var form=document.getElementById('lp-form');
-            if(form){
-              form.addEventListener('input', function(){
-                if(checkoutFired)return; checkoutFired=true;
-                window.ttq.track('InitiateCheckout',{content_id:'${product.id}',content_name:'${product.name.replace(/'/g, "\\'")}',value:${price},currency:'MAD'});
-              }, { once:true, capture:true });
-            }
-          }
-          if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){initSticky();initTikTokFunnelEvents();});}else{initSticky();initTikTokFunnelEvents();}
-        })();`
-      }} />
-
-      {page.google_gtm_id && (
-        <noscript>
-          <iframe src={`https://www.googletagmanager.com/ns.html?id=${page.google_gtm_id}`}
-            height="0" width="0" style={{ display: "none", visibility: "hidden" }} />
-        </noscript>
-      )}
-
-      <style>{GLOBAL_CSS}</style>
-
-      <div className="lp-root" dir="rtl" lang="ar">
-
-        {/* ── URGENCY TOP BAR ── */}
-        <CountdownTimer variant="topbar" />
-
-        {/* ── EN-TÊTE BOUTIQUE (logo + menu de tous les produits) ── */}
+      <div className="sp" dir="rtl" lang="ar">
+        <div className="sp-top">🚚 توصيل مجاني · الدفع عند الاستلام</div>
         <StoreHeader current={slug} products={storeProducts.map((x) => ({ slug: x.slug, title: x.title, image: x.image, price: x.price }))} />
 
-        {/* ── OFFER BAR ── */}
-        {offerBar && (
-          <div className="lp-bar">{offerBar}</div>
-        )}
+        <main className="sp-wrap">
+          {mainImg && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={mainImg} alt={product.name} className="sp-main" fetchPriority="high" loading="eager" decoding="async" />
+          )}
 
-
-        {/* ── HERO ── */}
-        <section className="lp-hero">
-          <div className="lp-wrap">
-
-            {/* Story hook */}
-            {!!psSection?.story_hook && (
-              <p className="lp-hook">{String(psSection.story_hook ?? "")}</p>
-            )}
-
-            <h1 className="lp-h1">{headline}</h1>
-            <p className="lp-sub">{subline}</p>
-
-            {/* Trust badges */}
-            <div className="lp-badges">
-              {["الدفع عند الاستلام","توصيل سريع","ضمان سنة"].map((b) => (
-                <span key={b} className="lp-badge">{b}</span>
-              ))}
-            </div>
-
-            {/* Hero image (bannière marketing optionnelle, différente de la galerie produit) */}
-            {heroImage && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={heroImage} alt={headline} className="lp-hero-banner" fetchPriority="high" loading="eager" decoding="async" />
-            )}
-
-            {/* Gallery — multiple photos build trust for COD customers */}
-            {product.images.length > 0 && (
-              <div className="lp-fade-in">
-                <ProductGallery
-                  images={product.images}
-                  productName={product.name}
-                  discountPct={heroDiscount}
-                />
-              </div>
-            )}
-
-            {/* Price row */}
-            <div className="lp-price-card lp-fade-in">
-              <div className="lp-price-left">
-                <span className="lp-price-label">{heroLabel}</span>
-                <div className="lp-price-row">
-                  <span className="lp-price-num">{heroPrice.toFixed(0)}</span>
-                  <span className="lp-price-cur">درهم</span>
-                  <span className="lp-price-old">{heroOld}</span>
-                </div>
-                <span className="lp-price-note">شامل التوصيل المجاني</span>
-              </div>
-              <StockCounter />
-            </div>
-
-            {/* Primary CTA */}
-            <a href="#lp-form" className="lp-cta">{ctaText}</a>
-
-            {/* Order form — juste après le hero, exactement comme sur les
-                captures Nivo.ma de référence (formulaire visible dès le
-                premier écran, avant tout le contenu de réassurance). */}
-            <div id="lp-form" className="lp-form-inline">
-              <p className="lp-form-note green">{formNote}</p>
-              <OrderFormPublic product={product} productSlug={slug}
-                ctaText={ctaText} b1={b1} b2={b2} b3={b3} offers={offers}
-                pixelId={page.meta_pixel_id?.trim() || undefined}
-                tiktokPixelId={page.tiktok_pixel_id?.trim() || undefined}
-                variants={(Array.isArray(lp.variant_options) ? lp.variant_options : []) as { name: string; options: { label: string; image?: string }[] }[]}
-                bumps={bumps}
-                cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
-            </div>
-
-            {/* Product description — clear, visible explanation of what this is */}
-            <div className="lp-desc">
-              <p>{description}</p>
-            </div>
-
-            {/* WhatsApp */}
-            {whatsapp && (
-              <a href={`https://wa.me/${whatsapp.replace(/\+/g,"")}?text=${encodeURIComponent(`مرحبا 👋\nأريد الاستفسار عن المنتج التالي:\n\n🛒 المنتج: ${product.name}\n💰 العرض: ${heroQty > 1 ? `${heroQty} قطع بـ ` : ""}${heroPrice.toFixed(0)} درهم\n📦 الدفع عند الاستلام`)}`}
-                target="_blank" rel="noopener noreferrer"
-                className="lp-wa">
-                واتساب — تواصل معنا
-              </a>
-            )}
-
-            <p className="lp-micro">لا دفع مسبق · فريقنا يتصل بك للتأكيد</p>
+          <h1 className="sp-title">{title}</h1>
+          <div className="sp-price">
+            <span className="sp-now">{one.price.toFixed(0)} د.م</span>
+            {oldNum > one.price && <span className="sp-old">{oldNum.toFixed(0)} د.م</span>}
           </div>
-        </section>
 
-        {/* ── STATS BAR ── */}
-        {!!statsSection && Array.isArray(statsSection.items) && (
-          <section className="lp-section lp-stats-section">
-            <div className="lp-wrap">
-              <div className="lp-stats-grid">
-                {(statsSection.items as { percent: string; label: string }[]).map((s, i) => (
-                  <div key={i} className="lp-stat">
-                    <span className="lp-stat-num">{s.percent}</span>
-                    <p className="lp-stat-label">{s.label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ── WHY THE PROBLEM EXISTS / WHY THIS SOLVES IT ──
-             Plein cadre, titre superposé sur l'image, bullets en dessous —
-             copie fidèle de la structure visuelle nivo.ma (pages 3/4/6 du PDF
-             de référence), pas juste des petites vignettes à côté du texte. */}
-        {!!psSection && Array.isArray(psSection.before_points) && Array.isArray(psSection.after_points) && (
-          <>
-            <section className="lp-fullbleed">
-              <div className="lp-fullbleed-img" style={psSection.before_image ? {backgroundImage:`url(${String(psSection.before_image)})`} : undefined}>
-                {!psSection.before_image && <span className="lp-fullbleed-placeholder">[ صورة توضح المشكل ]</span>}
-                <div className="lp-fullbleed-overlay">
-                  <span className="lp-story-tag lp-story-tag--red">المشكل</span>
-                  <h2 className="lp-fullbleed-title">{String(psSection.before_title ?? "")}</h2>
-                </div>
-              </div>
-              <div className="lp-wrap lp-fullbleed-body">
-                <ul className="lp-story-list">
-                  {(psSection.before_points as string[]).map((p, i) => (
-                    <li key={i} className="lp-story-item lp-story-item--red">{p}</li>
-                  ))}
-                </ul>
-              </div>
-            </section>
-
-            <section className="lp-fullbleed">
-              <div className="lp-fullbleed-img" style={psSection.after_image ? {backgroundImage:`url(${String(psSection.after_image)})`} : undefined}>
-                {!psSection.after_image && <span className="lp-fullbleed-placeholder">[ صورة توضح الحل ]</span>}
-                <div className="lp-fullbleed-overlay">
-                  <span className="lp-story-tag lp-story-tag--green">الحل</span>
-                  <h2 className="lp-fullbleed-title">{String(psSection.after_title ?? "")}</h2>
-                </div>
-              </div>
-              <div className="lp-wrap lp-fullbleed-body">
-                <ul className="lp-story-list">
-                  {(psSection.after_points as string[]).map((p, i) => (
-                    <li key={i} className="lp-story-item lp-story-item--green">{p}</li>
-                  ))}
-                </ul>
-              </div>
-            </section>
-          </>
-        )}
-
-        {/* ── BENEFITS (short) ── */}
-        <section className="lp-section">
-          <div className="lp-wrap">
-            <h2 className="lp-h2">مميزات المنتج</h2>
-            <div className="lp-grid-2">
-              {benefits.slice(0, 4).map((b, i) => (
-                <div key={i} className="lp-card lp-benefit">
-                  <span className="lp-benefit-icon">{b.icon}</span>
-                  <div>
-                    <p className="lp-benefit-title">{b.title}</p>
-                    <p className="lp-benefit-desc">{b.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div id="sp-form" className="sp-card">
+            <p className="sp-card-h">معلومات الزبون</p>
+            <OrderFormPublic product={product} productSlug={slug} ctaText={ctaText}
+              b1={one.price} b2={one.price * 2} b3={one.price * 3} offers={offers}
+              pixelId={pixel || undefined} tiktokPixelId={tt || undefined}
+              variants={(Array.isArray(lp.variant_options) ? lp.variant_options : []) as { name: string; options: { label: string; image?: string }[] }[]}
+              bumps={bumps} cities={cities} />
+            <p className="sp-note">✔ ما كتخلص حتى توصلك · ✔ فريقنا يتصل بك للتأكيد</p>
           </div>
-        </section>
 
-        {/* ── HOW TO USE (3 steps) ── */}
-        {!!howSection && Array.isArray(howSection.steps) && (
-          <section className="lp-section lp-section--gray">
-            <div className="lp-wrap">
-              <h2 className="lp-h2">{String(howSection.title ?? "كيفاش تستعمل المنتج")}</h2>
-              <div className="lp-grid-3">
-                {(howSection.steps as { number: number; title: string; desc: string; image_url?: string }[]).map((s, i) => (
-                  <div key={i} className="lp-card lp-step">
-                    {s.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={s.image_url} alt="" className="lp-step-img" loading="lazy" decoding="async" />
-                    ) : (
-                      <span className="lp-step-num">{s.number}</span>
-                    )}
-                    <p className="lp-step-title">{s.title}</p>
-                    <p className="lp-step-desc">{s.desc}</p>
-                  </div>
-                ))}
-              </div>
+          {story.map((s, i) => (
+            <div key={i} className="sp-story">
+              {s.text && <p>{s.text}</p>}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={s.src} alt="" loading="lazy" decoding="async" />
             </div>
-          </section>
-        )}
+          ))}
 
-        {/* ── SUITABLE FOR (audience icons) ── */}
-        {!!suitSection && Array.isArray(suitSection.items) && (
-          <section className="lp-section">
-            <div className="lp-wrap">
-              <h2 className="lp-h2">{String(suitSection.title ?? "مناسب للجميع")}</h2>
-              <div className="lp-suitable-grid">
-                {(suitSection.items as { icon: string; label: string }[]).map((s, i) => (
-                  <div key={i} className="lp-suitable-item">
-                    <span className="lp-suitable-icon">{s.icon}</span>
-                    <p className="lp-suitable-label">{s.label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ── COMPARISON TABLE ── */}
-        {!!cmpSection && Array.isArray(cmpSection.rows) && (
-          <section className="lp-section lp-section--gray">
-            <div className="lp-wrap">
-              <h2 className="lp-h2">{String(cmpSection.title ?? "لماذا منتجنا هو الأفضل؟")}</h2>
-              <div className="lp-cmp-table">
-                <div className="lp-cmp-row lp-cmp-head">
-                  <span></span>
-                  <span className="lp-cmp-ours">{String(cmpSection.ours_label ?? "منتجنا")}</span>
-                  <span className="lp-cmp-theirs">{String(cmpSection.theirs_label ?? "الحلول العادية")}</span>
-                </div>
-                {(cmpSection.rows as { feature: string; ours: boolean; theirs: boolean }[]).map((r, i) => (
-                  <div key={i} className="lp-cmp-row">
-                    <span className="lp-cmp-feature">{r.feature}</span>
-                    <span className="lp-cmp-check">{r.ours ? "✅" : "—"}</span>
-                    <span className="lp-cmp-check">{r.theirs ? "✅" : "❌"}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ── REVIEWS ── */}
-        <section className="lp-section lp-section--gray">
-          <div className="lp-wrap">
-            <div className="lp-reviews-header">
-              <h2 className="lp-h2" style={{ margin:0 }}>آراء العملاء</h2>
-              <div className="lp-rating">
-                <span className="lp-stars">★★★★★</span>
-                <span className="lp-rating-num">4.8</span>
-                <span className="lp-rating-count">(+200)</span>
-              </div>
-            </div>
-            <div className="lp-reviews">
-              {reviews.slice(0, 3).map((r, i) => (
-                <div key={i} className="lp-card lp-review">
-                  <div className="lp-review-top">
-                    <div className="lp-review-info">
-                      <span className="lp-avatar">{r.name.charAt(0)}</span>
-                      <div>
-                        <p className="lp-review-name">{r.name}</p>
-                        <p className="lp-review-city">{r.city}</p>
-                      </div>
-                    </div>
-                    <span className="lp-stars" style={{ fontSize:"12px" }}>
-                      {"★".repeat(r.stars ?? 5)}
-                    </span>
-                  </div>
-                  <p className="lp-review-text">{r.text}</p>
-                  <span className="lp-verified">مشتري موثق</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── GUARANTEES ── */}
-        {!!gtySection && Array.isArray(gtySection.items) && (
-          <section className="lp-section">
-            <div className="lp-wrap">
-              {!!gtySection.box_image && (
-                <div className="lp-box-included">
-                  <p className="lp-box-included-title">📦 كلشي واجد فالطلبية</p>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={String(gtySection.box_image)} alt="محتوى الطلبية" className="lp-box-included-img" loading="lazy" decoding="async" />
-                </div>
-              )}
-              <h2 className="lp-h2">{String(gtySection.title ?? "ليه تثق فينا؟")}</h2>
-              <div className="lp-grid-2">
-                {(gtySection.items as { icon: string; title: string; desc: string }[]).map((g, i) => (
-                  <div key={i} className="lp-card lp-benefit">
-                    <span className="lp-benefit-icon">{g.icon}</span>
-                    <div>
-                      <p className="lp-benefit-title">{g.title}</p>
-                      <p className="lp-benefit-desc">{g.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ── POLICIES ACCORDION (retour/garantie/service client) ── */}
-        <section className="lp-section lp-section--dark">
-          <div className="lp-wrap">
-            {[
-              { icon: "📦", title: "سياسة الاسترجاع", body: "عندك 7 أيام من توصل الطلب باش ترجعو إلا كان فيه مشكل، بلا أي تعقيد." },
-              { icon: "🛡️", title: "7 أيام ضمان", body: "كل منتج مضمون 7 أيام — إلا وصلك فيه عيب، نبدلوه ليك فوراً بلا ما تخلص شي حاجة." },
-              { icon: "💬", title: "خدمة العملاء", body: "فريقنا موجود يجاوبك على أي سؤال، قبل وبعد الطلب — عبر الهاتف أو واتساب." },
-            ].map((p, i) => (
-              <details key={i} className="lp-policy">
-                <summary className="lp-policy-summary">
-                  <span>{p.icon} {p.title}</span>
-                  <span className="lp-policy-arrow">˅</span>
-                </summary>
-                <p className="lp-policy-body">{p.body}</p>
-              </details>
-            ))}
-          </div>
-        </section>
-
-        {/* ── FAQ ── */}
-        <section className="lp-section">
-          <div className="lp-wrap">
-            <h2 className="lp-h2">الأسئلة الشائعة</h2>
-            <FaqAccordion items={faqItems.slice(0, 5)} />
-          </div>
-        </section>
-
-        {/* ── CUSTOMER PHOTOS — only if configured ── */}
-        {customerPhotos.length > 0 && (
-          <section style={{background:"#fff",marginTop:"8px",padding:"26px 0"}}>
-            <div style={{maxWidth:"580px",margin:"0 auto",padding:"0 16px"}}>
-              <h2 style={{fontSize:"clamp(17px,4vw,22px)",fontWeight:800,color:"#111827",textAlign:"center",marginBottom:"16px"}}>صور من زبنائنا 📸</h2>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}}>
+          {customerPhotos.length > 0 && (
+            <div className="sp-cust">
+              <h2>صور من زبنائنا 📸</h2>
+              <div className="sp-cust-grid">
                 {customerPhotos.map((src, i) => (
-                  <div key={i} style={{borderRadius:"12px",overflow:"hidden",aspectRatio:"1",background:"#f3f4f6"}}>
-                    <img src={src} alt={`عميل ${i+1}`} loading="lazy" style={{width:"100%",height:"100%",objectFit:"cover"}} />
-                  </div>
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={i} src={src} alt="" loading="lazy" decoding="async" />
                 ))}
               </div>
             </div>
-          </section>
-        )}
+          )}
 
-        {/* ── FINAL CTA ── */}
-        <section className="lp-final">
-          <div className="lp-wrap" style={{ textAlign:"center" }}>
-            <p className="lp-final-title">ما تخليش الفرصة تفوتك</p>
-            <p className="lp-final-sub">الكمية محدودة · الدفع عند الاستلام · توصيل مجاني</p>
-            <StockCounter variant="dark" />
-            <a href="#lp-form" className="lp-cta lp-cta--white">اطلب الآن</a>
-          </div>
-        </section>
+          <a href="#sp-form" className="sp-btn">{ctaText}</a>
+        </main>
 
-        {/* ── AUTRES PRODUITS DE LA BOUTIQUE ── */}
-        <CrossSell products={storeProducts} exclude={slug} />
-
-        <footer className="lp-footer">
-          <div className="lp-footer-social">
-            <a href="#" aria-label="Facebook">📘</a>
-            <a href="#" aria-label="Instagram">📷</a>
-            <a href="#" aria-label="TikTok">🎵</a>
-          </div>
-          <h3 className="lp-footer-about-title">من نحن — {storeName || "HajtekZone"}</h3>
-          <p className="lp-footer-about-text">
-            نحرص على توفير منتجات عملية ومختارة بعناية لتسهيل حياتك اليومية، مع خدمة توصيل موثوقة وسريعة داخل جميع مدن المغرب.
-          </p>
-          <div className="lp-footer-links">
-            <Link href="/confidentialite" style={{ color: "inherit" }}>سياسة الخصوصية</Link> · <Link href="/conditions" style={{ color: "inherit" }}>شروط البيع والاسترجاع</Link> · <Link href="/a-propos" style={{ color: "inherit" }}>من نحن</Link> · <Link href="/" style={{ color: "inherit" }}>جميع المنتجات</Link>
-          </div>
-          <p className="lp-footer-copyright">
-            {storeName || "HajtekZone"} © {new Date().getFullYear()}
-          </p>
+        <footer className="sp-foot">
+          <a href="/a-propos">من نحن</a> · <a href="/conditions">شروط البيع والاسترجاع</a> · <a href="/confidentialite">سياسة الخصوصية</a>
+          <div>HajtekZone © {new Date().getFullYear()}</div>
         </footer>
 
-        {/* ── FLOATING PILL CTA (mobile) — apparaît après 25% de scroll,
-             disparaît quand le formulaire est visible ── */}
-        <div className="lp-sticky" id="lp-sticky-bar">
-          <a href="#lp-form" className="lp-sticky-pill">
-            <span className="lp-sticky-cart">🛒</span>
-            <span className="lp-sticky-texts">
-              <span className="lp-sticky-cta-text">{ctaText}</span>
-              <span className="lp-sticky-cod-text">الدفع عند الاستلام</span>
-            </span>
-          </a>
-        </div>
-
-        <script dangerouslySetInnerHTML={{ __html: `(function(){function go(){var f=document.getElementById("lp-form"),w=document.getElementById("lp-wa-float");if(!f||!w||!("IntersectionObserver" in window))return;new IntersectionObserver(function(e){w.classList.toggle("lp-wa-hidden",e[0].isIntersecting);},{threshold:0.05}).observe(f);}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",go);else go();})();` }} />
-        {/* ── FLOATING WHATSAPP BUTTON ── */}
-        {whatsapp && (
-          <a
-            href={`https://wa.me/${whatsapp.replace(/\+/g,"")}?text=${encodeURIComponent(`مرحبا 👋\nأريد الاستفسار عن المنتج التالي:\n\n🛒 المنتج: ${product.name}\n💰 العرض: ${heroQty > 1 ? `${heroQty} قطع بـ ` : ""}${heroPrice.toFixed(0)} درهم\n📦 الدفع عند الاستلام`)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="lp-wa-float"
-            id="lp-wa-float"
-            aria-label="تواصل عبر واتساب"
-          >
-            <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28" aria-hidden="true">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-            </svg>
-          </a>
-        )}
+        <a id="sp-sticky" href="#sp-form" className="sp-sticky">{ctaText} — {one.price.toFixed(0)} د.م</a>
       </div>
     </>
   );
 }
 
-// ── Defaults ──────────────────────────────────────────────────────────────────
-const defaultBenefits = [
-  { icon:"✓", title:"جودة ممتازة",  desc:"مضمون ومعتمد" },
-  { icon:"✓", title:"توصيل سريع",   desc:"2-4 أيام عمل" },
-  { icon:"✓", title:"دعم مستمر",    desc:"فريقنا متاح" },
-  { icon:"✓", title:"ضمان سنة",     desc:"استرجاع مجاني" },
-];
-const defaultReviews = [
-  { name:"محمد أمين",     city:"الدار البيضاء", stars:5, text:"منتج ممتاز، توصل في يومين. الجودة فاقت توقعاتي تماماً." },
-  { name:"فاطمة الزهراء", city:"مراكش",          stars:5, text:"جربته وما ندمت. الدفع عند الاستلام راحني كثير." },
-  { name:"يوسف المرابط",  city:"الرباط",          stars:5, text:"أنصح به — قيمة حقيقية بسعر معقول." },
-];
-const defaultFaq = [
-  { q:"كيف يتم التوصيل؟",      a:"خلال 2-4 أيام لجميع مدن المغرب." },
-  { q:"هل يمكن إرجاع المنتج؟", a:"نعم، إرجاع مجاني خلال 7 أيام." },
-  { q:"كيف يتم الدفع؟",        a:"الدفع عند الاستلام — لا دفع مسبق." },
-  { q:"هل هناك ضمان؟",         a:"نعم، ضمان سنة كاملة مع دعم فني." },
-];
-
-// ── Global CSS — single source of truth ──────────────────────────────────────
-const GLOBAL_CSS = `
-  *{box-sizing:border-box;margin:0;padding:0}
-  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;overflow-x:hidden}
-  body{font-family:var(--font-cairo),sans-serif;background:#0f0f10;color:#111827;overflow-x:hidden;width:100%;position:relative}
-
-  /* ── Layout ── */
-  .lp-root{min-height:100vh;overflow-x:hidden;width:100%;max-width:100vw;background:#fff;border-radius:0 0 28px 28px;}
-  .lp-wrap{max-width:580px;margin:0 auto;padding:0 16px;width:100%;box-sizing:border-box}
-
-  /* ── Typography scale ── */
-  .lp-h1{
-    font-size:clamp(21px,5.5vw,30px);
-    font-weight:900;color:#111827;
-    line-height:1.3;text-align:center;margin-bottom:8px;
-  }
-  .lp-h2{
-    font-size:clamp(17px,4vw,22px);
-    font-weight:800;color:#111827;
-    text-align:center;margin-bottom:18px;line-height:1.3;
-  }
-  .lp-sub{text-align:center;color:#4b5563;font-size:clamp(13px,3.5vw,15px);
-    margin-bottom:16px;line-height:1.6;}
-  .lp-hook{text-align:center;color:#6b7280;font-size:clamp(12px,3vw,14px);
-    margin-bottom:10px;line-height:1.6;font-style:italic;}
-  .lp-micro{text-align:center;font-size:12px;color:#9ca3af;margin-top:10px;}
-  .lp-form-note{text-align:center;font-size:12px;margin-bottom:20px;}
-  .lp-form-note.green{color:#15803d;font-weight:600;}
-
-  /* ── Sections ── */
-  .lp-section{background:#fff;margin-top:8px;padding:26px 0}
-  .lp-section--gray{background:#f7f8fa}
-  .lp-section--green-light{background:#f0fdf4;margin-top:8px;padding:28px 0}
-  .lp-hero{background:#fff;padding-bottom:28px}
-  .lp-trust{background:#111827;margin-top:8px;padding:22px 0}
-  .lp-final{background:#16a34a;margin-top:8px;padding:28px 0}
-  .lp-footer{background:#0b0b0b;padding:28px 20px;text-align:center;
-    color:#6b7280;font-size:11px;margin-bottom:68px}
-  .lp-footer-social{display:flex;justify-content:center;gap:18px;font-size:20px;margin-bottom:18px;}
-  .lp-footer-social a{text-decoration:none;filter:grayscale(0);}
-  .lp-footer-about-title{color:#f5c744;font-size:14px;font-weight:800;margin-bottom:8px;}
-  .lp-footer-about-text{color:#9ca3af;font-size:11px;line-height:1.8;margin-bottom:16px;max-width:320px;margin-left:auto;margin-right:auto;}
-  .lp-footer-links{color:#d1d5db;font-size:10.5px;line-height:2;margin-bottom:16px;}
-  .lp-footer-copyright{color:#6b7280;font-size:10px;margin-top:8px;}
-
-  /* ── Offer bar ── */
-  /* ── Urgency top bar (sombre chaud, pas noir pur) ── */
-  .lp-urgency-bar{
-    background:#221a12;color:#f5c744;text-align:center;
-    padding:8px 12px;font-size:12px;font-weight:700;
-    letter-spacing:.01em;
-  }
-  .lp-urgency-bar strong{color:#fff;font-weight:900;}
-
-  /* ── Section sombre (fond brun chaud, pas noir pur) ── */
-  .lp-section--dark{background:#1c1712;}
-  .lp-policy{border-bottom:1px solid rgba(245,199,68,.15);padding:14px 4px;}
-  .lp-policy:first-child{border-top:1px solid rgba(245,199,68,.15);}
-  .lp-policy-summary{
-    display:flex;justify-content:space-between;align-items:center;
-    cursor:pointer;list-style:none;color:#f5f0e6;font-weight:700;font-size:13px;
-  }
-  .lp-policy-summary::-webkit-details-marker{display:none;}
-  .lp-policy-arrow{color:#f5c744;transition:transform .2s;}
-  .lp-policy[open] .lp-policy-arrow{transform:rotate(180deg);}
-  .lp-policy-body{color:#c9beac;font-size:12px;line-height:1.7;margin-top:10px;}
-
-  .lp-box-included{text-align:center;margin-bottom:18px;}
-  .lp-box-included-title{font-weight:800;font-size:14px;margin-bottom:10px;}
-  .lp-box-included-img{width:100%;border-radius:14px;box-shadow:0 4px 16px rgba(0,0,0,.08);}
-
-  .lp-bar{background:#111827;color:#fff;text-align:center;
-    padding:9px 16px;font-size:13px;font-weight:600;
-    letter-spacing:.01em;}
-
-  /* ── Store branding (confiance) ── */
-  .lp-store-brand{
-    display:flex;align-items:center;justify-content:center;gap:6px;
-    padding:6px 16px;background:#fff;border-bottom:1px solid #f1f5f9;
-  }
-  .lp-store-logo{
-    width:20px;height:20px;border-radius:50%;object-fit:cover;
-    border:1.5px solid #f5c744;
-  }
-  .lp-store-name{font-weight:700;font-size:11px;color:#6b7280;letter-spacing:.2px;}
-  @media (prefers-reduced-motion: no-preference) {
-    .lp-store-brand{animation:lpStoreBrandIn .5s ease-out both;}
-  }
-  @keyframes lpStoreBrandIn{
-    from{opacity:0;transform:translateY(-10px);}
-    to{opacity:1;transform:translateY(0);}
-  }
-
-  /* ── Hero banner (image marketing optionnelle) ── */
-  .lp-hero-banner{
-    width:100%;max-height:65vh;object-fit:contain;object-position:top center;
-    border-radius:16px;margin-bottom:14px;display:block;background:#f8f8f6;
-  }
-
-  /* ── Badges ── */
-  .lp-badges{display:flex;justify-content:center;flex-wrap:wrap;
-    gap:6px;margin-bottom:16px;}
-  .lp-badge{display:inline-flex;align-items:center;
-    background:#f0fdf4;border:1px solid #bbf7d0;
-    color:#15803d;font-size:11px;font-weight:600;
-    padding:4px 10px;border-radius:9999px;}
-
-  /* ── Gallery ── */
-  .lp-gallery-main{
-    position:relative;width:100%;aspect-ratio:1/1;
-    border-radius:18px;overflow:hidden;
-    box-shadow:0 8px 30px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.06);
-    margin-bottom:10px;background:#f3f4f6;
-  }
-  .lp-gallery-counter{
-    position:absolute;bottom:10px;right:10px;z-index:2;
-    background:rgba(0,0,0,.45);color:#fff;
-    font-size:11px;font-weight:600;
-    padding:3px 8px;border-radius:9999px;
-  }
-  .lp-gallery-arrow{
-    position:absolute;top:50%;transform:translateY(-50%);z-index:2;
-    background:rgba(255,255,255,.85);border:none;cursor:pointer;
-    width:36px;height:36px;border-radius:50%;
-    font-size:22px;line-height:1;color:#111;
-    display:flex;align-items:center;justify-content:center;
-    box-shadow:0 2px 8px rgba(0,0,0,.15);
-  }
-  .lp-gallery-arrow--prev{left:10px;}
-  .lp-gallery-arrow--next{right:10px;}
-  .lp-thumbs{
-    display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;
-    scrollbar-width:none;margin-bottom:18px;
-  }
-  .lp-thumbs::-webkit-scrollbar{display:none;}
-  .lp-thumb{
-    position:relative;flex-shrink:0;
-    width:72px;height:72px;border-radius:10px;overflow:hidden;
-    border:2px solid transparent;cursor:pointer;background:#f3f4f6;
-    transition:border-color .15s;
-  }
-  .lp-thumb--active{border-color:#16a34a;}
-  .lp-thumb:hover{border-color:#86efac;}
-  .lp-discount-badge{
-    position:absolute;top:12px;left:12px;z-index:2;
-    background:#ef4444;color:#fff;font-weight:800;
-    font-size:clamp(13px,3.5vw,15px);
-    padding:6px 12px;border-radius:9999px;
-    box-shadow:0 3px 10px rgba(239,68,68,.4);
-    font-family:var(--font-cairo),sans-serif;
-  }
-
-  /* ── Entrance animation (subtle, respects reduced motion) ── */
-  @media (prefers-reduced-motion: no-preference) {
-    .lp-fade-in{animation:lpFadeIn .5s ease-out both;}
-  }
-  @keyframes lpFadeIn{
-    from{opacity:0;transform:translateY(8px);}
-    to{opacity:1;transform:translateY(0);}
-  }
-
-  /* ── Scroll reveal: chaque section apparaît en douceur en descendant ── */
-  @media (prefers-reduced-motion: no-preference) {
-    .lp-root section{opacity:0;transform:translateY(20px);transition:opacity .55s ease-out,transform .55s ease-out;}
-    .lp-root section.lp-visible{opacity:1;transform:translateY(0);}
-    .lp-root section.lp-hero{opacity:1!important;transform:none!important;} /* toujours visible direct */
-  }
-
-  /* ── CTA pulse: attire l'œil sans être agressif ── */
-  @media (prefers-reduced-motion: no-preference) {
-    .lp-cta{animation:lpCtaPulse 2.2s ease-in-out infinite;}
-  }
-  @keyframes lpCtaPulse{
-    0%,100%{box-shadow:0 10px 28px -8px rgba(184,134,11,.5);transform:scale(1);}
-    50%{box-shadow:0 14px 36px -6px rgba(184,134,11,.7);transform:scale(1.015);}
-  }
-
-  /* ── Galerie: léger zoom au tap/clic ── */
-  .lp-gallery-img{transition:transform .25s ease-out;}
-  .lp-gallery-img:active{transform:scale(1.04);}
-
-  /* ── Price card ── */
-  .lp-price-card{display:flex;justify-content:space-between;align-items:center;
-    background:#fff;border-radius:14px;border:1px solid #e5e7eb;
-    box-shadow:0 1px 4px rgba(0,0,0,.05);
-    padding:14px 16px;margin-bottom:16px;}
-  .lp-price-left{display:flex;flex-direction:column;gap:2px}
-  .lp-price-label{font-size:11px;color:#9ca3af;}
-  .lp-price-row{display:flex;align-items:baseline;gap:8px;}
-  .lp-price-num{font-size:clamp(30px,8vw,40px);font-weight:900;color:#16a34a;line-height:1;}
-  .lp-price-cur{font-size:15px;font-weight:700;color:#9ca3af;}
-  .lp-price-old{font-size:12px;color:#ef4444;text-decoration:line-through;}
-  .lp-price-note{font-size:11px;color:#16a34a;font-weight:600;}
-
-  /* ── CTA button ── */
-  .lp-cta{
-    display:block;width:100%;text-align:center;
-    background:linear-gradient(135deg,#f7d264,#d4a017);color:#1a1400;
-    font-family:var(--font-cairo),sans-serif;
-    font-size:clamp(15px,4vw,17px);font-weight:800;
-    padding:16px 24px;border-radius:16px;
-    text-decoration:none;border:none;cursor:pointer;
-    box-shadow:0 4px 18px rgba(184,134,11,.35),0 1px 3px rgba(184,134,11,.2);
-    transition:transform .18s ease,box-shadow .18s ease;
-  }
-  @media(hover:hover){
-    .lp-cta:hover{transform:translateY(-2px) scale(1.015);box-shadow:0 8px 26px rgba(184,134,11,.45),0 2px 6px rgba(184,134,11,.25);}
-  }
-  .lp-cta:active{transform:scale(.97);box-shadow:0 2px 10px rgba(184,134,11,.3);}
-  .lp-cta:active{transform:scale(.98);background:#15803d}
-  .lp-cta:focus-visible{outline:3px solid #bbf7d0;outline-offset:2px;}
-  .lp-cta--white{
-    background:#fff;color:#16a34a;
-    display:inline-block;width:auto;
-    padding:13px 40px;margin-top:6px;
-    box-shadow:none;
-  }
-  .lp-form-inline{
-    margin-top:18px;padding:18px 16px;
-    background:#fff;border-radius:16px;
-    border:1px solid #e5e7eb;
-    box-shadow:0 4px 20px rgba(0,0,0,.06);
-  }
-  .lp-desc{
-    margin-top:16px;padding:14px 4px;
-    font-size:14.5px;line-height:1.8;color:#4b5563;
-    text-align:center;
-  }
-  .lp-wa{
-    display:block;width:100%;text-align:center;
-    background:#25d366;color:#fff;
-    font-family:var(--font-cairo),sans-serif;
-    font-size:14px;font-weight:700;
-    padding:12px 24px;border-radius:14px;
-    text-decoration:none;margin-top:10px;
-    transition:transform .1s;
-  }
-  .lp-wa:active{transform:scale(.98);}
-
-  /* ── Floating WhatsApp ── */
-  .lp-wa-float{
-    position:fixed;bottom:80px;left:16px;z-index:60;
-    width:56px;height:56px;border-radius:50%;
-    background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;
-    box-shadow:0 4px 14px rgba(0,0,0,.25);transition:opacity .2s,transform .2s;
-  }
-  /* Caché quand le formulaire de commande est à l'écran (sinon il couvrait le bouton "اطلب") */
-  .lp-wa-float.lp-wa-hidden{opacity:0;pointer-events:none;transform:scale(.6);}
-  .lp-wa-float:active{transform:scale(.92);}
-  @keyframes wa-pulse{
-    0%,100%{box-shadow:0 4px 16px rgba(37,211,102,.5);}
-    50%{box-shadow:0 4px 24px rgba(37,211,102,.8),0 0 0 8px rgba(37,211,102,.15);}
-  }
-  @media(min-width:640px){
-    .lp-wa-float{bottom:24px;}
-  }
-
-  /* ── Cards ── */
-  .lp-card{
-    background:#fff;border-radius:20px;
-    border:1px solid #e5e7eb;
-    box-shadow:0 1px 2px rgba(0,0,0,.04),0 6px 16px rgba(0,0,0,.05);
-    padding:16px 18px;
-    transition:box-shadow .25s ease,transform .25s ease;
-  }
-  @media(hover:hover){
-    .lp-card:hover{transform:translateY(-3px);box-shadow:0 4px 8px rgba(0,0,0,.06),0 14px 28px rgba(0,0,0,.09);}
-  }
-
-  /* ── Story (why problem / why solution) ── */
-  .lp-story{padding:32px 0!important;}
-  .lp-story .lp-wrap{display:flex;flex-direction:column;gap:20px;}
-  .lp-story-col{background:#fff;border-radius:16px;padding:20px;border:1px solid #e5e7eb;}
-  .lp-story-before{border-color:#fecaca;background:#fef2f2;}
-  .lp-story-after{border-color:#bbf7d0;background:#f0fdf4;}
-  .lp-story-arrow{display:none;}
-  .lp-story-tag{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:9999px;}
-  .lp-story-tag--red{background:#fecaca;color:#991b1b;}
-  .lp-story-tag--green{background:#bbf7d0;color:#166534;}
-  .lp-story-list{list-style:none;padding:0;margin:12px 0 0;display:flex;flex-direction:column;gap:8px;}
-  .lp-story-item{font-size:clamp(12px,3.2vw,13px);line-height:1.6;padding-right:20px;position:relative;color:#374151;}
-  .lp-story-item--red::before{content:"✕";position:absolute;right:0;color:#dc2626;font-weight:800;}
-  .lp-story-item--green::before{content:"✓";position:absolute;right:0;color:#16a34a;font-weight:800;}
-  .lp-story-img{width:100%;border-radius:12px;margin:8px 0;object-fit:cover;max-height:160px;}
-
-  /* ── Full-bleed image blocks avec titre superposé (structure nivo.ma) ── */
-  .lp-fullbleed{margin-bottom:0;}
-  .lp-fullbleed-img{
-    width:100%;aspect-ratio:4/3;max-height:340px;background-size:cover;background-position:center;
-    background-color:#1c1712;position:relative;display:flex;align-items:flex-end;
-    padding:24px 20px;
-  }
-  .lp-fullbleed-img::before{
-    content:"";position:absolute;inset:0;
-    background:linear-gradient(to top,rgba(0,0,0,.75) 20%,rgba(0,0,0,.15) 60%,transparent);
-  }
-  .lp-fullbleed-placeholder{
-    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    color:#b8860b;font-size:12px;font-weight:700;text-align:center;padding:20px;
-  }
-  .lp-fullbleed-overlay{position:relative;z-index:1;}
-  .lp-fullbleed-title{color:#fff;font-size:22px;font-weight:900;line-height:1.35;margin-top:8px;}
-  .lp-fullbleed-body{padding:18px 16px;background:#fff;}
-
-  .lp-step-img{width:100%;max-width:150px;aspect-ratio:1/1;border-radius:14px;object-fit:cover;margin:0 auto 10px;display:block;box-shadow:0 2px 8px rgba(0,0,0,.08);}
-
-  .lp-card--green{
-    background:#f0fdf4;border-color:#bbf7d0;
-  }
-  @media(hover:hover){
-    .lp-review:hover,.lp-benefit:hover,.lp-scenario:hover{
-      box-shadow:0 2px 6px rgba(0,0,0,.06),0 10px 24px rgba(0,0,0,.08);
-      transform:translateY(-2px);
-    }
-  }
-
-  /* ── Check rows ── */
-  .lp-check-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;}
-  .lp-check-row--border{border-bottom:1px solid #f3f4f6;}
-  .lp-check-row--border-g{border-bottom:1px solid #dcfce7;}
-  .lp-x{color:#ef4444;font-size:15px;flex-shrink:0;margin-top:1px;}
-  .lp-tick{color:#16a34a;font-size:15px;flex-shrink:0;margin-top:1px;}
-  .lp-check-text{font-size:clamp(12px,3.5vw,14px);color:#374151;line-height:1.55;}
-  .lp-check-text--g{color:#166534;font-weight:500;}
-
-  /* ── Grid ── */
-  .lp-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-  .lp-grid-3{display:grid;grid-template-columns:1fr;gap:10px;}
-
-  /* ── Steps (how_to_use) ── */
-  .lp-step{text-align:center;padding:20px 14px;}
-  .lp-step-num{display:flex;align-items:center;justify-content:center;width:32px;height:32px;margin:0 auto 10px;border-radius:9999px;background:#111827;color:#fff;font-weight:800;font-size:14px;}
-  .lp-step-title{font-weight:700;color:#111827;font-size:clamp(13px,3.5vw,14px);margin-bottom:4px;}
-  .lp-step-desc{color:#6b7280;font-size:clamp(11px,3vw,12px);line-height:1.5;}
-
-  /* ── Stats bar ── */
-  .lp-stats-section{padding:20px 0!important;background:#111827;}
-  .lp-stats-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
-  .lp-stat{text-align:center;padding:8px 4px;}
-  .lp-stat-num{display:block;font-weight:800;font-size:clamp(18px,5.5vw,28px);color:#fff;margin-bottom:4px;}
-  .lp-stat-label{color:#9ca3af;font-size:clamp(9px,2.6vw,12px);line-height:1.3;}
-
-  /* ── Suitable for (audience icons) ── */
-  .lp-suitable-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
-  .lp-suitable-item{text-align:center;padding:12px 6px;}
-  .lp-suitable-icon{display:block;font-size:28px;margin-bottom:6px;}
-  .lp-suitable-label{color:#374151;font-size:clamp(10px,2.8vw,12px);font-weight:600;line-height:1.3;}
-
-  /* ── Comparison table ── */
-  .lp-cmp-table{border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;background:#fff;}
-  .lp-cmp-row{display:grid;grid-template-columns:1.4fr 1fr 1fr;align-items:center;padding:10px 8px;border-bottom:1px solid #f3f4f6;}
-  .lp-cmp-row:last-child{border-bottom:none;}
-  .lp-cmp-head{background:#f9fafb;font-weight:700;font-size:clamp(11px,3vw,12px);}
-  .lp-cmp-ours{color:#059669;text-align:center;}
-  .lp-cmp-theirs{color:#6b7280;text-align:center;}
-  .lp-cmp-feature{font-size:clamp(11px,3vw,12px);color:#111827;font-weight:600;}
-  .lp-cmp-check{text-align:center;font-size:14px;}
-
-  /* ── Countdown timer ── */
-  .lp-countdown{margin:16px 0;}
-  .lp-countdown-label{font-size:clamp(11px,3vw,13px);opacity:0.85;margin-bottom:8px;}
-  .lp-countdown-boxes{display:flex;justify-content:center;gap:8px;}
-  .lp-countdown-box{background:rgba(255,255,255,0.15);border-radius:10px;padding:8px 12px;min-width:56px;text-align:center;}
-  .lp-countdown-num{display:block;font-weight:800;font-size:clamp(18px,5vw,24px);}
-  .lp-countdown-unit{font-size:10px;opacity:0.8;}
-
-  /* ── Scenario cards ── */
-  .lp-scenario{text-align:center;padding:16px 12px;}
-  .lp-scenario-icon{display:block;font-size:26px;margin-bottom:8px;}
-  .lp-scenario-title{font-weight:700;color:#111827;font-size:clamp(12px,3.5vw,13px);margin-bottom:4px;}
-  .lp-scenario-desc{color:#6b7280;font-size:clamp(11px,3vw,12px);line-height:1.4;}
-
-  /* ── Benefits ── */
-  .lp-benefit{display:flex;align-items:flex-start;gap:10px;padding:14px;}
-  .lp-benefit-icon{font-size:20px;flex-shrink:0;line-height:1;}
-  .lp-benefit-title{font-weight:700;color:#111827;font-size:clamp(12px,3.5vw,13px);margin-bottom:2px;}
-  .lp-benefit-desc{color:#6b7280;font-size:clamp(10px,3vw,11px);line-height:1.4;}
-
-  /* ── Gallery ── */
-  .lp-gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
-  .lp-gallery-item{position:relative;border-radius:12px;overflow:hidden;
-    aspect-ratio:1/1;background:#f3f4f6;}
-
-  /* ── Trust strip ── */
-  .lp-trust-item{display:flex;align-items:center;gap:10px;
-    background:rgba(255,255,255,.07);border-radius:12px;padding:12px;}
-  .lp-trust-icon{font-size:20px;flex-shrink:0;}
-  .lp-trust-title{font-weight:700;color:#fff;font-size:clamp(11px,3vw,12px);margin-bottom:1px;}
-  .lp-trust-desc{color:#9ca3af;font-size:10px;}
-
-  /* ── Reviews ── */
-  .lp-reviews-header{display:flex;align-items:center;justify-content:space-between;
-    margin-bottom:16px;flex-wrap:wrap;gap:8px;}
-  .lp-rating{display:flex;align-items:center;gap:5px;}
-  .lp-stars{color:#f59e0b;letter-spacing:-1px;}
-  .lp-rating-num{font-weight:800;font-size:15px;}
-  .lp-rating-count{color:#9ca3af;font-size:11px;}
-  .lp-reviews{display:flex;flex-direction:column;gap:10px;}
-  .lp-review{padding:16px;}
-  .lp-review-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
-  .lp-review-info{display:flex;align-items:center;gap:10px;}
-  .lp-avatar{width:36px;height:36px;border-radius:50%;background:#16a34a;
-    color:#fff;display:flex;align-items:center;justify-content:center;
-    font-weight:800;font-size:14px;flex-shrink:0;}
-  .lp-review-name{font-weight:700;color:#111827;font-size:13px;margin-bottom:1px;}
-  .lp-review-city{color:#9ca3af;font-size:11px;}
-  .lp-review-text{color:#374151;font-size:clamp(12px,3.5vw,13px);
-    line-height:1.65;margin-bottom:8px;}
-  .lp-verified{color:#16a34a;font-size:11px;font-weight:600;}
-
-  /* ── Bundle offers ── */
-  .lp-bundles{display:flex;flex-direction:column;gap:10px;}
-  .lp-bundle{
-    display:flex;justify-content:space-between;align-items:center;
-    position:relative;background:#fff;border:2px solid #e5e7eb;
-    border-radius:14px;padding:14px 16px;text-decoration:none;
-    transition:border-color .15s;
-  }
-  .lp-bundle--pop{background:#16a34a;border-color:#16a34a;}
-  .lp-bundle-badge{
-    position:absolute;top:-11px;right:14px;
-    background:#f59e0b;color:#fff;font-size:10px;font-weight:700;
-    padding:2px 10px;border-radius:9999px;
-    font-family:var(--font-cairo),sans-serif;
-  }
-  .lp-bundle-left{display:flex;flex-direction:column;gap:4px;}
-  .lp-bundle-label{font-weight:700;font-size:clamp(12px,3.5vw,14px);color:#111827;}
-  .lp-bundle--pop .lp-bundle-label{color:#fff;}
-  .lp-bundle-tag{
-    background:#dcfce7;color:#15803d;font-size:11px;
-    font-weight:600;padding:2px 8px;border-radius:9999px;
-    display:inline-block;width:fit-content;
-  }
-  .lp-bundle-tag--pop{background:rgba(255,255,255,.2);color:#fff;}
-  .lp-bundle-price{font-size:clamp(18px,5vw,21px);font-weight:900;color:#16a34a;}
-  .lp-bundle--pop .lp-bundle-price{color:#fff;}
-  .lp-bundle-price small{font-size:11px;}
-
-  /* ── Final CTA ── */
-  .lp-final-title{color:#fff;font-size:clamp(17px,4.5vw,20px);
-    font-weight:800;margin-bottom:4px;}
-  .lp-final-sub{color:rgba(255,255,255,.8);font-size:13px;margin-bottom:18px;}
-
-  /* ── Floating pill CTA (mobile): apparaît après 25% de scroll, disparaît
-       quand le formulaire de commande est visible — géré en JS plus bas ── */
-  .lp-sticky{
-    position:fixed;bottom:16px;left:0;right:0;z-index:50;
-    display:flex;justify-content:center;
-    transform:translateY(120%);opacity:0;
-    transition:transform .3s ease-out,opacity .3s ease-out;
-    pointer-events:none;
-  }
-  .lp-sticky.lp-sticky-show{transform:translateY(0);opacity:1;pointer-events:auto;}
-  .lp-sticky-pill{
-    display:flex;align-items:center;gap:10px;
-    background:linear-gradient(135deg,#f7d264,#d4a017);color:#1a1400;
-    padding:12px 22px;border-radius:9999px;text-decoration:none;
-    box-shadow:0 8px 24px -4px rgba(184,134,11,.5),0 2px 8px rgba(0,0,0,.15);
-    font-family:var(--font-cairo),sans-serif;
-  }
-  .lp-sticky-cart{font-size:18px;}
-  .lp-sticky-texts{display:flex;flex-direction:column;line-height:1.2;}
-  .lp-sticky-cta-text{font-size:14px;font-weight:800;}
-  .lp-sticky-cod-text{font-size:9px;font-weight:600;opacity:.75;}
-  @media (prefers-reduced-motion: no-preference) {
-    .lp-sticky-pill{animation:lpCtaPulse 2.2s ease-in-out infinite;}
-  }
-
-  /* ── Desktop adjustments ── */
-  @media(min-width:640px){
-    .lp-sticky{display:none!important}
-    .lp-footer{margin-bottom:0}
-    .lp-h1{font-size:28px;}
-    .lp-h2{font-size:22px;}
-    .lp-section,.lp-section--gray,.lp-section--green-light{padding:36px 0}
-    .lp-hero{padding-bottom:36px}
-    .lp-grid-2{gap:14px}
-    .lp-grid-3{grid-template-columns:1fr 1fr 1fr;gap:14px}
-    .lp-card{padding:20px}
-  }
-  @media(min-width:900px){
-    .lp-wrap{max-width:640px}
-    .lp-img-wrap{max-width:520px;margin-left:auto;margin-right:auto;}
-    .lp-price-card{max-width:520px;margin-left:auto;margin-right:auto;margin-bottom:18px;}
-    .lp-story .lp-wrap{flex-direction:row;max-width:900px;align-items:stretch;}
-    .lp-story-col{flex:1;}
-  }
+const CSS = `
+html{scroll-behavior:smooth}
+body{margin:0;background:#fff}
+.sp{color:#111;font-family:var(--font-cairo),sans-serif;padding-bottom:84px}
+.sp-top{background:#111;color:#fff;text-align:center;font-size:13px;font-weight:700;padding:7px 10px}
+.sp-wrap{max-width:560px;margin:0 auto;padding:0 16px}
+.sp-main{display:block;width:100%;aspect-ratio:1/1;object-fit:contain;background:#f6f6f6;border-radius:14px;margin-top:12px}
+.sp-title{font-size:22px;line-height:1.5;font-weight:800;text-align:center;margin:16px 0 6px}
+.sp-price{display:flex;justify-content:center;align-items:baseline;gap:10px;margin-bottom:14px}
+.sp-now{color:#15803d;font-size:30px;font-weight:900}
+.sp-old{color:#9ca3af;text-decoration:line-through;font-size:16px}
+.sp-card{border:2px solid #f59e0b;border-radius:16px;padding:16px 14px;background:#fff;box-shadow:0 6px 24px rgba(0,0,0,.06)}
+.sp-card-h{text-align:center;font-weight:800;font-size:17px;margin:0 0 12px}
+.sp-note{text-align:center;color:#15803d;font-size:12.5px;font-weight:700;margin:10px 0 0}
+.sp-story{margin:26px 0 0;text-align:center}
+.sp-story p{font-size:16px;font-weight:700;line-height:1.7;margin:0 0 10px}
+.sp-story img{display:block;width:100%;border-radius:14px}
+.sp-cust{margin-top:30px;text-align:center}
+.sp-cust h2{font-size:19px;font-weight:800;margin:0 0 12px}
+.sp-cust-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.sp-cust-grid img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px}
+.sp-btn{display:block;margin:28px 0 8px;background:#f59e0b;color:#fff;text-align:center;font-weight:800;font-size:18px;padding:15px;border-radius:12px;text-decoration:none}
+.sp-foot{text-align:center;font-size:12px;color:#6b7280;padding:24px 16px 10px;line-height:2}
+.sp-foot a{color:#6b7280}
+.sp-sticky{position:fixed;left:12px;right:12px;bottom:12px;z-index:50;background:#16a34a;color:#fff;text-align:center;font-weight:800;font-size:17px;padding:14px;border-radius:12px;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.25);transition:opacity .2s,transform .2s}
+.sp-sticky.sp-hide{opacity:0;transform:translateY(120%);pointer-events:none}
+@media (min-width:900px){.sp-sticky{max-width:520px;margin:0 auto}}
 `;
