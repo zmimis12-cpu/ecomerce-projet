@@ -2,7 +2,7 @@ import type { StoreProduct } from "@/lib/store/catalog";
 
 /** « منتجات أخرى قد تعجبك » — autres produits de la boutique (page produit / accueil). */
 export function CrossSell({ products, exclude, title = "منتجات أخرى قد تعجبك" }: { products: StoreProduct[]; exclude?: string; title?: string }) {
-  const list = products.filter((p) => p.slug !== exclude).slice(0, 6);
+  const list = products.filter((p) => p.visible && p.slug !== exclude).slice(0, 6);
   if (!list.length) return null;
   return (
     <section dir="rtl" className="bg-[#faf7f0] px-3 py-8">

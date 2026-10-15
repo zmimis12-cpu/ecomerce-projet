@@ -10,7 +10,7 @@ import { HajtekLogo } from "@/components/brand/logo";
 
 export type HeaderProduct = { slug: string; title: string; image: string | null; price: number };
 
-export function StoreHeader(_props: { products?: HeaderProduct[]; current?: string }) {
+export function StoreHeader({ announcement }: { products?: HeaderProduct[]; current?: string; announcement?: string }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -27,9 +27,13 @@ export function StoreHeader(_props: { products?: HeaderProduct[]; current?: stri
           </button>
           <Link href="/" aria-label="HajtekZone" dir="ltr"><HajtekLogo tone="light" sub={null} /></Link>
         </div>
-        <div className="flex items-center justify-center gap-4 bg-neutral-900 px-3 py-1.5 text-[11px] font-semibold text-[#F3D98B]">
-          <span className="flex items-center gap-1"><Truck className="h-3.5 w-3.5" /> توصيل لجميع المدن</span>
-          <span className="flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5" /> الدفع عند الاستلام</span>
+        <div className="flex items-center justify-center gap-4 bg-neutral-900 px-3 py-1.5 text-center text-[11px] font-semibold text-[#F3D98B]">
+          {announcement?.trim() ? <span>{announcement}</span> : (
+            <>
+              <span className="flex items-center gap-1"><Truck className="h-3.5 w-3.5" /> توصيل لجميع المدن</span>
+              <span className="flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5" /> الدفع عند الاستلام</span>
+            </>
+          )}
         </div>
       </header>
 

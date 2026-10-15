@@ -78,7 +78,7 @@ const ADMIN_NAV: NavGroup[] = [
       { href: "/admin/ads/rules",     label: "Règles auto pub",   icon: Wand2 },
       { href: "/admin/ads/tiktok",    label: "Dépenses TikTok",   icon: Music2 },
       { href: "/admin/landing-pages", label: "Landing pages",     icon: Globe },
-      { href: "/admin/store",         label: "Boutique & upsells", icon: Store },
+      { href: "/admin/store",         label: "Boutique",          icon: Store },
       { href: "/admin/creatives",     label: "Vidéos & éditeurs", icon: Clapperboard },
     ],
   },

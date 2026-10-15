@@ -6,10 +6,12 @@
  */
 import { unstable_cache } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { readStoreConfig } from "./config";
 
 export type StoreProduct = {
   productId: string; slug: string; title: string; image: string | null;
   price: number; oldPrice: number | null;
+  visible: boolean; featured: boolean; order: number;
 };
 export type BumpConfig = { product_id: string; price: number; label?: string };
 export type StoreBump = { productId: string; name: string; image: string | null; price: number; oldPrice: number | null; label: string | null };
@@ -22,9 +24,10 @@ export const getStoreProducts = unstable_cache(async (): Promise<StoreProduct[]>
     .filter((l) => l.product_id);
   const ids = [...new Set(list.map((l) => l.product_id!))];
   if (!ids.length) return [];
-  const [{ data: imgs }, { data: prods }] = await Promise.all([
+  const [{ data: imgs }, { data: prods }, cfg] = await Promise.all([
     supabaseAdmin.from("product_images").select("product_id, public_url, is_primary, display_order").in("product_id", ids),
     supabaseAdmin.from("products").select("id, sale_price_mad, is_active").in("id", ids),
+    readStoreConfig(),
   ]);
   const img = new Map<string, string>();
   for (const i of ((imgs ?? []) as { product_id: string; public_url: string; is_primary: boolean }[]))
@@ -45,10 +48,13 @@ export const getStoreProducts = unstable_cache(async (): Promise<StoreProduct[]>
       image: img.get(l.product_id!) || l.hero_image || null,
       price: one ? Number(one.price) : price.get(l.product_id!)!,
       oldPrice: old,
+      visible: cfg.products[l.product_id!]?.visible !== false,
+      featured: !!cfg.products[l.product_id!]?.featured,
+      order: cfg.products[l.product_id!]?.order ?? 1000 + out.length,
     });
   }
-  return out;
-}, ["store-products-v2"], { revalidate: 300, tags: ["store"] });
+  return out.sort((a, b) => a.order - b.order);
+}, ["store-products-v3"], { revalidate: 300, tags: ["store"] });
 
 export async function getBumpConfig(): Promise<Record<string, BumpConfig[]>> {
   const { data } = await supabaseAdmin.from("app_settings").select("value").eq("key", "store_bumps").maybeSingle();

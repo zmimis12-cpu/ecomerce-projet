@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Truck, ShieldCheck, PhoneCall, RefreshCcw } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getStoreProducts } from "@/lib/store/catalog";
+import { getStoreConfig } from "@/lib/store/config";
 import { StoreHeader } from "@/components/store/store-header";
 import { ProductCard } from "@/components/store/cross-sell";
 import { Cairo } from "next/font/google";
@@ -11,7 +12,8 @@ import { Cairo } from "next/font/google";
 const cairo = Cairo({ subsets: ["arabic", "latin"], weight: ["400", "600", "700", "800", "900"], variable: "--font-cairo", display: "swap" });
 
 /**
- * Boutique HajtekZone — page d'accueil publique (catalogue + confiance).
+ * Boutique HajtekZone — page d'accueil publique, pilotée depuis
+ * Admin → Marketing → Boutique (textes, bannière, produits visibles / mis en avant / ordre).
  * Un membre de l'équipe déjà connecté est envoyé directement sur /admin.
  */
 export const metadata: Metadata = {
@@ -29,55 +31,76 @@ export default async function HomePage() {
   } catch (e) {
     if ((e as { digest?: string })?.digest?.startsWith("NEXT_REDIRECT")) throw e;
   }
-  const products = await getStoreProducts().catch(() => []);
+  const [all, cfg] = await Promise.all([getStoreProducts().catch(() => []), getStoreConfig()]);
+  const products = all.filter((p) => p.visible);
+  const featured = products.filter((p) => p.featured);
+  const wa = cfg.whatsapp.replace(/\D/g, "");
+  const waIntl = !wa ? "" : wa.startsWith("0") ? `212${wa.slice(1)}` : wa;
 
   return (
     <main dir="rtl" lang="ar" className={`${cairo.variable} min-h-screen bg-white text-neutral-900`} style={{ fontFamily: "var(--font-cairo), sans-serif" }}>
-      <StoreHeader products={products.map((p) => ({ slug: p.slug, title: p.title, image: p.image, price: p.price }))} />
+      <StoreHeader announcement={cfg.announcement} />
 
-      {/* Hero */}
+      {/* Bannière */}
       <section className="relative overflow-hidden bg-neutral-950 text-white">
-        <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#D4A93F]/25 blur-3xl" />
+        {cfg.heroImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={cfg.heroImage} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />
+        ) : (
+          <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#D4A93F]/25 blur-3xl" />
+        )}
         <div className="relative mx-auto max-w-5xl px-4 py-12 text-center sm:py-16">
           <p className="mb-2 text-xs font-bold tracking-widest text-[#F3D98B]">HAJTEK ZONE</p>
-          <h1 className="text-[26px] font-black leading-tight sm:text-4xl">منتجات عملية لحياة أسهل</h1>
-          <p className="mx-auto mt-3 max-w-md text-sm text-white/70">اختر منتجك، أكد طلبك فالهاتف، وخلص غير ملي يوصلك. توصيل لجميع مدن المغرب.</p>
-          <a href="#products" className="mt-6 inline-block rounded-full bg-gradient-to-r from-[#F3D98B] to-[#B8860B] px-7 py-3 text-sm font-extrabold text-neutral-900 shadow-lg transition hover:scale-[1.03]">تسوق الآن</a>
+          <h1 className="text-[26px] font-black leading-tight sm:text-4xl">{cfg.heroTitle}</h1>
+          {cfg.heroSubtitle && <p className="mx-auto mt-3 max-w-md text-sm text-white/75">{cfg.heroSubtitle}</p>}
+          {cfg.heroCta && (
+            <a href={featured.length ? "#featured" : "#products"} className="mt-6 inline-block rounded-full bg-gradient-to-r from-[#F3D98B] to-[#B8860B] px-7 py-3 text-sm font-extrabold text-neutral-900 shadow-lg transition hover:scale-[1.03]">{cfg.heroCta}</a>
+          )}
         </div>
       </section>
 
-      {/* Confiance */}
-      <section className="border-b bg-[#faf7f0]">
-        <div className="mx-auto grid max-w-5xl grid-cols-2 gap-3 px-4 py-5 text-center text-[12px] font-bold sm:grid-cols-4">
-          {[
-            { i: Truck, t: "توصيل 24–72 ساعة" },
-            { i: ShieldCheck, t: "الدفع عند الاستلام" },
-            { i: PhoneCall, t: "تأكيد بالهاتف" },
-            { i: RefreshCcw, t: "استبدال إلا كان عيب" },
-          ].map(({ i: I, t }) => (
-            <div key={t} className="flex flex-col items-center gap-1.5 rounded-xl bg-white p-3 shadow-sm">
-              <I className="h-5 w-5 text-[#B8860B]" />{t}
-            </div>
-          ))}
-        </div>
-      </section>
+      {cfg.showTrust && (
+        <section className="border-b bg-[#faf7f0]">
+          <div className="mx-auto grid max-w-5xl grid-cols-2 gap-3 px-4 py-5 text-center text-[12px] font-bold sm:grid-cols-4">
+            {[
+              { i: Truck, t: "توصيل 24–72 ساعة" },
+              { i: ShieldCheck, t: "الدفع عند الاستلام" },
+              { i: PhoneCall, t: "تأكيد بالهاتف" },
+              { i: RefreshCcw, t: "استبدال إلا كان عيب" },
+            ].map(({ i: I, t }) => (
+              <div key={t} className="flex flex-col items-center gap-1.5 rounded-xl bg-white p-3 shadow-sm">
+                <I className="h-5 w-5 text-[#B8860B]" />{t}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
-      {/* Produits */}
+      {featured.length > 0 && (
+        <section id="featured" className="mx-auto max-w-5xl px-3 pt-8">
+          <h2 className="mb-4 text-center text-xl font-extrabold">{cfg.featuredTitle}</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {featured.map((p) => <ProductCard key={p.slug} p={p} />)}
+          </div>
+        </section>
+      )}
+
       <section id="products" className="mx-auto max-w-5xl px-3 py-8">
-        <h2 className="mb-4 text-center text-xl font-extrabold">منتجاتنا</h2>
+        <h2 className="mb-4 text-center text-xl font-extrabold">{cfg.allTitle}</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {products.map((p) => <ProductCard key={p.slug} p={p} />)}
         </div>
       </section>
 
-      {/* Entreprise (FR/EN — exigé par Meta / TikTok) */}
-      <section dir="ltr" className="bg-neutral-50">
-        <div className="mx-auto max-w-5xl px-4 py-8 text-sm leading-relaxed text-neutral-600">
-          <h3 className="mb-2 text-base font-bold text-neutral-900">About HajtekZone</h3>
-          <p>HajtekZone is an online store operated by <b>ODT Deals</b>. We sell practical home, wellness and tech products in Morocco,
-            delivered by professional carriers and paid in cash on delivery. Contact: <a className="underline" href="mailto:contact@hajtek.ma">contact@hajtek.ma</a>.</p>
-        </div>
-      </section>
+      {cfg.showAbout && (
+        <section dir="ltr" className="bg-neutral-50">
+          <div className="mx-auto max-w-5xl px-4 py-8 text-sm leading-relaxed text-neutral-600">
+            <h3 className="mb-2 text-base font-bold text-neutral-900">About HajtekZone</h3>
+            <p>HajtekZone is an online store operated by <b>ODT Deals</b>. We sell practical home, wellness and tech products in Morocco,
+              delivered by professional carriers and paid in cash on delivery. Contact: <a className="underline" href={`mailto:${cfg.contactEmail}`}>{cfg.contactEmail}</a>.</p>
+          </div>
+        </section>
+      )}
 
       <footer className="bg-neutral-950 px-4 py-8 text-center text-[12px] text-neutral-400">
         <div className="mb-3 flex flex-wrap justify-center gap-x-4 gap-y-1 text-neutral-300">
@@ -89,6 +112,13 @@ export default async function HomePage() {
         </div>
         © {new Date().getFullYear()} HajtekZone · ODT Deals
       </footer>
+
+      {waIntl && (
+        <a href={`https://wa.me/${waIntl}`} target="_blank" rel="noopener" aria-label="WhatsApp"
+          className="fixed bottom-4 left-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-2xl text-white shadow-lg">
+          <svg viewBox="0 0 24 24" className="h-7 w-7 fill-white"><path d="M17.5 14.4c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.7.1-.2.3-.8.9-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5c.2-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3.1 4.9 4.3 2.4 1 2.9.8 3.4.7.6-.1 1.7-.7 2-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3zM12 2a10 10 0 0 0-8.6 15l-1.4 5 5.1-1.3A10 10 0 1 0 12 2z"/></svg>
+        </a>
+      )}
     </main>
   );
 }
