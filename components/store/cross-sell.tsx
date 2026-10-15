@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { StoreProduct } from "@/lib/store/catalog";
 
 /** « منتجات أخرى قد تعجبك » — autres produits de la boutique (page produit / accueil). */
@@ -20,7 +19,10 @@ export function CrossSell({ products, exclude, title = "منتجات أخرى ق
 export function ProductCard({ p }: { p: StoreProduct }) {
   const pct = p.oldPrice && p.oldPrice > p.price ? Math.round((1 - p.price / p.oldPrice) * 100) : 0;
   return (
-    <Link href={`/lp/${p.slug}`}
+    // <a> (rechargement complet) et pas <Link> : la page produit doit exécuter
+    // ses scripts (pixel PageView/ViewContent + animations d'apparition).
+    // eslint-disable-next-line @next/next/no-html-link-for-pages
+    <a href={`/lp/${p.slug}`}
       className="group block overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
       <div className="relative aspect-square bg-neutral-100">
         {p.image && /* eslint-disable-next-line @next/next/no-img-element */ <img src={p.image} alt={p.title} loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" />}
@@ -34,6 +36,6 @@ export function ProductCard({ p }: { p: StoreProduct }) {
         </div>
         <span className="mt-2 block rounded-full bg-neutral-900 py-1.5 text-center text-[12px] font-bold text-white transition group-hover:bg-[#B8860B]">اطلب الآن</span>
       </div>
-    </Link>
+    </a>
   );
 }
