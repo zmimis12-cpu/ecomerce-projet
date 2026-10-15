@@ -253,7 +253,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
       {/* Honeypot */}
       <input type="text" name="website" value={form.website}
         onChange={(e) => set("website", e.target.value)}
-        style={{ position:"absolute", left:"-9999px", opacity:0 }}
+        style={{ position:"absolute", width:1, height:1, overflow:"hidden", clip:"rect(0 0 0 0)", opacity:0, pointerEvents:"none" }}
         tabIndex={-1} aria-hidden="true" />
 
       {/* Offres (masquées s'il n'y a qu'une seule offre) */}

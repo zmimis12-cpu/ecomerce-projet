@@ -169,9 +169,9 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 }
 
 const CSS = `
-html{scroll-behavior:smooth}
-body{margin:0;background:#fff}
-.sp{color:#111;font-family:var(--font-cairo),sans-serif;padding-bottom:84px}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;overflow-x:hidden}
+body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
+.sp{overflow-x:hidden;width:100%;max-width:100vw;color:#111;font-family:var(--font-cairo),sans-serif;padding-bottom:84px}
 .sp-top{background:#111;color:#fff;text-align:center;font-size:13px;font-weight:700;padding:7px 10px}
 .sp-wrap{max-width:560px;margin:0 auto;padding:0 16px}
 .sp-main{display:block;width:100%;aspect-ratio:1/1;object-fit:contain;background:#f6f6f6;border-radius:14px;margin-top:12px}
