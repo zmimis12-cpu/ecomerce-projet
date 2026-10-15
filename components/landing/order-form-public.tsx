@@ -40,9 +40,11 @@ interface Props {
   variants?: {name:string; options:{label:string; image?:string}[]}[];
   pixelId?: string;
   tiktokPixelId?: string;
+  /** Upsells « en même temps » (order bump) : produits à ajouter en 1 clic */
+  bumps?: { productId: string; name: string; image: string | null; price: number; oldPrice: number | null; label: string | null }[];
 }
 
-export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId }: Props) {
+export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [] }: Props) {
   const [isPending, startTransition] = useTransition();
   useEffect(() => { getCreativeCode(); }, []); // mémorise ?cr= dès l'arrivée
   const [submitted, setSubmitted]    = useState(false);
@@ -78,7 +80,14 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   const offers: Offer[] = offersProp?.length ? offersProp : normalizeOffers([], { price: b1, b1, b2, b3 });
   const [offerId, setOfferId] = useState<string>(() => (offers.find((o) => o.isDefault) ?? offers[0]).id);
   const offer = offers.find((o) => o.id === offerId) ?? offers[0];
-  const total = offer.price;
+  const baseTotal = offer.price;
+  const [pickedBumps, setPickedBumps] = useState<string[]>([]);
+  const bumpTotal = bumps.filter((b) => pickedBumps.includes(b.productId)).reduce((t, b) => t + b.price, 0);
+  const total = baseTotal + bumpTotal;
+  function toggleBump(id: string) {
+    trackInitiateCheckoutOnce();
+    setPickedBumps((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
+  }
   const activeVariants = variants.filter(v => v.options.some(o => o.label.trim()));
 
   // Pré-remplit chaque pièce avec une couleur différente (pièce 1 = 1re couleur,
@@ -144,7 +153,8 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
             ...form,
             quantity:     offer.qty,
             offer_id:     offer.id,
-            bundle_price: total,   // send the bundle total so API applies correct pricing
+            bundle_price: baseTotal,   // prix de l'offre seule (les upsells sont recalculés côté serveur)
+            bumps:        pickedBumps,
             variants:     selectedVariants.slice(0, bundle),
             product_id:   product.id,
             product_slug: productSlug,
@@ -454,6 +464,38 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         )}
         {ERR(errors.customer_city)}
       </div>
+
+      {/* Upsell « en même temps » (order bump) */}
+      {bumps.length > 0 && (
+        <div style={{ marginBottom:"14px" }}>
+          <p style={{ fontSize:"13px", fontWeight:800, color:"#111827", marginBottom:"8px" }}>🎁 أضف لطلبك بثمن خاص</p>
+          <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+            {bumps.map((b) => {
+              const on = pickedBumps.includes(b.productId);
+              return (
+                <button key={b.productId} type="button" onClick={() => toggleBump(b.productId)}
+                  style={{ display:"flex", alignItems:"center", gap:"10px", width:"100%", textAlign:"right",
+                    padding:"8px", borderRadius:"12px", cursor:"pointer", background: on ? "#fffbeb" : "#fff",
+                    border: on ? "2px solid #d4a017" : "2px dashed #e5e7eb", transition:"all .15s",
+                    fontFamily:"var(--font-cairo),sans-serif" }}>
+                  <span style={{ width:"22px", height:"22px", borderRadius:"6px", flexShrink:0,
+                    border: on ? "none" : "2px solid #d1d5db", background: on ? "#d4a017" : "#fff",
+                    color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"14px", fontWeight:900 }}>{on ? "✓" : ""}</span>
+                  {b.image && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={b.image} alt="" loading="lazy" style={{ width:"48px", height:"48px", borderRadius:"8px", objectFit:"cover", flexShrink:0 }} />
+                  )}
+                  <span style={{ flex:1, minWidth:0 }}>
+                    <span style={{ display:"block", fontSize:"13px", fontWeight:700, color:"#111827", lineHeight:1.35 }}>{b.label || b.name}</span>
+                    <span style={{ fontSize:"14px", fontWeight:900, color:"#b8860b" }}>+{b.price} درهم </span>
+                    {b.oldPrice && <span style={{ fontSize:"11px", color:"#9ca3af", textDecoration:"line-through" }}>{b.oldPrice} درهم</span>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Total */}
       <div style={{ borderRadius:"12px", background:"#f0fdf4",

@@ -14,6 +14,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { validateOrderInput, isHoneypotTriggered } from "@/lib/public/validation";
 import { checkRateLimit, recordRequest, getClientIp, hashIp } from "@/lib/public/rate-limit";
 import { findAvailableAgent } from "@/lib/orders/auto-assign";
+import { getBumpConfig } from "@/lib/store/catalog";
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
@@ -200,7 +201,33 @@ export async function POST(request: NextRequest) {
   }
 
   // Livraison / pub / confirmation comptées UNE fois par commande, pas par pièce
-  const cogs      = orderCost(p, qty).total;
+  let cogs        = orderCost(p, qty).total;
+
+  // ── Upsells « en même temps » (order bumps) ───────────────────────────────
+  // Prix et produits lus dans la config du vendeur (app_settings.store_bumps),
+  // jamais ceux envoyés par le navigateur.
+  type BumpItem = { id: string; name: string; sku: string; price: number; unitCost: number };
+  const bumpItems: BumpItem[] = [];
+  const wantedBumps = Array.isArray((body as Record<string, unknown>).bumps)
+    ? ((body as Record<string, unknown>).bumps as unknown[]).map(String).slice(0, 5) : [];
+  if (wantedBumps.length) {
+    const cfg = ((await getBumpConfig())[p.id] ?? []).filter((c) => wantedBumps.includes(c.product_id) && Number(c.price) > 0);
+    if (cfg.length) {
+      const { data: bp } = await supabaseAdmin.from("products")
+        .select("id, name, sku, sale_price_mad, total_cost_mad, ads_cost_mad, confirmation_cost_mad, shipping_cost_mad, purchase_price_mad, packaging_cost_mad, estimated_profit_mad, slug")
+        .in("id", cfg.map((c) => c.product_id));
+      for (const row of (bp ?? []) as unknown as (typeof p)[]) {
+        const c = cfg.find((x) => x.product_id === row.id)!;
+        // Coût de l'upsell = achat + emballage seulement (même colis, même livraison)
+        const unitCost = row.purchase_price_mad != null
+          ? Number(row.purchase_price_mad) + Number(row.packaging_cost_mad ?? 0)
+          : orderCost(row, 1).unitEffective;
+        bumpItems.push({ id: row.id, name: row.name, sku: row.sku, price: Number(c.price), unitCost });
+      }
+      subtotal += bumpItems.reduce((t, b) => t + b.price, 0);
+      cogs     += bumpItems.reduce((t, b) => t + b.unitCost, 0);
+    }
+  }
   const estProfit = subtotal - cogs;
 
   // ── 5. Duplicate detection ────────────────────────────────────────────────────
@@ -279,7 +306,8 @@ export async function POST(request: NextRequest) {
   // unit_price = prix EFFECTIF (prix bundle réel ÷ quantité), pas le prix
   // catalogue brut — sinon l'affichage (unit_price × qté) montre un total
   // différent du vrai total de la commande (ex: 298 affiché vs 249 réel).
-  const effectiveUnitPrice = Math.round((subtotal / qty) * 100) / 100;
+  const bumpsTotal = bumpItems.reduce((t, b) => t + b.price, 0);
+  const effectiveUnitPrice = Math.round(((subtotal - bumpsTotal) / qty) * 100) / 100;
   await supabaseAdmin.from("order_items").insert({
     order_id:      orderId,
     product_id:    p.id,
@@ -290,6 +318,12 @@ export async function POST(request: NextRequest) {
     quantity:      qty,
     discount_pct:  0,
   } as never);
+  if (bumpItems.length) {
+    await supabaseAdmin.from("order_items").insert(bumpItems.map((b) => ({
+      order_id: orderId, product_id: b.id, product_name: `${b.name} (عرض إضافي)`, product_sku: b.sku,
+      unit_price: b.price, unit_cost_mad: b.unitCost, quantity: 1, discount_pct: 0,
+    })) as never);
+  }
 
   // ── 9. Log rate limit entry ───────────────────────────────────────────────────
   after(() => recordRequest(ip)); // ne bloque plus la réponse

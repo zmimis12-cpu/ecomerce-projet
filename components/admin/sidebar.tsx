@@ -7,7 +7,7 @@ import {
   Truck, Layers, FileText, FolderOpen,
   ScanLine, RotateCcw, BarChart3, Globe, Settings,
   Shield, Award, Users, ListOrdered, CreditCard, Clapperboard, PackageCheck, Wallet, Calculator, Rocket,
-  ChevronDown, Megaphone, Landmark, Menu, X, Boxes, Wand2, Music2,
+  ChevronDown, Megaphone, Landmark, Menu, X, Boxes, Wand2, Music2, Store,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/lib/settings/users-constants";
@@ -78,6 +78,7 @@ const ADMIN_NAV: NavGroup[] = [
       { href: "/admin/ads/rules",     label: "Règles auto pub",   icon: Wand2 },
       { href: "/admin/ads/tiktok",    label: "Dépenses TikTok",   icon: Music2 },
       { href: "/admin/landing-pages", label: "Landing pages",     icon: Globe },
+      { href: "/admin/store",         label: "Boutique & upsells", icon: Store },
       { href: "/admin/creatives",     label: "Vidéos & éditeurs", icon: Clapperboard },
     ],
   },

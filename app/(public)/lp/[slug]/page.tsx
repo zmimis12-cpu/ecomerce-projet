@@ -11,6 +11,10 @@ import { CountdownTimer } from "@/components/landing/countdown-timer";
 import { FaqAccordion } from "@/components/landing/faq-accordion";
 import { ProductGallery } from "@/components/landing/product-gallery";
 import type { LPSection } from "@/lib/templates";
+import Link from "next/link";
+import { getStoreProducts, getBumpsFor } from "@/lib/store/catalog";
+import { StoreHeader } from "@/components/store/store-header";
+import { CrossSell } from "@/components/store/cross-sell";
 
 // Servie depuis le cache CDN (instantané) et régénérée au plus toutes les 60 s
 // → une modification dans l'éditeur est visible en ligne en moins d'une minute.
@@ -99,6 +103,12 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
   if (!page) notFound();
 
+  // Boutique : menu produits + upsells « en même temps » (cache 2–5 min)
+  const [storeProducts, bumps] = await Promise.all([
+    getStoreProducts().catch(() => []),
+    getBumpsFor(page.product.id).catch(() => []),
+  ]);
+
   // Vues comptées par le navigateur (/api/public/lp-view) : la page est en cache CDN.
 
   // Load Digylog cities from cached settings (updated via sync in admin)
@@ -123,7 +133,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const offerBar  = String(lp.offer_text       ?? "");
   const ctaText   = String(lp.cta_text         ?? "اطلب الآن");
   const storeName    = lp.store_name as string | null;
-  const storeLogoUrl = lp.store_logo_url as string | null;
   const heroImage    = lp.hero_image as string | null;
   const oldPriceNum = Number(lp.old_price_num) || price * 1.3;
   const oldPrice  = String(lp.old_price_text   ?? `${oldPriceNum.toFixed(0)} درهم`);
@@ -302,16 +311,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         {/* ── URGENCY TOP BAR ── */}
         <CountdownTimer variant="topbar" />
 
-        {/* ── STORE BRANDING (confiance client) ── */}
-        {(storeLogoUrl || storeName) && (
-          <div className="lp-store-brand">
-            {storeLogoUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={storeLogoUrl} alt={storeName ?? ""} className="lp-store-logo" decoding="async" />
-            )}
-            {storeName && <span className="lp-store-name">{storeName}</span>}
-          </div>
-        )}
+        {/* ── EN-TÊTE BOUTIQUE (logo + menu de tous les produits) ── */}
+        <StoreHeader current={slug} products={storeProducts.map((x) => ({ slug: x.slug, title: x.title, image: x.image, price: x.price }))} />
 
         {/* ── OFFER BAR ── */}
         {offerBar && (
@@ -382,6 +383,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                 pixelId={page.meta_pixel_id?.trim() || undefined}
                 tiktokPixelId={page.tiktok_pixel_id?.trim() || undefined}
                 variants={(Array.isArray(lp.variant_options) ? lp.variant_options : []) as { name: string; options: { label: string; image?: string }[] }[]}
+                bumps={bumps}
                 cities={digylogCities.length > 0 ? digylogCities : FALLBACK_CITIES} />
             </div>
 
@@ -656,21 +658,24 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </section>
 
+        {/* ── AUTRES PRODUITS DE LA BOUTIQUE ── */}
+        <CrossSell products={storeProducts} exclude={slug} />
+
         <footer className="lp-footer">
           <div className="lp-footer-social">
             <a href="#" aria-label="Facebook">📘</a>
             <a href="#" aria-label="Instagram">📷</a>
             <a href="#" aria-label="TikTok">🎵</a>
           </div>
-          {!!storeName && <h3 className="lp-footer-about-title">من نحن — {storeName}</h3>}
+          <h3 className="lp-footer-about-title">من نحن — {storeName || "HajtekZone"}</h3>
           <p className="lp-footer-about-text">
             نحرص على توفير منتجات عملية ومختارة بعناية لتسهيل حياتك اليومية، مع خدمة توصيل موثوقة وسريعة داخل جميع مدن المغرب.
           </p>
           <div className="lp-footer-links">
-            <span>سياسة الخصوصية</span> · <span>شروط الخدمة</span> · <span>سياسة الاسترجاع</span> · <span>تواصل معنا</span>
+            <Link href="/confidentialite" style={{ color: "inherit" }}>سياسة الخصوصية</Link> · <Link href="/conditions" style={{ color: "inherit" }}>شروط البيع والاسترجاع</Link> · <Link href="/a-propos" style={{ color: "inherit" }}>من نحن</Link> · <Link href="/" style={{ color: "inherit" }}>جميع المنتجات</Link>
           </div>
           <p className="lp-footer-copyright">
-            {storeName ?? "جميع الحقوق محفوظة"} © {new Date().getFullYear()}
+            {storeName || "HajtekZone"} © {new Date().getFullYear()}
           </p>
         </footer>
 
