@@ -38,7 +38,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           <h1 className="flex items-center gap-2 text-xl font-semibold"><Store className="h-5 w-5 text-brand" /> Boutique hajtek.ma</h1>
           <p className="mt-1 text-sm text-muted-foreground">Tout ce que voient tes clients : accueil, produits affichés, ordre, produits mis en avant et upsells.</p>
         </div>
-        <a href="https://hajtek.ma" target="_blank" rel="noopener" className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-2 text-sm font-medium shadow-sm hover:bg-muted">
+        <a href="/?boutique=1" target="_blank" rel="noopener" className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-2 text-sm font-medium shadow-sm hover:bg-muted">
           Voir la boutique <ExternalLink className="h-3.5 w-3.5" />
         </a>
       </div>

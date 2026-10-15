@@ -23,8 +23,10 @@ export const metadata: Metadata = {
 };
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
-  try {
+export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
+  // ?boutique=1 : l'équipe connectée peut voir la boutique comme un client
+  const asClient = (await searchParams).boutique === "1";
+  if (!asClient) try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (user) redirect("/admin");
