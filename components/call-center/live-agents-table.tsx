@@ -69,9 +69,12 @@ export function LiveAgentsTable({ initialAgents }: { initialAgents: AgentStats[]
   }, []);
 
   useEffect(() => {
-    // Poll every 5 seconds
-    const interval = setInterval(refreshAvailability, 5000);
-    return () => clearInterval(interval);
+    // Toutes les 20 s, et seulement si l'onglet est visible (avant : toutes les 5 s même
+    // en arrière-plan → ~17 000 appels serveur par jour et par onglet ouvert = conso Vercel).
+    const interval = setInterval(() => { if (document.visibilityState === "visible") refreshAvailability(); }, 20_000);
+    const onVis = () => { if (document.visibilityState === "visible") refreshAvailability(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", onVis); };
   }, [refreshAvailability]);
 
   if (agents.length === 0) {

@@ -10,7 +10,8 @@ export function LiveRefresh({ fetchedAt }: { fetchedAt: string }) {
   const [, tick] = useState(0);
 
   useEffect(() => {
-    const t = setInterval(() => start(() => router.refresh()), 60_000);
+    // Rafraîchit seulement si l'onglet est visible (un onglet oublié ne consomme plus de serveur)
+    const t = setInterval(() => { if (document.visibilityState === "visible") start(() => router.refresh()); }, 60_000);
     const c = setInterval(() => tick((x) => x + 1), 10_000);
     return () => { clearInterval(t); clearInterval(c); };
   }, [router]);
