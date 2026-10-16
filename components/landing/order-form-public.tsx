@@ -44,9 +44,11 @@ interface Props {
   bumps?: { productId: string; name: string; image: string | null; price: number; oldPrice: number | null; label: string | null }[];
   /** Affiche un champ « العنوان » (facultatif — vide = confirmé par téléphone) */
   askAddress?: boolean;
+  /** Rend le champ adresse obligatoire */
+  addressRequired?: boolean;
 }
 
-export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [], askAddress = false }: Props) {
+export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [], askAddress = false, addressRequired = false }: Props) {
   const [isPending, startTransition] = useTransition();
   useEffect(() => { getCreativeCode(); }, []); // mémorise ?cr= dès l'arrivée
   const [submitted, setSubmitted]    = useState(false);
@@ -140,6 +142,8 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     if (!form.customer_name.trim()) newErrors.customer_name = "الاسم مطلوب";
     if (!form.customer_phone.trim()) newErrors.customer_phone = "رقم الهاتف مطلوب";
     if (!form.customer_city.trim()) newErrors.customer_city = "المدينة مطلوبة";
+    const DEFAULT_ADDR = "سيتم تأكيد العنوان عبر الهاتف";
+    if (askAddress && addressRequired && (!form.customer_address.trim() || form.customer_address === DEFAULT_ADDR)) newErrors.customer_address = "العنوان مطلوب";
     const missingVariant = selectedVariants.slice(0, bundle).some(sel =>
       activeVariants.some(v => !sel[v.name]));
     if (missingVariant) newErrors.variants = bundle > 1
@@ -153,6 +157,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           method:"POST", headers:{"Content-Type":"application/json"},
           body: JSON.stringify({
             ...form,
+            customer_address: form.customer_address.trim() || "سيتم تأكيد العنوان عبر الهاتف",
             quantity:     offer.qty,
             offer_id:     offer.id,
             bundle_price: baseTotal,   // prix de l'offre seule (les upsells sont recalculés côté serveur)
@@ -469,11 +474,12 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
 
       {askAddress && (
         <div style={{ marginBottom:"14px" }}>
-          <label style={LBL}>العنوان</label>
+          <label style={LBL}>العنوان{addressRequired ? " *" : ""}</label>
           <input type="text" autoComplete="street-address"
             placeholder="الحي، الزنقة، رقم المنزل..."
-            onChange={(e) => set("customer_address", e.target.value.trim() || "سيتم تأكيد العنوان عبر الهاتف")}
-            style={INP(false)} />
+            onChange={(e) => set("customer_address", e.target.value)}
+            style={INP(!!errors.customer_address)} />
+          {ERR(errors.customer_address)}
         </div>
       )}
 

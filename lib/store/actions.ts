@@ -49,3 +49,31 @@ export async function saveStoreConfig(cfg: import("./config").StoreConfig): Prom
   revalidatePath("/lp/[slug]", "page");
   return { success: true };
 }
+
+/** Enregistre le design des landing pages (global + réglages par landing page). */
+export async function saveLpDesign(store: import("./lp-design-shared").LpDesignStore): Promise<{ success: boolean; error?: string }> {
+  await requireRole(["super_admin", "admin", "manager"]);
+  const { normalizeDesign } = await import("./lp-design-shared");
+  const clip = (d: import("./lp-design-shared").LpDesign) => {
+    const n = normalizeDesign(d);
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(n)) {
+      if (k === "blocks") out[k] = n.blocks.map((b) => ({ key: b.key, on: !!b.on }));
+      else if (typeof v === "string") out[k] = k.startsWith("color") ? (/^#[0-9a-f]{3,8}$/i.test(v) ? v : "") : v.slice(0, k === "videoUrl" ? 500 : 200);
+      else out[k] = v;
+    }
+    return normalizeDesign(out as Partial<import("./lp-design-shared").LpDesign>);
+  };
+  const clean = {
+    global: clip(store.global),
+    perSlug: Object.fromEntries(Object.entries(store.perSlug ?? {}).filter(([k]) => /^[a-z0-9-]{1,120}$/i.test(k)).map(([k, d]) => [k, clip(d)])),
+  };
+  const { error } = await supabaseAdmin.from("app_settings").upsert(
+    { key: "lp_design", value: JSON.stringify(clean), category: "store", label: "Design des landing pages" } as never,
+    { onConflict: "key" },
+  );
+  if (error) return { success: false, error: error.message };
+  revalidateTag("store");
+  revalidatePath("/lp/[slug]", "page");
+  return { success: true };
+}

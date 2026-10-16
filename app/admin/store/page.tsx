@@ -7,6 +7,8 @@ import { getBumpConfig, getStoreProducts } from "@/lib/store/catalog";
 import { readStoreConfig } from "@/lib/store/config";
 import { StoreBumpsEditor } from "@/components/store/bumps-editor";
 import { StoreSettingsEditor } from "@/components/store/settings-editor";
+import { LpDesignEditor } from "@/components/store/lp-design-editor";
+import { readLpDesign } from "@/lib/store/lp-design";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Boutique" };
@@ -16,16 +18,19 @@ const TABS = [
   { key: "accueil", label: "Accueil & design" },
   { key: "produits", label: "Produits" },
   { key: "upsells", label: "Upsells" },
+  { key: "landing", label: "Landing pages" },
 ] as const;
 
 export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   await requireRole(["super_admin", "admin", "manager"]);
   const tab = (await searchParams).tab ?? "accueil";
-  const [storeProducts, cfg, bumps, { data: all }] = await Promise.all([
+  const [storeProducts, cfg, bumps, { data: all }, lpDesign, { data: lps }] = await Promise.all([
     getStoreProducts(),
     readStoreConfig(),
     getBumpConfig(),
     supabaseAdmin.from("products").select("id, name, sale_price_mad, purchase_price_mad, packaging_cost_mad").eq("is_active", true).order("name"),
+    readLpDesign(),
+    supabaseAdmin.from("landing_pages").select("slug, title").eq("is_active", true).order("title"),
   ]);
   const catalog = ((all ?? []) as { id: string; name: string; sale_price_mad: number; purchase_price_mad: number | null; packaging_cost_mad: number | null }[])
     .map((p) => ({ id: p.id, name: p.name, price: Number(p.sale_price_mad), cost: p.purchase_price_mad != null ? Number(p.purchase_price_mad) + Number(p.packaging_cost_mad ?? 0) : null }));
@@ -52,7 +57,15 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         ))}
       </div>
 
-      {tab === "upsells" ? (
+      {tab === "landing" ? (
+        <>
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Design de toutes tes landing pages <b>/lp/…</b> : sections (ordre, afficher/cacher), textes, options du formulaire, couleurs et vidéo.
+            Règle pour <b>toutes</b> les pages ou pour <b>une seule</b>. Le contenu (titre, prix, offres X1/X2/X3, avantages, avis, FAQ) se modifie dans l&apos;éditeur de chaque landing page.
+          </p>
+          <LpDesignEditor initial={lpDesign} pages={((lps ?? []) as { slug: string; title: string }[])} />
+        </>
+      ) : tab === "upsells" ? (
         <>
           <p className="max-w-2xl text-sm text-muted-foreground">
             Pour chaque produit, jusqu&apos;à 3 produits proposés <b>« en même temps »</b> dans le formulaire (case « 🎁 أضف لطلبك بثمن خاص »).
