@@ -28,6 +28,7 @@ export type LpDesign = {
   askAddress: boolean;
   addressRequired: boolean;
   showWhatsapp: boolean;
+  showWhatsappFloat: boolean;      // bouton WhatsApp rond flottant
   sticky: boolean;
   showFooter: boolean;
   // Textes (vide = texte de la landing page / texte par défaut)
@@ -43,7 +44,7 @@ export type LpDesign = {
 export const DEFAULT_LP_DESIGN: LpDesign = {
   blocks: LP_BLOCKS.map((b) => ({ key: b.key, on: true })),
   heroSource: "product", showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
-  showOldPrice: true, showCodBar: true, askAddress: true, addressRequired: false, showWhatsapp: true,
+  showOldPrice: true, showCodBar: true, askAddress: true, addressRequired: false, showWhatsapp: true, showWhatsappFloat: true,
   sticky: true, showFooter: true,
   topBar: "", badge: "عرض خاص", codBar: "🚚 التوصيل لجميع المدن | الدفع عند الاستلام", orderTitle: "🛒 اطلب الآن", orderSub: "",
   videoTitle: "شاهد كيف يعمل", videoSub: "فيديو توضيحي يبين لك جودة الصورة وسهولة الاستعمال",

@@ -111,6 +111,7 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
           {B("askAddress", "Champ « العنوان » dans le formulaire")}
           {d.askAddress && B("addressRequired", "… adresse obligatoire")}
           {B("showWhatsapp", "Bouton WhatsApp sous le formulaire")}
+          {B("showWhatsappFloat", "Bouton WhatsApp rond flottant (coin de l'écran)")}
           {B("sticky", "Bouton de commande fixe en bas de l'écran")}
           {B("showFooter", "Pied de page (footer)")}
         </div>
