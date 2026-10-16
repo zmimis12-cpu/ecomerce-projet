@@ -19,10 +19,15 @@ type ORow = {
 
 export async function syncDigylogActiveOrders(opts: { max?: number } = {}) {
   const max = opts.max ?? 300;
-  const { data, error } = await supabaseAdmin
+  // Les colis Speedaf sont suivis par lib/delivery/speedaf/sync.ts (pas chez Digylog)
+  const { data: sp } = await supabaseAdmin.from("delivery_companies").select("id").eq("slug", "speedaf").maybeSingle();
+  const speedafId = (sp as { id: string } | null)?.id;
+  let query = supabaseAdmin
     .from("orders")
     .select("id, delivery_tracking_number, delivery_store_id, delivery_external_status_id, delivery_driver_phone, delivery_reported_to")
-    .not("delivery_tracking_number", "is", null)
+    .not("delivery_tracking_number", "is", null);
+  if (speedafId) query = query.or(`delivery_company_id.is.null,delivery_company_id.neq.${speedafId}`);
+  const { data, error } = await query
     .in("status", ["sent_to_delivery", "in_transit", "delivered"])
     .neq("fulfillment_type", "self_delivery")
     .order("delivery_last_sync_at", { ascending: true, nullsFirst: true })

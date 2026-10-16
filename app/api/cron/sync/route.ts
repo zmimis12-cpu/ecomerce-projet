@@ -44,6 +44,10 @@ export async function GET(req: NextRequest) {
   if (!only || only === "digylog") {
     result.digylog = await safe(() => syncDigylogActiveOrders());
   }
+  if (!only || only === "digylog" || only === "speedaf") {
+    const { syncSpeedafActiveOrders } = await import("@/lib/delivery/speedaf/sync");
+    result.speedaf = await safe(() => syncSpeedafActiveOrders());
+  }
   // Gains éditeurs figés dès qu'une commande vidéo est livrée
   result.editorEarnings = await safe(() => snapshotEditorEarnings());
   // Livraisons → Meta (Purchase) + audience "Acheteurs livrés"

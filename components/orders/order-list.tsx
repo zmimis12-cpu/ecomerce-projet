@@ -4,12 +4,14 @@ import Link from "next/link";
 import type { OrderListItem as Order, OrderStatus } from "@/types/orders";
 import { StatusBadge } from "./status-badge";
 import { DigylogStatusBadge } from "@/components/orders/digylog-status-badge";
-import { sendOrderToDigylog, getDigylogLabelUrl } from "@/lib/delivery/shipment-actions";
+import { sendOrderToDigylog } from "@/lib/delivery/shipment-actions";
+import { sendOrderToSpeedaf, getCarrierLabel } from "@/lib/delivery/speedaf/actions";
 import { Send, FileDown, RefreshCw, Package } from "lucide-react";
 
 interface OrderListProps {
   orders:     Order[];
   canManage:  boolean;
+  speedafEnabled?: boolean;
 }
 
 // ── Mini stat card ─────────────────────────────────────────────────────────────
@@ -23,7 +25,7 @@ function Stat({ label, value, color }: { label: string; value: number | string; 
 }
 
 // ── Single row actions ─────────────────────────────────────────────────────────
-function RowActions({ order, canManage }: { order: Order; canManage: boolean }) {
+function RowActions({ order, canManage, speedaf }: { order: Order; canManage: boolean; speedaf?: boolean }) {
   const [isPending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -57,12 +59,28 @@ function RowActions({ order, canManage }: { order: Order; canManage: boolean }) 
         </button>
       )}
 
+      {/* Send to Speedaf */}
+      {canSend && speedaf && (
+        <button type="button" disabled={isPending}
+          onClick={() => {
+            setMsg(null);
+            startTransition(async () => {
+              const r = await sendOrderToSpeedaf(order.id);
+              setMsg(r.success ? `✓ ${r.tracking}` : `✕ ${r.needCity ? "Ville inconnue chez Speedaf — ouvrir la commande" : r.error}`);
+            });
+          }}
+          className="flex items-center gap-1 rounded-md bg-orange-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-orange-700 disabled:opacity-50">
+          <Send className="h-3 w-3" />
+          {isPending ? "…" : "Speedaf"}
+        </button>
+      )}
+
       {/* Download label */}
       {hasTrack && (
         <button type="button" disabled={isPending}
           onClick={() => {
             startTransition(async () => {
-              const r = await getDigylogLabelUrl([order.delivery_tracking_number!]);
+              const r = await getCarrierLabel(order.delivery_tracking_number!);
               if (r.ok && r.blobBase64) downloadPdf(r.blobBase64, `label-${order.delivery_tracking_number}.pdf`);
               else setMsg(r.error ?? "Erreur");
             });
@@ -83,10 +101,11 @@ function RowActions({ order, canManage }: { order: Order; canManage: boolean }) 
 }
 
 // ── Bulk Digylog send ──────────────────────────────────────────────────────────
-function BulkDigylogBar({ selected, orders, onDone }: {
+function BulkDigylogBar({ selected, orders, onDone, speedaf }: {
   selected: string[];
   orders:   Order[];
   onDone:   () => void;
+  speedaf?: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const [results, setResults] = useState<string[]>([]);
@@ -97,12 +116,12 @@ function BulkDigylogBar({ selected, orders, onDone }: {
 
   if (!selected.length) return null;
 
-  function handleBulk() {
+  function handleBulk(carrier: "digylog" | "speedaf" = "digylog") {
     setResults([]);
     startTransition(async () => {
       const msgs: string[] = [];
       for (const ord of eligible) {
-        const r = await sendOrderToDigylog(ord.id);
+        const r = carrier === "speedaf" ? await sendOrderToSpeedaf(ord.id) : await sendOrderToDigylog(ord.id);
         msgs.push(r.success
           ? `✓ ${ord.order_number} → ${r.tracking}`
           : `✕ ${ord.order_number}: ${r.error}`);
@@ -119,10 +138,17 @@ function BulkDigylogBar({ selected, orders, onDone }: {
           {selected.length} sélectionné(s) — {eligible.length} envoyable(s) à Digylog
         </span>
         {eligible.length > 0 && (
-          <button type="button" onClick={handleBulk} disabled={isPending}
+          <button type="button" onClick={() => handleBulk("digylog")} disabled={isPending}
             className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
             <Send className="h-3.5 w-3.5" />
             {isPending ? "Envoi en cours…" : `Envoyer ${eligible.length} à Digylog`}
+          </button>
+        )}
+        {eligible.length > 0 && speedaf && (
+          <button type="button" onClick={() => handleBulk("speedaf")} disabled={isPending}
+            className="flex items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50">
+            <Send className="h-3.5 w-3.5" />
+            {isPending ? "Envoi en cours…" : `Envoyer ${eligible.length} à Speedaf`}
           </button>
         )}
       </div>
@@ -154,7 +180,7 @@ const STATUS_OPTIONS: { value: OrderStatus | "all"; label: string }[] = [
   { value:"cancelled",          label:"Annulé" },
 ];
 
-export function OrderList({ orders, canManage }: OrderListProps) {
+export function OrderList({ orders, canManage, speedafEnabled = false }: OrderListProps) {
   const [statusFilter, setStatus]   = useState<OrderStatus | "all">("all");
   const [search, setSearch]         = useState("");
   const [selected, setSelected]     = useState<string[]>([]);
@@ -232,6 +258,7 @@ export function OrderList({ orders, canManage }: OrderListProps) {
           selected={selected}
           orders={orders}
           onDone={() => { setSelected([]); setSelKey((k) => k + 1); }}
+          speedaf={speedafEnabled}
         />
       )}
 
@@ -324,7 +351,7 @@ export function OrderList({ orders, canManage }: OrderListProps) {
                     </td>
                     {canManage && (
                       <td className="px-4 py-3">
-                        <RowActions order={order} canManage={canManage} />
+                        <RowActions order={order} canManage={canManage} speedaf={speedafEnabled} />
                       </td>
                     )}
                   </tr>

@@ -10,6 +10,8 @@ import { DigylogStatusBadge } from "@/components/orders/digylog-status-badge";
 import { StatusUpdater } from "@/components/orders/status-updater";
 import { AgentAssigner } from "@/components/orders/agent-assigner";
 import { TrackingEditor } from "@/components/orders/tracking-editor";
+import { SpeedafOrderActions } from "@/components/delivery/speedaf-order-actions";
+import { readSpeedafConfig, getSpeedafCompanyId } from "@/lib/delivery/speedaf/config";
 import { ExchangeDialog } from "@/components/orders/exchange-dialog";
 import { ResendWhatsAppButton } from "@/components/whatsapp/resend-whatsapp-button";
 import { ManualWhatsAppPanel } from "@/components/whatsapp/manual-whatsapp-panel";
@@ -39,6 +41,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const canManage  = hasRole(session.role, ["super_admin", "admin", "manager"]);
   const isAgent    = session.role === "call_center_agent";
   const canEdit    = canManage || (isAgent && order.assigned_to === session.authId);
+  const [speedafCfg, speedafCompanyId] = await Promise.all([readSpeedafConfig(), getSpeedafCompanyId()]);
+  const speedafOn  = speedafCfg.enabled;
+  const isSpeedaf  = !!speedafCompanyId && (order as unknown as { delivery_company_id?: string | null }).delivery_company_id === speedafCompanyId;
 
   // Agent can't see order not assigned to them
   if (isAgent && order.assigned_to !== session.authId) notFound();
@@ -212,6 +217,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               notes={order.notes}
               canEdit={canEdit}
             />
+            {canManage && speedafOn && (
+              <SpeedafOrderActions orderId={id}
+                canSend={order.status === "confirmed" && !order.delivery_tracking_number}
+                isSpeedaf={isSpeedaf} tracking={order.delivery_tracking_number} />
+            )}
           </div>
 
           {/* Meta */}

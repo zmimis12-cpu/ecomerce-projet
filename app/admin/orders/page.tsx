@@ -23,6 +23,8 @@ export default async function OrdersPage() {
 
   const canManage = hasRole(session.role, ["super_admin", "admin", "manager"]);
   const { orders } = await getOrders({}, isAgent, session.authId);
+  const { readSpeedafConfig } = await import("@/lib/delivery/speedaf/config");
+  const speedafEnabled = canManage && (await readSpeedafConfig()).enabled;
 
   return (
     <div className="space-y-6">
@@ -36,7 +38,7 @@ export default async function OrdersPage() {
         {canManage && <ImportBonRetourButton />}
         {canManage && <ExportCashPaidButton />}
       </div>
-      <OrderList orders={orders} canManage={canManage} />
+      <OrderList orders={orders} canManage={canManage} speedafEnabled={speedafEnabled} />
     </div>
   );
 }

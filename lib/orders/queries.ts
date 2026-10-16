@@ -25,7 +25,7 @@ const ORDER_DETAIL_FIELDS = `
   notes, internal_notes, delivery_tracking_number, sync_error, import_source,
   delivery_external_status, delivery_external_status_id, delivery_driver_phone, delivery_reported_to, creative_code,
   source, is_duplicate, duplicate_of, is_exchange, exchange_of_order_id,
-  created_at, updated_at
+  delivery_company_id, created_at, updated_at
 `;
 
 export interface OrderFilters {

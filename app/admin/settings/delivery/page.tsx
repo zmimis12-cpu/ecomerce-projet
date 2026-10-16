@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { DigylogSettingsForm } from "@/components/delivery-integration/digylog-settings-form";
+import { SpeedafSettings } from "@/components/delivery/speedaf-settings";
+import { readSpeedafConfig } from "@/lib/delivery/speedaf/config";
 
 export const metadata: Metadata = { title: "Paramètres Livraison" };
 export const dynamic = "force-dynamic";
@@ -17,6 +19,7 @@ export default async function DeliverySettingsPage() {
     .maybeSingle();
 
   const appUrl       = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const speedaf      = await readSpeedafConfig();
   const envToken     = process.env.DIGYLOG_TOKEN ?? "";
   const dbToken      = (settings as Record<string,unknown> | null)?.token as string ?? "";
   const activeToken  = envToken || dbToken; // env takes priority
@@ -63,6 +66,9 @@ export default async function DeliverySettingsPage() {
         cachedNetworks={config?.networks ?? []}
         cachedStores={config?.stores ?? []}
       />
+
+      <SpeedafSettings initial={{ ...speedaf, secretKey: "" }} hasSecret={!!speedaf.secretKey}
+        webhookUrl={`${appUrl.replace(/\/$/, "")}/api/webhooks/speedaf`} />
     </div>
   );
 }
