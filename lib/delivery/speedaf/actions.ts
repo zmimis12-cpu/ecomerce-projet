@@ -15,6 +15,18 @@ import { syncSpeedafActiveOrders } from "./sync";
 
 const MANAGER = ["super_admin", "admin", "manager"] as const;
 
+/** Message clair quand Speedaf refuse la connexion (ex : appCode de production en mode test). */
+async function speedafConnError(cfg: SpeedafConfig): Promise<string> {
+  const r = await new SpeedafClient(cfg).getAreaTree();
+  if (r.ok) return "Speedaf a répondu sans villes, réessaie dans un instant.";
+  if (r.code === "70401") {
+    return `appCode ${cfg.appCode} refusé en mode ${cfg.env === "prod" ? "Production" : "Test (UAT)"}. ` +
+      (cfg.env === "uat" ? "Si c'est ton code de production, choisis « Production » dans Environnement puis Enregistrer." : "Vérifie le code avec Speedaf.");
+  }
+  if (r.code === "70602") return "L'adresse IP du serveur n'est pas autorisée chez Speedaf (liste blanche) — demande-leur de l'ouvrir.";
+  return `Speedaf : ${r.error}`;
+}
+
 // ── Réglages ──────────────────────────────────────────────────────────────────
 export async function saveSpeedafConfig(input: SpeedafConfig): Promise<{ success: boolean; error?: string }> {
   await requireRole(["super_admin", "admin"]);
@@ -54,7 +66,7 @@ export async function testSpeedafConnection(): Promise<{ ok: boolean; message: s
   const cities = await getSpeedafCities(cfg, true);
   return cities.length
     ? { ok: true, message: `Connexion OK (${cfg.env === "prod" ? "production" : "test UAT"}) — ${cities.length} villes Speedaf chargées.` }
-    : { ok: false, message: "Speedaf ne répond pas ou appCode invalide." };
+    : { ok: false, message: await speedafConnError(cfg) };
 }
 
 export async function subscribeSpeedafWebhook(): Promise<{ ok: boolean; message: string }> {
@@ -121,7 +133,7 @@ export async function sendOrderToSpeedaf(orderId: string, cityOverride?: string)
 
   // Ville → région / ville / quartier Speedaf
   const list = await getSpeedafCities(cfg);
-  if (!list.length) return { success: false, error: "Impossible de charger les villes Speedaf (connexion ?)." };
+  if (!list.length) return { success: false, error: await speedafConnError(cfg) };
   const resolved = cityOverride ? resolveCity(cityOverride, list) : resolveCity(o.customer_city, list, cfg.cityMap);
   if (cityOverride && resolved) {
     // On mémorise le choix : la prochaine commande de cette ville partira toute seule
