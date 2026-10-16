@@ -7,6 +7,8 @@ import { normalizeOffers } from "@/lib/landing-pages/offers";
 import { getStoreProducts, getBumpsFor } from "@/lib/store/catalog";
 import { StoreHeader } from "@/components/store/store-header";
 import type { LPSection } from "@/lib/templates";
+import { FaqAccordion } from "@/components/landing/faq-accordion";
+import { CrossSell } from "@/components/store/cross-sell";
 
 // Landing page « simple » (style boutique COD rapide) :
 // photo → titre → prix → formulaire tout de suite → photos + 1 phrase → re-CTA.
@@ -75,28 +77,35 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const one = offers.find((o) => o.isDefault) ?? offers[0] ?? { id: "q1", qty: 1, price };
   const oldShown = one.qty > 1 ? price * one.qty : oldNum;
 
-  // Photo principale = photo produit (pas le GIF/vidéo) ; puis photos d'ambiance avec une phrase chacune
+  // ── Données (toutes viennent de l'éditeur de la landing page) ──
   const productImgs = product.images.map((i) => i.public_url).filter(Boolean);
-  const mainImg = productImgs[0] ?? (lp.hero_image as string | undefined) ?? null;
+  const heroImg = productImgs[0] ?? (lp.hero_image as string | undefined) ?? null;
+  const discount = oldShown > one.price ? Math.round((1 - one.price / oldShown) * 100) : 0;
 
-  const captions: string[] = [];
-  const life = sec("lifestyle")?.scenarios as { title?: string; desc?: string }[] | undefined;
-  life?.forEach((x) => x.desc && captions.push(x.desc));
-  const ben = sec("benefits")?.items as { title?: string; desc?: string }[] | undefined;
-  ben?.forEach((x) => x.desc && captions.push(x.desc));
+  type Ico = { icon?: string; title?: string; desc?: string; label?: string };
+  const ben = (sec("benefits")?.items as Ico[] | undefined) ?? [];
+  // Rangée d'icônes sous la photo : texte court (desc) de chaque avantage
+  const quick = ben.slice(0, 4).map((b) => ({ icon: b.icon ?? "✓", text: b.desc || b.title || "" }));
+  const lifeSec = sec("lifestyle");
+  const why = ((lifeSec?.scenarios as Ico[] | undefined) ?? []).slice(0, 4);
+  const whyTitle = String(lifeSec?.title ?? `لماذا تختار ${product.name}؟`);
   const ps = sec("problem_solution");
-  (ps?.after_points as string[] | undefined)?.forEach((x) => captions.push(x));
+  const featureImg = productImgs[1] ?? (lp.hero_image as string | undefined);
+  const featureTitle = String(lp.subtitle ?? ps?.after_title ?? title);
+  const featureText = ben[0]?.title ?? subline;
+  const tiles = productImgs.slice(2, 5).map((src, i) => ({ src, text: ben[i + 1]?.desc ?? "" }));
+  const moreImgs = productImgs.slice(5);
 
-  const storyImgs: string[] = [];
-  const add = (u: unknown) => { if (typeof u === "string" && u && u !== mainImg && !storyImgs.includes(u)) storyImgs.push(u); };
-  add(lp.hero_image);
-  productImgs.slice(1).forEach(add);
-  const story = storyImgs.slice(0, 6).map((src, i) => ({ src, text: captions[i] ?? "" }));
+  const revSec = sec("reviews");
+  const reviews = ((revSec?.items as { name: string; city: string; stars: number; text: string }[] | undefined) ?? []);
+  const customerPhotos = (lp.customer_photos as string[] | undefined) ?? [];
+  const faqItems = ((sec("faq")?.items as { q: string; a: string }[] | undefined) ?? []);
+  const gty = ((sec("guarantees")?.items as Ico[] | undefined) ?? []).slice(0, 4);
 
-  const customerPhotos = ((lp.customer_photos as string[] | undefined) ?? []).slice(0, 6);
   const pixel = page.meta_pixel_id?.trim();
   const tt = page.tiktok_pixel_id?.trim();
   const pname = product.name.replace(/'/g, "\\'");
+  const waHref = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`مرحبا 👋\nأريد الاستفسار عن المنتج التالي:\n\n🛒 المنتج: ${product.name}\n💰 العرض: ${one.qty > 1 ? `${one.qty} قطع بـ ` : ""}${one.price.toFixed(0)} درهم\n📦 الدفع عند الاستلام`)}` : "";
 
   return (
     <>
@@ -118,67 +127,168 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       <style>{CSS}</style>
 
       <div className="sp" dir="rtl" lang="ar">
-        <div className="sp-top">{offerBar || "🚚 توصيل مجاني · الدفع عند الاستلام"}</div>
+        {offerBar && <div className="sp-top">{offerBar}</div>}
         <StoreHeader current={slug} products={storeProducts.map((x) => ({ slug: x.slug, title: x.title, image: x.image, price: x.price }))} />
 
+        {/* 1. Photo produit */}
+        {heroImg && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={heroImg} alt={product.name} className="sp-hero" fetchPriority="high" loading="eager" decoding="async" />
+        )}
+
         <main className="sp-wrap">
-          {mainImg && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={mainImg} alt={product.name} className="sp-main" fetchPriority="high" loading="eager" decoding="async" />
+          {/* 2. Icônes rapides */}
+          {quick.length > 0 && (
+            <div className="sp-quick">
+              {quick.map((q, i) => (
+                <div key={i} className="sp-quick-i"><span className="sp-ico">{q.icon}</span><span>{q.text}</span></div>
+              ))}
+            </div>
           )}
 
-          <h1 className="sp-title">{title}</h1>
-          <p className="sp-sub">{subline}</p>
-          <div className="sp-price">
-            <span className="sp-now">{one.price.toFixed(0)} د.م</span>
-            {oldShown > one.price && <span className="sp-old">{oldShown.toFixed(0)} د.م</span>}
-          </div>
-
+          {/* 3. Prix + formulaire directement */}
           <div id="sp-form" className="sp-card">
-            <p className="sp-note" style={{ marginTop: 0, marginBottom: 12 }}>{formNote}</p>
+            <div className="sp-badges">
+              <span className="sp-b-red">عرض خاص</span>
+              {discount > 0 && <span className="sp-b-yel">تخفيض {discount}%</span>}
+            </div>
+            <h1 className="sp-title">{title}</h1>
+            <div className="sp-price">
+              <span className="sp-now">{one.price.toFixed(0)} DH</span>
+              {oldShown > one.price && <span className="sp-old">{oldShown.toFixed(0)} DH</span>}
+            </div>
+            <div className="sp-cod">🚚 التوصيل لجميع المدن | الدفع عند الاستلام</div>
+            <p className="sp-order-h">🛒 اطلب الآن</p>
+            <p className="sp-order-sub">{formNote}</p>
             <OrderFormPublic product={product} productSlug={slug} ctaText={ctaText}
-              b1={b1} b2={b2} b3={b3} offers={offers}
+              b1={b1} b2={b2} b3={b3} offers={offers} askAddress
               pixelId={pixel || undefined} tiktokPixelId={tt || undefined}
               variants={(Array.isArray(lp.variant_options) ? lp.variant_options : []) as { name: string; options: { label: string; image?: string }[] }[]}
               bumps={bumps} cities={cities} />
+            {waHref && <a className="sp-wa" href={waHref} target="_blank" rel="noopener noreferrer">واتساب — تواصل معنا</a>}
           </div>
 
-          {whatsapp && (
-            <a className="sp-wa" target="_blank" rel="noopener noreferrer"
-              href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`مرحبا 👋\nأريد الاستفسار عن المنتج التالي:\n\n🛒 المنتج: ${product.name}\n💰 العرض: ${one.qty > 1 ? `${one.qty} قطع بـ ` : ""}${one.price.toFixed(0)} درهم\n📦 الدفع عند الاستلام`)}`}>
-              واتساب — تواصل معنا
-            </a>
-          )}
-
-          {story.map((s, i) => (
-            <div key={i} className="sp-story">
-              {s.text && <p>{s.text}</p>}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={s.src} alt="" loading="lazy" decoding="async" />
-            </div>
-          ))}
-
-          {customerPhotos.length > 0 && (
-            <div className="sp-cust">
-              <h2>صور من زبنائنا 📸</h2>
-              <div className="sp-cust-grid">
-                {customerPhotos.map((src, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={i} src={src} alt="" loading="lazy" decoding="async" />
+          {/* 4. Pourquoi ce produit */}
+          {why.length > 0 && (
+            <section className="sp-sec">
+              <h2 className="sp-h2">{whyTitle}</h2>
+              <p className="sp-h2-sub">{subline}</p>
+              <div className="sp-why">
+                {why.map((w, i) => (
+                  <div key={i} className="sp-why-i">
+                    <span className="sp-ico sp-ico-lg">{w.icon}</span>
+                    <b>{w.title}</b>
+                    <span>{w.desc}</span>
+                  </div>
                 ))}
               </div>
+            </section>
+          )}
+
+          {/* 5. Image + texte */}
+          {featureImg && (
+            <section className="sp-feature">
+              <div className="sp-feature-txt">
+                <h3>{featureTitle}</h3>
+                <p>{featureText}</p>
+              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={featureImg} alt="" loading="lazy" decoding="async" />
+            </section>
+          )}
+
+          {/* 6. 3 photos avec légende */}
+          {tiles.length > 0 && (
+            <div className="sp-tiles">
+              {tiles.map((t, i) => (
+                <div key={i} className="sp-tile">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={t.src} alt="" loading="lazy" decoding="async" />
+                  {t.text && <span>{t.text}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          {moreImgs.map((src, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={i} src={src} alt="" loading="lazy" decoding="async" className="sp-more" />
+          ))}
+        </main>
+
+        {/* 7. Produits complémentaires */}
+        <CrossSell products={storeProducts} exclude={slug} title="عروض و منتجات مكملة" />
+
+        <main className="sp-wrap">
+          {/* 8. Avis clients */}
+          {(reviews.length > 0 || customerPhotos.length > 0) && (
+            <section className="sp-sec">
+              <h2 className="sp-h2">ماذا يقول عملاؤنا؟</h2>
+              {!!revSec?.rating && <p className="sp-h2-sub">⭐ {String(revSec.rating)} / 5</p>}
+              <div className="sp-revs">
+                {reviews.map((r, i) => (
+                  <div key={i} className="sp-rev">
+                    <div className="sp-rev-h"><span className="sp-av">{(r.name || "?").slice(0, 1).toUpperCase()}</span><div><b>{r.name}</b><small>{r.city}</small></div></div>
+                    <div className="sp-stars">{"★".repeat(Math.max(1, Math.min(5, r.stars || 5)))}</div>
+                    <p>{r.text}</p>
+                    {customerPhotos[i] && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={customerPhotos[i]} alt="" loading="lazy" decoding="async" />
+                    )}
+                  </div>
+                ))}
+                {customerPhotos.slice(reviews.length).map((src, i) => (
+                  <div key={`p${i}`} className="sp-rev sp-rev-photo">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt="" loading="lazy" decoding="async" />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* 9. FAQ */}
+          {faqItems.length > 0 && (
+            <section className="sp-sec">
+              <h2 className="sp-h2">أسئلة شائعة</h2>
+              <FaqAccordion items={faqItems} />
+            </section>
+          )}
+
+          {/* 10. Garanties */}
+          {gty.length > 0 && (
+            <div className="sp-gty">
+              {gty.map((g, i) => (
+                <div key={i} className="sp-gty-i"><span className="sp-ico">{g.icon}</span><b>{g.title}</b><small>{g.desc}</small></div>
+              ))}
             </div>
           )}
 
-          <a href="#sp-form" className="sp-btn">{ctaText}</a>
+          {/* 11. Dernier appel */}
+          <section className="sp-final">
+            <div>
+              <h3>لا تفوت الفرصة!</h3>
+              <p>{subline}</p>
+              <a href="#sp-form" className="sp-final-btn">🛒 {ctaText}</a>
+            </div>
+            {heroImg && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={heroImg} alt="" loading="lazy" decoding="async" />
+            )}
+          </section>
         </main>
 
         <footer className="sp-foot">
-          <a href="/a-propos">من نحن</a> · <a href="/conditions">شروط البيع والاسترجاع</a> · <a href="/confidentialite">سياسة الخصوصية</a>
-          <div>HajtekZone © {new Date().getFullYear()}</div>
+          <div className="sp-foot-top">
+            <b>{String(lp.store_name ?? "HajtekZone")}</b>
+            {waHref && <a href={waHref} target="_blank" rel="noopener noreferrer">📞 {String(lp.whatsapp_number ?? "")}</a>}
+          </div>
+          <div className="sp-foot-links">
+            <a href="/a-propos">من نحن</a> · <a href="/conditions">شروط البيع والاسترجاع</a> · <a href="/confidentialite">سياسة الخصوصية</a>
+          </div>
+          <div className="sp-foot-copy">© {new Date().getFullYear()} {String(lp.store_name ?? "HajtekZone")}</div>
         </footer>
 
-        <a id="sp-sticky" href="#sp-form" className="sp-sticky">{ctaText}</a>
+        <a id="sp-sticky" href="#sp-form" className="sp-sticky">🛒 {ctaText}</a>
       </div>
     </>
   );
@@ -187,30 +297,64 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 const CSS = `
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;overflow-x:hidden}
 body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
-.sp{overflow-x:hidden;width:100%;max-width:100vw;color:#111;font-family:var(--font-cairo),sans-serif;padding-bottom:84px}
+.sp{overflow-x:hidden;width:100%;max-width:100vw;color:#111827;font-family:var(--font-cairo),sans-serif;background:#f6f7f9}
 .sp-top{background:#111;color:#fff;text-align:center;font-size:13px;font-weight:700;padding:7px 10px}
-.sp-wrap{max-width:560px;margin:0 auto;padding:0 16px}
-.sp-main{display:block;width:100%;aspect-ratio:1/1;object-fit:contain;background:#f6f6f6;border-radius:14px;margin-top:12px}
-.sp-title{font-size:22px;line-height:1.5;font-weight:800;text-align:center;margin:16px 0 6px}
-.sp-sub{text-align:center;color:#4b5563;font-size:14.5px;line-height:1.7;margin:0 0 8px}
-.sp-wa{display:block;margin:14px 0 0;background:#22c55e;color:#fff;text-align:center;font-weight:800;font-size:16px;padding:13px;border-radius:12px;text-decoration:none}
-.sp-price{display:flex;justify-content:center;align-items:baseline;gap:10px;margin-bottom:14px}
-.sp-now{color:#15803d;font-size:30px;font-weight:900}
-.sp-old{color:#9ca3af;text-decoration:line-through;font-size:16px}
-.sp-card{border:2px solid #f59e0b;border-radius:16px;padding:16px 14px;background:#fff;box-shadow:0 6px 24px rgba(0,0,0,.06)}
-.sp-card-h{text-align:center;font-weight:800;font-size:17px;margin:0 0 12px}
-.sp-note{text-align:center;color:#15803d;font-size:12.5px;font-weight:700;margin:10px 0 0}
-.sp-story{margin:26px 0 0;text-align:center}
-.sp-story p{font-size:16px;font-weight:700;line-height:1.7;margin:0 0 10px}
-.sp-story img{display:block;width:100%;border-radius:14px}
-.sp-cust{margin-top:30px;text-align:center}
-.sp-cust h2{font-size:19px;font-weight:800;margin:0 0 12px}
-.sp-cust-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-.sp-cust-grid img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px}
-.sp-btn{display:block;margin:28px 0 8px;background:#f59e0b;color:#fff;text-align:center;font-weight:800;font-size:18px;padding:15px;border-radius:12px;text-decoration:none}
-.sp-foot{text-align:center;font-size:12px;color:#6b7280;padding:24px 16px 10px;line-height:2}
-.sp-foot a{color:#6b7280}
-.sp-sticky{position:fixed;left:12px;right:12px;bottom:12px;z-index:50;background:#16a34a;color:#fff;text-align:center;font-weight:800;font-size:17px;padding:14px;border-radius:12px;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.25);transition:opacity .2s,transform .2s}
+.sp-wrap{max-width:560px;margin:0 auto;padding:0 14px}
+.sp-hero{display:block;width:100%;max-width:560px;margin:0 auto;aspect-ratio:1/1;object-fit:cover;background:#111}
+.sp-ico{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:#eef6f0;font-size:20px;flex-shrink:0}
+.sp-ico-lg{width:48px;height:48px;font-size:24px}
+.sp-quick{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:#fff;border-radius:0 0 16px 16px;padding:12px 6px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+.sp-quick-i{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;font-size:11.5px;font-weight:700;line-height:1.4;color:#374151}
+.sp-card{background:#fff;border-radius:18px;padding:16px 14px;margin-top:14px;box-shadow:0 6px 24px rgba(0,0,0,.07);border:1px solid #eef0f3}
+.sp-badges{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.sp-b-red{background:#dc2626;color:#fff;font-size:12px;font-weight:800;padding:3px 10px;border-radius:8px}
+.sp-b-yel{background:#facc15;color:#111;font-size:12px;font-weight:800;padding:3px 10px;border-radius:8px}
+.sp-title{font-size:19px;line-height:1.5;font-weight:800;margin:6px 0 2px}
+.sp-price{display:flex;align-items:baseline;gap:10px;margin:2px 0 10px}
+.sp-now{color:#15803d;font-size:34px;font-weight:900;letter-spacing:-.5px}
+.sp-old{color:#9ca3af;text-decoration:line-through;font-size:18px;font-weight:700}
+.sp-cod{background:#15803d;color:#fff;text-align:center;font-weight:800;font-size:14px;padding:11px;border-radius:12px}
+.sp-order-h{text-align:center;font-size:20px;font-weight:900;color:#15803d;margin:14px 0 0}
+.sp-order-sub{text-align:center;font-size:12.5px;color:#6b7280;margin:2px 0 14px}
+.sp-wa{display:block;margin:12px 0 0;background:#fff;color:#16a34a;border:2px solid #22c55e;text-align:center;font-weight:800;font-size:15px;padding:11px;border-radius:12px;text-decoration:none}
+.sp-sec{margin-top:28px}
+.sp-h2{text-align:center;font-size:20px;font-weight:900;margin:0}
+.sp-h2-sub{text-align:center;font-size:13px;color:#6b7280;margin:4px 0 14px}
+.sp-why{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.sp-why-i{background:#fff;border-radius:14px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+.sp-why-i b{font-size:14px}
+.sp-why-i span:last-child{font-size:12px;color:#6b7280;line-height:1.5}
+.sp-feature{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:center;background:#fff;border-radius:16px;padding:12px;margin-top:22px;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+.sp-feature h3{font-size:17px;font-weight:900;margin:0 0 6px;line-height:1.4}
+.sp-feature p{font-size:13px;color:#4b5563;line-height:1.7;margin:0}
+.sp-feature img{width:100%;border-radius:12px;aspect-ratio:1/1;object-fit:cover}
+.sp-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.sp-tile{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.04);display:flex;flex-direction:column}
+.sp-tile img{width:100%;aspect-ratio:1/1;object-fit:cover}
+.sp-tile span{font-size:11.5px;font-weight:700;text-align:center;padding:6px 4px;line-height:1.4}
+.sp-more{display:block;width:100%;border-radius:14px;margin-top:12px}
+.sp-revs{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 2px 10px;-webkit-overflow-scrolling:touch}
+.sp-rev{flex:0 0 78%;max-width:300px;scroll-snap-align:start;background:#fff;border-radius:14px;padding:12px;box-shadow:0 2px 10px rgba(0,0,0,.05);display:flex;flex-direction:column;gap:6px}
+.sp-rev-h{display:flex;align-items:center;gap:8px}
+.sp-rev-h b{display:block;font-size:14px}.sp-rev-h small{color:#6b7280;font-size:11.5px}
+.sp-av{width:34px;height:34px;border-radius:50%;background:#15803d;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900}
+.sp-stars{color:#f59e0b;letter-spacing:2px;font-size:14px}
+.sp-rev p{font-size:13px;line-height:1.6;margin:0;color:#374151}
+.sp-rev img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;margin-top:auto}
+.sp-rev-photo{padding:6px}.sp-rev-photo img{aspect-ratio:3/4;height:100%}
+.sp-gty{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:#fff;border-radius:16px;padding:14px 6px;margin-top:24px;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+.sp-gty-i{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+.sp-gty-i b{font-size:12px}.sp-gty-i small{font-size:10.5px;color:#6b7280;line-height:1.4}
+.sp-final{display:grid;grid-template-columns:1.4fr 1fr;gap:10px;align-items:center;background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;border-radius:18px;padding:16px;margin-top:24px}
+.sp-final h3{font-size:19px;font-weight:900;margin:0 0 4px}
+.sp-final p{font-size:12.5px;color:#cbd5e1;margin:0 0 12px;line-height:1.6}
+.sp-final img{width:100%;border-radius:12px;aspect-ratio:1/1;object-fit:cover}
+.sp-final-btn{display:block;background:#16a34a;color:#fff;text-align:center;font-weight:800;font-size:14px;padding:12px 8px;border-radius:12px;text-decoration:none}
+.sp-foot{background:#0f172a;color:#cbd5e1;text-align:center;font-size:12.5px;padding:22px 16px 96px;margin-top:28px;line-height:2}
+.sp-foot-top{display:flex;justify-content:space-between;align-items:center;max-width:560px;margin:0 auto 6px;color:#fff}
+.sp-foot a{color:#cbd5e1;text-decoration:none}
+.sp-foot-copy{color:#64748b;font-size:11.5px}
+.sp-sticky{position:fixed;left:12px;right:12px;bottom:12px;z-index:50;background:#16a34a;color:#fff;text-align:center;font-weight:800;font-size:16px;padding:14px;border-radius:14px;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.25);transition:opacity .2s,transform .2s}
 .sp-sticky.sp-hide{opacity:0;transform:translateY(120%);pointer-events:none}
 @media (min-width:900px){.sp-sticky{max-width:520px;margin:0 auto}}
 `;

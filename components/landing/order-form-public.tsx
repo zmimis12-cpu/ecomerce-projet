@@ -42,9 +42,11 @@ interface Props {
   tiktokPixelId?: string;
   /** Upsells « en même temps » (order bump) : produits à ajouter en 1 clic */
   bumps?: { productId: string; name: string; image: string | null; price: number; oldPrice: number | null; label: string | null }[];
+  /** Affiche un champ « العنوان » (facultatif — vide = confirmé par téléphone) */
+  askAddress?: boolean;
 }
 
-export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [] }: Props) {
+export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [], askAddress = false }: Props) {
   const [isPending, startTransition] = useTransition();
   useEffect(() => { getCreativeCode(); }, []); // mémorise ?cr= dès l'arrivée
   const [submitted, setSubmitted]    = useState(false);
@@ -464,6 +466,16 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         )}
         {ERR(errors.customer_city)}
       </div>
+
+      {askAddress && (
+        <div style={{ marginBottom:"14px" }}>
+          <label style={LBL}>العنوان</label>
+          <input type="text" autoComplete="street-address"
+            placeholder="الحي، الزنقة، رقم المنزل..."
+            onChange={(e) => set("customer_address", e.target.value.trim() || "سيتم تأكيد العنوان عبر الهاتف")}
+            style={INP(false)} />
+        </div>
+      )}
 
       {/* Upsell « en même temps » (order bump) */}
       {bumps.length > 0 && (
