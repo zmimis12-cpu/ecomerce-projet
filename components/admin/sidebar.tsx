@@ -87,6 +87,7 @@ const ADMIN_NAV: NavGroup[] = [
     items: [
       { href: "/admin/settings/ads",                label: "Comptes pub",   icon: Megaphone },
       { href: "/admin/settings/delivery-providers", label: "Transporteurs", icon: Truck },
+      { href: "/admin/settings/delivery-providers#speedaf", label: "Speedaf", icon: Truck },
       { href: "/admin/settings/whatsapp",           label: "WhatsApp",      icon: PhoneCall },
       { href: "/admin/audit-logs",                  label: "Audit logs",    icon: Shield },
       { href: "/admin/settings",                    label: "Paramètres",    icon: Settings, exact: true },

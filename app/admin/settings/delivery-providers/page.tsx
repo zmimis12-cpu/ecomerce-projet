@@ -3,6 +3,8 @@ import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { DeliveryProvidersClient } from "@/components/settings/delivery-providers-client";
 import type { DeliveryStoreRow } from "@/lib/delivery/store-actions-types";
+import { SpeedafSettings } from "@/components/delivery/speedaf-settings";
+import { readSpeedafConfig } from "@/lib/delivery/speedaf/config";
 
 export const metadata: Metadata = { title: "Sociétés de Livraison" };
 export const dynamic = "force-dynamic";
@@ -14,6 +16,7 @@ export default async function DeliveryProvidersPage() {
 
   let stores: DeliveryStoreRow[] = [];
   let companies: Company[]       = [];
+  const speedaf = await readSpeedafConfig();
 
   try {
     const { data } = await supabaseAdmin
@@ -53,6 +56,12 @@ export default async function DeliveryProvidersPage() {
         </div>
       )}
       <DeliveryProvidersClient stores={stores} companies={companies} />
+
+      {/* ── Speedaf (API) ── */}
+      <div id="speedaf">
+        <SpeedafSettings initial={{ ...speedaf, secretKey: "" }} hasSecret={!!speedaf.secretKey}
+          webhookUrl={`${(process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "")}/api/webhooks/speedaf`} />
+      </div>
     </div>
   );
 }
