@@ -36,6 +36,10 @@ export type VideoDelivery = {
   adminNote: string;
 };
 
+/** Fiche produit pour les éditeurs (même fiche pour tous) : détails + liens utiles. */
+export type ProductBrief = { text: string; links: string; updatedAt: string | null };
+export const EMPTY_BRIEF: ProductBrief = { text: "", links: "", updatedAt: null };
+
 export function normalizePortalCfg(v: Partial<EditorPortalCfg> | undefined | null): EditorPortalCfg {
   const d = { ...DEFAULT_PORTAL_CFG, ...(v ?? {}) };
   return {

@@ -6,7 +6,7 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth/session";
 import {
-  readPortalConfigs, readVideoLinks, writeJson, normalizePortalCfg,
+  readPortalConfigs, readVideoLinks, readProductBriefs, writeJson, normalizePortalCfg,
   type EditorPortalCfg, type VideoDelivery, type DeliveryStatus,
 } from "./portal";
 
@@ -82,6 +82,21 @@ export async function reviewVideoLink(id: string, status: DeliveryStatus, adminN
   d.reviewedAt = status === "pending" ? null : new Date().toISOString();
   d.adminNote = adminNote.trim().slice(0, 300);
   const { error } = await writeJson("editor_video_links", all, "Liens vidéos envoyés par les éditeurs");
+  if (error) return { success: false, error: error.message };
+  refresh();
+  return { success: true };
+}
+
+/** Admin : fiche produit (détails pour que l'éditeur connaisse bien le produit). */
+export async function saveProductBrief(productId: string, text: string, links: string): Promise<Result> {
+  await requireRole([...MANAGERS]);
+  if (!productId) return { success: false, error: "Produit manquant." };
+  const all = await readProductBriefs();
+  const t = text.trim().slice(0, 8000);
+  const l = links.trim().slice(0, 3000);
+  if (!t && !l) delete all[productId];
+  else all[productId] = { text: t, links: l, updatedAt: new Date().toISOString() };
+  const { error } = await writeJson("editor_product_briefs", all, "Fiches produits pour éditeurs vidéo");
   if (error) return { success: false, error: error.message };
   refresh();
   return { success: true };

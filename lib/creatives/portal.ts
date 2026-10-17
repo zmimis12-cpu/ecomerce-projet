@@ -4,7 +4,7 @@
  *            app_settings.editor_video_links = VideoDelivery[]
  */
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { normalizePortalCfg, type EditorPortalCfg, type VideoDelivery } from "./portal-shared";
+import { normalizePortalCfg, type EditorPortalCfg, type VideoDelivery, type ProductBrief } from "./portal-shared";
 export * from "./portal-shared";
 
 async function readJson<T>(key: string, fallback: T): Promise<T> {
@@ -39,6 +39,14 @@ export async function readVideoLinks(editorId?: string | null): Promise<VideoDel
   const list = Array.isArray(all) ? all : [];
   return (editorId ? list.filter((d) => d.editorId === editorId) : list)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** Fiches produits pour éditeurs : app_settings.editor_product_briefs = { [productId]: ProductBrief } */
+export async function readProductBriefs(): Promise<Record<string, ProductBrief>> {
+  const raw = await readJson<Record<string, Partial<ProductBrief>>>("editor_product_briefs", {});
+  return Object.fromEntries(Object.entries(raw ?? {}).map(([k, v]) => [k, {
+    text: String(v?.text ?? ""), links: String(v?.links ?? ""), updatedAt: v?.updatedAt ?? null,
+  }]));
 }
 
 /** Nom + photo principale des produits (rien d'autre : prix, stock… restent privés). */

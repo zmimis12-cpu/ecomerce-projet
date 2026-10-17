@@ -14,8 +14,8 @@ import { getCreativesLiveStatus, getMetaDeliveries, TONE_CLS } from "@/lib/ads/m
 import { AddPaymentForm } from "@/components/creatives/payment-controls";
 import { RateForm, DeleteRateButton } from "@/components/creatives/rate-controls";
 import { PaymentsList } from "@/components/creatives/payments-list";
-import { readPortalConfigs, readVideoLinks, getProductCards, portalEarned, payLabel, normalizePortalCfg } from "@/lib/creatives/portal";
-import { EditorPortalForm, ReceivedLinks } from "@/components/creatives/portal-controls";
+import { readPortalConfigs, readVideoLinks, readProductBriefs, getProductCards, portalEarned, payLabel, normalizePortalCfg } from "@/lib/creatives/portal";
+import { EditorPortalForm, ReceivedLinks, BriefsManager } from "@/components/creatives/portal-controls";
 import { periodRange } from "@/lib/creatives/queries";
 
 export const metadata: Metadata = { title: "Vidéos & Éditeurs" };
@@ -36,7 +36,7 @@ export default async function CreativesAdminPage({
     getEditorBalances(),
     getRecentAds(),
   ]);
-  const [portalCfgs, videoLinks, productCards] = await Promise.all([readPortalConfigs(), readVideoLinks(), getProductCards()]);
+  const [portalCfgs, videoLinks, productCards, briefs] = await Promise.all([readPortalConfigs(), readVideoLinks(), getProductCards(), readProductBriefs()]);
   const cfgOf = (id: string) => portalCfgs[id] ?? normalizePortalCfg(null);
   const { from: pFrom, to: pTo } = periodRange(report.period);
   const commissionText = (e: { commissionType: string; commissionValue: number }) =>
@@ -154,6 +154,18 @@ export default async function CreativesAdminPage({
               products={productCards} commissionLabel={commissionText(e)} />
           ))}
         </div>
+      </section>
+
+      {/* Fiches produits : détails pour que l'éditeur connaisse bien le produit */}
+      <section id="fiches" className="rounded-xl border bg-card">
+        <div className="border-b px-4 py-3">
+          <h2 className="font-medium">Détails produits pour les éditeurs</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Écris tout ce que l&apos;éditeur doit savoir (points forts, client cible, angle, à éviter, format…).
+            Il le voit sous la photo du produit dans « Mes produits » → plus besoin de te poser des questions.
+          </p>
+        </div>
+        <BriefsManager products={productCards} briefs={briefs} />
       </section>
 
       {/* Liens vidéo envoyés par les éditeurs */}

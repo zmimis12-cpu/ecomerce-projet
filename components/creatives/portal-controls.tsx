@@ -4,9 +4,9 @@
  * réglages de rémunération (commission / salaire / par produit) et confidentialité.
  */
 import { useMemo, useState, useTransition } from "react";
-import { Check, X, Trash2, ExternalLink, Copy, Send, RotateCcw, ImageOff, Search } from "lucide-react";
-import { saveEditorPortalCfg, submitVideoLinks, deleteVideoLink, reviewVideoLink } from "@/lib/creatives/portal-actions";
-import type { EditorPortalCfg, VideoDelivery, DeliveryStatus } from "@/lib/creatives/portal-shared";
+import { Check, X, Trash2, ExternalLink, Copy, Send, RotateCcw, ImageOff, Search, FileText, Pencil } from "lucide-react";
+import { saveEditorPortalCfg, submitVideoLinks, deleteVideoLink, reviewVideoLink, saveProductBrief } from "@/lib/creatives/portal-actions";
+import { EMPTY_BRIEF, type EditorPortalCfg, type VideoDelivery, type DeliveryStatus, type ProductBrief } from "@/lib/creatives/portal-shared";
 import { cn } from "@/lib/utils";
 
 type ProductCard = { id: string; name: string; image: string | null };
@@ -29,10 +29,10 @@ export function ProductThumb({ p, size = "md" }: { p: ProductCard; size?: "sm" |
 /* ───────────────────────── Éditeur : carte produit + envoi des liens ───────────────────────── */
 
 export function EditorProductCard({
-  product, links, canSubmit, canReview, editorNames,
+  product, links, canSubmit, canReview, editorNames, brief,
 }: {
   product: ProductCard; links: VideoDelivery[]; canSubmit: boolean; canReview: boolean;
-  editorNames?: Record<string, string>;
+  editorNames?: Record<string, string>; brief?: ProductBrief;
 }) {
   const [text, setText] = useState("");
   const [note, setNote] = useState("");
@@ -51,6 +51,10 @@ export function EditorProductCard({
           </div>
         </div>
       </div>
+
+      {canReview
+        ? <div className="border-b p-3"><BriefForm productId={product.id} initial={brief ?? EMPTY_BRIEF} compact /></div>
+        : <BriefView brief={brief} />}
 
       {canSubmit && (
         <div className="space-y-2 border-b p-3">
@@ -309,6 +313,124 @@ export function ReceivedLinks({ products, links, editorNames }: {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ───────────────────────── Fiche produit pour l'éditeur ───────────────────────── */
+
+const URL_RE = /(https?:\/\/[^\s]+)/g;
+function Linkified({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(URL_RE).map((part, i) => i % 2 === 1
+        ? <a key={i} href={part} target="_blank" rel="noreferrer" className="break-all text-primary hover:underline">{part}</a>
+        : <span key={i}>{part}</span>)}
+    </>
+  );
+}
+
+/** Lecture seule (éditeur) : détails du produit écrits par l'admin. */
+export function BriefView({ brief }: { brief?: ProductBrief }) {
+  if (!brief || (!brief.text && !brief.links)) {
+    return <p className="border-b p-3 text-xs text-muted-foreground">Pas encore de détails pour ce produit.</p>;
+  }
+  return (
+    <details open className="group border-b">
+      <summary className="flex cursor-pointer items-center gap-1.5 px-3 py-2 text-sm font-medium">
+        <FileText className="h-4 w-4 text-fuchsia-600" /> Détails du produit
+      </summary>
+      <div className="space-y-2 px-3 pb-3 text-sm">
+        {brief.text && <div dir="auto" className="whitespace-pre-wrap leading-relaxed"><Linkified text={brief.text} /></div>}
+        {brief.links && (
+          <div className="rounded-md bg-muted/40 p-2 text-xs">
+            <div className="mb-1 font-medium">Liens utiles</div>
+            <div dir="ltr" className="whitespace-pre-wrap"><Linkified text={brief.links} /></div>
+          </div>
+        )}
+      </div>
+    </details>
+  );
+}
+
+/** Admin : écrire / modifier la fiche d'un produit. */
+export function BriefForm({ productId, initial, compact = false }: { productId: string; initial: ProductBrief; compact?: boolean }) {
+  const [open, setOpen] = useState(!compact);
+  const [text, setText] = useState(initial.text);
+  const [links, setLinks] = useState(initial.links);
+  const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
+  const [pending, start] = useTransition();
+
+  if (!open) {
+    return (
+      <div className="space-y-1">
+        <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline">
+          <Pencil className="h-3.5 w-3.5" /> {initial.text || initial.links ? "Modifier les détails du produit" : "Écrire les détails du produit"}
+        </button>
+        {initial.text && <p dir="auto" className="line-clamp-2 whitespace-pre-wrap text-xs text-muted-foreground">{initial.text}</p>}
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <label className="block space-y-1 text-sm">
+        <span className="text-xs font-medium text-muted-foreground">Détails du produit (visible par les éditeurs)</span>
+        <textarea dir="auto" rows={compact ? 6 : 10} value={text} onChange={(e) => { setText(e.target.value); setMsg(null); }}
+          placeholder={"Ex :\n• C'est quoi : …\n• Problème qu'il règle : …\n• Points forts : …\n• Client cible : …\n• Prix / offre : …\n• Angle / hook à utiliser : …\n• À ne pas dire / montrer : …\n• Format : 9:16, 20-30 s, sous-titres darija"}
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-primary/30" />
+      </label>
+      <label className="block space-y-1 text-sm">
+        <span className="text-xs font-medium text-muted-foreground">Liens utiles (photos, rushs, vidéos d&apos;exemple, page produit…) — un par ligne</span>
+        <textarea dir="ltr" rows={3} value={links} onChange={(e) => { setLinks(e.target.value); setMsg(null); }}
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+      </label>
+      <div className="flex items-center gap-2">
+        <button disabled={pending}
+          className="h-9 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          onClick={() => start(async () => {
+            const r = await saveProductBrief(productId, text, links);
+            setMsg(r.success ? { ok: true, t: "Enregistré ✓" } : { ok: false, t: r.error ?? "Erreur" });
+          })}>
+          {pending ? "Enregistrement…" : "Enregistrer"}
+        </button>
+        {compact && <button onClick={() => setOpen(false)} className="text-xs text-muted-foreground hover:underline">Fermer</button>}
+        {msg && <span className={msg.ok ? "text-sm text-emerald-700" : "text-sm text-red-600"}>{msg.t}</span>}
+      </div>
+    </div>
+  );
+}
+
+/** Admin (page Vidéos & Éditeurs) : choisir un produit et écrire sa fiche. */
+export function BriefsManager({ products, briefs }: { products: ProductCard[]; briefs: Record<string, ProductBrief> }) {
+  const [pid, setPid] = useState(products[0]?.id ?? "");
+  const p = products.find((x) => x.id === pid);
+  const done = products.filter((x) => briefs[x.id]?.text || briefs[x.id]?.links).length;
+  return (
+    <div className="grid gap-4 p-4 lg:grid-cols-[280px_1fr]">
+      <div className="max-h-[480px] space-y-1 overflow-y-auto pr-1">
+        <div className="pb-1 text-xs text-muted-foreground">{done} / {products.length} produits avec détails</div>
+        {products.map((x) => {
+          const has = !!(briefs[x.id]?.text || briefs[x.id]?.links);
+          return (
+            <button key={x.id} onClick={() => setPid(x.id)}
+              className={cn("flex w-full items-center gap-2 rounded-lg border p-1.5 text-left text-xs",
+                x.id === pid ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-muted")}>
+              <ProductThumb p={x} size="sm" />
+              <span className="line-clamp-2 flex-1">{x.name}</span>
+              {has ? <Check className="h-4 w-4 shrink-0 text-emerald-600" /> : <span className="shrink-0 text-[10px] text-amber-600">vide</span>}
+            </button>
+          );
+        })}
+      </div>
+      {p ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <ProductThumb p={p} size="sm" />
+            <div className="font-semibold">{p.name}</div>
+          </div>
+          <BriefForm key={p.id} productId={p.id} initial={briefs[p.id] ?? EMPTY_BRIEF} />
+        </div>
+      ) : <p className="text-sm text-muted-foreground">Aucun produit.</p>}
     </div>
   );
 }

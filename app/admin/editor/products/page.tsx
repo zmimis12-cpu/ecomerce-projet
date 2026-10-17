@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Package } from "lucide-react";
 import { loadEditorContext } from "@/lib/creatives/editor-context";
-import { getProductCards } from "@/lib/creatives/portal";
+import { getProductCards, readProductBriefs } from "@/lib/creatives/portal";
 import { EditorHeader } from "@/components/creatives/editor-sections";
 import { EditorProductCard } from "@/components/creatives/portal-controls";
 
@@ -12,7 +12,7 @@ export default async function EditorProductsPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string>> }) {
   const ctx = await loadEditorContext(await searchParams);
-  const products = await getProductCards(ctx.portal.productIds);
+  const [products, briefs] = await Promise.all([getProductCards(ctx.portal.productIds), readProductBriefs()]);
   const canReview = !ctx.isEditor;
 
   return (
@@ -34,7 +34,7 @@ export default async function EditorProductsPage({
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {products.map((p) => (
             <EditorProductCard key={p.id} product={p}
-              links={ctx.links.filter((l) => l.productId === p.id)}
+              links={ctx.links.filter((l) => l.productId === p.id)} brief={briefs[p.id]}
               canSubmit={ctx.isEditor} canReview={canReview} />
           ))}
         </div>
