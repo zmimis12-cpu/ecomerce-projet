@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Truck, ShieldCheck, PhoneCall, RefreshCcw } from "lucide-react";
+import { Truck, ShieldCheck, BadgeCheck, Headset, MapPin, ShoppingCart } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getStoreProducts } from "@/lib/store/catalog";
 import { getStoreConfig } from "@/lib/store/config";
-import { StoreHeader } from "@/components/store/store-header";
-import { ProductCard } from "@/components/store/cross-sell";
+import { StoreGrid } from "@/components/store/store-grid";
+import { HajtekMark } from "@/components/brand/logo";
 import { Cairo } from "next/font/google";
 
 const cairo = Cairo({ subsets: ["arabic", "latin"], weight: ["400", "600", "700", "800", "900"], variable: "--font-cairo", display: "swap" });
@@ -38,79 +38,143 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const featured = products.filter((p) => p.featured);
   const wa = cfg.whatsapp.replace(/\D/g, "");
   const waIntl = !wa ? "" : wa.startsWith("0") ? `212${wa.slice(1)}` : wa;
+  const trustIcons = [Truck, ShieldCheck, BadgeCheck, Headset];
+  const nav = [
+    { href: "#top", label: "الرئيسية" },
+    { href: "#products", label: "المنتجات" },
+    ...(featured.length ? [{ href: "#offers", label: "العروض" }] : []),
+    { href: "#contact", label: "تواصل معنا" },
+  ];
 
   return (
-    <main dir="rtl" lang="ar" className={`${cairo.variable} min-h-screen bg-white text-neutral-900`} style={{ fontFamily: "var(--font-cairo), sans-serif" }}>
-      <StoreHeader announcement={cfg.announcement} />
+    <main id="top" dir="rtl" lang="ar" className={`${cairo.variable} min-h-screen bg-[#0b0b0b] text-white`} style={{ fontFamily: "var(--font-cairo), sans-serif" }}>
+      {cfg.announcement && (
+        <div className="bg-gradient-to-l from-[#F3D98B] to-[#D4A93F] px-3 py-1.5 text-center text-[12px] font-bold text-neutral-900">{cfg.announcement}</div>
+      )}
+
+      {/* En-tête */}
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#0b0b0b]/95 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+          <a href="#top" className="flex items-center gap-2.5">
+            <HajtekMark className="h-10 w-10" />
+            <span className="text-[15px] font-black tracking-[0.2em]" dir="ltr">HAJTEK <span className="text-[#D4A93F]">ZONE</span></span>
+          </a>
+          <nav className="hidden items-center gap-1 md:flex">
+            {nav.map((n, i) => (
+              <a key={n.href} href={n.href}
+                className={i === 1 ? "rounded-full bg-gradient-to-l from-[#F3D98B] to-[#D4A93F] px-4 py-1.5 text-sm font-bold text-neutral-900" : "rounded-full px-4 py-1.5 text-sm text-white/80 hover:text-white"}>
+                {n.label}
+              </a>
+            ))}
+          </nav>
+          <a href="#products" aria-label="المنتجات" className="rounded-full border border-white/15 p-2 text-white/80 hover:text-white md:hidden"><ShoppingCart className="h-5 w-5" /></a>
+        </div>
+        <nav className="flex gap-1 overflow-x-auto px-3 pb-2 md:hidden">
+          {nav.map((n) => <a key={n.href} href={n.href} className="shrink-0 rounded-full border border-white/10 px-3 py-1 text-[12px] text-white/80">{n.label}</a>)}
+        </nav>
+      </header>
 
       {/* Bannière */}
-      <section className="relative overflow-hidden bg-neutral-950 text-white">
-        {cfg.heroImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={cfg.heroImage} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />
-        ) : (
-          <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#D4A93F]/25 blur-3xl" />
-        )}
-        <div className="relative mx-auto max-w-5xl px-4 py-12 text-center sm:py-16">
-          <p className="mb-2 text-xs font-bold tracking-widest text-[#F3D98B]">HAJTEK ZONE</p>
-          <h1 className="text-[26px] font-black leading-tight sm:text-4xl">{cfg.heroTitle}</h1>
-          {cfg.heroSubtitle && <p className="mx-auto mt-3 max-w-md text-sm text-white/75">{cfg.heroSubtitle}</p>}
-          {cfg.heroCta && (
-            <a href={featured.length ? "#featured" : "#products"} className="mt-6 inline-block rounded-full bg-gradient-to-r from-[#F3D98B] to-[#B8860B] px-7 py-3 text-sm font-extrabold text-neutral-900 shadow-lg transition hover:scale-[1.03]">{cfg.heroCta}</a>
-          )}
+      <section className="relative overflow-hidden border-b border-white/10">
+        <div className="pointer-events-none absolute -left-20 top-0 h-80 w-80 rounded-full bg-[#D4A93F]/20 blur-3xl" />
+        <div className="relative mx-auto grid max-w-6xl items-center gap-6 px-4 py-10 md:grid-cols-2 md:py-14">
+          <div className="text-center md:text-right">
+            <p className="mb-2 text-xs font-black tracking-[0.3em] text-[#D4A93F]" dir="ltr">HAJTEK ZONE</p>
+            <h1 className="text-[30px] font-black leading-tight sm:text-5xl">
+              {cfg.heroTitle}
+              {cfg.heroTitleGold && <span className="mt-1 block bg-gradient-to-l from-[#F3D98B] to-[#D4A93F] bg-clip-text text-transparent">{cfg.heroTitleGold}</span>}
+            </h1>
+            {cfg.heroSubtitle && <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-white/70 md:mx-0">{cfg.heroSubtitle}</p>}
+            {cfg.heroCta && (
+              <a href={featured.length ? "#offers" : "#products"}
+                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-gradient-to-l from-[#F3D98B] to-[#D4A93F] px-7 py-3 text-sm font-black text-neutral-900 shadow-[0_8px_30px_rgba(212,169,63,0.35)] transition hover:scale-[1.03]">
+                {cfg.heroCta} <ShoppingCart className="h-4 w-4" />
+              </a>
+            )}
+          </div>
+          <div className="relative">
+            {cfg.heroImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={cfg.heroImage} alt="" className="mx-auto max-h-[360px] w-full rounded-2xl object-contain" />
+            ) : (
+              <div className="mx-auto grid max-w-sm grid-cols-2 gap-3">
+                {products.slice(0, 4).map((p) => p.image && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={p.slug} src={p.image} alt="" className="aspect-square w-full rounded-2xl border border-white/10 object-cover" />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
+      {/* Garanties */}
       {cfg.showTrust && (
-        <section className="border-b bg-[#faf7f0]">
-          <div className="mx-auto grid max-w-5xl grid-cols-2 gap-3 px-4 py-5 text-center text-[12px] font-bold sm:grid-cols-4">
-            {[
-              { i: Truck, t: "توصيل 24–72 ساعة" },
-              { i: ShieldCheck, t: "الدفع عند الاستلام" },
-              { i: PhoneCall, t: "تأكيد بالهاتف" },
-              { i: RefreshCcw, t: "استبدال إلا كان عيب" },
-            ].map(({ i: I, t }) => (
-              <div key={t} className="flex flex-col items-center gap-1.5 rounded-xl bg-white p-3 shadow-sm">
-                <I className="h-5 w-5 text-[#B8860B]" />{t}
-              </div>
-            ))}
+        <section className="border-b border-white/10 bg-[#111]">
+          <div className="mx-auto grid max-w-6xl grid-cols-2 gap-y-5 px-4 py-6 md:grid-cols-4 md:divide-x md:divide-x-reverse md:divide-white/10">
+            {cfg.trust.map((t, i) => {
+              const I = trustIcons[i % trustIcons.length];
+              return (
+                <div key={i} className="flex items-center justify-center gap-3 px-2">
+                  <I className="h-9 w-9 shrink-0 text-[#D4A93F]" strokeWidth={1.6} />
+                  <div><p className="text-[14px] font-extrabold">{t.title}</p><p className="text-[11px] text-white/55">{t.sub}</p></div>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}
 
+      {/* Mis en avant */}
       {featured.length > 0 && (
-        <section id="featured" className="mx-auto max-w-5xl px-3 pt-8">
-          <h2 className="mb-4 text-center text-xl font-extrabold">{cfg.featuredTitle}</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {featured.map((p) => <ProductCard key={p.slug} p={p} />)}
-          </div>
-        </section>
+        <StoreGrid products={featured} title={cfg.featuredTitle} sectionId="offers" filters={false} />
       )}
 
-      <section id="products" className="mx-auto max-w-5xl px-3 py-8">
-        <h2 className="mb-4 text-center text-xl font-extrabold">{cfg.allTitle}</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {products.map((p) => <ProductCard key={p.slug} p={p} />)}
+      {/* Tous les produits */}
+      <StoreGrid products={products} title={cfg.allTitle} subtitle="منتجات مختارة بعناية من أجلك" />
+
+      {/* Bandeau du bas */}
+      <section id="contact" className="border-t border-[#D4A93F]/30 bg-gradient-to-b from-[#151208] to-[#0b0b0b]">
+        <div className="mx-auto grid max-w-6xl items-center gap-6 px-4 py-8 text-center md:grid-cols-4 md:text-right">
+          <div className="flex flex-col items-center gap-1 md:items-start">
+            <HajtekMark className="h-14 w-14" />
+            <p className="text-sm font-black tracking-[0.2em]" dir="ltr">HAJTEK <span className="text-[#D4A93F]">ZONE</span></p>
+          </div>
+          <div className="flex items-center justify-center gap-3 md:justify-start">
+            <Truck className="h-9 w-9 text-[#D4A93F]" strokeWidth={1.6} />
+            <div><p className="font-extrabold">{cfg.bottomTitle1}</p><p className="text-[12px] text-white/60">{cfg.bottomSub1}</p></div>
+          </div>
+          <div className="flex items-center justify-center gap-3 md:justify-start">
+            <MapPin className="h-9 w-9 text-[#D4A93F]" strokeWidth={1.6} />
+            <div><p className="font-extrabold">{cfg.bottomTitle2}</p><p className="text-[12px] text-white/60">{cfg.bottomSub2}</p></div>
+          </div>
+          <div className="flex flex-col items-center gap-2 md:items-end">
+            <a href="#products" className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-l from-[#F3D98B] to-[#D4A93F] px-6 py-3 text-sm font-black text-neutral-900">
+              {cfg.heroCta || "تسوق الآن"} <ShoppingCart className="h-4 w-4" />
+            </a>
+            {waIntl && <a href={`https://wa.me/${waIntl}`} target="_blank" rel="noopener" className="text-[12px] text-[#F3D98B] underline">واتساب: {cfg.whatsapp}</a>}
+            {cfg.contactEmail && <a href={`mailto:${cfg.contactEmail}`} className="text-[12px] text-white/60" dir="ltr">{cfg.contactEmail}</a>}
+          </div>
         </div>
       </section>
 
       {cfg.showAbout && (
-        <section dir="ltr" className="bg-neutral-50">
-          <div className="mx-auto max-w-5xl px-4 py-8 text-sm leading-relaxed text-neutral-600">
-            <h3 className="mb-2 text-base font-bold text-neutral-900">About HajtekZone</h3>
+        <section dir="ltr" className="border-t border-white/10 bg-[#0e0e0e]">
+          <div className="mx-auto max-w-6xl px-4 py-6 text-[13px] leading-relaxed text-white/55">
+            <h3 className="mb-1 text-sm font-bold text-white/85">About HajtekZone</h3>
             <p>HajtekZone is an online store operated by <b>ODT Deals</b>. We sell practical home, wellness and tech products in Morocco,
               delivered by professional carriers and paid in cash on delivery. Contact: <a className="underline" href={`mailto:${cfg.contactEmail}`}>{cfg.contactEmail}</a>.</p>
           </div>
         </section>
       )}
 
-      <footer className="bg-neutral-950 px-4 py-8 text-center text-[12px] text-neutral-400">
-        <div className="mb-3 flex flex-wrap justify-center gap-x-4 gap-y-1 text-neutral-300">
+      <footer className="border-t border-white/10 bg-black px-4 py-6 text-center text-[12px] text-white/45">
+        <div className="mb-3 flex flex-wrap justify-center gap-x-4 gap-y-1 text-white/70">
           <Link href="/a-propos">من نحن</Link>
           <Link href="/conditions">شروط البيع والاسترجاع</Link>
           <Link href="/confidentialite">سياسة الخصوصية</Link>
           <Link href="/suppression-donnees">حذف المعطيات</Link>
-          <Link href="/login" className="text-neutral-500">Staff</Link>
+          <Link href="/login" className="text-white/35">Staff</Link>
         </div>
         © {new Date().getFullYear()} HajtekZone · ODT Deals
       </footer>

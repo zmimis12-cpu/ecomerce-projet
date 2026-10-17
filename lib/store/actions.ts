@@ -31,12 +31,15 @@ export async function saveStoreConfig(cfg: import("./config").StoreConfig): Prom
   await requireRole(["super_admin", "admin", "manager"]);
   const clip = (v: unknown, n: number) => String(v ?? "").slice(0, n);
   const clean = {
-    announcement: clip(cfg.announcement, 140), heroTitle: clip(cfg.heroTitle, 120), heroSubtitle: clip(cfg.heroSubtitle, 300),
+    announcement: clip(cfg.announcement, 140), heroTitle: clip(cfg.heroTitle, 120), heroTitleGold: clip(cfg.heroTitleGold, 120), heroSubtitle: clip(cfg.heroSubtitle, 300),
+    trust: (cfg.trust ?? []).slice(0, 4).map((t) => ({ title: clip(t.title, 60), sub: clip(t.sub, 80) })),
+    bottomTitle1: clip(cfg.bottomTitle1, 80), bottomSub1: clip(cfg.bottomSub1, 120), bottomTitle2: clip(cfg.bottomTitle2, 80), bottomSub2: clip(cfg.bottomSub2, 120),
     heroCta: clip(cfg.heroCta, 40), heroImage: clip(cfg.heroImage, 500), featuredTitle: clip(cfg.featuredTitle, 80),
     allTitle: clip(cfg.allTitle, 80), showTrust: !!cfg.showTrust, showAbout: !!cfg.showAbout,
     contactEmail: clip(cfg.contactEmail, 120), whatsapp: clip(cfg.whatsapp, 20),
     products: Object.fromEntries(Object.entries(cfg.products ?? {}).map(([k, v]) => [k, {
       visible: v.visible !== false, featured: !!v.featured, order: Number.isFinite(Number(v.order)) ? Number(v.order) : 1000,
+      ...(v.category?.trim() ? { category: clip(v.category, 40) } : {}),
     }])),
   };
   const { error } = await supabaseAdmin.from("app_settings").upsert(

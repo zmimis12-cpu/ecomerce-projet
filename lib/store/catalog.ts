@@ -12,15 +12,16 @@ export type StoreProduct = {
   productId: string; slug: string; title: string; image: string | null;
   price: number; oldPrice: number | null;
   visible: boolean; featured: boolean; order: number;
+  category: string | null; subtitle: string | null;
 };
 export type BumpConfig = { product_id: string; price: number; label?: string };
 export type StoreBump = { productId: string; name: string; image: string | null; price: number; oldPrice: number | null; label: string | null };
 
 export const getStoreProducts = unstable_cache(async (): Promise<StoreProduct[]> => {
   const { data: lps } = await supabaseAdmin
-    .from("landing_pages").select("slug, title, hero_image, product_id, offers, old_price_text, updated_at")
+    .from("landing_pages").select("slug, title, subtitle, hero_subheadline, hero_image, product_id, offers, old_price_text, updated_at")
     .eq("is_active", true).order("updated_at", { ascending: false }).limit(40);
-  const list = ((lps ?? []) as { slug: string; title: string; hero_image: string | null; product_id: string | null; offers: unknown; old_price_text: string | null }[])
+  const list = ((lps ?? []) as { slug: string; title: string; subtitle: string | null; hero_subheadline: string | null; hero_image: string | null; product_id: string | null; offers: unknown; old_price_text: string | null }[])
     .filter((l) => l.product_id);
   const ids = [...new Set(list.map((l) => l.product_id!))];
   if (!ids.length) return [];
@@ -51,10 +52,12 @@ export const getStoreProducts = unstable_cache(async (): Promise<StoreProduct[]>
       visible: cfg.products[l.product_id!]?.visible !== false,
       featured: !!cfg.products[l.product_id!]?.featured,
       order: cfg.products[l.product_id!]?.order ?? 1000 + out.length,
+      category: cfg.products[l.product_id!]?.category?.trim() || null,
+      subtitle: (l.subtitle || l.hero_subheadline || "").trim() || null,
     });
   }
   return out.sort((a, b) => a.order - b.order);
-}, ["store-products-v3"], { revalidate: 300, tags: ["store"] });
+}, ["store-products-v4"], { revalidate: 300, tags: ["store"] });
 
 export async function getBumpConfig(): Promise<Record<string, BumpConfig[]>> {
   const { data } = await supabaseAdmin.from("app_settings").select("value").eq("key", "store_bumps").maybeSingle();

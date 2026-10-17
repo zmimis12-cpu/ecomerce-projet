@@ -38,7 +38,8 @@ export function StoreSettingsEditor({ tab, initial, products }: { tab: "accueil"
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
             <h2 className="font-semibold">Bannière d&apos;accueil</h2>
-            <L t="Titre"><input dir="auto" className={field} value={cfg.heroTitle} onChange={(e) => set("heroTitle", e.target.value)} /></L>
+            <L t="Titre (ligne blanche)"><input dir="auto" className={field} value={cfg.heroTitle} onChange={(e) => set("heroTitle", e.target.value)} /></L>
+            <L t="Titre (ligne dorée, optionnel)"><input dir="auto" className={field} value={cfg.heroTitleGold ?? ""} onChange={(e) => set("heroTitleGold", e.target.value)} /></L>
             <L t="Sous-titre"><textarea dir="auto" rows={2} className={cn(field, "h-auto py-2")} value={cfg.heroSubtitle} onChange={(e) => set("heroSubtitle", e.target.value)} /></L>
             <L t="Texte du bouton (vide = pas de bouton)"><input dir="auto" className={field} value={cfg.heroCta} onChange={(e) => set("heroCta", e.target.value)} /></L>
             <SectionImagePicker label="Image de fond (optionnel) — importe une photo depuis ton téléphone ou ton PC"
@@ -54,11 +55,32 @@ export function StoreSettingsEditor({ tab, initial, products }: { tab: "accueil"
             <L t="Email de contact"><input className={field} value={cfg.contactEmail} onChange={(e) => set("contactEmail", e.target.value)} /></L>
             <L t="Bouton WhatsApp sur l'accueil (numéro, vide = caché)"><input className={field} placeholder="06…" value={cfg.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} /></L>
           </div>
+          <div className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+            <h2 className="font-semibold">4 garanties (sous la bannière)</h2>
+            {(cfg.trust ?? []).map((t, i) => (
+              <div key={i} className="grid grid-cols-2 gap-2">
+                <input dir="auto" className={field} placeholder="Titre" value={t.title}
+                  onChange={(e) => set("trust", cfg.trust.map((x, k) => k === i ? { ...x, title: e.target.value } : x))} />
+                <input dir="auto" className={field} placeholder="Sous-titre" value={t.sub}
+                  onChange={(e) => set("trust", cfg.trust.map((x, k) => k === i ? { ...x, sub: e.target.value } : x))} />
+              </div>
+            ))}
+          </div>
+          <div className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+            <h2 className="font-semibold">Bandeau du bas</h2>
+            <div className="grid grid-cols-2 gap-2">
+              <input dir="auto" className={field} placeholder="Titre 1" value={cfg.bottomTitle1 ?? ""} onChange={(e) => set("bottomTitle1", e.target.value)} />
+              <input dir="auto" className={field} placeholder="Texte 1" value={cfg.bottomSub1 ?? ""} onChange={(e) => set("bottomSub1", e.target.value)} />
+              <input dir="auto" className={field} placeholder="Titre 2" value={cfg.bottomTitle2 ?? ""} onChange={(e) => set("bottomTitle2", e.target.value)} />
+              <input dir="auto" className={field} placeholder="Texte 2" value={cfg.bottomSub2 ?? ""} onChange={(e) => set("bottomSub2", e.target.value)} />
+            </div>
+          </div>
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
           <div className="border-b px-4 py-3 text-sm text-muted-foreground">
-            👁 = visible sur la boutique · ⭐ = section « mis en avant » en haut de l&apos;accueil · flèches = ordre d&apos;affichage.
+            👁 = visible sur la boutique · ⭐ = section « mis en avant » en haut de l&apos;accueil · flèches = ordre d&apos;affichage · Catégorie = filtres en haut des produits (ex : الإلكترونيات، المنزل…).
+            <datalist id="store-cats">{[...new Set(Object.values(cfg.products).map((x) => x.category).filter(Boolean))].map((c) => <option key={c} value={c} />)}</datalist>
             Un produit caché reste vendable par sa page (pubs), il n&apos;apparaît juste plus dans la boutique.
           </div>
           {ordered.map((p, i) => {
@@ -77,6 +99,9 @@ export function StoreSettingsEditor({ tab, initial, products }: { tab: "accueil"
                   <p className="truncate text-sm font-medium" dir="auto">{p.title}</p>
                   <p className="text-xs text-muted-foreground">{p.price} MAD · /lp/{p.slug}</p>
                 </div>
+                <input dir="auto" list="store-cats" placeholder="Catégorie" value={st.category ?? ""}
+                  onChange={(e) => setP(p.id, { category: e.target.value })}
+                  className="h-9 w-24 rounded-lg border bg-background px-2 text-xs sm:w-32" />
                 <a href={`/lp/${p.slug}`} target="_blank" className="hidden rounded p-2 text-muted-foreground hover:bg-muted sm:block" title="Voir"><ExternalLink className="h-4 w-4" /></a>
                 <button onClick={() => setP(p.id, { featured: !st.featured })} title="Mettre en avant"
                   className={cn("rounded-lg p-2 transition", st.featured ? "bg-amber-100 text-amber-600" : "text-muted-foreground hover:bg-muted")}>
