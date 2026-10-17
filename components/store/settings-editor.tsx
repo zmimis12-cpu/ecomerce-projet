@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, Eye, EyeOff, Star, ExternalLink } from "lucide-reac
 import { saveStoreConfig } from "@/lib/store/actions";
 import type { StoreConfig } from "@/lib/store/config";
 import { cn } from "@/lib/utils";
+import { SectionImagePicker } from "@/components/landing-builder/section-image-picker";
 
 type P = { id: string; title: string; image: string | null; price: number; slug: string };
 
@@ -40,7 +41,8 @@ export function StoreSettingsEditor({ tab, initial, products }: { tab: "accueil"
             <L t="Titre"><input dir="auto" className={field} value={cfg.heroTitle} onChange={(e) => set("heroTitle", e.target.value)} /></L>
             <L t="Sous-titre"><textarea dir="auto" rows={2} className={cn(field, "h-auto py-2")} value={cfg.heroSubtitle} onChange={(e) => set("heroSubtitle", e.target.value)} /></L>
             <L t="Texte du bouton (vide = pas de bouton)"><input dir="auto" className={field} value={cfg.heroCta} onChange={(e) => set("heroCta", e.target.value)} /></L>
-            <L t="Image de fond (URL, optionnel)"><input className={field} placeholder="https://…" value={cfg.heroImage} onChange={(e) => set("heroImage", e.target.value)} /></L>
+            <SectionImagePicker label="Image de fond (optionnel) — importe une photo depuis ton téléphone ou ton PC"
+              value={cfg.heroImage || undefined} onChange={(url) => set("heroImage", url)} />
             <L t="Barre d'annonce en haut (vide = « توصيل لجميع المدن · الدفع عند الاستلام »)"><input dir="auto" className={field} value={cfg.announcement} onChange={(e) => set("announcement", e.target.value)} placeholder="ex : 🔥 توصيل مجاني هاد الأسبوع" /></L>
           </div>
           <div className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
