@@ -3,6 +3,7 @@
  */
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getCreativesReport } from "@/lib/creatives/queries";
+import { readPortalConfigs, readVideoLinks, portalEarned, normalizePortalCfg } from "@/lib/creatives/portal";
 
 export type EditorPayment = {
   id: string;
@@ -70,18 +71,22 @@ export async function getEditorBalances(editorId?: string | null): Promise<{
   balances: EditorBalance[];
   payments: EditorPayment[];
 }> {
-  const [report, payments] = await Promise.all([
+  const [report, payments, cfgs, links] = await Promise.all([
     getCreativesReport({ month: "all", editorId }),
     getEditorPayments(editorId),
+    readPortalConfigs(),
+    readVideoLinks(editorId),
   ]);
   const balances = report.editors.map((e) => {
     const paid = payments.filter((p) => p.editorId === e.id).reduce((s, p) => s + p.amount, 0);
+    // Mode de rémunération : commission / salaire / par produit (+ commission)
+    const earned = portalEarned(cfgs[e.id] ?? normalizePortalCfg(null), e.earnings, links.filter((l) => l.editorId === e.id), null, null);
     return {
       editorId: e.id,
       name: e.name,
-      earned: e.earnings,
+      earned,
       paid,
-      remaining: Math.round((e.earnings - paid) * 100) / 100,
+      remaining: Math.round((earned - paid) * 100) / 100,
     };
   });
   return { balances, payments };

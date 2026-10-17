@@ -14,6 +14,9 @@ import { getCreativesLiveStatus, getMetaDeliveries, TONE_CLS } from "@/lib/ads/m
 import { AddPaymentForm } from "@/components/creatives/payment-controls";
 import { RateForm, DeleteRateButton } from "@/components/creatives/rate-controls";
 import { PaymentsList } from "@/components/creatives/payments-list";
+import { readPortalConfigs, readVideoLinks, getProductCards, portalEarned, payLabel, normalizePortalCfg } from "@/lib/creatives/portal";
+import { EditorPortalForm, ReceivedLinks } from "@/components/creatives/portal-controls";
+import { periodRange } from "@/lib/creatives/queries";
 
 export const metadata: Metadata = { title: "Vidéos & Éditeurs" };
 export const dynamic = "force-dynamic";
@@ -33,6 +36,15 @@ export default async function CreativesAdminPage({
     getEditorBalances(),
     getRecentAds(),
   ]);
+  const [portalCfgs, videoLinks, productCards] = await Promise.all([readPortalConfigs(), readVideoLinks(), getProductCards()]);
+  const cfgOf = (id: string) => portalCfgs[id] ?? normalizePortalCfg(null);
+  const { from: pFrom, to: pTo } = periodRange(report.period);
+  const commissionText = (e: { commissionType: string; commissionValue: number }) =>
+    e.commissionType === "percent" ? `${e.commissionValue}% par commande livrée` : `${e.commissionValue} MAD par commande livrée`;
+  // Gain de la période selon le mode de chaque éditeur (commission / salaire / par produit)
+  const gainOf = (e: { id: string; earnings: number }) =>
+    portalEarned(cfgOf(e.id), e.earnings, videoLinks.filter((l) => l.editorId === e.id), pFrom, pTo);
+  const pendingLinks = videoLinks.filter((l) => l.status === "pending").length;
   const { data: ratesRaw } = await supabaseAdmin
     .from("video_editor_rates" as never)
     .select("id, editor_id, product_id, commission_type, commission_value")
@@ -46,7 +58,7 @@ export default async function CreativesAdminPage({
   ]);
   const editorNames = new Map(balances.map((b) => [b.editorId, b.name]));
   const products = (productsRaw ?? []) as { id: string; name: string }[];
-  const totalEarnings = report.editors.reduce((s, e) => s + e.earnings, 0);
+  const totalEarnings = report.editors.reduce((s, e) => s + gainOf(e), 0);
 
   return (
     <div className="space-y-6">
@@ -105,12 +117,15 @@ export default async function CreativesAdminPage({
                   </td>
                   <td className="px-4 py-2">
                     <EditorCommissionForm userId={e.id} type={e.commissionType} value={e.commissionValue} />
+                    {cfgOf(e.id).payMode !== "commission" && (
+                      <div className="mt-1 text-xs font-medium text-fuchsia-700">{payLabel(cfgOf(e.id), commissionText(e))}</div>
+                    )}
                   </td>
                   <td className="px-4 py-2 text-right">{e.videosInAds} / {e.videos}</td>
                   <td className="px-4 py-2 text-right">{e.orders}</td>
                   <td className="px-4 py-2 text-right">{e.delivered}</td>
                   <td className="px-4 py-2 text-right">{rate(e.delivered, e.orders)}</td>
-                  <td className="px-4 py-2 text-right font-semibold text-emerald-700">{mad(e.earnings)}</td>
+                  <td className="px-4 py-2 text-right font-semibold text-emerald-700">{mad(gainOf(e))}</td>
                   <td className="px-4 py-2 text-right">
                     <Link href={`/admin/editor?editor=${e.id}&month=${report.period}`} className="text-xs text-primary hover:underline">
                       Détail
@@ -121,6 +136,38 @@ export default async function CreativesAdminPage({
             </tbody>
           </table>
         </div>
+      </section>
+
+      {/* Espace éditeurs : produits autorisés + rémunération + confidentialité */}
+      <section className="rounded-xl border bg-card">
+        <div className="border-b px-4 py-3">
+          <h2 className="font-medium">Espace éditeurs — produits, rémunération, confidentialité</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Choisis les produits de chaque éditeur (il voit seulement le nom et la photo), son mode de paiement
+            (commission, salaire ou par produit) et s&apos;il peut voir les montants pub.
+          </p>
+        </div>
+        <div className="grid gap-4 p-4 xl:grid-cols-2">
+          {report.editors.length === 0 && <p className="text-sm text-muted-foreground">Aucun éditeur.</p>}
+          {report.editors.map((e) => (
+            <EditorPortalForm key={e.id} editorId={e.id} editorName={e.name} initial={cfgOf(e.id)}
+              products={productCards} commissionLabel={commissionText(e)} />
+          ))}
+        </div>
+      </section>
+
+      {/* Liens vidéo envoyés par les éditeurs */}
+      <section id="liens" className="rounded-xl border bg-card">
+        <div className="border-b px-4 py-3">
+          <h2 className="font-medium">
+            Vidéos reçues (liens Drive){pendingLinks > 0 && <span className="ms-2 rounded-full bg-amber-500 px-2 py-0.5 text-xs text-white">{pendingLinks} à valider</span>}
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Classées par produit. « Valider » = la vidéo est acceptée (et payée si l&apos;éditeur est en mode « par produit »).
+          </p>
+        </div>
+        <ReceivedLinks products={productCards} links={videoLinks}
+          editorNames={Object.fromEntries(report.editors.map((e) => [e.id, e.name]))} />
       </section>
 
       {/* Tarifs flexibles */}

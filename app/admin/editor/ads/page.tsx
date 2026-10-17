@@ -38,8 +38,9 @@ export default async function EditorAdsPage({
   const linked = await getEditorLinkedAds(ctx.editorId);
   const metaLinks = linked.filter((l) => l.platform === "meta");
   const codeByAd = new Map(linked.map((l) => [l.adId, l.code]));
+  const hide = ctx.hideAdMoney; // réglé par l'admin : pas de dépense / budget / campagne
   const [live, ads, fx] = await Promise.all([
-    getMetaAdsLive(metaLinks.map((l) => l.adId), periodToRange(ctx.report.period)),
+    hide ? Promise.resolve(null) : getMetaAdsLive(metaLinks.map((l) => l.adId), periodToRange(ctx.report.period)),
     getEditorAdStats({ editorId: ctx.editorId, month: ctx.report.period }),
     getUsdToMad(),
   ]);
@@ -54,13 +55,13 @@ export default async function EditorAdsPage({
     <div className="space-y-6">
       <EditorHeader ctx={ctx} title="Stats pubs" icon={BarChart3} current="/admin/editor/ads" />
 
-      <MetaLiveSection live={live} codeByAd={Object.fromEntries(codeByAd)} rate={fx.rate} showTotals />
+      {live && <MetaLiveSection live={live} codeByAd={Object.fromEntries(codeByAd)} rate={fx.rate} showTotals />}
 
       <section className="rounded-xl border bg-card">
         <div className="border-b px-4 py-3">
           <h2 className="font-medium">Détail vidéo & engagement — synchro 15 min ({ads.length})</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Mêmes chiffres que Meta Ads Manager, sans les montants. * = cumul depuis le lancement de la pub.
+            {hide ? "Coût de tes vidéos (coût par lead) et engagement." : "Mêmes chiffres que Meta Ads Manager, sans les montants."} * = cumul depuis le lancement de la pub.
             Hook rate = vues 3 s ÷ impressions · Hold rate = ThruPlays ÷ vues 3 s.
           </p>
         </div>
@@ -80,7 +81,7 @@ export default async function EditorAdsPage({
                   <td className="px-3 py-2 font-mono font-semibold">{a.creativeCode}</td>
                   <td className="px-3 py-2">
                     <div className="font-medium">{a.adName}</div>
-                    <div className="text-[10px] text-muted-foreground">{a.platform === "meta" ? "Meta" : "TikTok"}{a.adsetName ? ` · ${a.adsetName}` : ""}</div>
+                    <div className="text-[10px] text-muted-foreground">{a.platform === "meta" ? "Meta" : "TikTok"}{!hide && a.adsetName ? ` · ${a.adsetName}` : ""}</div>
                   </td>
                   <td className="px-3 py-2">{a.status ? STATUS[a.status] ?? a.status : "—"}</td>
                   <td className="px-3 py-2 text-right font-semibold">{a.leads}</td>

@@ -10,6 +10,7 @@ const STATUS: Record<string, string> = { in_ads: "🟢 En pub", paused: "⏸️ 
 
 const TABS = [
   { href: "/admin/editor",          label: "Tableau de bord" },
+  { href: "/admin/editor/products", label: "Produits & liens" },
   { href: "/admin/editor/videos",   label: "Vidéos" },
   { href: "/admin/editor/ads",      label: "Stats pubs" },
   { href: "/admin/editor/deliveries", label: "Suivi livraisons" },
@@ -31,7 +32,7 @@ export function EditorHeader({
             {title}{!ctx.isEditor && ` — ${ctx.me?.name ?? ""}`}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Rémunération : {ctx.commissionLabel}. Seules les commandes livrées comptent.
+            Rémunération : {ctx.commissionLabel}.{(ctx.portal.payMode === "commission" || ctx.portal.plusCommission) && " Seules les commandes livrées comptent pour la commission."}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Stats pubs mises à jour {ago(ctx.report.adsUpdatedAt)} · automatique toutes les 15 min

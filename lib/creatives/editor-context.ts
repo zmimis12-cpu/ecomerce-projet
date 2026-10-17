@@ -4,7 +4,8 @@
  */
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth/session";
-import { getCreativesReport } from "@/lib/creatives/queries";
+import { getCreativesReport, periodRange } from "@/lib/creatives/queries";
+import { readPortalConfig, readVideoLinks, portalEarned, payLabel } from "@/lib/creatives/portal";
 import { getEditorBalances } from "@/lib/creatives/payment-queries";
 import { currentMonth } from "@/components/creatives/period-filter";
 import { getCreativesLiveStatus } from "@/lib/ads/meta-status";
@@ -16,21 +17,29 @@ export async function loadEditorContext(sp: Record<string, string>) {
   if (!editorId) redirect("/admin/creatives");
 
   const month = sp.month ?? currentMonth();
-  const [report, { balances, payments }] = await Promise.all([
+  const [report, { balances, payments }, portal, links] = await Promise.all([
     getCreativesReport({ month, editorId }),
     getEditorBalances(editorId),
+    readPortalConfig(editorId),
+    readVideoLinks(editorId),
   ]);
   const live = await getCreativesLiveStatus(report.creatives.map((c) => c.id));
   const liveInAds = [...live.values()].filter((l) => l.dbStatus === "in_ads").length;
-  const me = report.editors[0];
+  const { from, to } = periodRange(report.period);
+  const rawMe = report.editors[0];
+  // Gain de la période selon le mode de rémunération (commission / salaire / par produit)
+  const me = rawMe ? { ...rawMe, earnings: portalEarned(portal, rawMe.earnings, links, from, to) } : rawMe;
   const bal = balances[0] ?? { earned: 0, paid: 0, remaining: 0 };
-  const commissionLabel = me
+  const commissionOnly = me
     ? me.commissionType === "percent"
       ? `${me.commissionValue}% par commande livrée`
       : `${me.commissionValue} MAD par commande livrée`
     : "—";
+  const commissionLabel = payLabel(portal, commissionOnly);
+  /** Éditeur en mode restreint : pas de dépense / budget / campagne — seulement le coût de ses vidéos. */
+  const hideAdMoney = isEditor && portal.hideAdMoney;
 
-  return { session, isEditor, editorId, month, report, me, bal, payments, commissionLabel, live, liveInAds };
+  return { session, isEditor, editorId, month, report, me, bal, payments, commissionLabel, live, liveInAds, portal, links, hideAdMoney };
 }
 
 export type EditorContext = Awaited<ReturnType<typeof loadEditorContext>>;
