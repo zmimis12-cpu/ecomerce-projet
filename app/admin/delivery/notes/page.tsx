@@ -34,6 +34,14 @@ export default async function DeliveryNotesPage() {
     throw e;
   }
 
+  // Speedaf : rattache les colis envoyés qui ne sont dans aucun lot (rattrapage)
+  try {
+    const { backfillSpeedafBatches } = await import("@/lib/delivery/speedaf/batch");
+    await backfillSpeedafBatches();
+  } catch (e) {
+    console.warn("DELIVERY_NOTES_ERROR speedaf backfill:", e instanceof Error ? e.message : e);
+  }
+
   // Load batches — safe fallback
   let rows: Batch[] = [];
   try {

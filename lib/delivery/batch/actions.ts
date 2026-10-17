@@ -827,6 +827,18 @@ export async function downloadBatchBl(batchId: string): Promise<{
 export async function syncBatchStatuses(batchId: string) {
   await requireRole([...MANAGER]);
 
+  // Lot Speedaf → statuts via l'API Speedaf
+  const { data: bmeta } = await supabaseAdmin.from("delivery_batches").select("shipping_company").eq("id", batchId).maybeSingle();
+  if ((bmeta as { shipping_company?: string } | null)?.shipping_company === "Speedaf") {
+    const { data: srows } = await supabaseAdmin.from("delivery_batch_orders")
+      .select("tracking_number").eq("batch_id", batchId).not("tracking_number", "is", null);
+    const tr = ((srows ?? []) as { tracking_number: string }[]).map((r) => r.tracking_number);
+    if (!tr.length) return { success: false, error: "Aucun tracking à synchroniser." };
+    const r = await (await import("@/lib/delivery/speedaf/batch")).syncSpeedafBatch(tr);
+    revalidatePath(`/admin/delivery/notes/${batchId}`);
+    return r;
+  }
+
   const { data: rows } = await supabaseAdmin
     .from("delivery_batch_orders")
     .select("order_id, tracking_number")
@@ -1016,7 +1028,7 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   // ── 1. Fetch batch meta ────────────────────────────────────────────────────
   const { data: batchData, error: batchErr } = await supabaseAdmin
     .from("delivery_batches")
-    .select("batch_number, total_orders")
+    .select("batch_number, total_orders, shipping_company")
     .eq("id", batchId)
     .maybeSingle();
 
@@ -1025,8 +1037,9 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
     return { ok: false, error: `Batch introuvable: ${batchErr.message}` };
   }
 
-  type BD = { batch_number: string; total_orders: number };
+  type BD = { batch_number: string; total_orders: number; shipping_company: string | null };
   const batchNum    = (batchData as BD | null)?.batch_number ?? "";
+  const isSpeedaf   = (batchData as BD | null)?.shipping_company === "Speedaf";
   const totalOrders = (batchData as BD | null)?.total_orders ?? 0;
   const batchStoreId: string | null = null; // delivery_store_id not yet in production
 
@@ -1301,7 +1314,6 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   // Digylog POST /labels ignores the order of trackings array — it returns
   // labels in its own internal order. The only way to guarantee sorted output
   // is to download each label individually and merge them ourselves.
-  const client = await getDeliveryClient();
   const mergedDoc = await PDFDocument.create();
   const recapSrc  = await PDFDocument.load(recapBytes);
   const recapPages = await mergedDoc.copyPages(recapSrc, recapSrc.getPageIndices());
@@ -1311,9 +1323,24 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
   let labelsOk = 0;
   const labelErrors: string[] = [];
 
-  for (const tracking of trackings) {
+  if (isSpeedaf) {
+    // Speedaf : étiquettes dans le même ordre que le récap
+    const { speedafLabelPdfs } = await import("@/lib/delivery/speedaf/batch");
+    const { pdfs, missing } = await speedafLabelPdfs(trackings);
+    for (const bytes of pdfs) {
+      try {
+        const src = await PDFDocument.load(bytes);
+        (await mergedDoc.copyPages(src, src.getPageIndices())).forEach((p) => mergedDoc.addPage(p));
+        labelsOk++;
+      } catch (e) { labelErrors.push(e instanceof Error ? e.message : String(e)); }
+    }
+    missing.forEach((t) => labelErrors.push(`${t}: étiquette Speedaf introuvable`));
+  }
+
+  const client = isSpeedaf ? null : await getDeliveryClient();
+  for (const tracking of client ? trackings : []) {
     try {
-      const labelRes = await client.downloadLabels({ orders: [tracking], format: 3 });
+      const labelRes = await client!.downloadLabels({ orders: [tracking], format: 3 });
       if (!labelRes.ok || !labelRes.blob) {
         console.warn(`[labels] skip ${tracking}: ${labelRes.error}`);
         labelErrors.push(`${tracking}: ${labelRes.error ?? "not found"}`);

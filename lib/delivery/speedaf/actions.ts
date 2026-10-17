@@ -230,6 +230,13 @@ export async function sendOrderToSpeedaf(orderId: string, cityOverride?: string)
     notes: `Envoyée à Speedaf (${resolved.city}) — ${tracking}`,
   } as never).then(() => {}, () => {});
 
+  // Récap tickets : rattache au lot Speedaf du jour (comme Digylog)
+  try {
+    const { attachToSpeedafBatch } = await import("./batch");
+    await attachToSpeedafBatch(orderId, tracking, now);
+    revalidatePath("/admin/delivery/notes");
+  } catch (e) { console.error("[speedaf] lot du jour:", e); }
+
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath("/admin/orders");
   return { success: true, tracking };
@@ -279,6 +286,7 @@ export async function cancelSpeedafOrder(orderId: string, reason = "Annulation c
     delivery_external_status_id: null, delivery_status: null, sent_to_delivery_at: null, status: "confirmed",
   } as never).eq("id", orderId);
   await supabaseAdmin.from("delivery_shipments").delete().eq("order_id", orderId);
+  try { await (await import("./batch")).detachFromBatch(orderId); } catch { /* best effort */ }
   await supabaseAdmin.from("order_status_history").insert({
     order_id: orderId, from_status: o.status, to_status: "confirmed", notes: `Envoi Speedaf annulé (${o.delivery_tracking_number})`,
   } as never).then(() => {}, () => {});
