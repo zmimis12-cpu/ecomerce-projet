@@ -330,7 +330,7 @@ export function ReceivedLinks({ products, links, editorNames }: {
 /* ───────────────────────── Fiche produit pour l'éditeur ───────────────────────── */
 
 const URL_RE = /(https?:\/\/[^\s]+)/g;
-function Linkified({ text }: { text: string }) {
+export function Linkified({ text }: { text: string }) {
   return (
     <>
       {text.split(URL_RE).map((part, i) => i % 2 === 1

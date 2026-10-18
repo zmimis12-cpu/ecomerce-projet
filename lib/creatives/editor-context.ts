@@ -10,7 +10,8 @@ import { getEditorBalances } from "@/lib/creatives/payment-queries";
 import { currentMonth } from "@/components/creatives/period-filter";
 import { getCreativesLiveStatus } from "@/lib/ads/meta-status";
 
-export async function loadEditorContext(sp: Record<string, string>) {
+/** light = page « Mes produits » : pas de soldes ni de statut Meta en direct (ouverture plus rapide). */
+export async function loadEditorContext(sp: Record<string, string>, opts: { light?: boolean } = {}) {
   const session = await requireRole(["video_editor", "super_admin", "admin", "manager"]);
   const isEditor = session.role === "video_editor";
   const editorId = isEditor ? session.authId : (sp.editor || null);
@@ -19,11 +20,13 @@ export async function loadEditorContext(sp: Record<string, string>) {
   const month = sp.month ?? currentMonth();
   const [report, { balances, payments }, portal, links] = await Promise.all([
     getCreativesReport({ month, editorId }),
-    getEditorBalances(editorId),
+    opts.light ? Promise.resolve({ balances: [], payments: [] } as Awaited<ReturnType<typeof getEditorBalances>>) : getEditorBalances(editorId),
     readPortalConfig(editorId),
     readVideoLinks(editorId),
   ]);
-  const live = await getCreativesLiveStatus(report.creatives.map((c) => c.id));
+  const live = opts.light
+    ? new Map() as Awaited<ReturnType<typeof getCreativesLiveStatus>>
+    : await getCreativesLiveStatus(report.creatives.map((c) => c.id));
   const liveInAds = [...live.values()].filter((l) => l.dbStatus === "in_ads").length;
   const { from, to } = periodRange(report.period);
   const rawMe = report.editors[0];

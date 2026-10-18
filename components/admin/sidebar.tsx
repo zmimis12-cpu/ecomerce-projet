@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  Scale, LayoutDashboard, Package, ShoppingCart, PhoneCall,
+  Loader2, Scale, LayoutDashboard, Package, ShoppingCart, PhoneCall,
   Truck, Layers, FileText, FolderOpen,
   ScanLine, RotateCcw, BarChart3, Globe, Settings,
   Shield, Award, Users, ListOrdered, CreditCard, Clapperboard, PackageCheck, Wallet, Calculator, Rocket,
@@ -150,23 +150,43 @@ export function AdminSidebar({ role }: { role: AppRole }) {
   const pathname  = usePathname();
   const navGroups = getNavForRole(role);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [open, setOpen] = useState<Record<string, boolean>>({});
+  // Lien cliqué : surligné tout de suite (avant que la page ait fini de charger)
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [ready, setReady] = useState(false); // pas d'animation d'ouverture au 1er affichage
 
-  function isActive(href: string, exact?: boolean) {
-    if (href === "/admin") return pathname === "/admin";
-    if (exact) return pathname === href;
-    return pathname === href || pathname.startsWith(href + "/");
+  function isActive(href: string, exact?: boolean, path = pathname) {
+    if (href === "/admin") return path === "/admin";
+    if (exact) return path === href;
+    return path === href || path.startsWith(href + "/");
   }
-  const groupHasActive = (g: NavGroup) => g.items.some((i) => isActive(i.href, i.exact));
+  const groupHasActive = (g: NavGroup, path = pathname) => g.items.some((i) => isActive(i.href, i.exact, path));
 
-  // Groupes ouverts : mémorisés + le groupe de la page courante toujours ouvert
+  // Groupe de la page courante ouvert DÈS le premier rendu (avant : tout fermé puis ouverture → saut visuel)
+  const [open, setOpen] = useState<Record<string, boolean>>(() => {
+    const o: Record<string, boolean> = {};
+    for (const g of navGroups) if (g.key && groupHasActive(g)) o[g.key] = true;
+    return o;
+  });
+
+  // Après montage : on ajoute les groupes mémorisés (sans fermer celui de la page courante)
   useEffect(() => {
     let saved: Record<string, boolean> = {};
     try { saved = JSON.parse(localStorage.getItem(STORE_KEY) ?? "{}"); } catch { /* ignore */ }
-    const next = { ...saved };
-    for (const g of navGroups) if (g.key && groupHasActive(g)) next[g.key] = true;
-    setOpen(next);
+    setOpen((o) => ({ ...saved, ...o }));
+    const t = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Navigation terminée : fin du chargement, ferme le tiroir mobile, ouvre le groupe de la page
+  useEffect(() => {
+    setPendingHref(null);
     setMobileOpen(false);
+    setOpen((o) => {
+      const n = { ...o };
+      for (const g of navGroups) if (g.key && groupHasActive(g)) n[g.key] = true;
+      return n;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
@@ -177,6 +197,9 @@ export function AdminSidebar({ role }: { role: AppRole }) {
       return n;
     });
   }
+
+  // Lien actif = celui qu'on vient de cliquer (si chargement en cours), sinon la page courante
+  const activePath = pendingHref ?? pathname;
 
   const nav = (
     <>
@@ -209,13 +232,20 @@ export function AdminSidebar({ role }: { role: AppRole }) {
                   <ChevronDown className={cn("h-4 w-4 shrink-0 opacity-60 transition-transform duration-200", isOpen && "rotate-180")} />
                 </button>
               )}
-              <div className={cn("grid transition-[grid-template-rows,opacity] duration-300 ease-out", isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
+              <div className={cn("grid", ready && "transition-[grid-template-rows,opacity] duration-200 ease-out", isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
                 <div className="overflow-hidden">
                   <div className={cn("space-y-0.5", collapsible && "ml-[18px] mt-0.5 border-l border-white/10 pl-2")}>
                     {group.items.map(({ href, label, icon: Icon, exact }) => {
-                      const on = isActive(href, exact);
+                      const on = isActive(href.split("#")[0], exact, activePath);
+                      const loading = pendingHref === href.split("#")[0] && pendingHref !== pathname;
                       return (
                         <Link key={href} href={href}
+                          onClick={(e) => {
+                            if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                            const target = href.split("#")[0];
+                            if (target !== pathname) setPendingHref(target);
+                          }}
+                          tabIndex={isOpen ? undefined : -1}
                           className={cn(
                             "relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-200",
                             on
@@ -225,6 +255,7 @@ export function AdminSidebar({ role }: { role: AppRole }) {
                           {on && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brand" />}
                           <Icon className={cn("h-4 w-4 shrink-0", on ? "text-brand" : "")} />
                           <span className="truncate">{label}</span>
+                          {loading && <Loader2 className="ml-auto h-3.5 w-3.5 shrink-0 animate-spin text-brand" />}
                         </Link>
                       );
                     })}
