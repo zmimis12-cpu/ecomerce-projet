@@ -10,6 +10,9 @@ import { applySpeedafTrack } from "./sync";
 
 export const SPEEDAF_PROVIDER = "Speedaf";
 
+/** Un signal unique empêche React/Next de réutiliser la réponse d'une requête identique faite plus tôt dans le même rendu. */
+const fresh = () => new AbortController().signal;
+
 async function storeName(): Promise<string> {
   const { data } = await supabaseAdmin.from("digylog_settings").select("default_store_name").limit(1).maybeSingle();
   return (data as { default_store_name?: string } | null)?.default_store_name || "Hajtekzone";
@@ -27,6 +30,7 @@ async function getOrCreateSpeedafBatch(day: string, store: string): Promise<stri
     .is("bl_id", null)
     .order("created_at", { ascending: false })
     .limit(1)
+    .abortSignal(fresh()) // pas de mémorisation Next.js : toujours relire la base
     .maybeSingle();
   if (existing) return (existing as { id: string }).id;
 
@@ -44,7 +48,7 @@ async function getOrCreateSpeedafBatch(day: string, store: string): Promise<stri
 
 async function refreshCount(batchId: string) {
   const { count } = await supabaseAdmin
-    .from("delivery_batch_orders").select("id", { count: "exact", head: true }).eq("batch_id", batchId);
+    .from("delivery_batch_orders").select("id", { count: "exact", head: true }).eq("batch_id", batchId).abortSignal(fresh());
   await supabaseAdmin.from("delivery_batches").update({ total_orders: count ?? 0 } as never).eq("id", batchId);
 }
 
@@ -53,7 +57,7 @@ export async function attachToSpeedafBatch(orderId: string, tracking: string, se
   const day = (sentAt ?? new Date().toISOString()).slice(0, 10);
   const batchId = await getOrCreateSpeedafBatch(day, store ?? (await storeName()));
   const { data: linked } = await supabaseAdmin
-    .from("delivery_batch_orders").select("id").eq("batch_id", batchId).eq("order_id", orderId).maybeSingle();
+    .from("delivery_batch_orders").select("id").eq("batch_id", batchId).eq("order_id", orderId).abortSignal(fresh()).maybeSingle();
   if (!linked) {
     await supabaseAdmin.from("delivery_batch_orders").insert({
       batch_id: batchId, order_id: orderId, tracking_number: tracking, status: "pending",
@@ -74,10 +78,17 @@ export async function detachFromBatch(orderId: string) {
   for (const id of ids) await refreshCount(id);
 }
 
-/** Rattrapage : colis Speedaf des 7 derniers jours qui ne sont dans aucun lot. */
+/**
+ * Rattrapage, appelé au chargement de « Récap tickets ».
+ * ⚠️ Pendant le rendu d'une page, Next.js mémorise les requêtes identiques : on ne fait donc
+ * JAMAIS la même recherche en boucle — on groupe par jour en mémoire, 1 lot par jour.
+ */
 export async function backfillSpeedafBatches(): Promise<number> {
   const companyId = await getSpeedafCompanyId();
   if (!companyId) return 0;
+  const store = await storeName();
+  await mergeSpeedafDayBatches(store);
+
   const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
   const { data } = await supabaseAdmin.from("orders")
     .select("id, delivery_tracking_number, sent_to_delivery_at")
@@ -89,11 +100,74 @@ export async function backfillSpeedafBatches(): Promise<number> {
     .limit(300);
   const rows = (data ?? []) as { id: string; delivery_tracking_number: string; sent_to_delivery_at: string | null }[];
   if (!rows.length) return 0;
-  const store = await storeName();
+
+  // Groupement par jour d'envoi
+  const byDay = new Map<string, typeof rows>();
   for (const o of rows) {
-    try { await attachToSpeedafBatch(o.id, o.delivery_tracking_number, o.sent_to_delivery_at, store); } catch { /* suivant */ }
+    const day = (o.sent_to_delivery_at ?? new Date().toISOString()).slice(0, 10);
+    byDay.set(day, [...(byDay.get(day) ?? []), o]);
   }
-  return rows.length;
+
+  // Lots Speedaf ouverts existants (une seule requête)
+  const { data: open } = await supabaseAdmin.from("delivery_batches")
+    .select("id, batch_date, created_at")
+    .eq("shipping_company", SPEEDAF_PROVIDER).eq("store_name", store)
+    .in("batch_date", [...byDay.keys()])
+    .in("status", ["draft", "tickets_printed"]).is("bl_id", null)
+    .order("created_at", { ascending: true });
+  const openByDay = new Map<string, string>();
+  for (const b of (open ?? []) as { id: string; batch_date: string }[]) if (!openByDay.has(b.batch_date)) openByDay.set(b.batch_date, b.id);
+
+  let attached = 0;
+  for (const [day, list] of byDay) {
+    try {
+      const batchId = openByDay.get(day) ?? (await getOrCreateSpeedafBatch(day, store));
+      await supabaseAdmin.from("delivery_batch_orders").upsert(
+        list.map((o) => ({ batch_id: batchId, order_id: o.id, tracking_number: o.delivery_tracking_number, status: "pending" })) as never,
+        { onConflict: "batch_id,order_id", ignoreDuplicates: true },
+      );
+      await supabaseAdmin.from("orders").update({ delivery_batch_id: batchId } as never).in("id", list.map((o) => o.id));
+      await refreshCount(batchId);
+      // récap produits recalculé par la page (total_products = 0)
+      await supabaseAdmin.from("delivery_batch_product_summary").delete().eq("batch_id", batchId);
+      await supabaseAdmin.from("delivery_batches").update({ total_products: 0 } as never).eq("id", batchId);
+      attached += list.length;
+    } catch { /* jour suivant */ }
+  }
+  return attached;
+}
+
+/** Fusionne les lots Speedaf du même jour pas encore imprimés (corrige les lots en double). */
+async function mergeSpeedafDayBatches(store: string) {
+  const since = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const { data } = await supabaseAdmin.from("delivery_batches")
+    .select("id, batch_date, created_at")
+    .eq("shipping_company", SPEEDAF_PROVIDER).eq("store_name", store)
+    .eq("status", "draft").is("bl_id", null).is("labels_downloaded_at", null)
+    .gte("batch_date", since)
+    .order("created_at", { ascending: true });
+  const byDay = new Map<string, string[]>();
+  for (const b of (data ?? []) as { id: string; batch_date: string }[]) byDay.set(b.batch_date, [...(byDay.get(b.batch_date) ?? []), b.id]);
+
+  for (const ids of byDay.values()) {
+    if (ids.length < 2) continue;
+    const [keep, ...dupes] = ids;
+    const { data: bo } = await supabaseAdmin.from("delivery_batch_orders")
+      .select("order_id, tracking_number").in("batch_id", dupes);
+    const moved = (bo ?? []) as { order_id: string; tracking_number: string | null }[];
+    if (moved.length) {
+      await supabaseAdmin.from("delivery_batch_orders").upsert(
+        moved.map((m) => ({ batch_id: keep, order_id: m.order_id, tracking_number: m.tracking_number, status: "pending" })) as never,
+        { onConflict: "batch_id,order_id", ignoreDuplicates: true },
+      );
+      await supabaseAdmin.from("orders").update({ delivery_batch_id: keep } as never).in("id", moved.map((m) => m.order_id));
+    }
+    // les lignes des lots en double partent avec eux (ON DELETE CASCADE)
+    await supabaseAdmin.from("delivery_batches").delete().in("id", dupes);
+    await refreshCount(keep);
+    await supabaseAdmin.from("delivery_batch_product_summary").delete().eq("batch_id", keep);
+    await supabaseAdmin.from("delivery_batches").update({ total_products: 0 } as never).eq("id", keep);
+  }
 }
 
 /** Étiquettes Speedaf (PDF) dans l'ordre demandé — 1 PDF par colis, pour garder le tri du récap. */

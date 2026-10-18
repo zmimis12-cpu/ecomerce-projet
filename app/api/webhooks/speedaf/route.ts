@@ -31,7 +31,9 @@ export async function POST(req: NextRequest) {
     const expected = createHmac("sha256", cfg.secretKey).update(`${ts}\n${raw}`).digest("hex");
     const fresh = Math.abs(Date.now() - Number(ts)) < 10 * 60_000;
     trusted = fresh && expected.length === sig.length && timingSafeEqual(Buffer.from(expected), Buffer.from(sig));
-    if (!trusted) return NextResponse.json({ success: false, error: "bad signature", data: null }, { status: 401 });
+    // Signature invalide (clé différente ?) → on ne rejette pas : le contenu est ignoré
+    // et le statut est relu chez Speedaf ci-dessous (aucune mise à jour perdue).
+    if (!trusted) console.warn("[speedaf-webhook] signature non vérifiée → relecture API");
   }
 
   const mailNo = String(body.mailNo ?? body.tracks?.[0]?.mailNo ?? "").trim();
