@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { Truck, ShieldCheck, BadgeCheck, Headset, MapPin, ShoppingCart } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getStoreProducts } from "@/lib/store/catalog";
@@ -24,8 +25,14 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
-  // ?boutique=1 : l'équipe connectée peut voir la boutique comme un client
-  const asClient = (await searchParams).boutique === "1";
+  // L'équipe connectée qui tape hajtek.ma arrive sur /admin.
+  // MAIS tout lien cliqué DANS le site (تسوق الآن, المنتجات, logo…) reste dans la boutique :
+  // si on vient d'une page de hajtek.ma (referer même domaine) ou avec ?boutique=1, pas de redirection.
+  const h = await headers();
+  const ref = h.get("referer") ?? "";
+  const host = h.get("host") ?? "";
+  const fromSite = !!ref && !!host && (() => { try { return new URL(ref).host === host; } catch { return false; } })();
+  const asClient = (await searchParams).boutique === "1" || fromSite;
   if (!asClient) try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();

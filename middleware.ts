@@ -54,7 +54,7 @@ export async function middleware(request: NextRequest) {
       // une iframe interne. DENY bloquait silencieusement l'affichage,
       // causant un chargement infini côté client sans erreur visible.
       res.headers.set("X-Content-Type-Options", "nosniff");
-      res.headers.set("Referrer-Policy", "no-referrer");
+      res.headers.set("Referrer-Policy", "same-origin"); // rien n'est envoyé aux autres sites ; utile pour rester dans la boutique (app/page.tsx)
       res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
       return res;
     }
@@ -81,7 +81,7 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith("/lp/") || pathname.startsWith("/p/") || pathname.startsWith("/lp-classic/")) {
       // Même raison: pas de X-Frame-Options sur les landing pages publiques.
       res.headers.set("X-Content-Type-Options", "nosniff");
-      res.headers.set("Referrer-Policy", "no-referrer");
+      res.headers.set("Referrer-Policy", "same-origin"); // rien n'est envoyé aux autres sites ; utile pour rester dans la boutique (app/page.tsx)
       res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
     }
 
