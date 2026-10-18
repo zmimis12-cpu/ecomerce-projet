@@ -21,6 +21,8 @@ export type LpDesign = {
   heroSource: "product" | "banner";  // photo principale : 1re photo produit ou bannière (hero_image) de la LP
   heroImage: string;                 // photo principale CHOISIE (par landing page) — prioritaire sur heroSource
   showStoreHeader: boolean;          // logo + menu « القائمة »
+  crossAtBottom: boolean;            // autres produits toujours tout en bas (la page reste centrée sur LE produit — mieux pour Meta)
+  showBumps: boolean;                // upsells « أضف لطلبك » dans le formulaire
   showTopBar: boolean;               // barre noire en haut
   showBadge: boolean;
   showDiscount: boolean;
@@ -40,11 +42,15 @@ export type LpDesign = {
   colorPrimary: string; colorBadge: string; colorDiscount: string; colorDark: string; colorBg: string;
   // Vidéo (YouTube ou lien .mp4) — surtout utile par landing page
   videoUrl: string;
+  // Photos ↔ textes (par landing page) — vide = automatique
+  featureImage: string; featureTitle: string; featureText: string;   // bloc « photo + texte »
+  tiles: { image: string; text: string }[];                          // tuiles photo + légende
+  galleryImages: string[];                                           // galerie (ordre choisi)
 };
 
 export const DEFAULT_LP_DESIGN: LpDesign = {
   blocks: LP_BLOCKS.map((b) => ({ key: b.key, on: true })),
-  heroSource: "product", heroImage: "", showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
+  heroSource: "product", heroImage: "", crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
   showOldPrice: true, showCodBar: true, askAddress: true, addressRequired: false, showWhatsapp: true, showWhatsappFloat: true,
   sticky: true, showFooter: true,
   topBar: "", badge: "عرض خاص", codBar: "🚚 التوصيل لجميع المدن | الدفع عند الاستلام", orderTitle: "🛒 اطلب الآن", orderSub: "",
@@ -53,6 +59,7 @@ export const DEFAULT_LP_DESIGN: LpDesign = {
   finalTitle: "لا تفوت الفرصة!", finalText: "", finalCta: "", stickyText: "",
   colorPrimary: "#16a34a", colorBadge: "#dc2626", colorDiscount: "#facc15", colorDark: "#0f172a", colorBg: "#f6f7f9",
   videoUrl: "",
+  featureImage: "", featureTitle: "", featureText: "", tiles: [], galleryImages: [],
 };
 
 export type LpDesignStore = { global: LpDesign; perSlug: Record<string, LpDesign> };
@@ -63,6 +70,10 @@ export function normalizeDesign(v: Partial<LpDesign> | undefined | null): LpDesi
   const known = new Set(LP_BLOCKS.map((b) => b.key));
   const blocks = (Array.isArray(v?.blocks) ? v!.blocks : []).filter((b) => known.has(b.key));
   for (const b of LP_BLOCKS) if (!blocks.some((x) => x.key === b.key)) blocks.push({ key: b.key, on: true });
-  return { ...d, blocks };
+  const str = (x: unknown) => (typeof x === "string" ? x : "");
+  const tiles = (Array.isArray(v?.tiles) ? v!.tiles : []).slice(0, 9)
+    .map((t) => ({ image: str(t?.image), text: str(t?.text) })).filter((t) => t.image || t.text);
+  const galleryImages = (Array.isArray(v?.galleryImages) ? v!.galleryImages : []).filter((x) => typeof x === "string" && x).slice(0, 20);
+  return { ...d, blocks, tiles, galleryImages };
 }
 

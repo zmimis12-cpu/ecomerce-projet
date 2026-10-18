@@ -24,13 +24,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const page = await getLandingPage(slug);
   if (!page) return { title: "منتج غير موجود", robots: { index: false, follow: false } };
-  const image = page.product.images[0]?.public_url;
+  // Aperçu du lien (Meta / WhatsApp) = LE produit de la page : sa photo hero choisie, son nom
+  const d = await getLpDesignFor(slug).catch(() => null);
+  const image = d?.heroImage || page.product.images[0]?.public_url;
+  const description = page.description ?? `${page.product.name} — الدفع عند الاستلام · التوصيل لجميع المدن`;
   return {
     title: page.title,
-    description: page.description ?? `${page.product.name} — الدفع عند الاستلام`,
+    description,
     alternates: { canonical: `${SITE_URL}/lp/${slug}` },
     robots: { index: true, follow: true },
-    openGraph: { type: "website", locale: "ar_MA", title: page.title, images: image ? [image] : [] },
+    openGraph: { type: "website", locale: "ar_MA", title: page.title, description, url: `${SITE_URL}/lp/${slug}`, images: image ? [image] : [] },
   };
 }
 
@@ -93,11 +96,14 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const why = ((lifeSec?.scenarios as Ico[] | undefined) ?? []).slice(0, 4);
   const whyTitle = d.whyTitle || String(lifeSec?.title ?? `لماذا تختار ${product.name}؟`);
   const ps = sec("problem_solution");
-  const featureImg = productImgs[1] ?? banner;
-  const featureTitle = String(lp.subtitle ?? ps?.after_title ?? title);
-  const featureText = ben[0]?.title ?? subline;
-  const tiles = productImgs.slice(2, 5).map((src, i) => ({ src, text: ben[i + 1]?.desc ?? "" }));
-  const moreImgs = productImgs.slice(5);
+  // Photos ↔ textes : choisis dans Admin → Boutique → Landing pages (sinon automatique)
+  const featureImg = d.featureImage || (productImgs[1] ?? banner);
+  const featureTitle = d.featureTitle || String(lp.subtitle ?? ps?.after_title ?? title);
+  const featureText = d.featureText || (ben[0]?.title ?? subline);
+  const tiles = d.tiles.length
+    ? d.tiles.filter((t) => t.image).map((t) => ({ src: t.image, text: t.text }))
+    : productImgs.slice(2, 5).map((src, i) => ({ src, text: ben[i + 1]?.desc ?? "" }));
+  const moreImgs = d.galleryImages.length ? d.galleryImages : productImgs.slice(5);
 
   const revSec = sec("reviews");
   const reviews = ((revSec?.items as { name: string; city: string; stars: number; text: string }[] | undefined) ?? []);
@@ -156,7 +162,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           b1={b1} b2={b2} b3={b3} offers={offers} askAddress={d.askAddress} addressRequired={d.addressRequired}
           pixelId={pixel || undefined} tiktokPixelId={tt || undefined}
           variants={(Array.isArray(lp.variant_options) ? lp.variant_options : []) as { name: string; options: { label: string; image?: string }[] }[]}
-          bumps={bumps} cities={cities} />
+          bumps={d.showBumps ? bumps : []} cities={cities} />
         {d.showWhatsapp && waHref && <a className="sp-wa" href={waHref} target="_blank" rel="noopener noreferrer">واتساب — تواصل معنا</a>}
       </div></W>
     ),
@@ -281,9 +287,22 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <img src={heroImg} alt={product.name} className="sp-hero" fetchPriority="high" loading="eager" decoding="async" />
         )}
 
-        {d.blocks.filter((b) => b.on).map((b) => <div key={b.key}>{blocks[b.key] || null}</div>)}
+        {d.blocks.filter((b) => b.on && !(d.crossAtBottom && b.key === "crosssell")).map((b) => <div key={b.key}>{blocks[b.key] || null}</div>)}
         {/* Le formulaire est indispensable : s'il est caché, on le garde quand même (sinon aucune commande possible) */}
         {!d.blocks.some((b) => b.key === "form" && b.on) && blocks.form}
+
+        {/* Autres produits : tout en bas, bien séparés → la page reste centrée sur un seul produit */}
+        {d.crossAtBottom && d.blocks.some((b) => b.key === "crosssell" && b.on) && (
+          <div className="sp-more-products">{blocks.crosssell}</div>
+        )}
+
+        {/* Données produit structurées : indiquent clairement à Meta/Google le produit vendu sur cette page */}
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          "@context": "https://schema.org", "@type": "Product",
+          name: product.name, image: heroImg ? [heroImg, ...productImgs.filter((u) => u !== heroImg).slice(0, 4)] : productImgs.slice(0, 5),
+          description: String(lp.subtitle ?? lp.hero_subheadline ?? product.name),
+          offers: { "@type": "Offer", priceCurrency: "MAD", price: one.price, availability: "https://schema.org/InStock", url: `${SITE_URL}/lp/${slug}` },
+        }).replace(/</g, "\\u003c") }} />
 
         {d.showFooter && (
           <footer className="sp-foot">
@@ -321,6 +340,7 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 .sp-ico-lg{width:48px;height:48px;font-size:24px}
 .sp-quick{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:#fff;border-radius:0 0 16px 16px;padding:12px 6px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
 .sp-quick-i{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;font-size:11.5px;font-weight:700;line-height:1.4;color:#374151}
+.sp-more-products{margin-top:28px;padding-top:8px;border-top:6px solid #eef0f3}
 .sp-card{background:#fff;border-radius:18px;padding:16px 14px;margin-top:14px;box-shadow:0 6px 24px rgba(0,0,0,.07);border:1px solid #eef0f3}
 .sp-badges{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .sp-b-red{background:var(--c-badge);color:#fff;font-size:12px;font-weight:800;padding:3px 10px;border-radius:8px}

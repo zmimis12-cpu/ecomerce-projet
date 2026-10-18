@@ -1,6 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, Eye, EyeOff, ExternalLink, RotateCcw } from "lucide-react";
+import { ArrowDown, ArrowUp, Eye, EyeOff, ExternalLink, RotateCcw, Trash2 } from "lucide-react";
 import { saveLpDesign } from "@/lib/store/actions";
 import { LP_BLOCKS, DEFAULT_LP_DESIGN, type LpDesign, type LpDesignStore } from "@/lib/store/lp-design-shared";
 import { cn } from "@/lib/utils";
@@ -115,6 +115,8 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
               <option value="banner">Bannière (image hero de la landing page)</option>
             </select>
           </L>
+          {B("crossAtBottom", "Autres produits toujours tout en bas de la page (recommandé pour Meta)")}
+          {B("showBumps", "Upsells « أضف لطلبك » dans le formulaire")}
           {B("showTopBar", "Barre noire en haut (texte d'offre)")}
           {B("showStoreHeader", "En-tête boutique (logo + menu القائمة)")}
           {B("showBadge", "Badge « عرض خاص »")}
@@ -143,6 +145,76 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
           {T("reviewsTitle", "Titre avis clients")}
           {T("faqTitle", "Titre FAQ")}
         </div>
+
+        {/* Photos ↔ textes : chaque photo avec le bon texte (par landing page) */}
+        {!isGlobal && (() => {
+          const imgs = pages.find((x) => x.slug === scope)?.images ?? [];
+          const setTile = (i: number, patch: Partial<{ image: string; text: string }>) =>
+            set("tiles", d.tiles.map((t, j) => (j === i ? { ...t, ...patch } : t)));
+          const moveG = (i: number, dir: -1 | 1) => {
+            const g = [...d.galleryImages]; const j = i + dir;
+            if (j < 0 || j >= g.length) return;
+            [g[i], g[j]] = [g[j], g[i]]; set("galleryImages", g);
+          };
+          return (
+            <div className="space-y-5 rounded-xl border bg-card p-4 shadow-sm lg:col-span-2">
+              <div>
+                <h2 className="font-semibold">Photos & textes de cette page</h2>
+                <p className="text-xs text-muted-foreground">Choisis quelle photo va avec quel texte. Vide = automatique (photos du produit dans l&apos;ordre + textes des avantages).</p>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold">Bloc « photo + texte »</h3>
+                <div className="grid gap-3 md:grid-cols-[auto_1fr]">
+                  <ImageChoice value={d.featureImage} onChange={(u) => set("featureImage", u)} candidates={imgs} autoUrl={imgs[1]?.url ?? imgs[0]?.url} autoLabel="2e photo du produit" />
+                  <div className="space-y-2">
+                    <input dir="auto" className={field} value={d.featureTitle} placeholder="Titre (vide = sous-titre de la landing page)" onChange={(e) => set("featureTitle", e.target.value)} />
+                    <textarea dir="auto" rows={2} className={cn(field, "h-auto py-2")} value={d.featureText} placeholder="Texte (vide = 1er avantage)" onChange={(e) => set("featureText", e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">Tuiles photo + légende ({d.tiles.length || "auto"})</h3>
+                  <button type="button" disabled={d.tiles.length >= 9}
+                    onClick={() => set("tiles", [...d.tiles, { image: "", text: "" }])}
+                    className="rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-muted disabled:opacity-40">+ Ajouter une tuile</button>
+                </div>
+                {d.tiles.length === 0 && <p className="text-xs text-muted-foreground">Automatique : photos 3 à 5 du produit avec les avantages 2 à 4. Ajoute une tuile pour choisir toi-même.</p>}
+                {d.tiles.map((t, i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-lg border p-2">
+                    <ImageChoice compact value={t.image} onChange={(u) => setTile(i, { image: u })} candidates={imgs} autoUrl={null} />
+                    <input dir="auto" className={field} value={t.text} placeholder="Texte sous la photo (ex : قوي ومتين — كيتحمل 150 كيلو)" onChange={(e) => setTile(i, { text: e.target.value })} />
+                    <button type="button" onClick={() => set("tiles", d.tiles.filter((_, j) => j !== i))} className="rounded p-2 text-red-600 hover:bg-red-50" title="Supprimer"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                ))}
+                {d.tiles.some((t) => !t.image) && <p className="text-xs text-amber-700">Une tuile sans photo n&apos;est pas affichée.</p>}
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">Galerie ({d.galleryImages.length || "auto"})</h3>
+                  <ImageChoice compact value="" onChange={(u) => u && set("galleryImages", [...d.galleryImages, u].slice(0, 20))} candidates={imgs} autoUrl={null} />
+                </div>
+                <p className="text-xs text-muted-foreground">{d.galleryImages.length ? "Clique sur le crayon pour ajouter une photo. Flèches = ordre." : "Automatique : photos 6 et suivantes du produit. Clique sur le crayon pour choisir toi-même."}</p>
+                <div className="flex flex-wrap gap-2">
+                  {d.galleryImages.map((u, i) => (
+                    <div key={u + i} className="relative h-20 w-20 overflow-hidden rounded-lg border">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={u} alt="" className="h-full w-full object-cover" />
+                      <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/55 px-0.5 text-white">
+                        <button type="button" onClick={() => moveG(i, -1)} className="p-0.5"><ArrowUp className="h-3 w-3 -rotate-90" /></button>
+                        <button type="button" onClick={() => set("galleryImages", d.galleryImages.filter((_, j) => j !== i))} className="p-0.5"><Trash2 className="h-3 w-3" /></button>
+                        <button type="button" onClick={() => moveG(i, 1)} className="p-0.5"><ArrowDown className="h-3 w-3 -rotate-90" /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         <div className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
           <h2 className="font-semibold">Dernier appel, bouton fixe & vidéo</h2>
