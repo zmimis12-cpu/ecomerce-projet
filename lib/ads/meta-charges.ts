@@ -18,18 +18,19 @@ export async function getMetaChargedMad(from?: string, to?: string): Promise<Cha
   const out: ChargedResult = { mad: 0, usd: 0, count: 0, byAccount: [] };
   // un même compte peut être enregistré deux fois → on ne compte qu'une fois
   const seen = new Set<string>();
-  for (const a of accounts) {
-    const id = act(a);
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
+  const list = accounts.filter((a) => { const id = act(a); if (!id || seen.has(id)) return false; seen.add(id); return true; });
+
+  // ⚡ Tous les comptes EN PARALLÈLE, et toujours la MÊME requête (tout l'historique) :
+  // la réponse est gardée en cache 15 min → changer le filtre de dates ne rappelle plus Meta,
+  // on filtre les dates ici. Avant : 1 appel par compte, l'un après l'autre, à chaque filtre.
+  const results = await Promise.all(list.map(async (a) => {
+    const id = act(a)!;
     try {
       const tok = encodeURIComponent(a.token);
-      const since = from ?? "2023-01-01";
-      let next: string | undefined = `${META}/${id}/activities?fields=event_type,event_time,extra_data&limit=500&since=${since}` +
-        (to ? `&until=${addDay(to)}` : "") + `&access_token=${tok}`;
-      let usd = 0, mad = 0;
+      let next: string | undefined = `${META}/${id}/activities?fields=event_type,event_time,extra_data&limit=500&since=2023-01-01&access_token=${tok}`;
+      let usd = 0, mad = 0, count = 0;
       for (let g = 0; next && g < 30; g++) {
-        const res: Response = await fetch(next, { next: { revalidate: 3600 } });
+        const res: Response = await fetch(next, { next: { revalidate: 900, tags: ["meta-charges"] } });
         const json = await res.json();
         if (!res.ok || json.error) throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
         for (const ev of (json.data ?? []) as { event_type: string; event_time: string; extra_data?: string }[]) {
@@ -43,22 +44,23 @@ export async function getMetaChargedMad(from?: string, to?: string): Promise<Cha
           const f = taxFactorFor(day, { pct: Number(a.taxPct ?? 0), since: a.taxSince ?? null });
           usd += u * f;
           mad += u * f * rate;
-          out.count++;
+          count++;
         }
         next = json.paging?.next;
       }
-      out.usd += usd; out.mad += mad;
-      out.byAccount.push({ label: a.label, usd: Math.round(usd * 100) / 100, mad: Math.round(mad * 100) / 100 });
+      return { label: a.label, usd, mad, count, error: null as string | null };
     } catch (e) {
-      out.error = (out.error ? out.error + " · " : "") + `${a.label}: ${e instanceof Error ? e.message : String(e)}`;
+      return { label: a.label, usd: 0, mad: 0, count: 0, error: `${a.label}: ${e instanceof Error ? e.message : String(e)}` };
     }
+  }));
+  for (const r of results) {
+    if (r.error) { out.error = (out.error ? out.error + " · " : "") + r.error; continue; }
+    out.usd += r.usd; out.mad += r.mad; out.count += r.count;
+    out.byAccount.push({ label: r.label, usd: Math.round(r.usd * 100) / 100, mad: Math.round(r.mad * 100) / 100 });
   }
   out.mad = Math.round(out.mad * 100) / 100;
   out.usd = Math.round(out.usd * 100) / 100;
   return out;
 }
 
-function addDay(d: string) {
-  const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + 1);
-  return x.toISOString().slice(0, 10);
-}
+

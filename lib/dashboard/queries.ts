@@ -211,6 +211,10 @@ export async function getAdSpendByPlatform(filter?: DateFilter): Promise<{
 
 export async function getDashboardSummary(filter?: DateFilter): Promise<DashboardSummary> {
   const supabase = await createClient();
+  // ⚡ Appel Meta (prélèvements) lancé tout de suite, en parallèle des requêtes base
+  const chargedP = import("@/lib/ads/meta-charges")
+    .then(({ getMetaChargedMad }) => getMetaChargedMad(filter?.from, filter?.to))
+    .catch((e) => ({ mad: 0, usd: 0, count: 0, byAccount: [], error: e instanceof Error ? e.message : String(e) }));
 
   let q = supabase
     .from("orders")
@@ -416,8 +420,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     const [{ data: tr }, { data: tur }] = await Promise.all([tq, tu]);
     nonMetaSpend += [...((tr ?? []) as { spend_mad: number }[]), ...((tur ?? []) as { spend_mad: number }[])]
       .reduce((s2, r) => s2 + Number(r.spend_mad ?? 0), 0);
-    const { getMetaChargedMad } = await import("@/lib/ads/meta-charges");
-    const ch = await getMetaChargedMad(filter?.from, filter?.to);
+    const ch = await chargedP;
     ads_charged_meta = ch.mad;
     ads_charged_error = ch.error ?? null;
   } catch (e) {
@@ -730,7 +733,13 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
         (metaSettings as { access_token: string }).access_token,
         (metaSettings as { account_id: string }).account_id
       );
-      const liveResult = await client.getCampaignSpend(today, today);
+      // ⚡ Dépense du jour gardée 5 min (avant : appel Meta à chaque filtre)
+      const { unstable_cache } = await import("next/cache");
+      const liveResult = await unstable_cache(
+        () => client.getCampaignSpend(today, today),
+        ["dash-meta-live-spend", (metaSettings as { account_id: string }).account_id, today],
+        { revalidate: 300 },
+      )();
       if (liveResult.ok && liveResult.campaigns.length > 0) {
         const productList = ps.map((p) => ({ id: p.id, sku: p.sku, name: p.name }));
         const { matches } = matchCampaignsToProducts(productList, liveResult.campaigns);

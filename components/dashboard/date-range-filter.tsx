@@ -5,8 +5,8 @@
  * URL : ?from=YYYY-MM-DD&to=YYYY-MM-DD  ·  ?period=all pour tout voir.
  */
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useState } from "react";
-import { CalendarDays } from "lucide-react";
+import { useState, useTransition } from "react";
+import { CalendarDays, Loader2 } from "lucide-react";
 
 const MOIS = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
 
@@ -39,11 +39,12 @@ export function DateRangeFilter({ from: curFrom, to: curTo, all }: { from: strin
   const [mode, setMode] = useState(match);
   const [from, setFrom] = useState(curFrom);
   const [to, setTo] = useState(curTo);
+  const [pending, start] = useTransition(); // affiche « Calcul… » pendant le chargement
 
   function push(params: Record<string, string | null>) {
     const p = new URLSearchParams(sp.toString());
     for (const [k, v] of Object.entries(params)) { if (v) p.set(k, v); else p.delete(k); }
-    router.push(`${pathname}${p.toString() ? `?${p}` : ""}`);
+    start(() => router.push(`${pathname}${p.toString() ? `?${p}` : ""}`));
   }
 
   return (
@@ -78,6 +79,11 @@ export function DateRangeFilter({ from: curFrom, to: curTo, all }: { from: strin
             Appliquer
           </button>
         </>
+      )}
+      {pending && (
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" /> Calcul…
+        </span>
       )}
     </div>
   );
