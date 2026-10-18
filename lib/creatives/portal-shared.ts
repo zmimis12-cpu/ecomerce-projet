@@ -38,8 +38,10 @@ export type VideoDelivery = {
 };
 
 /** Fiche produit pour les éditeurs (même fiche pour tous) : détails + liens utiles. */
-export type ProductBrief = { text: string; links: string; updatedAt: string | null };
-export const EMPTY_BRIEF: ProductBrief = { text: "", links: "", updatedAt: null };
+/** Photo / vidéo réelle du produit, importée par l'admin pour les éditeurs */
+export type BriefMedia = { url: string; path: string; type: "image" | "video"; name: string; size: number; addedAt: string };
+export type ProductBrief = { text: string; links: string; updatedAt: string | null; media: BriefMedia[] };
+export const EMPTY_BRIEF: ProductBrief = { text: "", links: "", updatedAt: null, media: [] };
 
 export function normalizePortalCfg(v: Partial<EditorPortalCfg> | undefined | null): EditorPortalCfg {
   const d = { ...DEFAULT_PORTAL_CFG, ...(v ?? {}) };

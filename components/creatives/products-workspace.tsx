@@ -9,6 +9,7 @@ import { submitVideoLinks } from "@/lib/creatives/portal-actions";
 import { EMPTY_BRIEF, type VideoDelivery, type ProductBrief } from "@/lib/creatives/portal-shared";
 import { ProductThumb, LinkRow, BriefForm, Linkified } from "@/components/creatives/portal-controls";
 import { cn } from "@/lib/utils";
+import { BriefMediaGallery } from "@/components/creatives/brief-media";
 
 type ProductCard = { id: string; name: string; image: string | null };
 
@@ -120,7 +121,7 @@ function ProductPanel({ product, brief, links, canSubmit, canReview }: {
 /** Texte long replié (« Voir tout ») pour ne pas prendre toute la page. */
 function BriefText({ brief }: { brief?: ProductBrief }) {
   const [open, setOpen] = useState(false);
-  if (!brief || (!brief.text && !brief.links)) return <p className="text-xs text-muted-foreground">Pas encore de détails pour ce produit.</p>;
+  if (!brief || (!brief.text && !brief.links && !brief.media?.length)) return <p className="text-xs text-muted-foreground">Pas encore de détails pour ce produit.</p>;
   const long = (brief.text?.length ?? 0) > 400 || (brief.text?.split("\n").length ?? 0) > 8;
   return (
     <div className="space-y-2 text-sm">
@@ -137,6 +138,7 @@ function BriefText({ brief }: { brief?: ProductBrief }) {
           {open ? "Réduire" : "Voir tout"} <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
         </button>
       )}
+      <BriefMediaGallery media={brief.media ?? []} />
       {brief.links && (
         <div className="rounded-md bg-muted/40 p-2 text-xs">
           <div className="mb-1 font-medium">Liens utiles</div>

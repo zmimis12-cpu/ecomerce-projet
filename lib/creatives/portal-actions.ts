@@ -94,10 +94,56 @@ export async function saveProductBrief(productId: string, text: string, links: s
   const all = await readProductBriefs();
   const t = text.trim().slice(0, 8000);
   const l = links.trim().slice(0, 3000);
-  if (!t && !l) delete all[productId];
-  else all[productId] = { text: t, links: l, updatedAt: new Date().toISOString() };
+  const media = all[productId]?.media ?? [];
+  if (!t && !l && !media.length) delete all[productId];
+  else all[productId] = { text: t, links: l, updatedAt: new Date().toISOString(), media };
   const { error } = await writeJson("editor_product_briefs", all, "Fiches produits pour éditeurs vidéo");
   if (error) return { success: false, error: error.message };
+  refresh();
+  return { success: true };
+}
+
+/* ── Photos & vidéos réelles du produit (bucket ad-media, dossier editor-briefs/) ── */
+const MEDIA_BUCKET = "ad-media";
+
+/** URL d'envoi signée : le navigateur envoie le fichier directement au stockage (pas de limite Vercel). */
+export async function createBriefUploadUrl(productId: string, fileName: string): Promise<{ success: boolean; error?: string; data?: { path: string; token: string } }> {
+  await requireRole([...MANAGERS]);
+  const ext = (fileName.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || "bin";
+  const path = `editor-briefs/${productId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { supabaseAdmin } = await import("@/lib/supabase/admin");
+  const { data, error } = await supabaseAdmin.storage.from(MEDIA_BUCKET).createSignedUploadUrl(path);
+  if (error || !data) return { success: false, error: error?.message ?? "Échec" };
+  return { success: true, data: { path, token: data.token } };
+}
+
+export async function addBriefMedia(productId: string, item: { path: string; type: "image" | "video"; name: string; size: number }): Promise<Result> {
+  await requireRole([...MANAGERS]);
+  if (!item.path.startsWith(`editor-briefs/${productId}/`)) return { success: false, error: "Fichier invalide." };
+  const { supabaseAdmin } = await import("@/lib/supabase/admin");
+  const url = supabaseAdmin.storage.from(MEDIA_BUCKET).getPublicUrl(item.path).data.publicUrl;
+  const all = await readProductBriefs();
+  const b = all[productId] ?? { text: "", links: "", updatedAt: null, media: [] };
+  b.media = [...(b.media ?? []), { url, path: item.path, type: item.type, name: item.name.slice(0, 120), size: Math.max(0, Number(item.size) || 0), addedAt: new Date().toISOString() }];
+  b.updatedAt = new Date().toISOString();
+  all[productId] = b;
+  const { error } = await writeJson("editor_product_briefs", all, "Fiches produits pour éditeurs vidéo");
+  if (error) return { success: false, error: error.message };
+  refresh();
+  return { success: true };
+}
+
+export async function removeBriefMedia(productId: string, path: string): Promise<Result> {
+  await requireRole([...MANAGERS]);
+  const all = await readProductBriefs();
+  const b = all[productId];
+  if (!b) return { success: false, error: "Introuvable." };
+  b.media = (b.media ?? []).filter((m) => m.path !== path);
+  all[productId] = b;
+  const { error } = await writeJson("editor_product_briefs", all, "Fiches produits pour éditeurs vidéo");
+  if (error) return { success: false, error: error.message };
+  const { supabaseAdmin } = await import("@/lib/supabase/admin");
+  await supabaseAdmin.storage.from(MEDIA_BUCKET).remove([path]).catch(() => {});
   refresh();
   return { success: true };
 }

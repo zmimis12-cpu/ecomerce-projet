@@ -8,6 +8,7 @@ import { Check, X, Trash2, ExternalLink, Copy, Send, RotateCcw, ImageOff, Search
 import { saveEditorPortalCfg, submitVideoLinks, deleteVideoLink, reviewVideoLink, saveProductBrief } from "@/lib/creatives/portal-actions";
 import { EMPTY_BRIEF, type EditorPortalCfg, type VideoDelivery, type DeliveryStatus, type ProductBrief } from "@/lib/creatives/portal-shared";
 import { cn } from "@/lib/utils";
+import { BriefMediaManager } from "@/components/creatives/brief-media";
 
 type ProductCard = { id: string; name: string; image: string | null };
 const INPUT = "h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30";
@@ -394,6 +395,7 @@ export function BriefForm({ productId, initial, compact = false }: { productId: 
         <textarea dir="ltr" rows={3} value={links} onChange={(e) => { setLinks(e.target.value); setMsg(null); }}
           className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
       </label>
+      <BriefMediaManager productId={productId} initial={initial.media ?? []} />
       <div className="flex items-center gap-2">
         <button disabled={pending}
           className="h-9 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
@@ -414,13 +416,13 @@ export function BriefForm({ productId, initial, compact = false }: { productId: 
 export function BriefsManager({ products, briefs }: { products: ProductCard[]; briefs: Record<string, ProductBrief> }) {
   const [pid, setPid] = useState(products[0]?.id ?? "");
   const p = products.find((x) => x.id === pid);
-  const done = products.filter((x) => briefs[x.id]?.text || briefs[x.id]?.links).length;
+  const done = products.filter((x) => briefs[x.id]?.text || briefs[x.id]?.links || briefs[x.id]?.media?.length).length;
   return (
     <div className="grid gap-4 p-4 lg:grid-cols-[280px_1fr]">
       <div className="max-h-[480px] space-y-1 overflow-y-auto pr-1">
         <div className="pb-1 text-xs text-muted-foreground">{done} / {products.length} produits avec détails</div>
         {products.map((x) => {
-          const has = !!(briefs[x.id]?.text || briefs[x.id]?.links);
+          const has = !!(briefs[x.id]?.text || briefs[x.id]?.links || briefs[x.id]?.media?.length);
           return (
             <button key={x.id} onClick={() => setPid(x.id)}
               className={cn("flex w-full items-center gap-2 rounded-lg border p-1.5 text-left text-xs",

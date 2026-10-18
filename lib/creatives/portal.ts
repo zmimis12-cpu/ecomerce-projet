@@ -46,6 +46,7 @@ export async function readProductBriefs(): Promise<Record<string, ProductBrief>>
   const raw = await readJson<Record<string, Partial<ProductBrief>>>("editor_product_briefs", {});
   return Object.fromEntries(Object.entries(raw ?? {}).map(([k, v]) => [k, {
     text: String(v?.text ?? ""), links: String(v?.links ?? ""), updatedAt: v?.updatedAt ?? null,
+    media: Array.isArray(v?.media) ? v!.media.filter((m) => m && typeof m.url === "string") : [],
   }]));
 }
 
