@@ -99,7 +99,8 @@ export function computeEarning(amount: number, type: CommissionType, value: numb
 
 export async function getVideoEditors(): Promise<EditorInfo[]> {
   const [{ data: users }, { data: settings }] = await Promise.all([
-    supabaseAdmin.from("users").select("id, full_name, email, is_active").eq("role", "video_editor" as never),
+    // Éditeur supprimé / désactivé → n'apparaît plus et n'est plus calculé nulle part
+    supabaseAdmin.from("users").select("id, full_name, email, is_active").eq("role", "video_editor" as never).eq("is_active", true),
     supabaseAdmin.from("video_editor_settings" as never).select("user_id, commission_type, commission_value"),
   ]);
   const map = new Map(
@@ -167,6 +168,11 @@ export async function getCreativesReport(opts: { month?: string | null; editorId
   };
   const { loadRateBook, resolveRate, earningFor } = await import("@/lib/creatives/rates");
   const book = await loadRateBook();
+  // Mode de paiement choisi : commission seulement si l'admin l'a choisie (ou « + commission »)
+  const { readPortalConfigs, usesCommission, normalizePortalCfg } = await import("@/lib/creatives/portal");
+  const portalCfgs = await readPortalConfigs();
+  const paysCommission = (editorId: string) =>
+    editorMap.has(editorId) && usesCommission(portalCfgs[editorId] ?? normalizePortalCfg(null));
   const orders = (ordersRaw ?? []) as unknown as ORow[];
 
   const stats = new Map<string, CreativeStat>();
@@ -175,7 +181,7 @@ export async function getCreativesReport(opts: { month?: string | null; editorId
     stats.set(c.id, {
       id: c.id, code: c.code, title: c.title, videoUrl: c.video_url, platform: c.platform,
       status: c.status, createdAt: c.created_at, editorId: c.editor_id,
-      editorName: ed?.name ?? "—",
+      editorName: ed?.name ?? "Éditeur supprimé",
       productId: c.product_id,
       productName: c.product_id ? productName.get(c.product_id) ?? "—" : "—",
       lpSlug: c.product_id ? lpSlug.get(c.product_id) ?? null : null,
@@ -231,9 +237,10 @@ export async function getCreativesReport(opts: { month?: string | null; editorId
     if (DELIVERED_STATUSES.includes(o.status) && inRange(deliveredAt, from, to)) {
       const amount = Number(o.total_amount_mad ?? 0);
       // Gain FIGÉ à la livraison s'il existe, sinon tarif actuel (produit > éditeur)
-      const earning = o.editor_earning_mad != null
-        ? Number(o.editor_earning_mad)
-        : earningFor(resolveRate(book, s.editorId, s.productId), amount);
+      const earning = !paysCommission(s.editorId) ? 0
+        : o.editor_earning_mad != null
+          ? Number(o.editor_earning_mad)
+          : earningFor(resolveRate(book, s.editorId, s.productId), amount);
       s.delivered++;
       s.revenue += amount;
       s.earnings += earning;

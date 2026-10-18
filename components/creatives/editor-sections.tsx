@@ -5,6 +5,7 @@ import type { EditorContext } from "@/lib/creatives/editor-context";
 import { PeriodFilter, mad, rate } from "@/components/creatives/period-filter";
 import { ctr, ago } from "@/lib/creatives/queries";
 import { TONE_CLS } from "@/lib/ads/meta-status";
+import { usesCommission, packProgress } from "@/lib/creatives/portal-shared";
 
 const STATUS: Record<string, string> = { in_ads: "🟢 En pub", paused: "⏸️ En pause", draft: "📝 Brouillon" };
 
@@ -67,6 +68,12 @@ export function StatCards({ ctx }: { ctx: EditorContext }) {
     { label: "Livrées", value: `${me?.delivered ?? 0} (${rate(me?.delivered ?? 0, me?.orders ?? 0)})`, icon: CheckCircle },
     { label: "Gains (période)", value: mad(me?.earnings ?? 0), icon: Award },
   ];
+  if (ctx.portal.payMode === "per_product") {
+    const p = packProgress(ctx.portal, ctx.links);
+    cards.splice(1, 0, ctx.portal.perUnit === "pack"
+      ? { label: `Vidéos validées (lot de ${p.packSize})`, value: `${p.validated} · prochain lot ${p.inPack}/${p.packSize}`, icon: Film }
+      : { label: "Vidéos validées", value: String(p.validated), icon: Film });
+  }
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
       {cards.map((c) => (
@@ -99,6 +106,7 @@ export function BalanceCards({ ctx }: { ctx: EditorContext }) {
 }
 
 export function VideosTable({ ctx, limit }: { ctx: EditorContext; limit?: number }) {
+  const showGain = usesCommission(ctx.portal); // pas de colonne « Gain » si l'éditeur n'est pas payé à la commission
   const rows = limit ? [...ctx.report.creatives].sort((a, b) => b.delivered - a.delivered).slice(0, limit) : ctx.report.creatives;
   return (
     <div className="overflow-x-auto">
@@ -118,12 +126,12 @@ export function VideosTable({ ctx, limit }: { ctx: EditorContext; limit?: number
             <th className="px-4 py-2 text-right">Coût / commande</th>
             <th className="px-4 py-2 text-right">Livrées</th>
             <th className="px-4 py-2 text-right">Taux</th>
-            <th className="px-4 py-2 text-right">Gain</th>
+            {showGain && <th className="px-4 py-2 text-right">Gain</th>}
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 && (
-            <tr><td colSpan={14} className="px-4 py-6 text-center text-muted-foreground">Aucune vidéo pour le moment.</td></tr>
+            <tr><td colSpan={showGain ? 14 : 13} className="px-4 py-6 text-center text-muted-foreground">Aucune vidéo pour le moment.</td></tr>
           )}
           {rows.map((c) => (
             <tr key={c.id} className="border-t">
@@ -146,7 +154,7 @@ export function VideosTable({ ctx, limit }: { ctx: EditorContext; limit?: number
               <td className="px-4 py-2 text-right">{c.orders > 0 && c.spend > 0 ? `${Math.round(c.spend / c.orders)} MAD` : "—"}</td>
               <td className="px-4 py-2 text-right">{c.delivered}</td>
               <td className="px-4 py-2 text-right">{rate(c.delivered, c.orders)}</td>
-              <td className="px-4 py-2 text-right font-semibold text-emerald-700">{mad(c.earnings)}</td>
+              {showGain && <td className="px-4 py-2 text-right font-semibold text-emerald-700">{mad(c.earnings)}</td>}
             </tr>
           ))}
         </tbody>
@@ -157,6 +165,7 @@ export function VideosTable({ ctx, limit }: { ctx: EditorContext; limit?: number
 
 export function DeliveredTable({ ctx }: { ctx: EditorContext }) {
   const rows = ctx.report.deliveredOrders;
+  const showGain = usesCommission(ctx.portal);
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -166,12 +175,12 @@ export function DeliveredTable({ ctx }: { ctx: EditorContext }) {
             <th className="px-4 py-2">Vidéo</th>
             <th className="px-4 py-2">Produit</th>
             <th className="px-4 py-2">Livrée le</th>
-            <th className="px-4 py-2 text-right">Gain</th>
+            {showGain && <th className="px-4 py-2 text-right">Gain</th>}
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 && (
-            <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">Aucune commande livrée sur cette période.</td></tr>
+            <tr><td colSpan={showGain ? 5 : 4} className="px-4 py-6 text-center text-muted-foreground">Aucune commande livrée sur cette période.</td></tr>
           )}
           {rows.map((o) => (
             <tr key={o.id} className="border-t">
@@ -179,7 +188,7 @@ export function DeliveredTable({ ctx }: { ctx: EditorContext }) {
               <td className="px-4 py-2">{o.creativeCode} · {o.creativeTitle}</td>
               <td className="px-4 py-2">{o.productName}</td>
               <td className="px-4 py-2">{new Date(o.deliveredAt).toLocaleDateString("fr-FR")}</td>
-              <td className="px-4 py-2 text-right font-semibold text-emerald-700">{mad(o.earning)}</td>
+              {showGain && <td className="px-4 py-2 text-right font-semibold text-emerald-700">{mad(o.earning)}</td>}
             </tr>
           ))}
         </tbody>

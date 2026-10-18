@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  LayoutDashboard, Package, ShoppingCart, PhoneCall,
+  Scale, LayoutDashboard, Package, ShoppingCart, PhoneCall,
   Truck, Layers, FileText, FolderOpen,
   ScanLine, RotateCcw, BarChart3, Globe, Settings,
   Shield, Award, Users, ListOrdered, CreditCard, Clapperboard, PackageCheck, Wallet, Calculator, Rocket,
@@ -49,6 +49,7 @@ const ADMIN_NAV: NavGroup[] = [
       { href: "/admin/delivery/daily-bl", label: "BL du jour",         icon: FileText },
       { href: "/admin/delivery/batches",  label: "Tickets impression", icon: Layers },
       { href: "/admin/delivery/notes",    label: "Récap tickets",      icon: FileText },
+      { href: "/admin/delivery/compare",  label: "Comparatif transporteurs", icon: Scale },
       { href: "/admin/scanner",           label: "Scanner",            icon: ScanLine },
       { href: "/admin/returns",           label: "Retours",            icon: RotateCcw },
     ],

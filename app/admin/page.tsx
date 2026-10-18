@@ -174,13 +174,16 @@ export default async function AdminDashboardPage({
                 sub="Livrées non payées" />
               <KpiCard label="Net à Recevoir"   value={mad((summary as {net_a_recevoir?:number}).net_a_recevoir ?? 0)}
                 icon={AlertTriangle} variant="green"
-                sub="Après frais livraison (Casa 20 / Autres 35)" />
+                sub="Après frais livraison du transporteur (Digylog / Speedaf)" />
               <KpiCard label="Net Collecté"     value={mad((summary as {net_collected?:number}).net_collected ?? 0)}
                 icon={TrendingUp} variant="green" highlight
-                sub="Digylog (net des frais) + livreur propre (montant intégral)" />
+                sub="Digylog / Speedaf (net des frais) + livreur propre (montant intégral)" />
               <KpiCard label="Livré par Digylog" value={(summary.digylog_count ?? 0).toLocaleString()}
                 icon={Package} variant="default"
-                sub="Commandes via transporteur" />
+                sub="Commandes via Digylog" />
+              <KpiCard label="Livré par Speedaf" value={((summary as {speedaf_count?:number}).speedaf_count ?? 0).toLocaleString()}
+                icon={Package} variant="default"
+                sub="Comparatif complet : Livraison → Comparatif transporteurs" />
               <KpiCard label="Livré par nous"    value={(summary.self_delivery_count ?? 0).toLocaleString()}
                 icon={Truck} variant="default"
                 sub={`${mad(summary.self_delivery_revenue ?? 0)} collecté (livreur propre)`} />
@@ -198,7 +201,7 @@ export default async function AdminDashboardPage({
                 sub="Confirmation (fiche produit) × commandes payées traitées par un agent" />
               <KpiCard label="Éditeurs vidéo"  value={mad((summary as {total_editor_cost?:number}).total_editor_cost ?? 0)}
                 icon={PhoneCall} variant="red"
-                sub="Gains éditeurs (commandes payées venant de leurs vidéos)" />
+                sub="Selon le mode de chaque éditeur : commission (commandes payées), salaire ou par produit" />
               <KpiCard label="Autres Charges"  value={mad((summary as {total_other_expenses?:number}).total_other_expenses ?? 0)}
                 icon={CreditCard} variant="red"
                 sub="Frais généraux (Dépenses & Cartes) — informatif, pas déduit ci-dessus" />

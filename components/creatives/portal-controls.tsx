@@ -223,8 +223,15 @@ export function EditorPortalForm({
             <select className={INPUT} value={c.perUnit} onChange={(e) => set("perUnit", e.target.value as EditorPortalCfg["perUnit"])}>
               <option value="product">1 fois par produit (1re vidéo validée)</option>
               <option value="video">Par vidéo validée (chaque lien)</option>
+              <option value="pack">Par lot de N vidéos validées</option>
             </select>
           </label>
+          {c.perUnit === "pack" && (
+            <label className="space-y-1 text-sm">
+              <span className="text-xs font-medium text-muted-foreground">Vidéos par lot</span>
+              <input type="number" min={1} className={INPUT} value={c.packSize || ""} placeholder="ex : 9" onChange={(e) => set("packSize", Number(e.target.value))} />
+            </label>
+          )}
         </>)}
         {c.payMode !== "commission" && (
           <label className="flex items-center gap-2 self-end pb-2 text-sm">
@@ -236,7 +243,10 @@ export function EditorPortalForm({
       <p className="text-xs text-muted-foreground">
         {c.payMode === "commission" && `Commission actuelle : ${commissionLabel} (modifiable dans le tableau Éditeurs et Tarifs par produit).`}
         {c.payMode === "salary" && "Le salaire est compté jour par jour depuis la date de début → « Reste à payer » se met à jour tout seul."}
-        {c.payMode === "per_product" && "Compté quand tu cliques « Valider » sur un lien vidéo envoyé par l'éditeur."}
+        {c.payMode === "per_product" && (c.perUnit === "pack"
+          ? `Exemple : ${c.packSize} vidéos validées = ${c.perAmount || 0} MAD · ${c.packSize * 2} vidéos = ${(c.perAmount || 0) * 2} MAD · ${c.packSize * 3} vidéos = ${(c.perAmount || 0) * 3} MAD. Compté quand tu cliques « Valider ».`
+          : "Compté quand tu cliques « Valider » sur un lien vidéo envoyé par l'éditeur.")}
+        {c.payMode !== "commission" && !c.plusCommission && " Aucune commission sur les commandes n'est comptée pour cet éditeur."}
       </p>
 
       {/* Confidentialité */}

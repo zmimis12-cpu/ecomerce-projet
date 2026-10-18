@@ -4,7 +4,7 @@
  */
 
 export type PayMode = "commission" | "salary" | "per_product";
-export type PerUnit = "product" | "video";
+export type PerUnit = "product" | "video" | "pack";
 
 export type EditorPortalCfg = {
   productIds: string[];       // produits autorisés (l'éditeur ne voit que nom + photo)
@@ -12,14 +12,15 @@ export type EditorPortalCfg = {
   salary: number;             // MAD / mois (mode salaire)
   salaryStart: string;        // "YYYY-MM-DD" début du salaire
   perAmount: number;          // MAD par produit / par vidéo validée (mode par produit)
-  perUnit: PerUnit;           // "product" = 1 fois par produit · "video" = chaque lien validé
+  perUnit: PerUnit;           // "product" = 1 fois par produit · "video" = chaque lien validé · "pack" = par lot de N vidéos
+  packSize: number;           // mode "pack" : nombre de vidéos validées par lot (ex : 9 vidéos = 120 MAD)
   plusCommission: boolean;    // salaire / par produit + commission sur livrées en plus
   hideAdMoney: boolean;       // ne voit pas dépense, budget, campagnes — seulement le coût
 };
 
 export const DEFAULT_PORTAL_CFG: EditorPortalCfg = {
   productIds: [], payMode: "commission", salary: 0, salaryStart: "", perAmount: 0,
-  perUnit: "product", plusCommission: false, hideAdMoney: false,
+  perUnit: "product", packSize: 9, plusCommission: false, hideAdMoney: false,
 };
 
 export type DeliveryStatus = "pending" | "accepted" | "rejected";
@@ -48,7 +49,8 @@ export function normalizePortalCfg(v: Partial<EditorPortalCfg> | undefined | nul
     salary: Math.max(0, Number(d.salary) || 0),
     salaryStart: /^\d{4}-\d{2}-\d{2}$/.test(d.salaryStart) ? d.salaryStart : "",
     perAmount: Math.max(0, Number(d.perAmount) || 0),
-    perUnit: d.perUnit === "video" ? "video" : "product",
+    perUnit: d.perUnit === "video" || d.perUnit === "pack" ? d.perUnit : "product",
+    packSize: Math.max(1, Math.round(Number(d.packSize) || 9)),
     plusCommission: !!d.plusCommission,
     hideAdMoney: !!d.hideAdMoney,
   };
@@ -60,7 +62,9 @@ export function payLabel(cfg: EditorPortalCfg, commissionLabel: string): string 
   const plus = cfg.plusCommission ? ` + ${commissionLabel}` : "";
   if (cfg.payMode === "salary") return `Salaire ${fmt(cfg.salary)} / mois${plus}`;
   if (cfg.payMode === "per_product")
-    return `${fmt(cfg.perAmount)} par ${cfg.perUnit === "video" ? "vidéo validée" : "produit validé"}${plus}`;
+    return cfg.perUnit === "pack"
+      ? `${fmt(cfg.perAmount)} par lot de ${cfg.packSize} vidéos validées${plus}`
+      : `${fmt(cfg.perAmount)} par ${cfg.perUnit === "video" ? "vidéo validée" : "produit validé"}${plus}`;
   return commissionLabel;
 }
 
@@ -95,6 +99,10 @@ function perProductEarned(cfg: EditorPortalCfg, deliveries: VideoDelivery[], fro
   const ok = deliveries.filter((d) => d.status === "accepted" && d.reviewedAt)
     .sort((a, b) => a.reviewedAt!.localeCompare(b.reviewedAt!));
   if (cfg.perUnit === "video") return ok.filter((d) => inRange(d.reviewedAt, from, to)).length * cfg.perAmount;
+  if (cfg.perUnit === "pack") {
+    // Chaque N-ième vidéo validée complète un lot → payé à la date de cette validation
+    return ok.filter((d, i) => (i + 1) % cfg.packSize === 0 && inRange(d.reviewedAt, from, to)).length * cfg.perAmount;
+  }
   // 1 fois par produit : on compte la 1re vidéo validée de chaque produit
   const first = new Map<string, string>();
   for (const d of ok) if (!first.has(d.productId)) first.set(d.productId, d.reviewedAt!);
@@ -108,4 +116,16 @@ export function portalEarned(
   if (cfg.payMode === "commission") return commission;
   const base = cfg.payMode === "salary" ? salaryAccrued(cfg, from, to) : perProductEarned(cfg, deliveries, from, to);
   return Math.round((base + (cfg.plusCommission ? commission : 0)) * 100) / 100;
+}
+
+/** La commission (commandes livrées) compte-t-elle pour cet éditeur ? */
+export function usesCommission(cfg: EditorPortalCfg) {
+  return cfg.payMode === "commission" || cfg.plusCommission;
+}
+
+/** Mode « lot de N vidéos » : progression vers le prochain lot. */
+export function packProgress(cfg: EditorPortalCfg, deliveries: VideoDelivery[]) {
+  const validated = deliveries.filter((d) => d.status === "accepted").length;
+  const n = Math.max(1, cfg.packSize);
+  return { validated, packs: Math.floor(validated / n), inPack: validated % n, packSize: n };
 }

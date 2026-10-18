@@ -89,5 +89,7 @@ export async function getEditorBalances(editorId?: string | null): Promise<{
       remaining: Math.round((earned - paid) * 100) / 100,
     };
   });
-  return { balances, payments };
+  // Paiements des éditeurs supprimés : plus affichés
+  const active = new Set(report.editors.map((e) => e.id));
+  return { balances, payments: payments.filter((p) => active.has(p.editorId)) };
 }

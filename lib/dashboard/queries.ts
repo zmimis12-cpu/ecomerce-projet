@@ -33,6 +33,7 @@ export interface DashboardSummary {
   self_delivery_count:    number;  // Commandes livrées par un livreur propre (pas Digylog)
   self_delivery_revenue:  number;
   digylog_count:          number;
+  speedaf_count?:         number;
   total_ads_spend:        number;  // Meta (réel, synced) + TikTok/Google/autre (saisie manuelle)
   ads_spent_info?:        number;  // dépense pub (Meta Ads Manager) — info
   ads_charged_meta?:      number;  // prélevé réellement par Meta (MAD, TVA incluse)
@@ -218,6 +219,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
       "real_profit_mad","cogs_total","delivery_cost_real_mad","return_cost_mad",
       "customer_city","expected_delivery_cost","delivery_margin","actual_delivery_cost",
       "assigned_to","actual_cod_collected_mad","fulfillment_type","editor_earning_mad",
+      "creative_id","delivery_company_id",
     ].join(","));
   // Note: on n'exclut PLUS "cancelled" ici — on en a besoin pour calculer le
   // taux d'annulation après confirmation. Elles sont juste exclues du profit/CA.
@@ -244,6 +246,8 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     fulfillment_type: string | null;
     assigned_to: string | null;
     editor_earning_mad: number | null;
+    creative_id: string | null;
+    delivery_company_id: string | null;
   }[];
 
   // ── "Confirmés" = commandes qui SONT PASSÉES par une confirmation, même si
@@ -298,14 +302,14 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     .filter((r) => DELIVERED_STATUSES.has(r.status) && !r.is_paid)
     .reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
 
-  // Net à recevoir = montant collecté - frais livraison (20 MAD Casa, 35 MAD autres villes)
+  // Frais par transporteur (Digylog / Speedaf) — réglables dans Livraison → Comparatif transporteurs
+  const { readCarrierFees, getCarrierResolver, deliveryFee } = await import("@/lib/delivery/carrier-fees");
+  const [carrierFees, carrierOf] = await Promise.all([readCarrierFees(), getCarrierResolver()]);
+
+  // Net à recevoir = montant collecté - frais livraison du transporteur (Digylog : 20 Casa / 35 autres par défaut)
   const net_a_recevoir = activeRows
     .filter((r) => DELIVERED_STATUSES.has(r.status) && !r.is_paid)
-    .reduce((s, r) => {
-      const city = (r.customer_city ?? "").toLowerCase();
-      const livFee = city.includes("casablanca") || city.includes("casa") || city === "الدار البيضاء" ? 20 : 35;
-      return s + (r.total_amount_mad ?? 0) - livFee;
-    }, 0);
+    .reduce((s, r) => s + (r.total_amount_mad ?? 0) - deliveryFee(carrierFees, carrierOf(r), r.customer_city, null), 0);
 
   // Net déjà collecté = commandes payées, montant collecté - frais de livraison réel.
   // NOTE: actual_delivery_cost (default 35) et delivery_cost_real_mad (default 0) ne
@@ -323,9 +327,11 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
       // Vrai frais Digylog de la commande (synchronisé depuis Digylog : 20 / 30 / 35),
       // sinon estimation par ville. Avant : toujours l'estimation → Rabat à 30 MAD
       // comptée 35 → Net Collecté un peu plus bas que les virements Digylog.
+      const carrier = carrierOf(r);
       const livFee = isSelfDelivery ? 0
+        : carrier === "speedaf" ? deliveryFee(carrierFees, "speedaf", city, null)
         : r.actual_delivery_cost != null ? Number(r.actual_delivery_cost)
-        : city.includes("casablanca") || city.includes("casa") || city === "الدار البيضاء" ? 20 : 35;
+        : deliveryFee(carrierFees, "digylog", city, null);
       // Priorité au vrai montant collecté par Digylog (réconciliation) — sinon
       // le prix système par défaut. Sans ça, un surplus collecté (ex: 600 MAD
       // au lieu de 599 prévus) n'apparaissait jamais dans Net Collecté.
@@ -341,7 +347,8 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   const self_delivery_revenue = activeRows
     .filter((r) => isSelfDone(r) && r.is_paid)
     .reduce((s, r) => s + (r.actual_cod_collected_mad ?? r.total_amount_mad ?? 0), 0);
-  const digylog_count = activeRows.length - self_delivery_count;
+  const speedaf_count = activeRows.filter((r) => !isSelfDone(r) && carrierOf(r) === "speedaf").length;
+  const digylog_count = activeRows.length - self_delivery_count - speedaf_count;
 
   // Delivery margin: +10 MAD for each Casa order
   let total_delivery_margin = 0;
@@ -504,7 +511,9 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
       for (const e of (exs ?? []) as { id: string }[]) { goodsCost.set(e.id, 0); confCost.set(e.id, 0); }
     }
   }
-  const realDelivery = (r: (typeof activeRows)[number]) => r.actual_delivery_cost ?? r.expected_delivery_cost ?? 35;
+  const realDelivery = (r: (typeof activeRows)[number]) =>
+    carrierOf(r) === "speedaf" ? deliveryFee(carrierFees, "speedaf", r.customer_city, null)
+      : r.actual_delivery_cost ?? r.expected_delivery_cost ?? 35;
   const orderMargin = (r: (typeof activeRows)[number]) =>
     (r.total_amount_mad ?? 0) - (goodsCost.get(r.id) ?? (r.cogs_total ?? 0)) - realDelivery(r);
 
@@ -517,9 +526,19 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     activeRows.filter((r) => r.is_paid).reduce((s, r) => s + orderMargin(r), 0) * 100) / 100;
 
   // Gains éditeurs vidéo (figés à la livraison) des commandes payées de la période
-  const total_editor_cost = Math.round(activeRows
-    .filter((r) => r.is_paid)
-    .reduce((s, r) => s + Number(r.editor_earning_mad ?? 0), 0) * 100) / 100;
+  // … selon le mode de paiement de chaque éditeur (commission / salaire / par produit)
+  let total_editor_cost = 0;
+  try {
+    const { editorCostForPeriod } = await import("@/lib/creatives/portal-cost");
+    total_editor_cost = await editorCostForPeriod(
+      activeRows.filter((r) => r.is_paid),
+      filter ? new Date(filter.from + "T00:00:00Z") : null,
+      filter ? new Date(new Date(filter.to + "T00:00:00Z").getTime() + 86_400_000) : null,
+    );
+  } catch {
+    total_editor_cost = Math.round(activeRows.filter((r) => r.is_paid)
+      .reduce((s, r) => s + Number(r.editor_earning_mad ?? 0), 0) * 100) / 100;
+  }
 
   const true_final_profit = Math.round(
     (real_profit_before_ads - total_ads_spend - total_call_center_cost - total_editor_cost) * 100
@@ -539,7 +558,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     estimated_revenue, real_revenue, estimated_profit, real_profit,
     total_cogs, total_delivery_cost, total_return_losses, pending_collection, net_a_recevoir,
     net_collected, total_ads_spend, real_profit_net_ads, ads_spent_info, ads_charged_meta, ads_charged_error,
-    self_delivery_count, self_delivery_revenue, digylog_count,
+    self_delivery_count, self_delivery_revenue, digylog_count, speedaf_count,
     total_call_center_cost, total_other_expenses, true_final_profit,
     real_profit_before_ads, pending_profit, pending_orders_count, total_editor_cost,
     transit_margin, transit_count,

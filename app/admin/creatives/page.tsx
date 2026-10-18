@@ -14,7 +14,7 @@ import { getCreativesLiveStatus, getMetaDeliveries, TONE_CLS } from "@/lib/ads/m
 import { AddPaymentForm } from "@/components/creatives/payment-controls";
 import { RateForm, DeleteRateButton } from "@/components/creatives/rate-controls";
 import { PaymentsList } from "@/components/creatives/payments-list";
-import { readPortalConfigs, readVideoLinks, readProductBriefs, getProductCards, portalEarned, payLabel, normalizePortalCfg } from "@/lib/creatives/portal";
+import { readPortalConfigs, readVideoLinks, readProductBriefs, getProductCards, portalEarned, payLabel, normalizePortalCfg, usesCommission } from "@/lib/creatives/portal";
 import { EditorPortalForm, ReceivedLinks, BriefsManager } from "@/components/creatives/portal-controls";
 import { periodRange } from "@/lib/creatives/queries";
 
@@ -36,7 +36,10 @@ export default async function CreativesAdminPage({
     getEditorBalances(),
     getRecentAds(),
   ]);
-  const [portalCfgs, videoLinks, productCards, briefs] = await Promise.all([readPortalConfigs(), readVideoLinks(), getProductCards(), readProductBriefs()]);
+  const [portalCfgs, allLinks, productCards, briefs] = await Promise.all([readPortalConfigs(), readVideoLinks(), getProductCards(), readProductBriefs()]);
+  // Éditeurs supprimés : ni affichés ni calculés
+  const activeEditorIds = new Set(report.editors.map((e) => e.id));
+  const videoLinks = allLinks.filter((l) => activeEditorIds.has(l.editorId));
   const cfgOf = (id: string) => portalCfgs[id] ?? normalizePortalCfg(null);
   const { from: pFrom, to: pTo } = periodRange(report.period);
   const commissionText = (e: { commissionType: string; commissionValue: number }) =>
@@ -49,7 +52,8 @@ export default async function CreativesAdminPage({
     .from("video_editor_rates" as never)
     .select("id, editor_id, product_id, commission_type, commission_value")
     .order("created_at", { ascending: false });
-  const rates = (ratesRaw ?? []) as { id: string; editor_id: string | null; product_id: string; commission_type: string; commission_value: number }[];
+  const rates = ((ratesRaw ?? []) as { id: string; editor_id: string | null; product_id: string; commission_type: string; commission_value: number }[])
+    .filter((r) => !r.editor_id || report.editors.some((e) => e.id === r.editor_id));
   const totalRemaining = balances.reduce((s, b) => s + Math.max(0, b.remaining), 0);
   // Statuts EN DIRECT depuis Meta (plus de choix manuel "En pub / En pause")
   const [liveStatus, adDeliveries] = await Promise.all([
@@ -116,7 +120,10 @@ export default async function CreativesAdminPage({
                     <div className="text-xs text-muted-foreground">{e.email}{!e.isActive && " · désactivé"}</div>
                   </td>
                   <td className="px-4 py-2">
-                    <EditorCommissionForm userId={e.id} type={e.commissionType} value={e.commissionValue} />
+                    {/* Commission seulement si c'est le mode choisi (ou « + commission ») */}
+                    {usesCommission(cfgOf(e.id)) && (
+                      <EditorCommissionForm userId={e.id} type={e.commissionType} value={e.commissionValue} />
+                    )}
                     {cfgOf(e.id).payMode !== "commission" && (
                       <div className="mt-1 text-xs font-medium text-fuchsia-700">{payLabel(cfgOf(e.id), commissionText(e))}</div>
                     )}
