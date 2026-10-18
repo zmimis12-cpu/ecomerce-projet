@@ -19,6 +19,7 @@ export type LpDesign = {
   blocks: { key: LpBlockKey; on: boolean }[];
   // Options
   heroSource: "product" | "banner";  // photo principale : 1re photo produit ou bannière (hero_image) de la LP
+  heroImage: string;                 // photo principale CHOISIE (par landing page) — prioritaire sur heroSource
   showStoreHeader: boolean;          // logo + menu « القائمة »
   showTopBar: boolean;               // barre noire en haut
   showBadge: boolean;
@@ -43,7 +44,7 @@ export type LpDesign = {
 
 export const DEFAULT_LP_DESIGN: LpDesign = {
   blocks: LP_BLOCKS.map((b) => ({ key: b.key, on: true })),
-  heroSource: "product", showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
+  heroSource: "product", heroImage: "", showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
   showOldPrice: true, showCodBar: true, askAddress: true, addressRequired: false, showWhatsapp: true, showWhatsappFloat: true,
   sticky: true, showFooter: true,
   topBar: "", badge: "عرض خاص", codBar: "🚚 التوصيل لجميع المدن | الدفع عند الاستلام", orderTitle: "🛒 اطلب الآن", orderSub: "",

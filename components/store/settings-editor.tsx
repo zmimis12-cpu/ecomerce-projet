@@ -5,10 +5,13 @@ import { saveStoreConfig } from "@/lib/store/actions";
 import type { StoreConfig } from "@/lib/store/config";
 import { cn } from "@/lib/utils";
 import { SectionImagePicker } from "@/components/landing-builder/section-image-picker";
+import { ImageChoice } from "@/components/store/image-choice";
 
 type P = { id: string; title: string; image: string | null; price: number; slug: string };
 
-export function StoreSettingsEditor({ tab, initial, products }: { tab: "accueil" | "produits"; initial: StoreConfig; products: P[] }) {
+type Photos = Record<string, { auto: string | null; images: { url: string; label?: string }[] }>;
+
+export function StoreSettingsEditor({ tab, initial, products, photos = {} }: { tab: "accueil" | "produits"; initial: StoreConfig; products: P[]; photos?: Photos }) {
   const [cfg, setCfg] = useState<StoreConfig>(initial);
   const [msg, setMsg] = useState("");
   const [pending, start] = useTransition();
@@ -77,9 +80,9 @@ export function StoreSettingsEditor({ tab, initial, products }: { tab: "accueil"
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="rounded-xl border bg-card shadow-sm">
           <div className="border-b px-4 py-3 text-sm text-muted-foreground">
-            👁 = visible sur la boutique · ⭐ = section « mis en avant » en haut de l&apos;accueil · flèches = ordre d&apos;affichage · Catégorie = filtres en haut des produits (ex : الإلكترونيات، المنزل…).
+            🖼 clic sur la photo = choisir la photo affichée dans la boutique · 👁 = visible sur la boutique · ⭐ = section « mis en avant » en haut de l&apos;accueil · flèches = ordre d&apos;affichage · Catégorie = filtres en haut des produits (ex : الإلكترونيات، المنزل…).
             <datalist id="store-cats">{[...new Set(Object.values(cfg.products).map((x) => x.category).filter(Boolean))].map((c) => <option key={c} value={c} />)}</datalist>
             Un produit caché reste vendable par sa page (pubs), il n&apos;apparaît juste plus dans la boutique.
           </div>
@@ -92,9 +95,9 @@ export function StoreSettingsEditor({ tab, initial, products }: { tab: "accueil"
                   <button onClick={() => move(i, -1)} disabled={i === 0} className="rounded p-0.5 hover:bg-muted disabled:opacity-20" title="Monter"><ArrowUp className="h-4 w-4" /></button>
                   <button onClick={() => move(i, 1)} disabled={i === ordered.length - 1} className="rounded p-0.5 hover:bg-muted disabled:opacity-20" title="Descendre"><ArrowDown className="h-4 w-4" /></button>
                 </div>
-                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
-                  {p.image && /* eslint-disable-next-line @next/next/no-img-element */ <img src={p.image} alt="" className="h-full w-full object-cover" />}
-                </div>
+                {/* Photo affichée dans la boutique : au choix (photos du produit, bannière ou importée) */}
+                <ImageChoice compact value={st.image ?? ""} onChange={(u) => setP(p.id, { image: u || undefined })}
+                  candidates={photos[p.id]?.images ?? []} autoUrl={photos[p.id]?.auto ?? p.image} autoLabel="Photo principale" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium" dir="auto">{p.title}</p>
                   <p className="text-xs text-muted-foreground">{p.price} MAD · /lp/{p.slug}</p>

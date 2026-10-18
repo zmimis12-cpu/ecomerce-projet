@@ -40,6 +40,7 @@ export async function saveStoreConfig(cfg: import("./config").StoreConfig): Prom
     products: Object.fromEntries(Object.entries(cfg.products ?? {}).map(([k, v]) => [k, {
       visible: v.visible !== false, featured: !!v.featured, order: Number.isFinite(Number(v.order)) ? Number(v.order) : 1000,
       ...(v.category?.trim() ? { category: clip(v.category, 40) } : {}),
+      ...(v.image && /^https?:\/\//.test(v.image) ? { image: v.image.slice(0, 800) } : {}),
     }])),
   };
   const { error } = await supabaseAdmin.from("app_settings").upsert(
@@ -62,7 +63,7 @@ export async function saveLpDesign(store: import("./lp-design-shared").LpDesignS
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(n)) {
       if (k === "blocks") out[k] = n.blocks.map((b) => ({ key: b.key, on: !!b.on }));
-      else if (typeof v === "string") out[k] = k.startsWith("color") ? (/^#[0-9a-f]{3,8}$/i.test(v) ? v : "") : v.slice(0, k === "videoUrl" ? 500 : 200);
+      else if (typeof v === "string") out[k] = k.startsWith("color") ? (/^#[0-9a-f]{3,8}$/i.test(v) ? v : "") : v.slice(0, k === "videoUrl" || k === "heroImage" ? 800 : 200);
       else out[k] = v;
     }
     return normalizeDesign(out as Partial<import("./lp-design-shared").LpDesign>);

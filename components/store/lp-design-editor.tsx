@@ -4,8 +4,9 @@ import { ArrowDown, ArrowUp, Eye, EyeOff, ExternalLink, RotateCcw } from "lucide
 import { saveLpDesign } from "@/lib/store/actions";
 import { LP_BLOCKS, DEFAULT_LP_DESIGN, type LpDesign, type LpDesignStore } from "@/lib/store/lp-design-shared";
 import { cn } from "@/lib/utils";
+import { ImageChoice } from "@/components/store/image-choice";
 
-type Lp = { slug: string; title: string };
+type Lp = { slug: string; title: string; images?: { url: string; label?: string }[] };
 
 export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pages: Lp[] }) {
   const [store, setStore] = useState<LpDesignStore>(initial);
@@ -96,7 +97,19 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
         {/* Options */}
         <div className="space-y-2 rounded-xl border bg-card p-4 shadow-sm">
           <h2 className="font-semibold">Options</h2>
-          <L t="Photo principale en haut">
+          {!isGlobal && (() => {
+            const pg = pages.find((x) => x.slug === scope);
+            const auto = d.heroSource === "banner"
+              ? pg?.images?.find((i) => i.label === "Bannière LP")?.url ?? pg?.images?.[0]?.url
+              : pg?.images?.find((i) => i.label !== "Bannière LP")?.url ?? pg?.images?.[0]?.url;
+            return (
+              <L t="Photo du haut (hero) de cette landing page">
+                <ImageChoice value={d.heroImage} onChange={(u) => set("heroImage", u)} candidates={pg?.images ?? []}
+                  autoUrl={auto} autoLabel="Selon l'option ci-dessous" />
+              </L>
+            );
+          })()}
+          <L t={isGlobal ? "Photo principale en haut" : "Si aucune photo choisie : utiliser"}>
             <select className={field} value={d.heroSource} onChange={(e) => set("heroSource", e.target.value as LpDesign["heroSource"])}>
               <option value="product">1re photo du produit</option>
               <option value="banner">Bannière (image hero de la landing page)</option>

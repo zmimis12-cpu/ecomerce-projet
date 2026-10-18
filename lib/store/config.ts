@@ -5,7 +5,7 @@
 import { unstable_cache } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-export type StoreProductSetting = { visible?: boolean; featured?: boolean; order?: number; category?: string };
+export type StoreProductSetting = { visible?: boolean; featured?: boolean; order?: number; category?: string; image?: string };
 export type StoreTrustItem = { title: string; sub: string };
 export type StoreConfig = {
   announcement: string;          // barre noire en haut (vide = textes par défaut)

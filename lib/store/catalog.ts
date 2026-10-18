@@ -46,7 +46,8 @@ export const getStoreProducts = unstable_cache(async (): Promise<StoreProduct[]>
     out.push({
       productId: l.product_id!, slug: l.slug, title: l.title,
       // Photo du produit (pas le GIF/visuel « hero » de la landing page)
-      image: img.get(l.product_id!) || l.hero_image || null,
+      // Photo choisie dans Admin → Boutique → Produits (prioritaire), sinon photo principale du produit
+      image: cfg.products[l.product_id!]?.image || img.get(l.product_id!) || l.hero_image || null,
       price: one ? Number(one.price) : price.get(l.product_id!)!,
       oldPrice: old,
       visible: cfg.products[l.product_id!]?.visible !== false,

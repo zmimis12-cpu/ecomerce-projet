@@ -82,7 +82,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   // ── Données (contenu = éditeur de la landing page ; design = Admin → Boutique → Landing pages) ──
   const productImgs = product.images.map((i) => i.public_url).filter(Boolean);
   const banner = lp.hero_image as string | undefined;
-  const heroImg = (d.heroSource === "banner" ? banner ?? productImgs[0] : productImgs[0] ?? banner) ?? null;
+  // Photo choisie dans Admin → Boutique → Landing pages (prioritaire), sinon règle produit / bannière
+  const heroImg = (d.heroImage || (d.heroSource === "banner" ? banner ?? productImgs[0] : productImgs[0] ?? banner)) ?? null;
   const discount = oldShown > one.price ? Math.round((1 - one.price / oldShown) * 100) : 0;
 
   type Ico = { icon?: string; title?: string; desc?: string; label?: string };
