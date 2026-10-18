@@ -45,8 +45,17 @@ export function StoreSettingsEditor({ tab, initial, products, photos = {} }: { t
             <L t="Titre (ligne dorée, optionnel)"><input dir="auto" className={field} value={cfg.heroTitleGold ?? ""} onChange={(e) => set("heroTitleGold", e.target.value)} /></L>
             <L t="Sous-titre"><textarea dir="auto" rows={2} className={cn(field, "h-auto py-2")} value={cfg.heroSubtitle} onChange={(e) => set("heroSubtitle", e.target.value)} /></L>
             <L t="Texte du bouton (vide = pas de bouton)"><input dir="auto" className={field} value={cfg.heroCta} onChange={(e) => set("heroCta", e.target.value)} /></L>
-            <SectionImagePicker label="Image de fond (optionnel) — importe une photo depuis ton téléphone ou ton PC"
+            <SectionImagePicker label="Bannière (ordinateur + téléphone) — idéal 1920 × 700 px pour une bannière large"
               value={cfg.heroImage || undefined} onChange={(url) => set("heroImage", url)} />
+            <SectionImagePicker label="Bannière téléphone (optionnel) — idéal 1080 × 1080 px ou 1080 × 1350 px. Vide = même bannière"
+              value={cfg.heroImageMobile || undefined} onChange={(url) => set("heroImageMobile", url)} />
+            <L t="Affichage de la bannière">
+              <select className={field} value={cfg.heroLayout ?? "full"} onChange={(e) => set("heroLayout", e.target.value as StoreConfig["heroLayout"])}>
+                <option value="full">Bannière en grand (pleine largeur) + titre et bouton dessous</option>
+                <option value="banner">Bannière seule en grand (clic = produits)</option>
+                <option value="side">Texte à côté de l&apos;image (ancien affichage)</option>
+              </select>
+            </L>
             <L t="Barre d'annonce en haut (vide = « توصيل لجميع المدن · الدفع عند الاستلام »)"><input dir="auto" className={field} value={cfg.announcement} onChange={(e) => set("announcement", e.target.value)} placeholder="ex : 🔥 توصيل مجاني هاد الأسبوع" /></L>
           </div>
           <div className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">

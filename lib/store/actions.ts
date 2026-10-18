@@ -34,7 +34,8 @@ export async function saveStoreConfig(cfg: import("./config").StoreConfig): Prom
     announcement: clip(cfg.announcement, 140), heroTitle: clip(cfg.heroTitle, 120), heroTitleGold: clip(cfg.heroTitleGold, 120), heroSubtitle: clip(cfg.heroSubtitle, 300),
     trust: (cfg.trust ?? []).slice(0, 4).map((t) => ({ title: clip(t.title, 60), sub: clip(t.sub, 80) })),
     bottomTitle1: clip(cfg.bottomTitle1, 80), bottomSub1: clip(cfg.bottomSub1, 120), bottomTitle2: clip(cfg.bottomTitle2, 80), bottomSub2: clip(cfg.bottomSub2, 120),
-    heroCta: clip(cfg.heroCta, 40), heroImage: clip(cfg.heroImage, 500), featuredTitle: clip(cfg.featuredTitle, 80),
+    heroCta: clip(cfg.heroCta, 40), heroImage: clip(cfg.heroImage, 800), heroImageMobile: clip(cfg.heroImageMobile, 800),
+    heroLayout: cfg.heroLayout === "banner" || cfg.heroLayout === "side" ? cfg.heroLayout : "full", featuredTitle: clip(cfg.featuredTitle, 80),
     allTitle: clip(cfg.allTitle, 80), showTrust: !!cfg.showTrust, showAbout: !!cfg.showAbout,
     contactEmail: clip(cfg.contactEmail, 120), whatsapp: clip(cfg.whatsapp, 20),
     products: Object.fromEntries(Object.entries(cfg.products ?? {}).map(([k, v]) => [k, {

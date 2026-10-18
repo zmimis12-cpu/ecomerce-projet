@@ -14,6 +14,8 @@ export type StoreConfig = {
   heroSubtitle: string;
   heroCta: string;
   heroImage: string;             // URL image de fond (optionnel)
+  heroImageMobile: string;       // bannière spéciale téléphone (optionnel, ex. carrée)
+  heroLayout: "full" | "banner" | "side"; // full = bannière pleine largeur + texte dessous · banner = bannière seule · side = texte à côté
   featuredTitle: string;         // titre de la section « mis en avant »
   allTitle: string;              // titre de la grille de produits
   showTrust: boolean;            // bloc « livraison / paiement / … »
@@ -32,6 +34,8 @@ export const DEFAULT_STORE_CONFIG: StoreConfig = {
   heroSubtitle: "اختر منتجك، أكد طلبك فالهاتف، وخلص غير ملي يوصلك. توصيل لجميع مدن المغرب.",
   heroCta: "تسوق الآن",
   heroImage: "",
+  heroImageMobile: "",
+  heroLayout: "full",
   featuredTitle: "الأكثر مبيعاً 🔥",
   allTitle: "جميع المنتجات",
   showTrust: true,
@@ -55,7 +59,8 @@ export async function readStoreConfig(): Promise<StoreConfig> {
   let v: Partial<StoreConfig> = {};
   try { v = (typeof raw === "string" ? JSON.parse(raw) : raw) ?? {}; } catch { /* défauts */ }
   const trust = Array.isArray(v.trust) && v.trust.length ? v.trust.slice(0, 4) : DEFAULT_STORE_CONFIG.trust;
-  return { ...DEFAULT_STORE_CONFIG, ...v, trust, products: { ...(v.products ?? {}) } };
+  const heroLayout = v.heroLayout === "banner" || v.heroLayout === "side" ? v.heroLayout : "full";
+  return { ...DEFAULT_STORE_CONFIG, ...v, heroLayout, trust, products: { ...(v.products ?? {}) } };
 }
 
 export const getStoreConfig = unstable_cache(readStoreConfig, ["store-config-v1"], { revalidate: 300, tags: ["store"] });
