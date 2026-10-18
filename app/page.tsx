@@ -77,17 +77,18 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       {/* Bannière — affichage réglable : Admin → Boutique → Accueil */}
       {(() => {
         const shopHref = featured.length ? "#offers" : "#products";
-        const text = (centered: boolean) => (
+        // compact = sous une bannière : texte plus petit sur téléphone pour laisser la place à la bannière
+        const text = (centered: boolean, compact = false) => (
           <div className={centered ? "text-center" : "text-center md:text-right"}>
-            <p className="mb-2 text-xs font-black tracking-[0.3em] text-[#D4A93F]" dir="ltr">HAJTEK ZONE</p>
-            <h1 className="text-[30px] font-black leading-tight sm:text-5xl">
+            <p className={`text-xs font-black tracking-[0.3em] text-[#D4A93F] ${compact ? "mb-1 hidden sm:block" : "mb-2"}`} dir="ltr">HAJTEK ZONE</p>
+            <h1 className={`font-black leading-tight sm:text-5xl ${compact ? "text-[22px]" : "text-[30px]"}`}>
               {cfg.heroTitle}
               {cfg.heroTitleGold && <span className="mt-1 block bg-gradient-to-l from-[#F3D98B] to-[#D4A93F] bg-clip-text text-transparent">{cfg.heroTitleGold}</span>}
             </h1>
-            {cfg.heroSubtitle && <p className={`mx-auto mt-4 max-w-md text-sm leading-relaxed text-white/70 ${centered ? "" : "md:mx-0"}`}>{cfg.heroSubtitle}</p>}
+            {cfg.heroSubtitle && <p className={`mx-auto max-w-md leading-relaxed text-white/70 ${compact ? "mt-2 text-[13px] sm:mt-4 sm:text-sm" : "mt-4 text-sm"} ${centered ? "" : "md:mx-0"}`}>{cfg.heroSubtitle}</p>}
             {cfg.heroCta && (
               <a href={shopHref}
-                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-gradient-to-l from-[#F3D98B] to-[#D4A93F] px-7 py-3 text-sm font-black text-neutral-900 shadow-[0_8px_30px_rgba(212,169,63,0.35)] transition hover:scale-[1.03]">
+                className={`${compact ? "mt-4 sm:mt-6" : "mt-6"} inline-flex items-center gap-2 rounded-xl bg-gradient-to-l from-[#F3D98B] to-[#D4A93F] px-7 py-3 text-sm font-black text-neutral-900 shadow-[0_8px_30px_rgba(212,169,63,0.35)] transition hover:scale-[1.03]`}>
                 {cfg.heroCta} <ShoppingCart className="h-4 w-4" />
               </a>
             )}
@@ -98,21 +99,21 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <picture>
             {cfg.heroImageMobile && <source media="(max-width: 767px)" srcSet={cfg.heroImageMobile} />}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={cfg.heroImage} alt="HajtekZone" fetchPriority="high" className="block h-auto w-full rounded-2xl border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.5)]" />
+            <img src={cfg.heroImage} alt="HajtekZone" fetchPriority="high" className="block h-auto w-full border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.5)] sm:rounded-2xl sm:border" />
           </picture>
         );
         const layout = cfg.heroImage ? cfg.heroLayout : "side";
 
         if (layout === "banner") return (
           <section className="border-b border-white/10">
-            <div className="mx-auto max-w-6xl px-2 py-3 sm:px-4 sm:py-6"><a href={shopHref} className="block">{banner}</a></div>
+            <div className="mx-auto max-w-6xl sm:px-4 sm:py-6"><a href={shopHref} className="block">{banner}</a></div>
           </section>
         );
         if (layout === "full") return (
           <section className="relative overflow-hidden border-b border-white/10">
             <div className="pointer-events-none absolute -left-20 top-0 h-80 w-80 rounded-full bg-[#D4A93F]/20 blur-3xl" />
-            <div className="relative mx-auto max-w-6xl px-2 pt-3 sm:px-4 sm:pt-6"><a href={shopHref} className="block">{banner}</a></div>
-            <div className="relative mx-auto max-w-3xl px-4 py-8 md:py-10">{text(true)}</div>
+            <div className="relative mx-auto max-w-6xl sm:px-4 sm:pt-6"><a href={shopHref} className="block">{banner}</a></div>
+            <div className="relative mx-auto max-w-3xl px-4 py-5 sm:py-8 md:py-10">{text(true, true)}</div>
           </section>
         );
         return (
