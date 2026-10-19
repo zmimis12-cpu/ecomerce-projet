@@ -129,7 +129,6 @@ const VIDEO_EDITOR_NAV: NavGroup[] = [
       { href: "/admin/editor",          label: "Tableau de bord",   icon: LayoutDashboard, exact: true },
       { href: "/admin/editor/products", label: "Mes produits",      icon: Package },
       { href: "/admin/editor/videos",   label: "Mes vidéos",        icon: Clapperboard },
-      { href: "/admin/editor/ads",      label: "Stats pubs",        icon: BarChart3 },
       { href: "/admin/editor/deliveries", label: "Suivi livraisons", icon: Truck },
       { href: "/admin/editor/orders",   label: "Commandes livrées", icon: PackageCheck },
       { href: "/admin/editor/payments", label: "Mes paiements",     icon: Wallet },

@@ -43,7 +43,16 @@ export type CreativeStat = {
   adLeads: number;
   messages: number;
   spend: number;       // ⚠️ privé : jamais affiché aux éditeurs
+  // Qualité des commandes (commandes créées dans la période)
+  treated: number;     // commandes traitées par la confirmation (hors « nouvelles »)
+  confirmed: number;   // confirmées (envoyées, livrées, retournées…)
+  shipDone: number;    // expéditions terminées (livrées + retournées + refusées)
+  shipDelivered: number; // dont livrées
 };
+
+/** Statuts = commande confirmée par le centre d'appel (elle est partie ou va partir). */
+export const CONFIRMED_LIKE = ["confirmed", "ready", "shipped", "in_transit", "out_for_delivery", "delivered", "paid", "returned", "refused_delivery", "exchanged"];
+const SHIP_DONE = ["delivered", "paid", "returned", "refused_delivery"];
 
 export type EditorStat = EditorInfo & {
   impressions: number;
@@ -53,6 +62,10 @@ export type EditorStat = EditorInfo & {
   videosInAds: number;
   orders: number;
   delivered: number;
+  treated: number;
+  confirmed: number;
+  shipDone: number;
+  shipDelivered: number;
   revenue: number;
   earnings: number;
 };
@@ -187,6 +200,7 @@ export async function getCreativesReport(opts: { month?: string | null; editorId
       lpSlug: c.product_id ? lpSlug.get(c.product_id) ?? null : null,
       orders: 0, delivered: 0, revenue: 0, earnings: 0,
       adsCount: 0, impressions: 0, linkClicks: 0, adLeads: 0, messages: 0, spend: 0,
+      treated: 0, confirmed: 0, shipDone: 0, shipDelivered: 0,
     });
   }
 
@@ -232,7 +246,12 @@ export async function getCreativesReport(opts: { month?: string | null; editorId
   for (const o of orders) {
     const s = stats.get(o.creative_id);
     if (!s) continue;
-    if (inRange(o.created_at, from, to)) s.orders++;
+    if (inRange(o.created_at, from, to)) {
+      s.orders++;
+      if (o.status !== "new") s.treated++;
+      if (CONFIRMED_LIKE.includes(o.status)) s.confirmed++;
+      if (SHIP_DONE.includes(o.status)) { s.shipDone++; if (DELIVERED_STATUSES.includes(o.status)) s.shipDelivered++; }
+    }
     const deliveredAt = o.delivered_at ?? o.updated_at;
     if (DELIVERED_STATUSES.includes(o.status) && inRange(deliveredAt, from, to)) {
       const amount = Number(o.total_amount_mad ?? 0);
@@ -266,6 +285,10 @@ export async function getCreativesReport(opts: { month?: string | null; editorId
         linkClicks: mine.reduce((s, c) => s + c.linkClicks, 0),
         adLeads: mine.reduce((s, c) => s + c.adLeads, 0),
         delivered: mine.reduce((s, c) => s + c.delivered, 0),
+        treated: mine.reduce((s, c) => s + c.treated, 0),
+        confirmed: mine.reduce((s, c) => s + c.confirmed, 0),
+        shipDone: mine.reduce((s, c) => s + c.shipDone, 0),
+        shipDelivered: mine.reduce((s, c) => s + c.shipDelivered, 0),
         revenue: mine.reduce((s, c) => s + c.revenue, 0),
         earnings: mine.reduce((s, c) => s + c.earnings, 0),
       };
@@ -532,4 +555,18 @@ export async function getEditorDeliveries(opts: { editorId: string; month?: stri
       earning: (r.status === "delivered" || r.status === "paid") ? r.editor_earning_mad : null,
     };
   });
+}
+
+/** Verdict simple d'une vidéo pour l'éditeur (sans montrer les chiffres Meta). */
+export function videoVerdict(c: Pick<CreativeStat, "orders" | "treated" | "confirmed" | "shipDone" | "shipDelivered" | "spend">):
+  { label: string; tone: "good" | "mid" | "bad" | "wait" } {
+  if (c.treated < 3) {
+    if (c.orders === 0 && c.spend >= 80) return { label: "❌ Ne vend pas", tone: "bad" };
+    return { label: "⏳ En test", tone: "wait" };
+  }
+  const conf = c.confirmed / c.treated;
+  const del = c.shipDone >= 3 ? c.shipDelivered / c.shipDone : null;
+  if (conf >= 0.55 && (del === null || del >= 0.55)) return { label: "✅ Bonne vidéo", tone: "good" };
+  if (conf >= 0.4 && (del === null || del >= 0.4)) return { label: "🟡 Moyenne", tone: "mid" };
+  return { label: "❌ Faible", tone: "bad" };
 }

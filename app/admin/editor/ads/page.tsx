@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { BarChart3 } from "lucide-react";
 import { loadEditorContext } from "@/lib/creatives/editor-context";
@@ -35,6 +36,8 @@ export default async function EditorAdsPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string>> }) {
   const ctx = await loadEditorContext(await searchParams);
+  // Les éditeurs ne voient pas les stats Meta : seulement « Mes vidéos » (verdict, confirmation, livraison)
+  if (ctx.isEditor) redirect("/admin/editor/videos");
   const linked = await getEditorLinkedAds(ctx.editorId);
   const metaLinks = linked.filter((l) => l.platform === "meta");
   const codeByAd = new Map(linked.map((l) => [l.adId, l.code]));

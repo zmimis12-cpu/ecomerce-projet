@@ -1,13 +1,20 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { Film, ShoppingCart, CheckCircle, Award, Eye, MousePointerClick } from "lucide-react";
+import { Film, ShoppingCart, CheckCircle, Award, Eye, MousePointerClick, PhoneCall } from "lucide-react";
 import type { EditorContext } from "@/lib/creatives/editor-context";
 import { PeriodFilter, mad, rate } from "@/components/creatives/period-filter";
-import { ctr, ago } from "@/lib/creatives/queries";
+import { ctr, ago, videoVerdict } from "@/lib/creatives/queries";
 import { TONE_CLS } from "@/lib/ads/meta-status";
 import { usesCommission, packProgress } from "@/lib/creatives/portal-shared";
 
 const STATUS: Record<string, string> = { in_ads: "🟢 En pub", paused: "⏸️ En pause", draft: "📝 Brouillon" };
+
+const VERDICT_CLS = { good: "bg-emerald-100 text-emerald-800", mid: "bg-amber-100 text-amber-800", bad: "bg-rose-100 text-rose-800", wait: "bg-slate-100 text-slate-700" } as const;
+
+export function Verdict({ c }: { c: Parameters<typeof videoVerdict>[0] }) {
+  const v = videoVerdict(c);
+  return <span className={`whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-semibold ${VERDICT_CLS[v.tone]}`}>{v.label}</span>;
+}
 
 const TABS = [
   { href: "/admin/editor",          label: "Tableau de bord" },
@@ -35,9 +42,11 @@ export function EditorHeader({
           <p className="mt-1 text-sm text-muted-foreground">
             Rémunération : {ctx.commissionLabel}.{(ctx.portal.payMode === "commission" || ctx.portal.plusCommission) && " Seules les commandes livrées comptent pour la commission."}
           </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Stats pubs mises à jour {ago(ctx.report.adsUpdatedAt)} · automatique toutes les 15 min
-          </p>
+          {!ctx.isEditor && (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Stats pubs mises à jour {ago(ctx.report.adsUpdatedAt)} · automatique toutes les 15 min
+            </p>
+          )}
         </div>
         {withFilter && (
           <PeriodFilter period={ctx.report.period} extra={ctx.isEditor ? undefined : { editor: ctx.editorId }} />
@@ -60,10 +69,18 @@ export function EditorHeader({
 
 export function StatCards({ ctx }: { ctx: EditorContext }) {
   const me = ctx.me;
-  const cards = [
-    { label: "Vidéos en pub (direct)", value: `${ctx.liveInAds} / ${me?.videos ?? 0}`, icon: Film },
+  // L'éditeur ne voit pas les stats Meta : seulement la qualité des commandes de ses vidéos
+  const quality = [
+    { label: "Taux de confirmation", value: rate(me?.confirmed ?? 0, me?.treated ?? 0), icon: PhoneCall },
+    { label: "Taux de livraison", value: rate(me?.shipDelivered ?? 0, me?.shipDone ?? 0), icon: CheckCircle },
+  ];
+  const meta = [
     { label: "Impressions", value: (me?.impressions ?? 0).toLocaleString("fr-FR"), icon: Eye },
     { label: "CTR (lien)", value: ctr(me?.linkClicks ?? 0, me?.impressions ?? 0), icon: MousePointerClick },
+  ];
+  const cards = [
+    { label: "Vidéos en pub (direct)", value: `${ctx.liveInAds} / ${me?.videos ?? 0}`, icon: Film },
+    ...(ctx.isEditor ? quality : meta),
     { label: "Commandes", value: String(me?.orders ?? 0), icon: ShoppingCart },
     { label: "Livrées", value: `${me?.delivered ?? 0} (${rate(me?.delivered ?? 0, me?.orders ?? 0)})`, icon: CheckCircle },
     { label: "Gains (période)", value: mad(me?.earnings ?? 0), icon: Award },
@@ -106,6 +123,7 @@ export function BalanceCards({ ctx }: { ctx: EditorContext }) {
 }
 
 export function VideosTable({ ctx, limit }: { ctx: EditorContext; limit?: number }) {
+  if (ctx.isEditor) return <EditorVideosTable ctx={ctx} limit={limit} />;
   const showGain = usesCommission(ctx.portal); // pas de colonne « Gain » si l'éditeur n'est pas payé à la commission
   const rows = limit ? [...ctx.report.creatives].sort((a, b) => b.delivered - a.delivered).slice(0, limit) : ctx.report.creatives;
   return (
@@ -126,12 +144,14 @@ export function VideosTable({ ctx, limit }: { ctx: EditorContext; limit?: number
             <th className="px-4 py-2 text-right">Coût / commande</th>
             <th className="px-4 py-2 text-right">Livrées</th>
             <th className="px-4 py-2 text-right">Taux</th>
+            <th className="px-4 py-2 text-right">Confirm.</th>
+            <th className="px-4 py-2">Verdict</th>
             {showGain && <th className="px-4 py-2 text-right">Gain</th>}
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 && (
-            <tr><td colSpan={showGain ? 14 : 13} className="px-4 py-6 text-center text-muted-foreground">Aucune vidéo pour le moment.</td></tr>
+            <tr><td colSpan={showGain ? 16 : 15} className="px-4 py-6 text-center text-muted-foreground">Aucune vidéo pour le moment.</td></tr>
           )}
           {rows.map((c) => (
             <tr key={c.id} className="border-t">
@@ -154,11 +174,70 @@ export function VideosTable({ ctx, limit }: { ctx: EditorContext; limit?: number
               <td className="px-4 py-2 text-right">{c.orders > 0 && c.spend > 0 ? `${Math.round(c.spend / c.orders)} MAD` : "—"}</td>
               <td className="px-4 py-2 text-right">{c.delivered}</td>
               <td className="px-4 py-2 text-right">{rate(c.delivered, c.orders)}</td>
+              <td className="px-4 py-2 text-right">{rate(c.confirmed, c.treated)}</td>
+              <td className="px-4 py-2"><Verdict c={c} /></td>
               {showGain && <td className="px-4 py-2 text-right font-semibold text-emerald-700">{mad(c.earnings)}</td>}
             </tr>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** Vue éditeur : pas d'impressions / clics / CTR / coûts — seulement si la vidéo vend bien. */
+function EditorVideosTable({ ctx, limit }: { ctx: EditorContext; limit?: number }) {
+  const showGain = usesCommission(ctx.portal);
+  const rows = limit ? [...ctx.report.creatives].sort((a, b) => b.delivered - a.delivered).slice(0, limit) : ctx.report.creatives;
+  const cols = showGain ? 11 : 10;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
+          <tr>
+            <th className="px-4 py-2">Code</th>
+            <th className="px-4 py-2">Vidéo</th>
+            <th className="px-4 py-2">Produit</th>
+            <th className="px-4 py-2">Diffusion</th>
+            <th className="px-4 py-2">Verdict</th>
+            <th className="px-4 py-2 text-right">Commandes</th>
+            <th className="px-4 py-2 text-right">Confirmées</th>
+            <th className="px-4 py-2 text-right">Taux confirmation</th>
+            <th className="px-4 py-2 text-right">Livrées</th>
+            <th className="px-4 py-2 text-right">Taux livraison</th>
+            {showGain && <th className="px-4 py-2 text-right">Gain</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && (
+            <tr><td colSpan={cols} className="px-4 py-6 text-center text-muted-foreground">Aucune vidéo pour le moment.</td></tr>
+          )}
+          {rows.map((c) => (
+            <tr key={c.id} className="border-t">
+              <td className="px-4 py-2 font-mono font-semibold">{c.code}</td>
+              <td className="px-4 py-2">{c.videoUrl
+                ? <a href={c.videoUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">{c.title}</a>
+                : c.title}</td>
+              <td className="px-4 py-2">{c.productName}</td>
+              <td className="px-4 py-2">
+                {(() => { const l = ctx.live.get(c.id); return l
+                  ? <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${TONE_CLS[l.tone]}`}>{l.label}</span>
+                  : <span className="text-xs">{STATUS[c.status] ?? c.status}</span>; })()}
+              </td>
+              <td className="px-4 py-2"><Verdict c={c} /></td>
+              <td className="px-4 py-2 text-right">{c.orders}</td>
+              <td className="px-4 py-2 text-right">{c.confirmed}</td>
+              <td className="px-4 py-2 text-right">{rate(c.confirmed, c.treated)}</td>
+              <td className="px-4 py-2 text-right">{c.delivered}</td>
+              <td className="px-4 py-2 text-right">{rate(c.shipDelivered, c.shipDone)}</td>
+              {showGain && <td className="px-4 py-2 text-right font-semibold text-emerald-700">{mad(c.earnings)}</td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="border-t px-4 py-2 text-[11px] text-muted-foreground">
+        ✅ Bonne vidéo = les clients confirment et reçoivent bien leur commande · ⏳ En test = pas encore assez de commandes pour juger.
+      </p>
     </div>
   );
 }
