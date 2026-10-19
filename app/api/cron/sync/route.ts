@@ -89,6 +89,12 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Images trop lourdes (photos produits, LP, boutique) → WebP léger : pages rapides sur la 4G
+  {
+    const { optimizeAllMedia } = await import("@/lib/landing-pages/optimize-media");
+    result.media = await safe(() => optimizeAllMedia(6));
+  }
+
   const duration_ms = Date.now() - started;
   await supabaseAdmin.from("auto_sync_runs" as never).insert({ duration_ms, result } as never);
   return NextResponse.json({ ok: true, duration_ms, result });

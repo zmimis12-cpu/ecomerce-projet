@@ -15,6 +15,11 @@ export async function optimizeImageBuffer(input: Buffer, contentType: string): P
   if (!/^image\/(png|jpe?g|webp|gif)$/.test(contentType)) return null;
   if (input.length < MIN_BYTES) return null;
   try {
+    // WebP/PNG animé : on ne l'aplatit jamais en une seule image
+    if (!isGif) {
+      const md = await sharp(input, { limitInputPixels: false }).metadata();
+      if ((md.pages ?? 1) > 1) return null;
+    }
     const out = isGif
       ? await sharp(input, { animated: true, limitInputPixels: false })
           .resize({ width: 720, withoutEnlargement: true })
@@ -87,4 +92,59 @@ export async function optimizeAllLandingMedia(maxFiles = 4) {
     if (Object.keys(patch).length) await supabaseAdmin.from("landing_pages").update(patch as never).eq("id", String(row.id));
   }
   return { ok: true, optimized: done };
+}
+
+/**
+ * Filet de sécurité élargi (cron toutes les 15 min) : photos produits (boutique + LP),
+ * réglages boutique / design LP (hero, tuiles, galerie, bannières) et landing pages.
+ * Toute image > 300 Ko est convertie en WebP 1080 px, et les liens sont remplacés partout.
+ */
+export async function optimizeAllMedia(maxFiles = 6) {
+  const re = /https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\/object\/public\/(product-images|lp-media)\/([^"\s\\?]+?\.(?:png|jpe?g|webp))(?=["\s\\?]|$)/gi;
+  const [{ data: imgs }, { data: lps }, { data: sets }] = await Promise.all([
+    supabaseAdmin.from("product_images").select("id, public_url"),
+    supabaseAdmin.from("landing_pages").select("*"),
+    supabaseAdmin.from("app_settings").select("key, value").in("key", ["lp_design", "store_config"]),
+  ]);
+  const urls = new Set<string>();
+  for (const i of (imgs ?? []) as { public_url: string | null }[]) if (i.public_url) urls.add(i.public_url);
+  for (const m of JSON.stringify([lps ?? [], sets ?? []]).matchAll(re)) urls.add(m[0]);
+
+  const map = new Map<string, string>();
+  for (const url of urls) {
+    if (map.size >= maxFiles) break;
+    if (/\.opt\.webp$/i.test(url)) continue;
+    const m = url.match(/\/object\/public\/(product-images|lp-media)\/(.+)$/i);
+    if (!m) continue;
+    const head = await fetch(url, { method: "HEAD" }).catch(() => null);
+    const size = Number(head?.headers.get("content-length") ?? 0);
+    if (!head?.ok || (size && size < MIN_BYTES)) continue;
+    const nu = await optimizeStoredFile(m[1], decodeURIComponent(m[2]));
+    if (nu !== url) map.set(url, nu);
+  }
+  if (!map.size) return { ok: true, optimized: 0 };
+
+  const sub = (s: string) => { let n = s; for (const [a, b] of map) n = n.split(a).join(b); return n; };
+  for (const i of (imgs ?? []) as { id: string; public_url: string | null }[]) {
+    if (i.public_url && map.has(i.public_url))
+      await supabaseAdmin.from("product_images").update({ public_url: map.get(i.public_url) } as never).eq("id", i.id);
+  }
+  for (const row of (lps ?? []) as Record<string, unknown>[]) {
+    const patch: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(row)) {
+      if (["id", "created_at"].includes(k) || v == null) continue;
+      const s = JSON.stringify(v), n = sub(s);
+      if (n !== s) patch[k] = JSON.parse(n);
+    }
+    if (Object.keys(patch).length) await supabaseAdmin.from("landing_pages").update(patch as never).eq("id", String(row.id));
+  }
+  for (const st of (sets ?? []) as { key: string; value: unknown }[]) {
+    const str = typeof st.value === "string" ? st.value : JSON.stringify(st.value);
+    const n = sub(str);
+    if (n !== str) await supabaseAdmin.from("app_settings")
+      .update({ value: typeof st.value === "string" ? n : JSON.parse(n) } as never).eq("key", st.key);
+  }
+  const { revalidateTag } = await import("next/cache");
+  revalidateTag("store");
+  return { ok: true, optimized: map.size };
 }
