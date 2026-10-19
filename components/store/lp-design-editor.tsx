@@ -115,6 +115,16 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
               <option value="banner">Bannière (image hero de la landing page)</option>
             </select>
           </L>
+          <L t="Position de la photo principale">
+            <select className={field} value={d.heroPosition} onChange={(e) => set("heroPosition", e.target.value as LpDesign["heroPosition"])}>
+              <option value="top">Photo en haut, puis titre, prix et formulaire (recommandé)</option>
+              <option value="after_form">Formulaire tout en haut, photo juste après</option>
+              <option value="hidden">Pas de grande photo</option>
+            </select>
+          </L>
+          {B("offersAfterFields", "Choix de la quantité SOUS les champs nom / téléphone / ville (sinon au-dessus)")}
+          {B("formFirst", "Formulaire juste sous la photo (avant les icônes et les autres blocs)")}
+          {B("offerThumbs", "Petite photo du produit sur chaque offre (1 / 2 / 3 pièces)")}
           {B("crossAtBottom", "Autres produits toujours tout en bas de la page (recommandé pour Meta)")}
           {B("showBumps", "Upsells « أضف لطلبك » dans le formulaire")}
           {B("showTopBar", "Barre noire en haut (texte d'offre)")}
@@ -128,6 +138,7 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
           {B("showWhatsapp", "Bouton WhatsApp sous le formulaire")}
           {B("showWhatsappFloat", "Bouton WhatsApp rond flottant (coin de l'écran)")}
           {B("sticky", "Bouton de commande fixe en bas de l'écran")}
+          {d.sticky && B("stickyAlways", "… toujours visible (barre « اشتري الآن » + WhatsApp sur toute la page, envoie la commande directement)")}
           {B("showFooter", "Pied de page (footer)")}
         </div>
 

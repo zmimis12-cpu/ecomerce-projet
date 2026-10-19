@@ -46,9 +46,14 @@ interface Props {
   askAddress?: boolean;
   /** Rend le champ adresse obligatoire */
   addressRequired?: boolean;
+  /** Petite photo du produit sur chaque carte d'offre (1 / 2 / 3 pièces) */
+  offerImage?: string | null;
+  /** Quantité sous les champs nom / téléphone / ville (true) ou au-dessus (false) */
+  offersAfterFields?: boolean;
 }
 
-export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [], askAddress = false, addressRequired = false }: Props) {
+export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [], askAddress = false, addressRequired = false, offerImage = null, offersAfterFields = true }: Props) {
+  const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
   useEffect(() => { getCreativeCode(); }, []); // mémorise ?cr= dès l'arrivée
   const [submitted, setSubmitted]    = useState(false);
@@ -149,7 +154,12 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     if (missingVariant) newErrors.variants = bundle > 1
       ? "المرجو اختيار الخيارات لكل قطعة"
       : "المرجو اختيار الخيارات";
-    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      // Bouton fixe « اشتري الآن » cliqué loin du formulaire : on ramène le client aux champs à remplir
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
 
     startTransition(async () => {
       try {
@@ -255,14 +265,9 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     <p style={{ color:"#ef4444", fontSize:"11px", marginTop:"3px" }}>{msg}</p>
   ) : null;
 
-  return (
-    <form onSubmit={handleSubmit} style={{ fontFamily:"var(--font-cairo),sans-serif" }}>
-      {/* Honeypot */}
-      <input type="text" name="website" value={form.website}
-        onChange={(e) => set("website", e.target.value)}
-        style={{ position:"absolute", width:1, height:1, overflow:"hidden", clip:"rect(0 0 0 0)", opacity:0, pointerEvents:"none" }}
-        tabIndex={-1} aria-hidden="true" />
-
+  // Choix de la quantité (+ variantes) : sous les champs (par défaut) ou au-dessus
+  const choiceBlock = (
+    <>
       {/* Offres (masquées s'il n'y a qu'une seule offre) */}
       <div style={{ marginBottom:"18px", display: offers.length > 1 ? undefined : "none" }}>
         <label style={LBL}>اختار العرض</label>
@@ -281,6 +286,11 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
                     fontSize:"10px", fontWeight:800, padding:"2px 8px", borderRadius:"9999px" }}>{o.badge}</span>
                 )}
                 <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                  {offerImage && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={offerImage} alt="" loading="eager" decoding="async"
+                      style={{ width:"52px", height:"52px", borderRadius:"10px", objectFit:"cover", flexShrink:0, border:"1px solid #e5e7eb", background:"#fff" }} />
+                  )}
                   <div style={{ width:"18px", height:"18px", borderRadius:"50%", flexShrink:0,
                     border:`2px solid ${on ? "#16a34a" : "#d1d5db"}`, background: on ? "#16a34a" : "transparent",
                     display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -392,6 +402,19 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
       ))}
       {activeVariants.length > 0 && ERR(errors.variants)}
 
+    </>
+  );
+
+  return (
+    <form id="sp-order-form" ref={formRef} onSubmit={handleSubmit} style={{ fontFamily:"var(--font-cairo),sans-serif", scrollMarginTop:"12px" }}>
+      {/* Honeypot */}
+      <input type="text" name="website" value={form.website}
+        onChange={(e) => set("website", e.target.value)}
+        style={{ position:"absolute", width:1, height:1, overflow:"hidden", clip:"rect(0 0 0 0)", opacity:0, pointerEvents:"none" }}
+        tabIndex={-1} aria-hidden="true" />
+
+      {!offersAfterFields && choiceBlock}
+
       {/* Name */}
       <div style={{ marginBottom:"14px" }}>
         <label style={LBL}>الاسم الكامل *</label>
@@ -482,6 +505,8 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           {ERR(errors.customer_address)}
         </div>
       )}
+
+      {offersAfterFields && choiceBlock}
 
       {/* Upsell « en même temps » (order bump) */}
       {bumps.length > 0 && (

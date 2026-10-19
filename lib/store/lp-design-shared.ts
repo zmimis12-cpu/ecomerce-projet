@@ -20,6 +20,11 @@ export type LpDesign = {
   // Options
   heroSource: "product" | "banner";  // photo principale : 1re photo produit ou bannière (hero_image) de la LP
   heroImage: string;                 // photo principale CHOISIE (par landing page) — prioritaire sur heroSource
+  heroPosition: "top" | "after_form" | "hidden"; // photo en haut puis formulaire (défaut) / formulaire puis photo / pas de photo
+  formFirst: boolean;                // formulaire juste sous la photo (avant les icônes et autres blocs)
+  stickyAlways: boolean;             // barre fixe « اشتري الآن » + WhatsApp visible sur toute la page
+  offerThumbs: boolean;              // petite photo du produit sur chaque offre (1 / 2 / 3 pièces)
+  offersAfterFields: boolean;        // quantité sous les champs nom / téléphone / ville
   showStoreHeader: boolean;          // logo + menu « القائمة »
   crossAtBottom: boolean;            // autres produits toujours tout en bas (la page reste centrée sur LE produit — mieux pour Meta)
   showBumps: boolean;                // upsells « أضف لطلبك » dans le formulaire
@@ -50,7 +55,7 @@ export type LpDesign = {
 
 export const DEFAULT_LP_DESIGN: LpDesign = {
   blocks: LP_BLOCKS.map((b) => ({ key: b.key, on: true })),
-  heroSource: "product", heroImage: "", crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
+  heroSource: "product", heroImage: "", heroPosition: "top", formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
   showOldPrice: true, showCodBar: true, askAddress: true, addressRequired: false, showWhatsapp: true, showWhatsappFloat: true,
   sticky: true, showFooter: true,
   topBar: "", badge: "عرض خاص", codBar: "🚚 التوصيل لجميع المدن | الدفع عند الاستلام", orderTitle: "🛒 اطلب الآن", orderSub: "",
@@ -74,6 +79,7 @@ export function normalizeDesign(v: Partial<LpDesign> | undefined | null): LpDesi
   const tiles = (Array.isArray(v?.tiles) ? v!.tiles : []).slice(0, 9)
     .map((t) => ({ image: str(t?.image), text: str(t?.text) })).filter((t) => t.image || t.text);
   const galleryImages = (Array.isArray(v?.galleryImages) ? v!.galleryImages : []).filter((x) => typeof x === "string" && x).slice(0, 20);
-  return { ...d, blocks, tiles, galleryImages };
+  const heroPosition = d.heroPosition === "after_form" || d.heroPosition === "hidden" ? d.heroPosition : "top";
+  return { ...d, heroPosition, blocks, tiles, galleryImages };
 }
 
