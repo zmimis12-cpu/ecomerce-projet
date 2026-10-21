@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { HajtekMark } from "@/components/brand/logo";
 import { getStoreConfig } from "@/lib/store/config";
+import { viaCdn } from "@/lib/media";
 
 export const LEGAL_LINKS = [
   { href: "/a-propos", label: "من نحن" },
@@ -17,7 +18,7 @@ export const LEGAL_LINKS = [
 export async function StoreShell({ title, subtitle, current, children }: {
   title: string; subtitle?: string; current: string; children: ReactNode;
 }) {
-  const cfg = await getStoreConfig().catch(() => null);
+  const cfg = await getStoreConfig().then(viaCdn).catch(() => null);
   const wa = (cfg?.whatsapp ?? "").replace(/\D/g, "");
   const waIntl = !wa ? "" : wa.startsWith("0") ? `212${wa.slice(1)}` : wa;
   const nav = [

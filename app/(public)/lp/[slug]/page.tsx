@@ -10,6 +10,7 @@ import type { LPSection } from "@/lib/templates";
 import { FaqAccordion } from "@/components/landing/faq-accordion";
 import { CrossSell } from "@/components/store/cross-sell";
 import { getLpDesignFor, DEFAULT_LP_DESIGN, type LpBlockKey } from "@/lib/store/lp-design";
+import { viaCdn } from "@/lib/media";
 
 // Landing page « simple » (style boutique COD rapide) :
 // photo → titre → prix → formulaire tout de suite → photos + 1 phrase → re-CTA.
@@ -40,19 +41,22 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function LandingPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  const [{ data: lpData, error }, page, dg] = await Promise.all([
+  const [{ data: lpRaw, error }, pageRaw, dg] = await Promise.all([
     supabaseAdmin.from("landing_pages").select("*").eq("slug", slug).eq("is_active", true).maybeSingle(),
     getLandingPage(slug),
     supabaseAdmin.from("digylog_settings").select("config").order("created_at", { ascending: false }).limit(1).maybeSingle()
       .then((r) => r, () => ({ data: null, error: null })),
   ]);
   if (error) throw new Error(`lpData query failed: ${error.message}`);
-  if (!page) notFound();
+  if (!pageRaw) notFound();
+  // Images servies via le cache Vercel (/media/…) → presque plus de bande passante Supabase
+  const lpData = viaCdn(lpRaw);
+  const page = viaCdn(pageRaw);
 
   const [storeProducts, bumps, d] = await Promise.all([
-    getStoreProducts().catch(() => []),
-    getBumpsFor(page.product.id).catch(() => []),
-    getLpDesignFor(slug),
+    getStoreProducts().catch(() => []).then(viaCdn),
+    getBumpsFor(page.product.id).catch(() => []).then(viaCdn),
+    getLpDesignFor(slug).then(viaCdn),
   ]);
 
   const cfg = (dg?.data as { config?: { cities?: string[] } } | null)?.config;
@@ -287,8 +291,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         (function(){function buy(){var f=document.getElementById('sp-order-form');if(!f){var c=document.getElementById('sp-form');if(c)c.scrollIntoView({behavior:'smooth'});return;}if(f.requestSubmit)f.requestSubmit();else f.dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));}document.addEventListener('click',function(e){var t=e.target;if(t&&t.closest&&t.closest('#sp-buy')){e.preventDefault();buy();}});})();
         (function(){function go(){var b=document.getElementById('sp-sticky'),f=document.getElementById('sp-form');if(!f||!('IntersectionObserver' in window))return;var w=document.getElementById('sp-wa-float');new IntersectionObserver(function(e){if(b)b.classList.toggle('sp-hide',e[0].isIntersecting);if(w)w.classList.toggle('sp-hide-wa',e[0].isIntersecting);},{threshold:0.05}).observe(f);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`
       }} />
-      <link rel="preconnect" href="https://nccufqvnxoftzovfsako.supabase.co" />
-      <style>{CSS}</style>
+            <style>{CSS}</style>
 
       <div className="sp" dir="rtl" lang="ar" style={colorVars}>
         {d.showTopBar && topBarText && <div className="sp-top">{topBarText}</div>}
@@ -314,7 +317,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         {/* Données produit structurées : indiquent clairement à Meta/Google le produit vendu sur cette page */}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
           "@context": "https://schema.org", "@type": "Product",
-          name: product.name, image: heroImg ? [heroImg, ...productImgs.filter((u) => u !== heroImg).slice(0, 4)] : productImgs.slice(0, 5),
+          name: product.name, image: (heroImg ? [heroImg, ...productImgs.filter((u) => u !== heroImg).slice(0, 4)] : productImgs.slice(0, 5)).map((u) => u.startsWith("/") ? SITE_URL + u : u),
           description: String(lp.subtitle ?? lp.hero_subheadline ?? product.name),
           offers: { "@type": "Offer", priceCurrency: "MAD", price: one.price, availability: "https://schema.org/InStock", url: `${SITE_URL}/lp/${slug}` },
         }).replace(/</g, "\\u003c") }} />

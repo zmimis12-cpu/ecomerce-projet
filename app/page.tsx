@@ -6,6 +6,7 @@ import { Truck, ShieldCheck, BadgeCheck, Headset, MapPin, ShoppingCart } from "l
 import { createClient } from "@/lib/supabase/server";
 import { getStoreProducts } from "@/lib/store/catalog";
 import { getStoreConfig } from "@/lib/store/config";
+import { viaCdn } from "@/lib/media";
 import { StoreGrid } from "@/components/store/store-grid";
 import { HajtekMark } from "@/components/brand/logo";
 import { Cairo } from "next/font/google";
@@ -40,7 +41,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   } catch (e) {
     if ((e as { digest?: string })?.digest?.startsWith("NEXT_REDIRECT")) throw e;
   }
-  const [all, cfg] = await Promise.all([getStoreProducts().catch(() => []), getStoreConfig()]);
+  // Images via le cache Vercel (/media/…) → moins de bande passante Supabase
+  const [all, cfg] = await Promise.all([getStoreProducts().catch(() => []).then(viaCdn), getStoreConfig().then(viaCdn)]);
   const products = all.filter((p) => p.visible);
   const featured = products.filter((p) => p.featured);
   const wa = cfg.whatsapp.replace(/\D/g, "");
