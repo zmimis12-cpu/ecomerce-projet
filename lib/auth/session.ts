@@ -28,11 +28,18 @@ const fetchProfile = cache(async function fetchProfile(userId: string): Promise<
   return data as AppUser | null;
 });
 
+// Un seul appel au serveur d'authentification par affichage de page
+// (avant : 1 fois dans le layout + 1 fois dans la page → 2 allers-retours réseau).
+const getAuthUser = cache(async function getAuthUser() {
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  return error ? null : user;
+});
+
 export async function getSession(): Promise<SessionUser | null> {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) return null;
+    const user = await getAuthUser();
+    if (!user) return null;
 
     const profile = await fetchProfile(user.id);
 
@@ -52,8 +59,7 @@ export async function getSession(): Promise<SessionUser | null> {
 
 export async function ensureProfile(): Promise<SessionUser | null> {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getAuthUser();
     if (!user) return null;
 
     const profile = await fetchProfile(user.id);
