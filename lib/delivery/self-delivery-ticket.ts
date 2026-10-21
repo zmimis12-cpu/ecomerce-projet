@@ -25,10 +25,23 @@ export async function generateSelfDeliveryTicket(orderId: string, deliveryFee: n
 
   const { data: order } = await supabaseAdmin
     .from("orders")
-    .select("order_number, customer_name, customer_phone, customer_city, customer_address, total_amount_mad, notes, created_at")
+    .select("order_number, customer_name, customer_phone, customer_city, customer_address, total_amount_mad, notes, created_at, metadata")
     .eq("id", orderId)
     .single();
   if (!order) return { success: false, error: "Commande introuvable." };
+
+  // Part du livreur : enregistrée sur la commande → le tableau de bord l'utilise
+  // comme vrai coût de livraison (vide = 0, le livreur rend tout le montant).
+  const fee = Math.max(0, Math.round(Number(deliveryFee) || 0));
+  {
+    const meta = ((order as { metadata?: Record<string, unknown> | null }).metadata ?? {}) as Record<string, unknown>;
+    await supabaseAdmin.from("orders").update({
+      fulfillment_type: "self_delivery",
+      delivery_cost_real_mad: fee,
+      actual_delivery_cost: fee,
+      metadata: { ...meta, self_delivery_fee: fee },
+    } as never).eq("id", orderId);
+  }
 
   const o = order as {
     order_number: string; customer_name: string; customer_phone: string;
@@ -230,7 +243,12 @@ export async function generateSelfDeliveryTicket(orderId: string, deliveryFee: n
 
   // Livraison gratuite annoncée au client — on affiche uniquement le prix
   // total de la commande, jamais de "net" après déduction d'un frais.
-  textCenterArabic(`${o.total_amount_mad.toFixed(0)} DH`, colB + (X1 - colB) / 2, row3Top - 27, { bold: true, size: 15 });
+  textCenterArabic(`${o.total_amount_mad.toFixed(0)} DH`, colB + (X1 - colB) / 2, row3Top - (fee > 0 ? 19 : 27), { bold: true, size: 15 });
+  if (fee > 0) {
+    // Part du livreur + montant à remettre
+    textCenterMixed("أجرة الليفور:", `${fee} DH`, colB + (X1 - colB) / 2, row3Top - 31, { size: 7 });
+    textCenterMixed("يسلم:", `${(o.total_amount_mad - fee).toFixed(0)} DH`, colB + (X1 - colB) / 2, row3Top - 41, { bold: true, size: 8 });
+  }
 
   // ── Rangée 4: Ville (grande, centrée) ─────────────────────────────────────
   const row4Top = row3Top - row3H;

@@ -222,7 +222,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
       "id","status","is_paid","total_amount_mad","estimated_profit",
       "real_profit_mad","cogs_total","delivery_cost_real_mad","return_cost_mad",
       "customer_city","expected_delivery_cost","delivery_margin","actual_delivery_cost",
-      "assigned_to","actual_cod_collected_mad","fulfillment_type","editor_earning_mad",
+      "assigned_to","actual_cod_collected_mad","fulfillment_type","editor_earning_mad","metadata",
       "creative_id","delivery_company_id",
     ].join(","));
   // Note: on n'exclut PLUS "cancelled" ici — on en a besoin pour calculer le
@@ -248,6 +248,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     actual_delivery_cost: number | null;
     actual_cod_collected_mad: number | null;
     fulfillment_type: string | null;
+    metadata?: Record<string, unknown> | null;
     assigned_to: string | null;
     editor_earning_mad: number | null;
     creative_id: string | null;
@@ -320,6 +321,9 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   // sont JAMAIS mis à jour par l'app avec le vrai frais par commande — on ne peut pas
   // s'y fier (ex: Casa reste à 35 au lieu de 20). On utilise donc le calcul par ville,
   // qui matche exactement les factures Digylog réelles (vérifié: 34/34 sans écart).
+  // Livreur propre : part du livreur tapée sur le ticket (vide = 0 → il rend tout)
+  const selfFee = (r: { metadata?: Record<string, unknown> | null }) =>
+    Math.max(0, Number((r.metadata as { self_delivery_fee?: unknown } | null | undefined)?.self_delivery_fee ?? 0) || 0);
   const net_collected = activeRows
     .filter((r) => r.is_paid)
     .reduce((s, r) => {
@@ -332,7 +336,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
       // sinon estimation par ville. Avant : toujours l'estimation → Rabat à 30 MAD
       // comptée 35 → Net Collecté un peu plus bas que les virements Digylog.
       const carrier = carrierOf(r);
-      const livFee = isSelfDelivery ? 0
+      const livFee = isSelfDelivery ? selfFee(r)
         : carrier === "speedaf" ? deliveryFee(carrierFees, "speedaf", city, null)
         : r.actual_delivery_cost != null ? Number(r.actual_delivery_cost)
         : deliveryFee(carrierFees, "digylog", city, null);
@@ -515,7 +519,8 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     }
   }
   const realDelivery = (r: (typeof activeRows)[number]) =>
-    carrierOf(r) === "speedaf" ? deliveryFee(carrierFees, "speedaf", r.customer_city, null)
+    r.fulfillment_type === "self_delivery" ? selfFee(r)
+    : carrierOf(r) === "speedaf" ? deliveryFee(carrierFees, "speedaf", r.customer_city, null)
       : r.actual_delivery_cost ?? r.expected_delivery_cost ?? 35;
   const orderMargin = (r: (typeof activeRows)[number]) =>
     (r.total_amount_mad ?? 0) - (goodsCost.get(r.id) ?? (r.cogs_total ?? 0)) - realDelivery(r);
