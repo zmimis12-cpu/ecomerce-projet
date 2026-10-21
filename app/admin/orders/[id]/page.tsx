@@ -71,7 +71,16 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             </span>
           )}
         </div>
-        {canManage && <DeleteOrderButton orderId={id} orderNumber={order.order_number} />}
+        <div className="flex items-center gap-2">
+          {/* Modifier (nom, téléphone, ville, adresse, produit…) — tant que le colis n'est pas parti */}
+          {canManage && !["sent_to_delivery", "in_transit", "delivered", "paid", "returned"].includes(order.status) && (
+            <Link href={`/admin/orders/${id}/edit`}
+              className="flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-xs font-medium hover:bg-secondary">
+              <Pencil className="h-3.5 w-3.5" /> Modifier
+            </Link>
+          )}
+          {canManage && <DeleteOrderButton orderId={id} orderNumber={order.order_number} />}
+        </div>
       </div>
 
       {/* Duplicate warning */}
