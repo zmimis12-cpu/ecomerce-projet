@@ -243,12 +243,9 @@ export async function generateSelfDeliveryTicket(orderId: string, deliveryFee: n
 
   // Livraison gratuite annoncée au client — on affiche uniquement le prix
   // total de la commande, jamais de "net" après déduction d'un frais.
-  textCenterArabic(`${o.total_amount_mad.toFixed(0)} DH`, colB + (X1 - colB) / 2, row3Top - (fee > 0 ? 19 : 27), { bold: true, size: 15 });
-  if (fee > 0) {
-    // Part du livreur + montant à remettre
-    textCenterMixed("أجرة الليفور:", `${fee} DH`, colB + (X1 - colB) / 2, row3Top - 31, { size: 7 });
-    textCenterMixed("يسلم:", `${(o.total_amount_mad - fee).toFixed(0)} DH`, colB + (X1 - colB) / 2, row3Top - 41, { bold: true, size: 8 });
-  }
+  // Livraison gratuite annoncée au client : le ticket montre UNIQUEMENT le total.
+  // La part du livreur reste interne (enregistrée sur la commande pour le dashboard).
+  textCenterArabic(`${o.total_amount_mad.toFixed(0)} DH`, colB + (X1 - colB) / 2, row3Top - 27, { bold: true, size: 15 });
 
   // ── Rangée 4: Ville (grande, centrée) ─────────────────────────────────────
   const row4Top = row3Top - row3H;
