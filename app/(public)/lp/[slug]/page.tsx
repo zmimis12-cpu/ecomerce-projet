@@ -15,7 +15,7 @@ import { viaCdn } from "@/lib/media";
 // Landing page « simple » (style boutique COD rapide) :
 // photo → titre → prix → formulaire tout de suite → photos + 1 phrase → re-CTA.
 // Utilisée pour TOUTES les /lp/. L'ancienne version longue reste sur /lp-classic/[slug].
-export const revalidate = 60;
+export const revalidate = 300; // page régénérée au plus 1 fois / 5 min (les changements admin s'affichent tout de suite via revalidatePath)
 export const dynamic = "force-static";
 export const dynamicParams = true;
 
