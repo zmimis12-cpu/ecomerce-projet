@@ -68,6 +68,12 @@ async function autoLink(rows: Row[]) {
     byCode.set(code, list);
   }
   if (!byCode.size) return 0;
+  // Pubs détachées à la main d'une vidéo (ex : ancienne campagne qui ne compte pas pour l'éditeur) → jamais re-liées
+  const { data: ex } = await supabaseAdmin.from("app_settings").select("value").eq("key", "creative_unlinked_ads").maybeSingle();
+  let excluded: string[] = [];
+  try { const v = (ex as { value?: unknown } | null)?.value; excluded = (typeof v === "string" ? JSON.parse(v) : v) ?? []; } catch { excluded = []; }
+  const skip = new Set(excluded.map(String));
+  for (const [code, list] of byCode) byCode.set(code, list.filter((a) => !skip.has(a.ad_id)));
   const { data: creatives } = await supabaseAdmin
     .from("creatives" as never)
     .select("id, code")
