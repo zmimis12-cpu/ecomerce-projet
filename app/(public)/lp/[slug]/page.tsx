@@ -109,6 +109,11 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     : productImgs.slice(2, 5).map((src, i) => ({ src, text: ben[i + 1]?.desc ?? "" }));
   const moreImgs = d.galleryImages.length ? d.galleryImages : productImgs.slice(5);
 
+  const painTitle = String(ps?.title ?? "واش كتعاني من هادشي؟");
+  const painPoints = ((ps?.points as string[] | undefined) ?? []).filter(Boolean);
+  const whoSec = sec("suitable_for");
+  const whoItems = ((whoSec?.items as { icon?: string; label?: string; desc?: string }[] | undefined) ?? []).filter((w) => w.label);
+  const whoTitle = d.whoTitle || String(whoSec?.title ?? "لمن مناسب؟");
   const revSec = sec("reviews");
   const reviews = ((revSec?.items as { name: string; city: string; stars: number; text: string }[] | undefined) ?? []);
   const customerPhotos = (lp.customer_photos as string[] | undefined) ?? [];
@@ -170,6 +175,24 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           offerImage={d.offerThumbs ? (productImgs[0] ?? heroImg) : null} offersAfterFields={d.offersAfterFields} />
         {d.showWhatsapp && waHref && <a className="sp-wa" href={waHref} target="_blank" rel="noopener noreferrer">واتساب — تواصل معنا</a>}
       </div></W>
+    ),
+    problems: painPoints.length > 0 && (
+      <W><section className="sp-sec">
+        <h2 className="sp-h2">{painTitle}</h2>
+        <div className="sp-pain">{painPoints.map((t, i) => <div key={i}>❌ {t}</div>)}</div>
+        {d.problemImage && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={d.problemImage} alt="" loading="lazy" decoding="async" className="sp-more" />
+        )}
+      </section></W>
+    ),
+    who: whoItems.length > 0 && (
+      <W><section className="sp-sec">
+        <h2 className="sp-h2">{whoTitle}</h2>
+        <div className="sp-who">
+          {whoItems.map((w, i) => <div key={i}><span>{w.icon ?? "✓"}</span><b>{w.label}</b>{w.desc && <small>{w.desc}</small>}</div>)}
+        </div>
+      </section></W>
     ),
     video: d.videoUrl && (
       <W><section className="sp-sec">
@@ -426,6 +449,9 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 .sp-sticky{position:fixed;left:12px;right:12px;bottom:12px;z-index:50;background:var(--c-primary);color:#fff;text-align:center;font-weight:800;font-size:16px;padding:14px;border-radius:14px;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.25);transition:opacity .2s,transform .2s}
 .sp-sticky.sp-hide{opacity:0;transform:translateY(120%);pointer-events:none}
 @media (min-width:900px){.sp-sticky{max-width:520px;margin:0 auto}}
+.sp-pain{background:#fff7ed;border-radius:16px;padding:10px 14px;margin-top:10px}.sp-pain div{font-size:14px;font-weight:700;padding:5px 0;line-height:1.5}
+.sp-who{display:grid;grid-template-columns:1fr 1fr;gap:8px}.sp-who div{background:#fff;border-radius:14px;padding:12px 8px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.04);display:flex;flex-direction:column;gap:3px}
+.sp-who span{font-size:28px}.sp-who b{font-size:14px}.sp-who small{font-size:11.5px;color:#6b7280;line-height:1.5}
 .sp-hero-after{max-width:560px;margin:14px auto 0;padding:0 14px}.sp-hero-after .sp-hero{border-radius:16px}
 .sp-bar{position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;gap:10px;align-items:center;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(to top,rgba(255,255,255,.98) 70%,rgba(255,255,255,0))}
 .sp-bar-buy{flex:1;height:56px;border:0;border-radius:9999px;background:var(--c-primary);color:#fff;font-family:var(--font-cairo),sans-serif;font-size:19px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.18);animation:sp-buy-pulse 2.4s infinite}

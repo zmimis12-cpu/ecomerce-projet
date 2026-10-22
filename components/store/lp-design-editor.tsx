@@ -186,6 +186,16 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
               </div>
 
               <div className="space-y-2">
+                <h3 className="text-sm font-semibold">Photo sous la liste des problèmes (« واش كتعاني من هادشي؟ »)</h3>
+                <ImageChoice value={d.problemImage} onChange={(u) => set("problemImage", u)} candidates={imgs} autoUrl={null} autoLabel="Pas de photo" />
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold">Titre du bloc « Pour qui ? »</h3>
+                <input dir="auto" className={field} value={d.whoTitle} placeholder="vide = titre de la landing page (لمن مناسب؟)" onChange={(e) => set("whoTitle", e.target.value)} />
+              </div>
+
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold">Tuiles photo + légende ({d.tiles.length || "auto"})</h3>
                   <button type="button" disabled={d.tiles.length >= 9}

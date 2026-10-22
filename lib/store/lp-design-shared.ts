@@ -2,6 +2,8 @@
 export const LP_BLOCKS = [
   { key: "quick", label: "Icônes rapides sous la photo (avantages)" },
   { key: "form", label: "Prix + formulaire de commande" },
+  { key: "problems", label: "Problèmes du client (liste ❌ + photo)" },
+  { key: "who", label: "Pour qui ? (les avatars)" },
   { key: "video", label: "Vidéo « شاهد كيف يعمل »" },
   { key: "why", label: "Pourquoi ce produit (scénarios)" },
   { key: "feature", label: "Bloc image + texte" },
@@ -49,6 +51,8 @@ export type LpDesign = {
   videoUrl: string;
   // Photos ↔ textes (par landing page) — vide = automatique
   featureImage: string; featureTitle: string; featureText: string;   // bloc « photo + texte »
+  problemImage: string;                                              // photo sous la liste des problèmes
+  whoTitle: string;                                                  // titre du bloc « Pour qui ? »
   tiles: { image: string; text: string }[];                          // tuiles photo + légende
   galleryImages: string[];                                           // galerie (ordre choisi)
 };
@@ -64,7 +68,7 @@ export const DEFAULT_LP_DESIGN: LpDesign = {
   finalTitle: "لا تفوت الفرصة!", finalText: "", finalCta: "", stickyText: "",
   colorPrimary: "#16a34a", colorBadge: "#dc2626", colorDiscount: "#facc15", colorDark: "#0f172a", colorBg: "#f6f7f9",
   videoUrl: "",
-  featureImage: "", featureTitle: "", featureText: "", tiles: [], galleryImages: [],
+  featureImage: "", featureTitle: "", featureText: "", problemImage: "", whoTitle: "", tiles: [], galleryImages: [],
 };
 
 export type LpDesignStore = { global: LpDesign; perSlug: Record<string, LpDesign> };
@@ -74,7 +78,13 @@ export function normalizeDesign(v: Partial<LpDesign> | undefined | null): LpDesi
   const d = { ...DEFAULT_LP_DESIGN, ...(v ?? {}) } as LpDesign;
   const known = new Set(LP_BLOCKS.map((b) => b.key));
   const blocks = (Array.isArray(v?.blocks) ? v!.blocks : []).filter((b) => known.has(b.key));
-  for (const b of LP_BLOCKS) if (!blocks.some((x) => x.key === b.key)) blocks.push({ key: b.key, on: true });
+  // Nouveau bloc absent d'un ancien réglage → inséré à sa place logique (pas tout en bas)
+  LP_BLOCKS.forEach((b, i) => {
+    if (blocks.some((x) => x.key === b.key)) return;
+    const prev = LP_BLOCKS.slice(0, i).reverse().find((p) => blocks.some((x) => x.key === p.key));
+    const at = prev ? blocks.findIndex((x) => x.key === prev.key) + 1 : 0;
+    blocks.splice(at, 0, { key: b.key, on: true });
+  });
   const str = (x: unknown) => (typeof x === "string" ? x : "");
   const tiles = (Array.isArray(v?.tiles) ? v!.tiles : []).slice(0, 9)
     .map((t) => ({ image: str(t?.image), text: str(t?.text) })).filter((t) => t.image || t.text);
