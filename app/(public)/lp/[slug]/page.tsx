@@ -124,6 +124,12 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const yt = d.videoUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/))([\w-]{6,})/);
   const videoEmbed = yt ? `https://www.youtube-nocookie.com/embed/${yt[1]}?rel=0` : "";
 
+  // Angles : « V009, V010 » → liste de codes en majuscules
+  const angles = d.angles.filter((a) => a.codes.trim() && (a.headline || a.sub))
+    .map((a) => ({ c: a.codes.toUpperCase().split(/[\s,;]+/).filter(Boolean), h: a.headline, s: a.sub }));
+  const heroVid = d.heroVideo.trim();
+  const heroVidIsImg = /\.(webp|gif|avif|png|jpe?g)(\?|$)/i.test(heroVid);
+
   const topBarText = d.topBar || offerBar;
   const orderSub = d.orderSub || formNote;
   const finalText = d.finalText || subline;
@@ -159,14 +165,22 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             {d.showDiscount && discount > 0 && <span className="sp-b-yel">تخفيض {discount}%</span>}
           </div>
         )}
-        <h1 className="sp-title">{title}</h1>
+        {d.urgency && d.urgencyText && <div className="sp-urg">{d.urgencyText}</div>}
+        <h1 className="sp-title" id="sp-title" suppressHydrationWarning>{title}</h1>
+        {angles.length > 0 && (
+          // Même message pub ↔ page : ?cr=V009 → titre de l'angle de cette pub (sans recharger, page toujours en cache)
+          <script dangerouslySetInnerHTML={{ __html: `(function(){try{var c=(new URLSearchParams(location.search).get('cr')||'').toUpperCase();if(!c)return;var A=${JSON.stringify(angles).replace(/</g, "\\u003c")},m=null;for(var i=0;i<A.length;i++){if(A[i].c.indexOf(c)>-1){m=A[i];break;}}if(!m)return;function ap(){var t=document.getElementById('sp-title');if(t&&m.h&&t.textContent!==m.h)t.textContent=m.h;var s=document.getElementById('sp-angle-sub');if(s&&m.s&&s.textContent!==m.s){s.textContent=m.s;s.style.display='block';}}ap();setTimeout(ap,600);setTimeout(ap,2000);window.addEventListener('load',ap);}catch(e){}})();` }} />
+        )}
+        <p className="sp-angle-sub" id="sp-angle-sub" suppressHydrationWarning />
         <div className="sp-price">
           <span className="sp-now">{one.price.toFixed(0)} DH</span>
           {d.showOldPrice && oldShown > one.price && <span className="sp-old">{oldShown.toFixed(0)} DH</span>}
         </div>
         {d.showCodBar && d.codBar && <div className="sp-cod">{d.codBar}</div>}
+        {d.openBeforePay && d.openBeforePayText && <div className="sp-open">{d.openBeforePayText}</div>}
         {d.orderTitle && <p className="sp-order-h">{d.orderTitle}</p>}
         {orderSub && <p className="sp-order-sub">{orderSub}</p>}
+        {d.callNote && d.callNoteText && <p className="sp-call">{d.callNoteText}</p>}
         <OrderFormPublic product={product} productSlug={slug} ctaText={ctaText}
           b1={b1} b2={b2} b3={b3} offers={offers} askAddress={d.askAddress} addressRequired={d.addressRequired}
           pixelId={pixel || undefined} tiktokPixelId={tt || undefined}
@@ -175,6 +189,17 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           offerImage={d.offerThumbs ? (productImgs[0] ?? heroImg) : null} offersAfterFields={d.offersAfterFields} />
         {d.showWhatsapp && waHref && <a className="sp-wa" href={waHref} target="_blank" rel="noopener noreferrer">واتساب — تواصل معنا</a>}
       </div></W>
+    ),
+    proof: d.proofImages.length > 0 && (
+      <W><section className="sp-sec">
+        {d.proofTitle && <h2 className="sp-h2">{d.proofTitle}</h2>}
+        <div className="sp-proof">
+          {d.proofImages.map((src, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={i} src={src} alt="" loading="lazy" decoding="async" />
+          ))}
+        </div>
+      </section></W>
     ),
     problems: painPoints.length > 0 && (
       <W><section className="sp-sec">
@@ -287,10 +312,14 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     ),
   };
 
-  const heroEl = (
+  const heroEl = heroVid && !heroVidIsImg ? (
+    // Vidéo courte en boucle, sans son : la photo s'affiche d'abord (poster), la vidéo démarre ensuite
+    <video src={heroVid} poster={heroImg ?? undefined} className="sp-hero" autoPlay muted loop playsInline preload="metadata" aria-label={product.name} />
+  ) : (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={heroImg ?? ""} alt={product.name} className="sp-hero" fetchPriority={d.heroPosition === "top" ? "high" : "auto"} loading={d.heroPosition === "top" ? "eager" : "lazy"} decoding="async" />
+    <img src={(heroVid || heroImg) ?? ""} alt={product.name} className="sp-hero" fetchPriority={d.heroPosition === "top" ? "high" : "auto"} loading={d.heroPosition === "top" ? "eager" : "lazy"} decoding="async" />
   );
+  const hasHero = !!(heroImg || heroVid);
   // Formulaire tout en haut (sauf si « photo en haut » est choisi) : le client commande sans descendre
   const shown = d.blocks.filter((b) => b.on && !(d.crossAtBottom && b.key === "crosssell"));
   const orderedBlocks = d.formFirst || d.heroPosition === "after_form"
@@ -320,13 +349,13 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         {d.showTopBar && topBarText && <div className="sp-top">{topBarText}</div>}
         {d.showStoreHeader && <StoreHeader current={slug} products={storeProducts.map((x) => ({ slug: x.slug, title: x.title, image: x.image, price: x.price }))} />}
 
-        {heroImg && d.heroPosition === "top" && heroEl}
+        {hasHero && d.heroPosition === "top" && heroEl}
 
         {orderedBlocks.map((b) => (
           <div key={b.key}>
             {blocks[b.key] || null}
             {/* Formulaire en haut → la grande photo vient juste après */}
-            {b.key === "form" && d.heroPosition === "after_form" && heroImg && <div className="sp-hero-after">{heroEl}</div>}
+            {b.key === "form" && d.heroPosition === "after_form" && hasHero && <div className="sp-hero-after">{heroEl}</div>}
           </div>
         ))}
         {/* Le formulaire est indispensable : s'il est caché, on le garde quand même (sinon aucune commande possible) */}
@@ -449,6 +478,12 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 .sp-sticky{position:fixed;left:12px;right:12px;bottom:12px;z-index:50;background:var(--c-primary);color:#fff;text-align:center;font-weight:800;font-size:16px;padding:14px;border-radius:14px;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.25);transition:opacity .2s,transform .2s}
 .sp-sticky.sp-hide{opacity:0;transform:translateY(120%);pointer-events:none}
 @media (min-width:900px){.sp-sticky{max-width:520px;margin:0 auto}}
+.sp-urg{background:#fef2f2;color:#b91c1c;border:1px dashed #fca5a5;text-align:center;font-weight:800;font-size:13.5px;padding:7px 10px;border-radius:10px;margin:4px 0 6px}
+.sp-angle-sub{display:none;font-size:14px;font-weight:700;color:#374151;margin:0 0 6px;line-height:1.6}
+.sp-open{margin-top:8px;background:#fffbeb;color:#92400e;border:2px solid #fbbf24;text-align:center;font-weight:900;font-size:14.5px;padding:10px;border-radius:12px}
+.sp-call{text-align:center;font-size:13px;font-weight:700;color:#065f46;background:#ecfdf5;border-radius:10px;padding:8px 10px;margin:0 0 12px;line-height:1.6}
+.sp-proof{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}
+.sp-proof img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:12px;background:#e5e7eb}
 .sp-pain{background:#fff7ed;border-radius:16px;padding:10px 14px;margin-top:10px}.sp-pain div{font-size:14px;font-weight:700;padding:5px 0;line-height:1.5}
 .sp-who{display:grid;grid-template-columns:1fr 1fr;gap:8px}.sp-who div{background:#fff;border-radius:14px;padding:12px 8px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.04);display:flex;flex-direction:column;gap:3px}
 .sp-who span{font-size:28px}.sp-who b{font-size:14px}.sp-who small{font-size:11.5px;color:#6b7280;line-height:1.5}

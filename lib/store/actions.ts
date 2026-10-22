@@ -65,9 +65,11 @@ export async function saveLpDesign(store: import("./lp-design-shared").LpDesignS
     for (const [k, v] of Object.entries(n)) {
       if (k === "blocks") out[k] = n.blocks.map((b) => ({ key: b.key, on: !!b.on }));
       else if (typeof v === "string") out[k] = k.startsWith("color") ? (/^#[0-9a-f]{3,8}$/i.test(v) ? v : "")
-        : v.slice(0, ["videoUrl", "heroImage", "featureImage", "problemImage"].includes(k) ? 800 : k === "featureText" ? 600 : 200);
+        : v.slice(0, ["videoUrl", "heroImage", "featureImage", "problemImage", "heroVideo"].includes(k) ? 800 : k === "featureText" ? 600 : 200);
       else if (k === "tiles") out[k] = n.tiles.map((t) => ({ image: t.image.slice(0, 800), text: t.text.slice(0, 160) }));
       else if (k === "galleryImages") out[k] = n.galleryImages.map((u) => u.slice(0, 800));
+      else if (k === "proofImages") out[k] = n.proofImages.map((u) => u.slice(0, 800));
+      else if (k === "angles") out[k] = n.angles.map((a) => ({ codes: a.codes.slice(0, 120), headline: a.headline.slice(0, 160), sub: a.sub.slice(0, 200) }));
       else out[k] = v;
     }
     return normalizeDesign(out as Partial<import("./lp-design-shared").LpDesign>);

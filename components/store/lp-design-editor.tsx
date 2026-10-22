@@ -237,6 +237,83 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
           );
         })()}
 
+        {/* Conversion : ce qui fait commander le client COD */}
+        <div className="space-y-3 rounded-xl border bg-card p-4 shadow-sm lg:col-span-2">
+          <div>
+            <h2 className="font-semibold">🎯 Conversion (faire commander)</h2>
+            <p className="text-xs text-muted-foreground">N&apos;active que ce qui est VRAI (ouverture du colis, quantité limitée…) — sinon refus à la livraison et problèmes avec Meta.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">1 · Ouvrir le colis avant de payer</h3>
+              {B("openBeforePay", "Afficher (seulement si ton livreur accepte que le client ouvre le colis)")}
+              {d.openBeforePay && T("openBeforePayText", "Texte")}
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">5 · Rassurer sur l&apos;appel de confirmation</h3>
+              {B("callNote", "Afficher sous le titre du formulaire")}
+              {d.callNote && T("callNoteText", "Texte")}
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">6 · Urgence</h3>
+              {B("urgency", "Afficher au-dessus du titre (seulement si c'est vrai)")}
+              {d.urgency && T("urgencyText", "Texte")}
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">2 · Vidéo du produit en haut (à la place de la photo)</h3>
+              {T("heroVideo", "Lien .webp / .gif animé (conseillé, rapide) ou .mp4 court", "vide = photo hero")}
+              <p className="text-xs text-muted-foreground">5–8 s, sans son, en boucle. La photo hero s&apos;affiche pendant le chargement. Garde le fichier léger (&lt; 1 MB).</p>
+            </div>
+          </div>
+
+          {!isGlobal && (() => {
+            const imgs = pages.find((x) => x.slug === scope)?.images ?? [];
+            return (
+              <div className="space-y-2 border-t pt-3">
+                <h3 className="text-sm font-semibold">3 · Preuves réelles ({d.proofImages.length})</h3>
+                {T("proofTitle", "Titre du bloc")}
+                <div className="flex items-center gap-2">
+                  <ImageChoice compact value="" onChange={(u) => u && set("proofImages", [...d.proofImages, u].slice(0, 12))} candidates={imgs} autoUrl={null} />
+                  <p className="text-xs text-muted-foreground">Vraies photos seulement : colis préparés, livreur, captures WhatsApp de clients (avec leur accord, numéro caché). Le bloc ne s&apos;affiche que s&apos;il y a des photos.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {d.proofImages.map((u, i) => (
+                    <div key={u + i} className="relative h-20 w-20 overflow-hidden rounded-lg border">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={u} alt="" className="h-full w-full object-cover" />
+                      <button type="button" onClick={() => set("proofImages", d.proofImages.filter((_, j) => j !== i))} className="absolute inset-x-0 bottom-0 flex justify-center bg-black/55 p-0.5 text-white"><Trash2 className="h-3 w-3" /></button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {!isGlobal && (
+            <div className="space-y-2 border-t pt-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">4 · Même message pub ↔ page (titre selon la pub)</h3>
+                <button type="button" disabled={d.angles.length >= 20}
+                  onClick={() => set("angles", [...d.angles, { codes: "", headline: "", sub: "" }])}
+                  className="rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-muted disabled:opacity-40">+ Ajouter un angle</button>
+              </div>
+              <p className="text-xs text-muted-foreground">Le lien de la pub contient <code>?cr=V009</code> : si le code est dans la liste, le titre de la page devient celui de l&apos;angle (taekwondo → titre taekwondo). Sinon le titre normal reste.</p>
+              {d.angles.map((a, i) => {
+                const setA = (patch: Partial<{ codes: string; headline: string; sub: string }>) =>
+                  set("angles", d.angles.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+                return (
+                  <div key={i} className="grid gap-2 rounded-lg border p-2 md:grid-cols-[140px_1fr_1fr_auto]">
+                    <input className={field} value={a.codes} placeholder="V009, V010" onChange={(e) => setA({ codes: e.target.value })} />
+                    <input dir="auto" className={field} value={a.headline} placeholder="Titre (ex : بغيتي ضرباتك يطلعو لفوق؟ 🥋)" onChange={(e) => setA({ headline: e.target.value })} />
+                    <input dir="auto" className={field} value={a.sub} placeholder="Petite phrase sous le titre (optionnel)" onChange={(e) => setA({ sub: e.target.value })} />
+                    <button type="button" onClick={() => set("angles", d.angles.filter((_, j) => j !== i))} className="rounded p-2 text-red-600 hover:bg-red-50" title="Supprimer"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         <div className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
           <h2 className="font-semibold">Dernier appel, bouton fixe & vidéo</h2>
           {T("finalTitle", "Titre du dernier appel")}

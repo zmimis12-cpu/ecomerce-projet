@@ -19,13 +19,14 @@ export async function readLpDesign(): Promise<LpDesignStore> {
   };
 }
 
-const cached = unstable_cache(readLpDesign, ["lp-design-v1"], { revalidate: 300, tags: ["store"] });
+const cached = unstable_cache(readLpDesign, ["lp-design-v2"], { revalidate: 300, tags: ["store"] });
 
 /** Réglage effectif d'une landing page : spécifique si défini, sinon global. */
 export async function getLpDesignFor(slug: string): Promise<LpDesign> {
   try {
     const s = await cached();
-    return s.perSlug[slug] ?? s.global;
+    // normalizeDesign : sûr même si le cache contient un ancien format (nouvelles options ajoutées)
+    return normalizeDesign(s.perSlug[slug] ?? s.global);
   } catch {
     return DEFAULT_LP_DESIGN;
   }

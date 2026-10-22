@@ -2,6 +2,7 @@
 export const LP_BLOCKS = [
   { key: "quick", label: "Icônes rapides sous la photo (avantages)" },
   { key: "form", label: "Prix + formulaire de commande" },
+  { key: "proof", label: "Preuves réelles (photos de colis / livraisons / messages clients)" },
   { key: "problems", label: "Problèmes du client (liste ❌ + photo)" },
   { key: "who", label: "Pour qui ? (les avatars)" },
   { key: "video", label: "Vidéo « شاهد كيف يعمل »" },
@@ -55,6 +56,17 @@ export type LpDesign = {
   whoTitle: string;                                                  // titre du bloc « Pour qui ? »
   tiles: { image: string; text: string }[];                          // tuiles photo + légende
   galleryImages: string[];                                           // galerie (ordre choisi)
+  // ── Conversion ──
+  heroVideo: string;                 // vidéo/animation en haut à la place de la photo (.webp/.gif animé conseillé, ou .mp4)
+  openBeforePay: boolean;            // « تقدر تحل وتشوف المنتج قبل ما تخلص » (seulement si le livreur l'accepte)
+  openBeforePayText: string;
+  callNote: boolean;                 // réassurance appel de confirmation sous le titre du formulaire
+  callNoteText: string;
+  urgency: boolean;                  // bande d'urgence (seulement si c'est vrai)
+  urgencyText: string;
+  proofTitle: string;
+  proofImages: string[];             // vraies photos (colis préparés, livraisons, captures WhatsApp avec accord)
+  angles: { codes: string; headline: string; sub: string }[]; // titre selon la pub (?cr=V009) → même message pub ↔ page
 };
 
 export const DEFAULT_LP_DESIGN: LpDesign = {
@@ -69,6 +81,11 @@ export const DEFAULT_LP_DESIGN: LpDesign = {
   colorPrimary: "#16a34a", colorBadge: "#dc2626", colorDiscount: "#facc15", colorDark: "#0f172a", colorBg: "#f6f7f9",
   videoUrl: "",
   featureImage: "", featureTitle: "", featureText: "", problemImage: "", whoTitle: "", tiles: [], galleryImages: [],
+  heroVideo: "",
+  openBeforePay: false, openBeforePayText: "📦 تقدر تحل الكولية وتشوف المنتج قبل ما تخلص",
+  callNote: true, callNoteText: "📞 كنتاصلو بيك قبل ما نصيفطو — إلا بدلتي رأيك ما كتخلص والو",
+  urgency: false, urgencyText: "🔥 الكمية محدودة — اطلب دابا باش تضمن ديالك",
+  proofTitle: "📦 صور حقيقية من الطلبيات ديالنا", proofImages: [], angles: [],
 };
 
 export type LpDesignStore = { global: LpDesign; perSlug: Record<string, LpDesign> };
@@ -89,7 +106,10 @@ export function normalizeDesign(v: Partial<LpDesign> | undefined | null): LpDesi
   const tiles = (Array.isArray(v?.tiles) ? v!.tiles : []).slice(0, 9)
     .map((t) => ({ image: str(t?.image), text: str(t?.text) })).filter((t) => t.image || t.text);
   const galleryImages = (Array.isArray(v?.galleryImages) ? v!.galleryImages : []).filter((x) => typeof x === "string" && x).slice(0, 20);
+  const proofImages = (Array.isArray(v?.proofImages) ? v!.proofImages : []).filter((x) => typeof x === "string" && x).slice(0, 12);
+  const angles = (Array.isArray(v?.angles) ? v!.angles : []).slice(0, 20)
+    .map((a) => ({ codes: str(a?.codes), headline: str(a?.headline), sub: str(a?.sub) })).filter((a) => a.codes || a.headline);
   const heroPosition = d.heroPosition === "after_form" || d.heroPosition === "hidden" ? d.heroPosition : "top";
-  return { ...d, heroPosition, blocks, tiles, galleryImages };
+  return { ...d, heroPosition, blocks, tiles, galleryImages, proofImages, angles };
 }
 
