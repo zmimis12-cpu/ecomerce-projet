@@ -87,10 +87,10 @@ export function StatCards({ ctx }: { ctx: EditorContext }) {
     { label: "Gains (période)", value: mad(me?.earnings ?? 0), icon: Award },
   ];
   if (ctx.portal.payMode === "per_product") {
-    const p = packProgress(ctx.portal, ctx.links);
+    const p = packProgress(ctx.portal, ctx.units);
     cards.splice(1, 0, ctx.portal.perUnit === "pack"
-      ? { label: `Vidéos validées (lot de ${p.packSize})`, value: `${p.validated} · prochain lot ${p.inPack}/${p.packSize}`, icon: Film }
-      : { label: "Vidéos validées", value: String(p.validated), icon: Film });
+      ? { label: `Vidéos (lot de ${p.packSize})`, value: `${p.validated} · prochain lot ${p.inPack}/${p.packSize}`, icon: Film }
+      : { label: "Vidéos", value: String(p.validated), icon: Film });
   }
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
@@ -292,14 +292,14 @@ export function PayPlanCard({ ctx }: { ctx: EditorContext }) {
     lines.push({ k: "Mode", v: `Salaire fixe ${mad(c.salary)} / mois` });
     if (c.salaryStart) lines.push({ k: "Depuis le", v: new Date(c.salaryStart).toLocaleDateString("fr-FR") });
   } else {
-    const p = packProgress(c, ctx.links);
+    const p = packProgress(c, ctx.units);
     if (c.perUnit === "pack") {
-      lines.push({ k: "Mode", v: `${mad(c.perAmount)} par lot de ${p.packSize} vidéos validées` });
+      lines.push({ k: "Mode", v: `${mad(c.perAmount)} par lot de ${p.packSize} vidéos` });
       lines.push({ k: "Lots terminés", v: `${p.packs} (${mad(p.packs * c.perAmount)})` });
-      progress = { done: p.inPack, total: p.packSize, label: `Prochain lot : encore ${p.packSize - p.inPack} vidéo(s) validée(s) → ${mad(c.perAmount)}` };
+      progress = { done: p.inPack, total: p.packSize, label: `Prochain lot : encore ${p.packSize - p.inPack} vidéo(s) → ${mad(c.perAmount)}` };
     } else {
       lines.push({ k: "Mode", v: `${mad(c.perAmount)} par ${c.perUnit === "video" ? "vidéo validée" : "produit validé"}` });
-      lines.push({ k: "Vidéos validées", v: String(p.validated) });
+      lines.push({ k: "Vidéos", v: String(p.validated) });
     }
   }
   if (c.payMode !== "commission" && c.plusCommission) lines.push({ k: "+ Bonus", v: "commission sur chaque commande livrée" });

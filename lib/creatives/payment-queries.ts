@@ -3,7 +3,7 @@
  */
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getCreativesReport } from "@/lib/creatives/queries";
-import { readPortalConfigs, readVideoLinks, portalEarned, normalizePortalCfg } from "@/lib/creatives/portal";
+import { readPortalConfigs, readEditorVideoUnits, portalEarned, normalizePortalCfg } from "@/lib/creatives/portal";
 
 export type EditorPayment = {
   id: string;
@@ -75,7 +75,7 @@ export async function getEditorBalances(editorId?: string | null): Promise<{
     getCreativesReport({ month: "all", editorId }),
     getEditorPayments(editorId),
     readPortalConfigs(),
-    readVideoLinks(editorId),
+    readEditorVideoUnits(editorId),
   ]);
   const balances = report.editors.map((e) => {
     const paid = payments.filter((p) => p.editorId === e.id).reduce((s, p) => s + p.amount, 0);

@@ -5,7 +5,7 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth/session";
 import { getCreativesReport, periodRange } from "@/lib/creatives/queries";
-import { readPortalConfig, readVideoLinks, portalEarned, payLabel } from "@/lib/creatives/portal";
+import { readPortalConfig, readVideoLinks, readEditorVideoUnits, portalEarned, payLabel } from "@/lib/creatives/portal";
 import { getEditorBalances } from "@/lib/creatives/payment-queries";
 import { currentMonth } from "@/components/creatives/period-filter";
 import { getCreativesLiveStatus } from "@/lib/ads/meta-status";
@@ -24,6 +24,7 @@ export async function loadEditorContext(sp: Record<string, string>, opts: { ligh
     readPortalConfig(editorId),
     readVideoLinks(editorId),
   ]);
+  const units = await readEditorVideoUnits(editorId); // paie par vidéo / par lot = vidéos enregistrées, pas les liens
   const live = opts.light
     ? new Map() as Awaited<ReturnType<typeof getCreativesLiveStatus>>
     : await getCreativesLiveStatus(report.creatives.map((c) => c.id));
@@ -31,7 +32,7 @@ export async function loadEditorContext(sp: Record<string, string>, opts: { ligh
   const { from, to } = periodRange(report.period);
   const rawMe = report.editors[0];
   // Gain de la période selon le mode de rémunération (commission / salaire / par produit)
-  const me = rawMe ? { ...rawMe, earnings: portalEarned(portal, rawMe.earnings, links, from, to) } : rawMe;
+  const me = rawMe ? { ...rawMe, earnings: portalEarned(portal, rawMe.earnings, units, from, to) } : rawMe;
   const bal = balances[0] ?? { earned: 0, paid: 0, remaining: 0 };
   const commissionOnly = me
     ? me.commissionType === "percent"
@@ -42,7 +43,7 @@ export async function loadEditorContext(sp: Record<string, string>, opts: { ligh
   /** Éditeur en mode restreint : pas de dépense / budget / campagne — seulement le coût de ses vidéos. */
   const hideAdMoney = isEditor && portal.hideAdMoney;
 
-  return { session, isEditor, editorId, month, report, me, bal, payments, commissionLabel, live, liveInAds, portal, links, hideAdMoney };
+  return { session, isEditor, editorId, month, report, me, bal, payments, commissionLabel, live, liveInAds, portal, links, units, hideAdMoney };
 }
 
 export type EditorContext = Awaited<ReturnType<typeof loadEditorContext>>;

@@ -222,9 +222,9 @@ export function EditorPortalForm({
           <label className="space-y-1 text-sm">
             <span className="text-xs font-medium text-muted-foreground">Payé</span>
             <select className={INPUT} value={c.perUnit} onChange={(e) => set("perUnit", e.target.value as EditorPortalCfg["perUnit"])}>
-              <option value="product">1 fois par produit (1re vidéo validée)</option>
-              <option value="video">Par vidéo validée (chaque lien)</option>
-              <option value="pack">Par lot de N vidéos validées</option>
+              <option value="product">1 fois par produit (1re vidéo)</option>
+              <option value="video">Par vidéo</option>
+              <option value="pack">Par lot de N vidéos</option>
             </select>
           </label>
           {c.perUnit === "pack" && (
@@ -245,7 +245,7 @@ export function EditorPortalForm({
         {c.payMode === "commission" && `Commission actuelle : ${commissionLabel} (modifiable dans le tableau Éditeurs et Tarifs par produit).`}
         {c.payMode === "salary" && "Le salaire est compté jour par jour depuis la date de début → « Reste à payer » se met à jour tout seul."}
         {c.payMode === "per_product" && (c.perUnit === "pack"
-          ? `Exemple : ${c.packSize} vidéos validées = ${c.perAmount || 0} MAD · ${c.packSize * 2} vidéos = ${(c.perAmount || 0) * 2} MAD · ${c.packSize * 3} vidéos = ${(c.perAmount || 0) * 3} MAD. Compté quand tu cliques « Valider ».`
+          ? `Exemple : ${c.packSize} vidéos = ${c.perAmount || 0} MAD · ${c.packSize * 2} vidéos = ${(c.perAmount || 0) * 2} MAD · ${c.packSize * 3} vidéos = ${(c.perAmount || 0) * 3} MAD. Compte les vidéos enregistrées pour cet éditeur (Vidéos & Éditeurs), à leur date d'ajout.`
           : "Compté quand tu cliques « Valider » sur un lien vidéo envoyé par l'éditeur.")}
         {c.payMode !== "commission" && !c.plusCommission && " Aucune commission sur les commandes n'est comptée pour cet éditeur."}
       </p>

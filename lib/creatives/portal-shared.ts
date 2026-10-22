@@ -65,8 +65,8 @@ export function payLabel(cfg: EditorPortalCfg, commissionLabel: string): string 
   if (cfg.payMode === "salary") return `Salaire ${fmt(cfg.salary)} / mois${plus}`;
   if (cfg.payMode === "per_product")
     return cfg.perUnit === "pack"
-      ? `${fmt(cfg.perAmount)} par lot de ${cfg.packSize} vidéos validées${plus}`
-      : `${fmt(cfg.perAmount)} par ${cfg.perUnit === "video" ? "vidéo validée" : "produit validé"}${plus}`;
+      ? `${fmt(cfg.perAmount)} par lot de ${cfg.packSize} vidéos${plus}`
+      : `${fmt(cfg.perAmount)} par ${cfg.perUnit === "video" ? "vidéo" : "produit"}${plus}`;
   return commissionLabel;
 }
 

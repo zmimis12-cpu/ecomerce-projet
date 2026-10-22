@@ -69,3 +69,18 @@ export async function getProductCards(ids?: string[]): Promise<{ id: string; nam
   }
   return list.map((p) => ({ id: p.id, name: p.name, image: best.get(p.id)?.url ?? null }));
 }
+
+/**
+ * Vidéos de l'éditeur pour la paie « par vidéo / par lot » : chaque vidéo enregistrée
+ * dans GestionPro (Vidéos & Éditeurs) compte 1, à sa date de création — pas les liens Drive.
+ * Même format que les liens validés → portalEarned / packProgress fonctionnent tels quels.
+ */
+export async function readEditorVideoUnits(editorId?: string | null): Promise<VideoDelivery[]> {
+  let q = supabaseAdmin.from("creatives" as never).select("id, editor_id, product_id, created_at");
+  if (editorId) q = q.eq("editor_id", editorId);
+  const { data } = await q;
+  return ((data ?? []) as { id: string; editor_id: string; product_id: string | null; created_at: string }[]).map((c) => ({
+    id: c.id, editorId: c.editor_id, productId: c.product_id ?? "", url: "", note: "",
+    status: "accepted" as const, createdAt: c.created_at, reviewedAt: c.created_at, adminNote: "",
+  }));
+}

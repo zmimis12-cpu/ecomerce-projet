@@ -14,7 +14,7 @@ import { getCreativesLiveStatus, getMetaDeliveries, TONE_CLS } from "@/lib/ads/m
 import { AddPaymentForm } from "@/components/creatives/payment-controls";
 import { RateForm, DeleteRateButton } from "@/components/creatives/rate-controls";
 import { PaymentsList } from "@/components/creatives/payments-list";
-import { readPortalConfigs, readVideoLinks, readProductBriefs, getProductCards, portalEarned, payLabel, normalizePortalCfg, usesCommission } from "@/lib/creatives/portal";
+import { readPortalConfigs, readVideoLinks, readEditorVideoUnits, readProductBriefs, getProductCards, portalEarned, payLabel, normalizePortalCfg, usesCommission } from "@/lib/creatives/portal";
 import { EditorPortalForm, ReceivedLinks, BriefsManager } from "@/components/creatives/portal-controls";
 import { periodRange } from "@/lib/creatives/queries";
 
@@ -36,7 +36,7 @@ export default async function CreativesAdminPage({
     getEditorBalances(),
     getRecentAds(),
   ]);
-  const [portalCfgs, allLinks, productCards, briefs] = await Promise.all([readPortalConfigs(), readVideoLinks(), getProductCards(), readProductBriefs()]);
+  const [portalCfgs, allLinks, productCards, briefs, allUnits] = await Promise.all([readPortalConfigs(), readVideoLinks(), getProductCards(), readProductBriefs(), readEditorVideoUnits()]);
   // Éditeurs supprimés : ni affichés ni calculés
   const activeEditorIds = new Set(report.editors.map((e) => e.id));
   const videoLinks = allLinks.filter((l) => activeEditorIds.has(l.editorId));
@@ -46,7 +46,7 @@ export default async function CreativesAdminPage({
     e.commissionType === "percent" ? `${e.commissionValue}% par commande livrée` : `${e.commissionValue} MAD par commande livrée`;
   // Gain de la période selon le mode de chaque éditeur (commission / salaire / par produit)
   const gainOf = (e: { id: string; earnings: number }) =>
-    portalEarned(cfgOf(e.id), e.earnings, videoLinks.filter((l) => l.editorId === e.id), pFrom, pTo);
+    portalEarned(cfgOf(e.id), e.earnings, allUnits.filter((l) => l.editorId === e.id), pFrom, pTo);
   const pendingLinks = videoLinks.filter((l) => l.status === "pending").length;
   const { data: ratesRaw } = await supabaseAdmin
     .from("video_editor_rates" as never)

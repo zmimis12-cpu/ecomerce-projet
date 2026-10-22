@@ -5,13 +5,13 @@
  */
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getVideoEditors } from "@/lib/creatives/queries";
-import { readPortalConfigs, readVideoLinks, portalEarned, usesCommission, normalizePortalCfg } from "@/lib/creatives/portal";
+import { readPortalConfigs, readEditorVideoUnits, portalEarned, usesCommission, normalizePortalCfg } from "@/lib/creatives/portal";
 
 export async function editorCostForPeriod(
   paidOrders: { creative_id: string | null; editor_earning_mad: number | null }[],
   from: Date | null, to: Date | null,
 ): Promise<number> {
-  const [editors, cfgs, links] = await Promise.all([getVideoEditors(), readPortalConfigs(), readVideoLinks()]);
+  const [editors, cfgs, links] = await Promise.all([getVideoEditors(), readPortalConfigs(), readEditorVideoUnits()]);
   const active = new Set(editors.map((e) => e.id));
   const cfgOf = (id: string) => cfgs[id] ?? normalizePortalCfg(null);
 
