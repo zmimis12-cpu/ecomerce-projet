@@ -127,10 +127,25 @@ const VIDEO_EDITOR_NAV: NavGroup[] = [
     label: null,
     items: [
       { href: "/admin/editor",          label: "Tableau de bord",   icon: LayoutDashboard, exact: true },
+    ],
+  },
+  {
+    label: "Mon travail",
+    items: [
       { href: "/admin/editor/products", label: "Mes produits",      icon: Package },
       { href: "/admin/editor/videos",   label: "Mes vidéos",        icon: Clapperboard },
+    ],
+  },
+  {
+    label: "Mes résultats",
+    items: [
       { href: "/admin/editor/deliveries", label: "Suivi livraisons", icon: Truck },
       { href: "/admin/editor/orders",   label: "Commandes livrées", icon: PackageCheck },
+    ],
+  },
+  {
+    label: "Mon argent",
+    items: [
       { href: "/admin/editor/payments", label: "Mes paiements",     icon: Wallet },
     ],
   },
@@ -218,6 +233,9 @@ export function AdminSidebar({ role }: { role: AppRole }) {
           const GIcon = group.icon;
           return (
             <div key={group.key ?? gi} className={cn(gi > 0 && "pt-1")}>
+              {!collapsible && group.label && (
+                <p className="px-3 pb-1 pt-2 text-[10.5px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">{group.label}</p>
+              )}
               {collapsible && (
                 <button
                   onClick={() => toggle(group.key!)}
