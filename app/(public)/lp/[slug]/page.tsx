@@ -125,8 +125,11 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const videoEmbed = yt ? `https://www.youtube-nocookie.com/embed/${yt[1]}?rel=0` : "";
 
   // Angles : « V009, V010 » → liste de codes en majuscules
-  const angles = d.angles.filter((a) => a.codes.trim() && (a.headline || a.sub))
-    .map((a) => ({ c: a.codes.toUpperCase().split(/[\s,;]+/).filter(Boolean), h: a.headline, s: a.sub }));
+  const angles = d.angles.filter((a) => a.codes.trim() && (a.headline || a.sub || a.image))
+    .map((a) => ({ c: a.codes.toUpperCase().split(/[\s,;]+/).filter(Boolean), h: a.headline, s: a.sub, i: a.image }));
+  // Une photo hero par avatar → la photo est choisie AVANT son chargement (pas de double téléchargement)
+  const angleHero = angles.some((a) => a.i);
+  const angleJs = `var c=(new URLSearchParams(location.search).get('cr')||'').toUpperCase(),v=(new URLSearchParams(location.search).get('av')||'').toUpperCase(),A=${JSON.stringify(angles).replace(/</g, "\\u003c")},m=null;for(var i=0;i<A.length;i++){if((c&&A[i].c.indexOf(c)>-1)||(v&&A[i].c.indexOf(v)>-1)){m=A[i];break;}}`;
   const heroVid = d.heroVideo.trim();
   const heroVidIsImg = /\.(webp|gif|avif|png|jpe?g)(\?|$)/i.test(heroVid);
 
@@ -169,7 +172,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         <h1 className="sp-title" id="sp-title" suppressHydrationWarning>{title}</h1>
         {angles.length > 0 && (
           // Même message pub ↔ page : ?cr=V009 → titre de l'angle de cette pub (sans recharger, page toujours en cache)
-          <script dangerouslySetInnerHTML={{ __html: `(function(){try{var c=(new URLSearchParams(location.search).get('cr')||'').toUpperCase();if(!c)return;var A=${JSON.stringify(angles).replace(/</g, "\\u003c")},m=null;for(var i=0;i<A.length;i++){if(A[i].c.indexOf(c)>-1){m=A[i];break;}}if(!m)return;function ap(){var t=document.getElementById('sp-title');if(t&&m.h&&t.textContent!==m.h)t.textContent=m.h;var s=document.getElementById('sp-angle-sub');if(s&&m.s&&s.textContent!==m.s){s.textContent=m.s;s.style.display='block';}}ap();setTimeout(ap,600);setTimeout(ap,2000);window.addEventListener('load',ap);}catch(e){}})();` }} />
+          <script dangerouslySetInnerHTML={{ __html: `(function(){try{${angleJs}if(!m)return;function ap(){var t=document.getElementById('sp-title');if(t&&m.h&&t.textContent!==m.h)t.textContent=m.h;var s=document.getElementById('sp-angle-sub');if(s&&m.s&&s.textContent!==m.s){s.textContent=m.s;s.style.display='block';}}ap();setTimeout(ap,600);setTimeout(ap,2000);window.addEventListener('load',ap);}catch(e){}})();` }} />
         )}
         <p className="sp-angle-sub" id="sp-angle-sub" suppressHydrationWarning />
         <div className="sp-price">
@@ -312,14 +315,20 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     ),
   };
 
-  const heroEl = heroVid && !heroVidIsImg ? (
+  const heroEl = angleHero && !(heroVid && !heroVidIsImg) ? (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img id="sp-hero-img" data-src={(heroVid || heroImg) ?? ""} alt={product.name} className="sp-hero" fetchPriority="high" decoding="async" />
+      <script dangerouslySetInnerHTML={{ __html: `(function(){var e=document.getElementById('sp-hero-img');if(!e)return;var u=e.getAttribute('data-src');try{${angleJs}if(m&&m.i)u=m.i;}catch(x){}e.src=u;})();` }} />
+    </>
+  ) : heroVid && !heroVidIsImg ? (
     // Vidéo courte en boucle, sans son : la photo s'affiche d'abord (poster), la vidéo démarre ensuite
     <video src={heroVid} poster={heroImg ?? undefined} className="sp-hero" autoPlay muted loop playsInline preload="metadata" aria-label={product.name} />
   ) : (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={(heroVid || heroImg) ?? ""} alt={product.name} className="sp-hero" fetchPriority={d.heroPosition === "top" ? "high" : "auto"} loading={d.heroPosition === "top" ? "eager" : "lazy"} decoding="async" />
   );
-  const hasHero = !!(heroImg || heroVid);
+  const hasHero = !!(heroImg || heroVid || angleHero);
   // Formulaire tout en haut (sauf si « photo en haut » est choisi) : le client commande sans descendre
   const shown = d.blocks.filter((b) => b.on && !(d.crossAtBottom && b.key === "crosssell"));
   const orderedBlocks = d.formFirst || d.heroPosition === "after_form"

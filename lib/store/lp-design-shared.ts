@@ -66,7 +66,7 @@ export type LpDesign = {
   urgencyText: string;
   proofTitle: string;
   proofImages: string[];             // vraies photos (colis préparés, livraisons, captures WhatsApp avec accord)
-  angles: { codes: string; headline: string; sub: string }[]; // titre selon la pub (?cr=V009) → même message pub ↔ page
+  angles: { codes: string; headline: string; sub: string; image: string }[]; // titre + photo hero selon la pub (?cr=V009 ou ?av=couple) → même message pub ↔ page
 };
 
 export const DEFAULT_LP_DESIGN: LpDesign = {
@@ -108,7 +108,7 @@ export function normalizeDesign(v: Partial<LpDesign> | undefined | null): LpDesi
   const galleryImages = (Array.isArray(v?.galleryImages) ? v!.galleryImages : []).filter((x) => typeof x === "string" && x).slice(0, 20);
   const proofImages = (Array.isArray(v?.proofImages) ? v!.proofImages : []).filter((x) => typeof x === "string" && x).slice(0, 12);
   const angles = (Array.isArray(v?.angles) ? v!.angles : []).slice(0, 20)
-    .map((a) => ({ codes: str(a?.codes), headline: str(a?.headline), sub: str(a?.sub) })).filter((a) => a.codes || a.headline);
+    .map((a) => ({ codes: str(a?.codes), headline: str(a?.headline), sub: str(a?.sub), image: str((a as { image?: unknown })?.image) })).filter((a) => a.codes || a.headline || a.image);
   const heroPosition = d.heroPosition === "after_form" || d.heroPosition === "hidden" ? d.heroPosition : "top";
   return { ...d, heroPosition, blocks, tiles, galleryImages, proofImages, angles };
 }

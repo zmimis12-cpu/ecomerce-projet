@@ -69,7 +69,7 @@ export async function saveLpDesign(store: import("./lp-design-shared").LpDesignS
       else if (k === "tiles") out[k] = n.tiles.map((t) => ({ image: t.image.slice(0, 800), text: t.text.slice(0, 160) }));
       else if (k === "galleryImages") out[k] = n.galleryImages.map((u) => u.slice(0, 800));
       else if (k === "proofImages") out[k] = n.proofImages.map((u) => u.slice(0, 800));
-      else if (k === "angles") out[k] = n.angles.map((a) => ({ codes: a.codes.slice(0, 120), headline: a.headline.slice(0, 160), sub: a.sub.slice(0, 200) }));
+      else if (k === "angles") out[k] = n.angles.map((a) => ({ codes: a.codes.slice(0, 120), headline: a.headline.slice(0, 160), sub: a.sub.slice(0, 200), image: a.image.slice(0, 800) }));
       else out[k] = v;
     }
     return normalizeDesign(out as Partial<import("./lp-design-shared").LpDesign>);

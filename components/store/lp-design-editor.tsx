@@ -294,16 +294,17 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">4 · Même message pub ↔ page (titre selon la pub)</h3>
                 <button type="button" disabled={d.angles.length >= 20}
-                  onClick={() => set("angles", [...d.angles, { codes: "", headline: "", sub: "" }])}
+                  onClick={() => set("angles", [...d.angles, { codes: "", headline: "", sub: "", image: "" }])}
                   className="rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-muted disabled:opacity-40">+ Ajouter un angle</button>
               </div>
-              <p className="text-xs text-muted-foreground">Le lien de la pub contient <code>?cr=V009</code> : si le code est dans la liste, le titre de la page devient celui de l&apos;angle (taekwondo → titre taekwondo). Sinon le titre normal reste.</p>
+              <p className="text-xs text-muted-foreground">Le lien de la pub contient <code>?cr=V009</code> (ou <code>&amp;av=couple</code>) : si le code est dans la liste, la page prend la photo hero et le titre de cet angle (taekwondo → hero et titre taekwondo). Sinon le hero et le titre normaux restent. Photo vide = hero normal.</p>
               {d.angles.map((a, i) => {
-                const setA = (patch: Partial<{ codes: string; headline: string; sub: string }>) =>
+                const setA = (patch: Partial<{ codes: string; headline: string; sub: string; image: string }>) =>
                   set("angles", d.angles.map((x, j) => (j === i ? { ...x, ...patch } : x)));
                 return (
-                  <div key={i} className="grid gap-2 rounded-lg border p-2 md:grid-cols-[140px_1fr_1fr_auto]">
-                    <input className={field} value={a.codes} placeholder="V009, V010" onChange={(e) => setA({ codes: e.target.value })} />
+                  <div key={i} className="grid items-center gap-2 rounded-lg border p-2 md:grid-cols-[auto_140px_1fr_1fr_auto]">
+                    <ImageChoice compact value={a.image} onChange={(u) => setA({ image: u })} candidates={pages.find((x) => x.slug === scope)?.images ?? []} autoUrl={null} autoLabel="Hero normal" />
+                    <input className={field} value={a.codes} placeholder="V009, V010 ou couple" onChange={(e) => setA({ codes: e.target.value })} />
                     <input dir="auto" className={field} value={a.headline} placeholder="Titre (ex : بغيتي ضرباتك يطلعو لفوق؟ 🥋)" onChange={(e) => setA({ headline: e.target.value })} />
                     <input dir="auto" className={field} value={a.sub} placeholder="Petite phrase sous le titre (optionnel)" onChange={(e) => setA({ sub: e.target.value })} />
                     <button type="button" onClick={() => set("angles", d.angles.filter((_, j) => j !== i))} className="rounded p-2 text-red-600 hover:bg-red-50" title="Supprimer"><Trash2 className="h-4 w-4" /></button>
