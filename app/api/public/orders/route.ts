@@ -327,6 +327,12 @@ export async function POST(request: NextRequest) {
 
   // ── 9. Log rate limit entry ───────────────────────────────────────────────────
   after(() => recordRequest(ip)); // ne bloque plus la réponse
+  // Panier abandonné du même client pour ce produit → marqué « commande créée »
+  after(async () => {
+    await supabaseAdmin.from("abandoned_carts" as never)
+      .update({ status: "converted", order_id: orderId, updated_at: new Date().toISOString() } as never)
+      .eq("customer_phone", normalizedPhone).eq("product_id", p.id).in("status", ["pending", "called"]);
+  });
 
   // ── 9a. "Lead" envoyé à Meta CÔTÉ SERVEUR (Conversions API) pour chaque
   // commande, vers chaque pixel de la LP. Fiable même si le navigateur bloque

@@ -23,6 +23,7 @@ const ADMIN_NAV: NavGroup[] = [
     items: [
       { href: "/admin",        label: "Dashboard", icon: LayoutDashboard, exact: true },
       { href: "/admin/orders", label: "Commandes", icon: ShoppingCart },
+      { href: "/admin/orders/abandoned", label: "Paniers abandonnés", icon: ShoppingCart },
     ],
   },
   {
@@ -104,6 +105,7 @@ const CC_AGENT_NAV: NavGroup[] = [
       { href: "/admin/call-center/my-dashboard", label: "Mon Dashboard",  icon: LayoutDashboard, exact: true  },
       { href: "/admin/call-center/queue",         label: "File d'appels", icon: ListOrdered,     exact: false },
       { href: "/admin/call-center/my-orders",     label: "Mes commandes", icon: ShoppingCart,    exact: false },
+      { href: "/admin/orders/abandoned",          label: "Paniers abandonnés", icon: ShoppingCart, exact: false },
       { href: "/admin/call-center/my-earnings",   label: "Mes gains",     icon: Award,           exact: false },
       { href: "/admin/products",                  label: "Produits",      icon: Package,         exact: true  },
     ],

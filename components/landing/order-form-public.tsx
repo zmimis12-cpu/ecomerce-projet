@@ -93,6 +93,37 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   const [pickedBumps, setPickedBumps] = useState<string[]>([]);
   const bumpTotal = bumps.filter((b) => pickedBumps.includes(b.productId)).reduce((t, b) => t + b.price, 0);
   const total = baseTotal + bumpTotal;
+  // ── Panier abandonné : dès qu'un téléphone valide est tapé, on le garde côté serveur
+  // (sans bloquer la page). Si le client n'envoie pas la commande, le call center le rappelle.
+  const cartSent = useRef<{ sig: string; n: number }>({ sig: "", n: 0 });
+  useEffect(() => {
+    if (submitted) return;
+    const digits = form.customer_phone.replace(/[\s\-.]/g, "");
+    if (!/^(?:\+?212|0)[67]\d{8}$/.test(digits)) return;
+    const sig = [digits, form.customer_name.trim(), form.customer_city.trim(), offerId, pickedBumps.join(",")].join("|");
+    if (sig === cartSent.current.sig || cartSent.current.n >= 6) return;
+    const t = setTimeout(() => {
+      cartSent.current = { sig, n: cartSent.current.n + 1 };
+      try {
+        fetch("/api/public/abandoned", {
+          method: "POST", headers: { "Content-Type": "application/json" }, keepalive: true,
+          body: JSON.stringify({
+            customer_name: form.customer_name, customer_phone: form.customer_phone, customer_city: form.customer_city,
+            customer_address: form.customer_address, website: form.website,
+            product_id: product.id, product_slug: productSlug, offer_id: offer.id, quantity: offer.qty,
+            bundle_price: baseTotal, total, bumps: pickedBumps, variants: selectedVariants.slice(0, bundle),
+            meta_pixel_id: pixelId ?? null, meta_fbp: getCookie("_fbp"), meta_fbc: getCookie("_fbc"),
+            tiktok_pixel_id: tiktokPixelId ?? null, tiktok_ttp: getCookie("_ttp"),
+            tiktok_ttclid: new URLSearchParams(window.location.search).get("ttclid"),
+            creative_code: getCreativeCode(),
+          }),
+        }).catch(() => {});
+      } catch { /* jamais bloquant */ }
+    }, 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.customer_phone, form.customer_name, form.customer_city, offerId, pickedBumps, submitted]);
+
   function toggleBump(id: string) {
     trackInitiateCheckoutOnce();
     setPickedBumps((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
