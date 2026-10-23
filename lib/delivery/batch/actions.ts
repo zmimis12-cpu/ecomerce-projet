@@ -1155,13 +1155,15 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
     return fixed;
   }
 
+  // Récap noir & blanc (imprimante thermique) : fond blanc, photo du produit à côté du nom
   const SZ = 283.46;            // 100mm in PDF points
   const MARGIN = 10;
-  const LINE_H = 14;
-  const HEADER_H = 52;
+  const HEADER_H = 34;
   const FOOTER_H = 16;
-  const usableH = SZ - HEADER_H - FOOTER_H - MARGIN;
-  const ROWS_PER_PAGE = Math.floor(usableH / LINE_H);  // ~13 rows
+  const ROW_H = 56;
+  const PHOTO = 46;
+  const usableH = SZ - HEADER_H - FOOTER_H - 4;
+  const ROWS_PER_PAGE = Math.max(1, Math.floor(usableH / ROW_H));  // 4 produits / page
 
   const recapDoc   = await PDFDocument.create();
 
@@ -1204,6 +1206,35 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
     fontNormal = await recapDoc.embedFont(StandardFonts.Helvetica);
   }
 
+  // ── Photos emballage (choisies dans la fiche produit, sinon photo principale) ──
+  const black = rgb(0, 0, 0);
+  const photoByKey = new Map<string, import("pdf-lib").PDFImage>();
+  try {
+    const isUuid = (x: string) => /^[0-9a-f-]{36}$/i.test(x);
+    // Produits sans id (commandes Google Sheet) → retrouvés par leur nom
+    const byName = new Map<string, string>();
+    const names = products.filter((p) => !isUuid(p.id)).map((p) => p.name);
+    if (names.length) {
+      const { data: pr } = await supabaseAdmin.from("products").select("id, name").in("name", names);
+      for (const r of (pr ?? []) as { id: string; name: string }[]) byName.set(r.name, r.id);
+    }
+    const pidOf = (p: ProdEntry) => (isUuid(p.id) ? p.id : byName.get(p.name) ?? "");
+    const { resolvePackingPhotos } = await import("@/lib/products/packing-photo");
+    const urls = await resolvePackingPhotos(products.map(pidOf));
+    const sharp = (await import("sharp")).default;
+    await Promise.all(products.map(async (p) => {
+      const url = urls.get(pidOf(p));
+      if (!url) return;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const jpg = await sharp(Buffer.from(await res.arrayBuffer()), { limitInputPixels: false })
+          .rotate().resize(200, 200, { fit: "cover" }).grayscale().normalize().jpeg({ quality: 80 }).toBuffer();
+        photoByKey.set(p.id, await recapDoc.embedJpg(jpg));
+      } catch (e) { console.error("[recap] photo", p.name, e); }
+    }));
+  } catch (e) { console.error("[recap] photos", e); }
+
   // Chunk products into pages
   const chunks: ProdEntry[][] = [];
   if (products.length === 0) {
@@ -1216,96 +1247,86 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
 
   const totalUnits = products.reduce((s, p) => s + p.totalQty, 0);
 
+  // Coupe un nom en 2 lignes max selon la largeur disponible
+  function wrap(text: string, font: import("pdf-lib").PDFFont, size: number, maxW: number): string[] {
+    const words = text.split(/\s+/).filter(Boolean);
+    const lines: string[] = [];
+    let cur = "";
+    for (const w of words) {
+      const t = cur ? `${cur} ${w}` : w;
+      if (font.widthOfTextAtSize(pdfSafe(t), size) <= maxW || !cur) cur = t;
+      else { lines.push(cur); cur = w; }
+    }
+    if (cur) lines.push(cur);
+    if (lines.length > 2) { lines.length = 2; lines[1] = lines[1].slice(0, Math.max(4, lines[1].length - 3)) + "..."; }
+    return lines;
+  }
+
   chunks.forEach((chunk, pageIdx) => {
     const page = recapDoc.addPage([SZ, SZ]);
-    let y = SZ - MARGIN;
 
-    // ── Header block ──────────────────────────────────────────────────────
-    page.drawRectangle({ x: 0, y: SZ - HEADER_H, width: SZ, height: HEADER_H, color: rgb(0.07, 0.07, 0.07) });
-
-    // Batch number
-    const titleFontSize = batchNum.length > 18 ? 9 : 11;
-    page.drawText(pdfSafe(batchNum), {
-      x: MARGIN, y: SZ - MARGIN - titleFontSize,
-      font: fontBold, size: titleFontSize, color: rgb(1, 1, 1),
-    });
-
-    // Orders count + page indicator
-    const subLine = `${totalOrders} commandes  •  ${totalUnits} unités${chunks.length > 1 ? `  •  p.${pageIdx + 1}/${chunks.length}` : ""}`;
-    page.drawText(pdfSafe(subLine), {
-      x: MARGIN, y: SZ - MARGIN - titleFontSize - 13,
-      font: fontNormal, size: 7.5, color: rgb(0.75, 0.75, 0.75),
-    });
-
-    y = SZ - HEADER_H - 6;
-
-    // ── Column headers ────────────────────────────────────────────────────
-    page.drawRectangle({ x: 0, y: y - 10, width: SZ, height: 13, color: rgb(0.92, 0.92, 0.92) });
-    page.drawText("PRODUIT / SKU", { x: MARGIN + 14, y: y - 7, font: fontBold, size: 7, color: rgb(0.4, 0.4, 0.4) });
-    page.drawText("QTÉ", { x: SZ - 30, y: y - 7, font: fontBold, size: 7, color: rgb(0.4, 0.4, 0.4) });
-    y -= 13;
+    // ── En-tête blanc : n° de batch + total (pas de bande noire) ─────────
+    const titleFontSize = batchNum.length > 18 ? 11 : 13;
+    page.drawText(pdfSafe(batchNum), { x: MARGIN, y: SZ - MARGIN - titleFontSize, font: fontBold, size: titleFontSize, color: black });
+    const subLine = `${totalOrders} commandes  •  ${totalUnits} unités`;
+    const subW = fontBold.widthOfTextAtSize(pdfSafe(subLine), 8);
+    page.drawText(pdfSafe(subLine), { x: SZ - MARGIN - subW, y: SZ - MARGIN - titleFontSize, font: fontBold, size: 8, color: black });
+    page.drawLine({ start: { x: MARGIN, y: SZ - HEADER_H + 4 }, end: { x: SZ - MARGIN, y: SZ - HEADER_H + 4 }, thickness: 1.8, color: black });
 
     if (chunk.length === 0) {
-      page.drawText("Aucun produit trouvé.", {
-        x: MARGIN, y: y - 20, font: fontNormal, size: 8, color: rgb(0.7, 0, 0),
-      });
+      page.drawText("Aucun produit trouvé.", { x: MARGIN, y: SZ - HEADER_H - 24, font: fontNormal, size: 9, color: black });
     }
 
-    // ── Product rows ──────────────────────────────────────────────────────
+    // ── Lignes produit : n° · photo · nom + SKU · quantité encadrée ───────
     chunk.forEach((p, i) => {
       const globalRank = pageIdx * ROWS_PER_PAGE + i;
-      const rowY = y - (i + 1) * LINE_H;
+      const top = SZ - HEADER_H - i * ROW_H;
+      const midY = top - ROW_H / 2;
 
-      // Alternating background
-      if (i % 2 === 0) {
-        page.drawRectangle({ x: 0, y: rowY - 2, width: SZ, height: LINE_H, color: rgb(0.97, 0.97, 0.97) });
-      }
-
-      // Rank badge
-      const badgeColor = globalRank === 0 ? rgb(0.85, 0.65, 0.05)
-        : globalRank === 1 ? rgb(0.62, 0.62, 0.62)
-        : globalRank === 2 ? rgb(0.75, 0.45, 0.15)
-        : rgb(0.85, 0.85, 0.85);
-      page.drawCircle({ x: MARGIN + 5, y: rowY + 5, size: 5.5, color: badgeColor });
+      // N°
+      page.drawCircle({ x: MARGIN + 7, y: midY, size: 7, borderColor: black, borderWidth: 1.4 });
       const rankStr = String(globalRank + 1);
-      page.drawText(rankStr, {
-        x: MARGIN + (rankStr.length === 1 ? 3 : 1.5), y: rowY + 2,
-        font: fontBold, size: 6, color: globalRank < 3 ? rgb(1,1,1) : rgb(0.4,0.4,0.4),
-      });
+      page.drawText(rankStr, { x: MARGIN + 7 - fontBold.widthOfTextAtSize(rankStr, 8) / 2, y: midY - 3, font: fontBold, size: 8, color: black });
 
-      // Product name (max 28 chars)
-      const nameText = pdfSafe(p.name.length > 28 ? p.name.slice(0, 26) + "..." : p.name);
-      page.drawText(nameText, {
-        x: MARGIN + 14, y: rowY + 5,
-        font: globalRank < 3 ? fontBold : fontNormal,
-        size: 8, color: rgb(0.1, 0.1, 0.1),
-      });
+      // Photo (noir & blanc, encadrée)
+      const px = MARGIN + 19;
+      const img = photoByKey.get(p.id);
+      if (img) page.drawImage(img, { x: px, y: midY - PHOTO / 2, width: PHOTO, height: PHOTO });
+      page.drawRectangle({ x: px, y: midY - PHOTO / 2, width: PHOTO, height: PHOTO, borderColor: black, borderWidth: 1.2 });
 
-      // SKU below name — skip if identical to product name (sheet-sync sometimes sets sku = name)
-      const skuNormalized  = (p.sku ?? "").trim().toLowerCase();
-      const nameNormalized = p.name.trim().toLowerCase();
-      if (p.sku && skuNormalized !== nameNormalized) {
-        page.drawText(pdfSafe(p.sku.slice(0, 18)), {
-          x: MARGIN + 14, y: rowY - 1,
-          font: fontNormal, size: 6, color: rgb(0.6, 0.6, 0.6),
-        });
-      }
-
-      // Quantity (bold, right-aligned)
+      // Quantité dans un grand cadre
+      const qW = 44, qH = 28;
+      const qx = SZ - MARGIN - qW;
+      page.drawRectangle({ x: qx, y: midY - qH / 2, width: qW, height: qH, borderColor: black, borderWidth: 2 });
       const qtyText = `×${p.totalQty}`;
-      const qtyW = qtyText.length * 5.5;
-      page.drawText(qtyText, {
-        x: SZ - MARGIN - qtyW, y: rowY + 3,
-        font: fontBold, size: 10,
-        color: globalRank < 3 ? rgb(0.08, 0.08, 0.08) : rgb(0.35, 0.35, 0.35),
-      });
+      const qs = qtyText.length > 3 ? 13 : 16;
+      page.drawText(qtyText, { x: qx + (qW - fontBold.widthOfTextAtSize(qtyText, qs)) / 2, y: midY - qs / 3, font: fontBold, size: qs, color: black });
+
+      // Nom (2 lignes max) + SKU
+      const tx = px + PHOTO + 7;
+      const maxW = qx - 6 - tx;
+      const lines = wrap(p.name, fontBold, 10, maxW);
+      const skuNormalized  = (p.sku ?? "").trim().toLowerCase();
+      const showSku = !!p.sku && skuNormalized !== p.name.trim().toLowerCase();
+      const blockH = lines.length * 12 + (showSku ? 11 : 0);
+      let ty = midY + blockH / 2 - 9;
+      for (const l of lines) {
+        page.drawText(pdfSafe(l), { x: tx, y: ty, font: fontBold, size: 10, color: black });
+        ty -= 12;
+      }
+      if (showSku) page.drawText(pdfSafe(p.sku.slice(0, 24)), { x: tx, y: ty - 1, font: fontNormal, size: 6.5, color: black });
+
+      // Séparateur pointillé
+      page.drawLine({ start: { x: MARGIN, y: top - ROW_H }, end: { x: SZ - MARGIN, y: top - ROW_H }, thickness: 0.8, color: black, dashArray: [3, 2] });
     });
 
-    // ── Footer ────────────────────────────────────────────────────────────
-    page.drawLine({ start: { x: MARGIN, y: FOOTER_H - 2 }, end: { x: SZ - MARGIN, y: FOOTER_H - 2 }, thickness: 0.5, color: rgb(0.8,0.8,0.8) });
-    page.drawText(`${trackings.length} trackings à imprimer`, {
-      x: MARGIN, y: FOOTER_H - 12, font: fontNormal, size: 6.5, color: rgb(0.55, 0.55, 0.55),
-    });
+    // ── Pied de page ─────────────────────────────────────────────────────
+    page.drawLine({ start: { x: MARGIN, y: FOOTER_H - 2 }, end: { x: SZ - MARGIN, y: FOOTER_H - 2 }, thickness: 0.8, color: black });
+    page.drawText(`${trackings.length} trackings à imprimer`, { x: MARGIN, y: FOOTER_H - 12, font: fontNormal, size: 7, color: black });
+    if (chunks.length > 1) {
+      const pg = `p.${pageIdx + 1}/${chunks.length}`;
+      page.drawText(pg, { x: SZ - MARGIN - fontNormal.widthOfTextAtSize(pg, 7), y: FOOTER_H - 12, font: fontNormal, size: 7, color: black });
+    }
   });
 
   const recapBytes = await recapDoc.save();

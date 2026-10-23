@@ -15,6 +15,8 @@ import { formatMAD } from "@/types/products";
 import { cn } from "@/lib/utils";
 import { DeleteProductButton } from "@/components/products/delete-product-button";
 import { ProductGallery } from "@/components/landing/product-gallery";
+import { PackingPhotoCard } from "@/components/products/packing-photo-card";
+import { getPackingPhotoMap } from "@/lib/products/packing-photo";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +44,7 @@ export default async function ProductDetailPage({
 
   const canManage = hasRole(session.role, ["super_admin", "admin", "manager"]);
   const whatsappMedia = canManage ? await listProductWhatsAppMedia(id) : [];
+  const packingPhoto = canManage ? (await getPackingPhotoMap())[id] ?? "" : "";
 
   async function handleUpdate(formData: FormData) {
     "use server";
@@ -152,6 +155,12 @@ export default async function ProductDetailPage({
               />
             )}
           </div>
+          {canManage && (
+            <PackingPhotoCard productId={product.id} value={packingPhoto}
+              images={[...(product.images ?? [])]
+                .sort((a, b) => Number(!!b.is_primary) - Number(!!a.is_primary) || (a.display_order ?? 0) - (b.display_order ?? 0))
+                .map((img) => ({ url: img.public_url, label: img.is_primary ? "Principale" : undefined }))} />
+          )}
           {canManage && (
             <WhatsAppMediaManager productId={product.id} initialMedia={whatsappMedia as never} />
           )}
