@@ -162,12 +162,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     ),
     form: (
       <W><div id="sp-form" className="sp-card">
-        {(d.showBadge || (d.showDiscount && discount > 0)) && (
-          <div className="sp-badges">
-            {d.showBadge && d.badge ? <span className="sp-b-red">{d.badge}</span> : <span />}
-            {d.showDiscount && discount > 0 && <span className="sp-b-yel">تخفيض {discount}%</span>}
-          </div>
-        )}
         {d.urgency && d.urgencyText && <div className="sp-urg">{d.urgencyText}</div>}
         <h1 className="sp-title" id="sp-title" suppressHydrationWarning>{title}</h1>
         {angles.length > 0 && (
@@ -178,18 +172,28 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         <div className="sp-price">
           <span className="sp-now">{one.price.toFixed(0)} DH</span>
           {d.showOldPrice && oldShown > one.price && <span className="sp-old">{oldShown.toFixed(0)} DH</span>}
+          {/* Badges sur la ligne du prix (gagne une ligne → formulaire plus haut) */}
+          <span className="sp-price-b">
+            {d.showDiscount && discount > 0 && <span className="sp-b-yel">تخفيض {discount}%</span>}
+            {d.showBadge && d.badge && <span className="sp-b-red">{d.badge}</span>}
+          </span>
         </div>
-        {d.showCodBar && d.codBar && <div className="sp-cod">{d.codBar}</div>}
-        {d.openBeforePay && d.openBeforePayText && <div className="sp-open">{d.openBeforePayText}</div>}
         {d.orderTitle && <p className="sp-order-h">{d.orderTitle}</p>}
-        {orderSub && <p className="sp-order-sub">{orderSub}</p>}
-        {d.callNote && d.callNoteText && <p className="sp-call">{d.callNoteText}</p>}
         <OrderFormPublic product={product} productSlug={slug} ctaText={ctaText}
           b1={b1} b2={b2} b3={b3} offers={offers} askAddress={d.askAddress} addressRequired={d.addressRequired}
           pixelId={pixel || undefined} tiktokPixelId={tt || undefined}
           variants={(Array.isArray(lp.variant_options) ? lp.variant_options : []) as { name: string; options: { label: string; image?: string }[] }[]}
           bumps={d.showBumps ? bumps : []} cities={cities}
           offerImage={d.offerThumbs ? (productImgs[0] ?? heroImg) : null} offersAfterFields={d.offersAfterFields} />
+        {/* Rassurances juste sous le bouton (au moment de décider) — le formulaire reste dans le 1er écran */}
+        {((d.openBeforePay && d.openBeforePayText) || (d.callNote && d.callNoteText) || (d.showCodBar && d.codBar)) && (
+          <div className="sp-trust">
+            {d.showCodBar && d.codBar && <div className="sp-cod">{d.codBar}</div>}
+            {d.openBeforePay && d.openBeforePayText && <p className="sp-open">{d.openBeforePayText}</p>}
+            {d.callNote && d.callNoteText && <p className="sp-call">{d.callNoteText}</p>}
+          </div>
+        )}
+        {orderSub && <p className="sp-order-sub">{orderSub}</p>}
         {d.showWhatsapp && waHref && <a className="sp-wa" href={waHref} target="_blank" rel="noopener noreferrer">واتساب — تواصل معنا</a>}
       </div></W>
     ),
@@ -424,7 +428,9 @@ const CSS = `
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;overflow-x:hidden}
 body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 .sp{overflow-x:hidden;width:100%;max-width:100vw;color:#111827;font-family:var(--font-cairo),sans-serif;background:var(--c-bg)}
-.sp-top{background:#111;color:#fff;text-align:center;font-size:13px;font-weight:700;padding:7px 10px}
+.sp-top{background:#111;color:#fff;text-align:center;font-size:12px;font-weight:700;padding:6px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sp > header > div + div{display:none}
+.sp-price-b{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
 .sp-wrap{max-width:560px;margin:0 auto;padding:0 14px}
 .sp-hero{display:block;width:100%;max-width:560px;margin:0 auto;aspect-ratio:1/1;object-fit:cover;background:#111}
 .sp-ico{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:#eef6f0;font-size:20px;flex-shrink:0}
@@ -436,13 +442,13 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 .sp-badges{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .sp-b-red{background:var(--c-badge);color:#fff;font-size:12px;font-weight:800;padding:3px 10px;border-radius:8px}
 .sp-b-yel{background:var(--c-disc);color:#111;font-size:12px;font-weight:800;padding:3px 10px;border-radius:8px}
-.sp-title{font-size:19px;line-height:1.5;font-weight:800;margin:6px 0 2px}
-.sp-price{display:flex;align-items:baseline;gap:10px;margin:2px 0 10px}
+.sp-title{font-size:19px;line-height:1.45;font-weight:800;margin:4px 0 0}
+.sp-price{display:flex;align-items:baseline;gap:10px;margin:0 0 8px}
 .sp-now{color:var(--c-primary);font-size:34px;font-weight:900;letter-spacing:-.5px}
 .sp-old{color:#9ca3af;text-decoration:line-through;font-size:18px;font-weight:700}
-.sp-cod{background:var(--c-primary);color:#fff;text-align:center;font-weight:800;font-size:14px;padding:11px;border-radius:12px}
-.sp-order-h{text-align:center;font-size:20px;font-weight:900;color:var(--c-primary);margin:14px 0 0}
-.sp-order-sub{text-align:center;font-size:12.5px;color:#6b7280;margin:2px 0 14px}
+.sp-cod{background:var(--c-primary);color:#fff;text-align:center;font-weight:800;font-size:13.5px;padding:8px;border-radius:12px}
+.sp-order-h{text-align:center;font-size:19px;font-weight:900;color:var(--c-primary);margin:8px 0 0}
+.sp-order-sub{text-align:center;font-size:12px;color:#6b7280;margin:8px 0 0}
 .sp-wa{display:block;margin:12px 0 0;background:#fff;color:#16a34a;border:2px solid #22c55e;text-align:center;font-weight:800;font-size:15px;padding:11px;border-radius:12px;text-decoration:none}
 .sp-sec{margin-top:28px}
 .sp-h2{text-align:center;font-size:20px;font-weight:900;margin:0}
@@ -489,8 +495,9 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 @media (min-width:900px){.sp-sticky{max-width:520px;margin:0 auto}}
 .sp-urg{background:#fef2f2;color:#b91c1c;border:1px dashed #fca5a5;text-align:center;font-weight:800;font-size:13.5px;padding:7px 10px;border-radius:10px;margin:4px 0 6px}
 .sp-angle-sub{display:none;font-size:14px;font-weight:700;color:#374151;margin:0 0 6px;line-height:1.6}
-.sp-open{margin-top:8px;background:#fffbeb;color:#92400e;border:2px solid #fbbf24;text-align:center;font-weight:900;font-size:14.5px;padding:10px;border-radius:12px}
-.sp-call{text-align:center;font-size:13px;font-weight:700;color:#065f46;background:#ecfdf5;border-radius:10px;padding:8px 10px;margin:0 0 12px;line-height:1.6}
+.sp-trust{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.sp-open{margin:0;background:#fffbeb;color:#92400e;border:1.5px solid #fbbf24;text-align:center;font-weight:800;font-size:13.5px;padding:7px 10px;border-radius:10px;line-height:1.5}
+.sp-call{margin:0;text-align:center;font-size:12.5px;font-weight:700;color:#065f46;background:#ecfdf5;border-radius:10px;padding:7px 10px;line-height:1.5}
 .sp-proof{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}
 .sp-proof img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:12px;background:#e5e7eb}
 .sp-pain{background:#fff7ed;border-radius:16px;padding:10px 14px;margin-top:10px}.sp-pain div{font-size:14px;font-weight:700;padding:5px 0;line-height:1.5}
