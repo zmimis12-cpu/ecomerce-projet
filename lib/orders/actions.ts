@@ -285,6 +285,15 @@ export async function updateOrderStatus(
     }
   }
 
+  // Commande chez notre livreur remise en « Confirmé » (ex: le livreur ne l'a pas
+  // prise) → elle redevient une commande normale, envoyable au transporteur.
+  if (newStatus === "confirmed" && currentFulfillment === "self_delivery") {
+    updatePayload.fulfillment_type    = "digylog";
+    updatePayload.delivery_company    = null;
+    updatePayload.delivery_status     = null;
+    updatePayload.sent_to_delivery_at = null;
+  }
+
   const { error } = await supabase
     .from("orders")
     .update(updatePayload as never)

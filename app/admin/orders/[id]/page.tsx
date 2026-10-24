@@ -206,7 +206,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             )}
             {canManage && <ResendWhatsAppButton orderId={id} />}
             {canManage && <ManualWhatsAppPanel orderId={id} />}
-            {canManage && <SelfDeliveryTicketButton orderId={id} orderNumber={order.order_number} />}
+            {canManage && <SelfDeliveryTicketButton orderId={id} orderNumber={order.order_number}
+              isSelf={order.fulfillment_type === "self_delivery"}
+              hasCarrierTracking={!!order.delivery_tracking_number && order.fulfillment_type !== "self_delivery"}
+              currentDriver={(order.metadata as { self_driver?: { name?: string } } | null)?.self_driver?.name ?? null}
+              currentFee={Number((order.metadata as { self_delivery_fee?: unknown } | null)?.self_delivery_fee ?? 0) || 0}
+              status={order.status} />}
           </div>
 
           {/* Agent assignment */}

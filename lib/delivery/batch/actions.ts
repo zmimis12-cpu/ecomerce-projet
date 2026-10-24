@@ -231,6 +231,7 @@ export async function getConfirmedOrdersForBatch() {
       )
     `)
     .eq("status", "confirmed")
+    .neq("fulfillment_type", "self_delivery") // notre livreur → jamais chez le transporteur
     .is("delivery_tracking_number", null)
     .is("delivery_batch_id", null)
     .order("created_at", { ascending: false });

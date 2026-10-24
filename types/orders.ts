@@ -82,6 +82,9 @@ export interface Order {
   delivery_external_status: string | null;
   delivery_external_status_id: number | null;
   delivery_driver_phone?: string | null;
+  fulfillment_type?: string | null;
+  delivery_company?: string | null;
+  metadata?: Record<string, unknown> | null;
   delivery_reported_to?: string | null;
   creative_code?: string | null;
   delivery_status: string | null;
@@ -139,6 +142,8 @@ export interface OrderListItem {
   delivery_driver_phone?: string | null;
   delivery_reported_to?: string | null;
   creative_code?: string | null;
+  fulfillment_type?: string | null;   // "self_delivery" = notre livreur (jamais envoyé au transporteur)
+  delivery_company?: string | null;
   delivery_status: string | null;
   delivery_last_sync_at: string | null;
   bl_id: number | null;

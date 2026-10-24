@@ -12,7 +12,7 @@ const ORDER_LIST_FIELDS = `
   delivery_external_status, delivery_external_status_id,
   delivery_driver_phone, delivery_reported_to, creative_code,
   delivery_status, delivery_last_sync_at, bl_id,
-  is_duplicate, duplicate_of, created_at
+  is_duplicate, duplicate_of, fulfillment_type, delivery_company, created_at
 `;
 
 const ORDER_DETAIL_FIELDS = `
@@ -25,7 +25,7 @@ const ORDER_DETAIL_FIELDS = `
   notes, internal_notes, delivery_tracking_number, sync_error, import_source,
   delivery_external_status, delivery_external_status_id, delivery_driver_phone, delivery_reported_to, creative_code,
   source, is_duplicate, duplicate_of, is_exchange, exchange_of_order_id,
-  delivery_company_id, created_at, updated_at
+  delivery_company_id, fulfillment_type, delivery_company, metadata, created_at, updated_at
 `;
 
 export interface OrderFilters {
@@ -156,6 +156,8 @@ export async function getOrders(
       bl_id: (o as unknown as Record<string,unknown>).bl_id as number | null ?? null,
       is_duplicate: o.is_duplicate ?? false,
       duplicate_of: o.duplicate_of ?? null,
+      fulfillment_type: (o as unknown as Record<string,unknown>).fulfillment_type as string | null ?? null,
+      delivery_company: (o as unknown as Record<string,unknown>).delivery_company as string | null ?? null,
       created_at: o.created_at,
     } as OrderListItem;
   });

@@ -1,6 +1,7 @@
 "use server";
 import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { revalidatePath } from "next/cache";
 
 const MANAGER_ROLES = ["super_admin", "admin", "manager"] as const;
 
@@ -18,29 +19,69 @@ function generateHZTrackingCode(orderNumber: string): string {
  * — mais en marque HajtekZone, pour les livraisons gérées par ton propre
  * livreur (pas Digylog).
  */
-export async function generateSelfDeliveryTicket(orderId: string, deliveryFee: number = 0): Promise<{
+export async function generateSelfDeliveryTicket(
+  orderId: string,
+  deliveryFee: number = 0,
+  driver?: { name?: string; phone?: string } | null,
+): Promise<{
   success: boolean; base64?: string; error?: string;
 }> {
-  await requireRole([...MANAGER_ROLES]);
+  const session = await requireRole([...MANAGER_ROLES]);
 
   const { data: order } = await supabaseAdmin
     .from("orders")
-    .select("order_number, customer_name, customer_phone, customer_city, customer_address, total_amount_mad, notes, created_at, metadata")
+    .select("order_number, customer_name, customer_phone, customer_city, customer_address, total_amount_mad, notes, created_at, metadata, status, delivery_tracking_number, fulfillment_type")
     .eq("id", orderId)
     .single();
   if (!order) return { success: false, error: "Commande introuvable." };
 
+  const cur = order as { status: string; delivery_tracking_number: string | null; fulfillment_type: string | null; order_number: string };
+  // Déjà chez une société de livraison → jamais 2 livraisons pour la même commande
+  if (cur.delivery_tracking_number && cur.fulfillment_type !== "self_delivery") {
+    return { success: false, error: `Déjà envoyée au transporteur (tracking ${cur.delivery_tracking_number}).` };
+  }
+  if (["cancelled", "refused", "returned", "exchanged"].includes(cur.status)) {
+    return { success: false, error: `Statut "${cur.status}" : impossible de l'envoyer au livreur.` };
+  }
+
+  const meta = ((order as { metadata?: Record<string, unknown> | null }).metadata ?? {}) as Record<string, unknown>;
+  // Même code HZ à chaque réimpression du ticket
+  const trackingCode = typeof meta.self_tracking === "string" && meta.self_tracking
+    ? (meta.self_tracking as string)
+    : generateHZTrackingCode(cur.order_number);
+
   // Part du livreur : enregistrée sur la commande → le tableau de bord l'utilise
   // comme vrai coût de livraison (vide = 0, le livreur rend tout le montant).
   const fee = Math.max(0, Math.round(Number(deliveryFee) || 0));
+  const driverName  = String(driver?.name ?? "").trim().slice(0, 60);
+  const driverPhone = String(driver?.phone ?? "").replace(/[^\d+]/g, "").slice(0, 15);
+  // Commande confirmée → « En transit » chez NOTRE livreur : elle sort de la liste
+  // des commandes à envoyer (Digylog / Speedaf / lots) et ne part jamais chez eux.
+  const moveToTransit = ["new", "confirmed", "processing", "pending", "no_answer", "sent_to_delivery", "not_sent"].includes(cur.status);
   {
-    const meta = ((order as { metadata?: Record<string, unknown> | null }).metadata ?? {}) as Record<string, unknown>;
-    await supabaseAdmin.from("orders").update({
+    const update: Record<string, unknown> = {
       fulfillment_type: "self_delivery",
       delivery_cost_real_mad: fee,
       actual_delivery_cost: fee,
-      metadata: { ...meta, self_delivery_fee: fee },
-    } as never).eq("id", orderId);
+      delivery_company: driverName ? `Livreur propre — ${driverName}` : "Livreur propre",
+      delivery_driver_phone: driverPhone || null,
+      metadata: { ...meta, self_delivery_fee: fee, self_tracking: trackingCode,
+        self_driver: driverName ? { name: driverName, phone: driverPhone } : (meta.self_driver ?? null) },
+    };
+    if (moveToTransit) {
+      update.status = "in_transit";
+      update.delivery_status = "in_transit";
+      update.sent_to_delivery_at = new Date().toISOString();
+    }
+    await supabaseAdmin.from("orders").update(update as never).eq("id", orderId);
+    if (moveToTransit) {
+      await supabaseAdmin.from("order_status_history").insert({
+        order_id: orderId, from_status: cur.status, to_status: "in_transit", changed_by: session.authId,
+        notes: `Envoyée à notre livreur${driverName ? ` (${driverName})` : ""} — prix livraison ${fee} DH. Pas de société de livraison.`,
+      } as never);
+    }
+    revalidatePath(`/admin/orders/${orderId}`);
+    revalidatePath("/admin/orders");
   }
 
   const o = order as {
@@ -56,7 +97,6 @@ export async function generateSelfDeliveryTicket(orderId: string, deliveryFee: n
   const lineItems = (items ?? []) as { product_name: string; quantity: number }[];
   const productLine = lineItems.map((it) => `${it.quantity}x_${it.product_name}`).join(", ");
 
-  const trackingCode = generateHZTrackingCode(o.order_number);
 
   const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
   const arabicReshaper = await import("arabic-reshaper");

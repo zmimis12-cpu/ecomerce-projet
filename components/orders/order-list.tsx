@@ -38,7 +38,7 @@ function RowActions({ order, canManage, speedaf }: { order: Order; canManage: bo
     URL.revokeObjectURL(url);
   }
 
-  const canSend  = canManage && order.status === "confirmed" && !order.delivery_tracking_number;
+  const canSend  = canManage && order.status === "confirmed" && !order.delivery_tracking_number && order.fulfillment_type !== "self_delivery";
   const hasTrack = !!order.delivery_tracking_number;
 
   return (
@@ -111,7 +111,7 @@ function BulkDigylogBar({ selected, orders, onDone, speedaf }: {
   const [results, setResults] = useState<string[]>([]);
 
   const eligible = orders.filter(
-    (o) => selected.includes(o.id) && o.status === "confirmed" && !o.delivery_tracking_number
+    (o) => selected.includes(o.id) && o.status === "confirmed" && !o.delivery_tracking_number && o.fulfillment_type !== "self_delivery"
   );
 
   if (!selected.length) return null;
@@ -326,6 +326,11 @@ export function OrderList({ orders, canManage, speedafEnabled = false }: OrderLi
                     <td className="px-4 py-3">
                       <div className="flex flex-col items-start gap-1">
                         <StatusBadge status={order.status} />
+                        {order.fulfillment_type === "self_delivery" && (
+                          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 whitespace-nowrap">
+                            🛵 {order.delivery_company?.replace(/^Livreur propre( — )?/, "") || "Notre livreur"}
+                          </span>
+                        )}
                         <DigylogStatusBadge
                           label={order.delivery_tracking_number ? order.delivery_external_status : null}
                           id={order.delivery_external_status_id}
