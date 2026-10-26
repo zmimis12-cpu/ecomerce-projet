@@ -329,7 +329,7 @@ export function PayPlanCard({ ctx }: { ctx: EditorContext }) {
 }
 
 /* ── Vidéos regroupées par produit ─────────────────────────────────────────────── */
-export type ProductCardInfo = { id: string; name: string; image: string | null };
+export type ProductCardInfo = { id: string; name: string; image: string | null; rates?: { orders: number; confirmed: number; shipped: number; delivered: number } };
 
 function groupByProduct(ctx: EditorContext) {
   const groups = new Map<string, CreativeStat[]>();
@@ -348,6 +348,7 @@ function groupByProduct(ctx: EditorContext) {
 
 export function ProductGroups({ ctx, products }: { ctx: EditorContext; products: ProductCardInfo[] }) {
   const img = new Map(products.map((p) => [p.id, p.image]));
+  const rt = new Map(products.map((p) => [p.id, p.rates]));
   const groups = groupByProduct(ctx);
   if (!groups.length) return <p className="rounded-xl border bg-card p-6 text-center text-sm text-muted-foreground">Aucune vidéo pour le moment.</p>;
   return (
@@ -364,9 +365,9 @@ export function ProductGroups({ ctx, products }: { ctx: EditorContext; products:
               <p className="text-xs text-muted-foreground">{g.rows.length} vidéo{g.rows.length > 1 ? "s" : ""}</p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
-              <Chip label="Commandes" value={String(g.orders)} />
-              <Chip label="Confirmation" value={rateN(g.confirmed, g.treated)} />
-              <Chip label="Livraison" value={rateN(g.shipDelivered, g.shipDone)} />
+              <Chip label="Commandes" value={String(rt.get(g.pid)?.orders ?? g.orders)} />
+              <Chip label="Confirmation" value={rt.get(g.pid) ? rateN(rt.get(g.pid)!.confirmed, rt.get(g.pid)!.orders) : rateN(g.confirmed, g.treated)} />
+              <Chip label="Livraison" value={rt.get(g.pid) ? rateN(rt.get(g.pid)!.delivered, rt.get(g.pid)!.shipped) : rateN(g.shipDelivered, g.shipDone)} />
               <Chip label="Livrées" value={String(g.delivered)} />
               {usesCommission(ctx.portal) && <Chip label="Gain" value={mad(g.earnings)} strong />}
             </div>
@@ -389,6 +390,7 @@ function Chip({ label, value, strong }: { label: string; value: string; strong?:
 /** Résumé compact par produit (tableau de bord) */
 export function ProductSummary({ ctx, products }: { ctx: EditorContext; products: ProductCardInfo[] }) {
   const img = new Map(products.map((p) => [p.id, p.image]));
+  const rt = new Map(products.map((p) => [p.id, p.rates]));
   const groups = groupByProduct(ctx);
   if (!groups.length) return null;
   return (
@@ -403,9 +405,9 @@ export function ProductSummary({ ctx, products }: { ctx: EditorContext; products
             <div className="truncate text-sm font-semibold" dir="auto">{g.name}</div>
             <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-muted-foreground">
               <span>Vidéos <b className="text-foreground">{g.rows.length}</b></span>
-              <span>Commandes <b className="text-foreground">{g.orders}</b></span>
-              <span>Confirmation <b className="text-foreground">{rateN(g.confirmed, g.treated)}</b></span>
-              <span>Livraison <b className="text-foreground">{rateN(g.shipDelivered, g.shipDone)}</b></span>
+              <span>Commandes <b className="text-foreground">{rt.get(g.pid)?.orders ?? g.orders}</b></span>
+              <span>Confirmation <b className="text-foreground">{rt.get(g.pid) ? rateN(rt.get(g.pid)!.confirmed, rt.get(g.pid)!.orders) : rateN(g.confirmed, g.treated)}</b></span>
+              <span>Livraison <b className="text-foreground">{rt.get(g.pid) ? rateN(rt.get(g.pid)!.delivered, rt.get(g.pid)!.shipped) : rateN(g.shipDelivered, g.shipDone)}</b></span>
             </div>
           </div>
         </div>

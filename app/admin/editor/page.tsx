@@ -3,6 +3,8 @@ import Link from "next/link";
 import { LayoutDashboard } from "lucide-react";
 import { loadEditorContext } from "@/lib/creatives/editor-context";
 import { getProductCards } from "@/lib/creatives/portal";
+import { getProductRates } from "@/lib/creatives/product-rates";
+import { periodRange } from "@/lib/creatives/queries";
 import { EditorHeader, StatCards, BalanceCards, VideosTable, PayPlanCard, ProductSummary } from "@/components/creatives/editor-sections";
 
 export const metadata: Metadata = { title: "Tableau de bord éditeur" };
@@ -14,7 +16,10 @@ export default async function EditorDashboardPage({
   const ctx = await loadEditorContext(await searchParams);
   const q = ctx.isEditor ? `?month=${ctx.report.period}` : `?editor=${ctx.editorId}&month=${ctx.report.period}`;
   const ids = [...new Set(ctx.report.creatives.map((c) => c.productId).filter(Boolean) as string[])];
-  const products = await getProductCards(ids);
+  const { from: pFrom, to: pTo } = periodRange(ctx.report.period);
+  const [cards, rates] = await Promise.all([getProductCards(ids), getProductRates(ids, pFrom, pTo)]);
+  // Taux réels du produit (toutes ses commandes, mêmes formules que l'admin)
+  const products = cards.map((p) => ({ ...p, rates: rates.get(p.id) }));
   return (
     <div className="space-y-6">
       <EditorHeader ctx={ctx} title="Tableau de bord" icon={LayoutDashboard} current="/admin/editor" />
