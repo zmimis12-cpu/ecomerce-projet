@@ -31,6 +31,7 @@ const ADMIN_NAV: NavGroup[] = [
     items: [
       { href: "/admin/products",          label: "Produits",            icon: Package, exact: true },
       { href: "/admin/products/overview", label: "Vue d'ensemble",      icon: BarChart3 },
+      { href: "/admin/products/livraison", label: "Après livraison",    icon: Truck },
       { href: "/admin/products/calculs",  label: "Calculs par produit", icon: Calculator },
     ],
   },
