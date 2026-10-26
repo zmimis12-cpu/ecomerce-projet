@@ -52,12 +52,10 @@ export type CreativeStat = {
 
 /** Statuts = commande confirmée par le centre d'appel (elle est partie ou va partir). */
 export const CONFIRMED_LIKE = ["confirmed", "ready", "processing", "sent_to_delivery", "not_sent", "shipped", "in_transit", "out_for_delivery", "delivered", "paid", "returned", "partially_returned", "refused_delivery", "exchanged"];
-/** Colis arrivés au bout (livrés OU revenus) — base du taux de livraison. */
-const SHIP_DONE = ["delivered", "paid", "exchanged", "returned", "partially_returned", "refused_delivery"];
 /** Colis livrés au client (l'échange = le client a bien reçu et payé la 1re commande). */
 const SHIP_DELIVERED = ["delivered", "paid", "exchanged"];
-/** Pas encore traités par le call center → hors taux de confirmation. */
-const NOT_TREATED = ["new", "pending"];
+/** Expédiées (formule admin) : base du taux de livraison. */
+const SHIPPED_ADMIN = ["sent_to_delivery", "in_transit", "shipped", "out_for_delivery", "delivered", "paid", "exchanged", "returned", "partially_returned", "refused_delivery"];
 
 export type EditorStat = EditorInfo & {
   impressions: number;
@@ -255,9 +253,11 @@ export async function getCreativesReport(opts: { month?: string | null; editorId
     const dup = (o as { is_duplicate?: boolean | null }).is_duplicate === true;
     if (inRange(o.created_at, from, to) && !dup) {
       s.orders++;
-      if (!NOT_TREATED.includes(o.status)) s.treated++;
+      // Mêmes formules que l'admin : confirmation = confirmées / TOUTES les commandes,
+      // livraison = livrées / expédiées (y compris colis encore en route)
+      s.treated++;
       if (CONFIRMED_LIKE.includes(o.status)) s.confirmed++;
-      if (SHIP_DONE.includes(o.status)) { s.shipDone++; if (SHIP_DELIVERED.includes(o.status)) s.shipDelivered++; }
+      if (SHIPPED_ADMIN.includes(o.status)) { s.shipDone++; if (SHIP_DELIVERED.includes(o.status)) s.shipDelivered++; }
     }
     const deliveredAt = o.delivered_at ?? o.updated_at;
     if (DELIVERED_STATUSES.includes(o.status) && inRange(deliveredAt, from, to)) {
