@@ -37,3 +37,28 @@ export async function abandonedStats(days = 7) {
   for (const r of (data ?? []) as { status: string }[]) { c.total++; c[r.status] = (c[r.status] ?? 0) + 1; }
   return c;
 }
+
+/** Message WhatsApp de relance (modifiable dans la page Paniers abandonnés).
+ *  Variables : {prenom} {produit} {prix} {ville} */
+export const DEFAULT_ABANDONED_WA = `السلام عليكم {prenom} 👋
+معاك HajtekZone.
+شفنا بلي بديتي الطلب ديال {produit} وما كملتيهش، واش كان شي مشكل؟ 🙏
+
+إلا باغيه، غير صيفط لينا:
+📍 المدينة
+🏠 العنوان
+وحنا نكملو ليك الطلب من هنا ✅
+
+🚚 التوصيل لباب الدار لجميع المدن
+💵 الدفع عند الاستلام
+📦 تقدر تحل الكولية وتشوف السلعة قبل ما تخلص
+
+الكمية محدودة فهاد الدفعة، واش نكملو ليك؟ 😊`;
+
+export async function getAbandonedWaTemplate(): Promise<string> {
+  const { data } = await supabaseAdmin.from("app_settings").select("value").eq("key", "abandoned_wa_template").maybeSingle();
+  const v = (data as { value?: unknown } | null)?.value;
+  let t: unknown = v;
+  try { if (typeof v === "string" && v.startsWith('"')) t = JSON.parse(v); } catch { /* texte brut */ }
+  return typeof t === "string" && t.trim() ? t : DEFAULT_ABANDONED_WA;
+}

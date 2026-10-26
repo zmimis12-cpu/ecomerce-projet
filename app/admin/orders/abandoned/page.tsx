@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/session";
-import { listAbandonedCarts, abandonedStats } from "@/lib/orders/abandoned";
+import { listAbandonedCarts, abandonedStats, getAbandonedWaTemplate, DEFAULT_ABANDONED_WA } from "@/lib/orders/abandoned";
+import { AbandonedWaTemplateEditor } from "@/components/orders/abandoned-wa-template";
 import { AbandonedTable } from "@/components/orders/abandoned-table";
 import { cn } from "@/lib/utils";
 
@@ -17,10 +18,11 @@ const TABS = [
 ];
 
 export default async function AbandonedPage({ searchParams }: { searchParams: Promise<{ s?: string }> }) {
-  await requireRole(["super_admin", "admin", "manager", "call_center_agent"]);
   const { s } = await searchParams;
   const status = TABS.some((t) => t.key === s) ? s! : "pending";
-  const [{ rows, missingTable }, st] = await Promise.all([listAbandonedCarts({ status, days: 7 }), abandonedStats(7)]);
+  const session = await requireRole(["super_admin", "admin", "manager", "call_center_agent"]);
+  const [{ rows, missingTable }, st, waTemplate] = await Promise.all([listAbandonedCarts({ status, days: 7 }), abandonedStats(7), getAbandonedWaTemplate()]);
+  const canEdit = ["super_admin", "admin", "manager"].includes(session.role);
   const rate = st.total ? Math.round((st.converted / st.total) * 100) : 0;
 
   return (
@@ -52,7 +54,8 @@ export default async function AbandonedPage({ searchParams }: { searchParams: Pr
               </Link>
             ))}
           </div>
-          <AbandonedTable rows={rows} />
+          {canEdit && <AbandonedWaTemplateEditor initial={waTemplate} fallback={DEFAULT_ABANDONED_WA} />}
+          <AbandonedTable rows={rows} waTemplate={waTemplate} />
         </>
       )}
     </div>

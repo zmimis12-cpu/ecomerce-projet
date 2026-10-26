@@ -14,6 +14,18 @@ export async function setAbandonedStatus(id: string, status: "called" | "not_int
   return error ? { success: false, error: error.message } : { success: true };
 }
 
+/** Enregistre le message WhatsApp de relance (admin / manager). Vide = message par défaut. */
+export async function saveAbandonedWaTemplate(text: string): Promise<{ success: boolean; error?: string }> {
+  await requireRole(["super_admin", "admin", "manager"]);
+  const clean = String(text ?? "").slice(0, 2000);
+  const { error } = await supabaseAdmin.from("app_settings").upsert(
+    { key: "abandoned_wa_template", value: JSON.stringify(clean), category: "orders", label: "Message WhatsApp — paniers abandonnés" } as never,
+    { onConflict: "key" },
+  );
+  revalidatePath("/admin/orders/abandoned");
+  return error ? { success: false, error: error.message } : { success: true };
+}
+
 /** Le client a dit oui → crée la vraie commande avec EXACTEMENT les mêmes règles que la landing page
  *  (prix de l'offre, upsells, coût, agent, code pub, Lead Meta côté serveur). */
 export async function convertAbandonedCart(id: string): Promise<{ success: boolean; error?: string; orderNumber?: string }> {

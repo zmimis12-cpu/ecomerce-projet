@@ -13,12 +13,24 @@ const ST: Record<string, [string, string]> = {
   not_interested: ["Pas intéressé", "bg-slate-100 text-slate-600"],
 };
 
-function wa(phone: string) {
+function wa(phone: string, text?: string) {
   const d = phone.replace(/\D/g, "");
-  return `https://wa.me/${d.startsWith("0") ? "212" + d.slice(1) : d}`;
+  const base = `https://wa.me/${d.startsWith("0") ? "212" + d.slice(1) : d}`;
+  return text ? `${base}?text=${encodeURIComponent(text)}` : base;
 }
 
-export function AbandonedTable({ rows }: { rows: AbandonedCart[] }) {
+/** Remplit le message de relance avec les infos du panier. */
+function fillWa(tpl: string, r: AbandonedCart) {
+  const prenom = (r.customer_name ?? "").trim().split(/\s+/)[0] ?? "";
+  return tpl
+    .replace(/\{prenom\}/g, prenom)
+    .replace(/\{produit\}/g, r.product_name ?? "")
+    .replace(/\{prix\}/g, r.total_amount ? `${Number(r.total_amount).toFixed(0)} درهم` : "")
+    .replace(/\{ville\}/g, r.customer_city ?? "")
+    .replace(/ {2,}/g, " ");
+}
+
+export function AbandonedTable({ rows, waTemplate = "" }: { rows: AbandonedCart[]; waTemplate?: string }) {
   const [msg, setMsg] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
   const [, start] = useTransition();
@@ -52,7 +64,10 @@ export function AbandonedTable({ rows }: { rows: AbandonedCart[] }) {
                 <div className="font-medium" dir="auto">{r.customer_name || "—"}</div>
                 <div className="flex items-center gap-2 text-xs">
                   <a href={`tel:${r.customer_phone}`} className="flex items-center gap-1 text-primary hover:underline"><Phone className="h-3 w-3" />{r.customer_phone}</a>
-                  <a href={wa(r.customer_phone)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-green-600 hover:underline"><MessageCircle className="h-3 w-3" />WhatsApp</a>
+                  <a href={wa(r.customer_phone, waTemplate ? fillWa(waTemplate, r) : undefined)} target="_blank" rel="noopener noreferrer"
+                    onClick={() => { if (r.status === "pending") start(async () => { await setAbandonedStatus(r.id, "called"); }); }}
+                    title="Ouvre WhatsApp avec le message de relance déjà écrit"
+                    className="flex items-center gap-1 rounded-md bg-green-600 px-2 py-0.5 font-semibold text-white hover:bg-green-700"><MessageCircle className="h-3 w-3" />WhatsApp relance</a>
                 </div>
                 <div className="text-xs text-muted-foreground" dir="auto">{r.customer_city || "ville ?"}</div>
               </td>
