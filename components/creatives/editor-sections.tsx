@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { Film, ShoppingCart, CheckCircle, Award, Eye, MousePointerClick, PhoneCall, Wallet, Package } from "lucide-react";
 import type { EditorContext } from "@/lib/creatives/editor-context";
-import { PeriodFilter, mad, rate } from "@/components/creatives/period-filter";
+import { PeriodFilter, mad, rate, rateN } from "@/components/creatives/period-filter";
 import { ctr, ago, videoVerdict } from "@/lib/creatives/queries";
 import { TONE_CLS } from "@/lib/ads/meta-status";
 import { usesCommission, packProgress } from "@/lib/creatives/portal-shared";
@@ -72,8 +72,8 @@ export function StatCards({ ctx }: { ctx: EditorContext }) {
   const me = ctx.me;
   // L'éditeur ne voit pas les stats Meta : seulement la qualité des commandes de ses vidéos
   const quality = [
-    { label: "Taux de confirmation", value: rate(me?.confirmed ?? 0, me?.treated ?? 0), icon: PhoneCall },
-    { label: "Taux de livraison", value: rate(me?.shipDelivered ?? 0, me?.shipDone ?? 0), icon: CheckCircle },
+    { label: "Taux de confirmation", value: rateN(me?.confirmed ?? 0, me?.treated ?? 0), icon: PhoneCall },
+    { label: "Taux de livraison", value: rateN(me?.shipDelivered ?? 0, me?.shipDone ?? 0), icon: CheckCircle },
   ];
   const meta = [
     { label: "Impressions", value: (me?.impressions ?? 0).toLocaleString("fr-FR"), icon: Eye },
@@ -176,7 +176,7 @@ export function VideosTable({ ctx, limit, rows: only, hideProduct }: { ctx: Edit
               <td className="px-4 py-2 text-right">{c.orders > 0 && c.spend > 0 ? `${Math.round(c.spend / c.orders)} MAD` : "—"}</td>
               <td className="px-4 py-2 text-right">{c.delivered}</td>
               <td className="px-4 py-2 text-right">{rate(c.delivered, c.orders)}</td>
-              <td className="px-4 py-2 text-right">{rate(c.confirmed, c.treated)}</td>
+              <td className="px-4 py-2 text-right">{rateN(c.confirmed, c.treated)}</td>
               <td className="px-4 py-2"><Verdict c={c} /></td>
               {showGain && <td className="px-4 py-2 text-right font-semibold text-emerald-700">{mad(c.earnings)}</td>}
             </tr>
@@ -230,9 +230,9 @@ function EditorVideosTable({ ctx, limit, rows: only, hideProduct }: { ctx: Edito
               <td className="px-4 py-2"><Verdict c={c} /></td>
               <td className="px-4 py-2 text-right">{c.orders}</td>
               <td className="px-4 py-2 text-right">{c.confirmed}</td>
-              <td className="px-4 py-2 text-right">{rate(c.confirmed, c.treated)}</td>
+              <td className="px-4 py-2 text-right">{rateN(c.confirmed, c.treated)}</td>
               <td className="px-4 py-2 text-right">{c.delivered}</td>
-              <td className="px-4 py-2 text-right">{rate(c.shipDelivered, c.shipDone)}</td>
+              <td className="px-4 py-2 text-right">{rateN(c.shipDelivered, c.shipDone)}</td>
               {showGain && <td className="px-4 py-2 text-right font-semibold text-emerald-700">{mad(c.earnings)}</td>}
             </tr>
           ))}
@@ -365,8 +365,8 @@ export function ProductGroups({ ctx, products }: { ctx: EditorContext; products:
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
               <Chip label="Commandes" value={String(g.orders)} />
-              <Chip label="Confirmation" value={rate(g.confirmed, g.treated)} />
-              <Chip label="Livraison" value={rate(g.shipDelivered, g.shipDone)} />
+              <Chip label="Confirmation" value={rateN(g.confirmed, g.treated)} />
+              <Chip label="Livraison" value={rateN(g.shipDelivered, g.shipDone)} />
               <Chip label="Livrées" value={String(g.delivered)} />
               {usesCommission(ctx.portal) && <Chip label="Gain" value={mad(g.earnings)} strong />}
             </div>
@@ -404,8 +404,8 @@ export function ProductSummary({ ctx, products }: { ctx: EditorContext; products
             <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-muted-foreground">
               <span>Vidéos <b className="text-foreground">{g.rows.length}</b></span>
               <span>Commandes <b className="text-foreground">{g.orders}</b></span>
-              <span>Confirmation <b className="text-foreground">{rate(g.confirmed, g.treated)}</b></span>
-              <span>Livraison <b className="text-foreground">{rate(g.shipDelivered, g.shipDone)}</b></span>
+              <span>Confirmation <b className="text-foreground">{rateN(g.confirmed, g.treated)}</b></span>
+              <span>Livraison <b className="text-foreground">{rateN(g.shipDelivered, g.shipDone)}</b></span>
             </div>
           </div>
         </div>

@@ -51,8 +51,13 @@ export type CreativeStat = {
 };
 
 /** Statuts = commande confirmée par le centre d'appel (elle est partie ou va partir). */
-export const CONFIRMED_LIKE = ["confirmed", "ready", "shipped", "in_transit", "out_for_delivery", "delivered", "paid", "returned", "refused_delivery", "exchanged"];
-const SHIP_DONE = ["delivered", "paid", "returned", "refused_delivery"];
+export const CONFIRMED_LIKE = ["confirmed", "ready", "processing", "sent_to_delivery", "not_sent", "shipped", "in_transit", "out_for_delivery", "delivered", "paid", "returned", "partially_returned", "refused_delivery", "exchanged"];
+/** Colis arrivés au bout (livrés OU revenus) — base du taux de livraison. */
+const SHIP_DONE = ["delivered", "paid", "exchanged", "returned", "partially_returned", "refused_delivery"];
+/** Colis livrés au client (l'échange = le client a bien reçu et payé la 1re commande). */
+const SHIP_DELIVERED = ["delivered", "paid", "exchanged"];
+/** Pas encore traités par le call center → hors taux de confirmation. */
+const NOT_TREATED = ["new", "pending"];
 
 export type EditorStat = EditorInfo & {
   impressions: number;
@@ -163,7 +168,7 @@ export async function getCreativesReport(opts: { month?: string | null; editorId
     creativeIds.length
       ? supabaseAdmin
           .from("orders")
-          .select("id, order_number, creative_id, status, total_amount_mad, created_at, delivered_at, updated_at, editor_earning_mad, editor_rate_label")
+          .select("id, order_number, creative_id, status, total_amount_mad, created_at, delivered_at, updated_at, editor_earning_mad, editor_rate_label, is_duplicate")
           .in("creative_id" as never, creativeIds)
       : Promise.resolve({ data: [] }),
   ]);
@@ -246,11 +251,13 @@ export async function getCreativesReport(opts: { month?: string | null; editorId
   for (const o of orders) {
     const s = stats.get(o.creative_id);
     if (!s) continue;
-    if (inRange(o.created_at, from, to)) {
+    // Doublons (même client qui recommande 2 fois) : ne faussent pas les taux
+    const dup = (o as { is_duplicate?: boolean | null }).is_duplicate === true;
+    if (inRange(o.created_at, from, to) && !dup) {
       s.orders++;
-      if (o.status !== "new") s.treated++;
+      if (!NOT_TREATED.includes(o.status)) s.treated++;
       if (CONFIRMED_LIKE.includes(o.status)) s.confirmed++;
-      if (SHIP_DONE.includes(o.status)) { s.shipDone++; if (DELIVERED_STATUSES.includes(o.status)) s.shipDelivered++; }
+      if (SHIP_DONE.includes(o.status)) { s.shipDone++; if (SHIP_DELIVERED.includes(o.status)) s.shipDelivered++; }
     }
     const deliveredAt = o.delivered_at ?? o.updated_at;
     if (DELIVERED_STATUSES.includes(o.status) && inRange(deliveredAt, from, to)) {

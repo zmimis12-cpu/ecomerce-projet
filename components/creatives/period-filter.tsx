@@ -36,3 +36,11 @@ export function mad(n: number) {
 export function rate(delivered: number, orders: number) {
   return orders > 0 ? Math.round((delivered / orders) * 100) + "%" : "—";
 }
+
+/** Taux réel avec le nombre derrière : « 67 % (8/12) ». Moins de 3 cas → juste « 1/2 »
+ *  (un 100 % sur 1 seule commande ne veut rien dire). */
+export function rateN(ok: number, total: number) {
+  if (total <= 0) return "—";
+  if (total < 3) return `${ok}/${total}`;
+  return `${Math.round((ok / total) * 100)}% (${ok}/${total})`;
+}
