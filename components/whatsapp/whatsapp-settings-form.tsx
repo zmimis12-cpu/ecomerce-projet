@@ -77,7 +77,7 @@ export function WhatsAppSettingsForm({ initial }: Props) {
       <div className="rounded-xl border bg-card p-5 space-y-3">
         <h3 className="text-sm font-semibold">Template du message (Darija)</h3>
         <p className="text-xs text-muted-foreground">
-          Variables disponibles : <code>{"{name}"}</code> <code>{"{product}"}</code> <code>{"{price}"}</code> <code>{"{city}"}</code> <code>{"{address}"}</code>
+          Variables disponibles : <code>{"{name}"}</code> <code>{"{product}"}</code> <code>{"{price}"}</code> <code>{"{city}"}</code> <code>{"{address}"}</code> <code>{"{qty}"}</code> <code>{"{total}"}</code> <code>{"{qty_line}"}</code> (ligne « الكمية » seulement si plus d&apos;une pièce)
         </p>
         <textarea value={template} onChange={(e) => setTemplate(e.target.value)} rows={7} dir="rtl"
           className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-sans" />

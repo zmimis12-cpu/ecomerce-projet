@@ -26,8 +26,32 @@ async function getSettings(): Promise<WhatsAppSettings | null> {
   return data as WhatsAppSettings | null;
 }
 
+const DEFAULT_CONFIRM_TEMPLATE =
+  "السلام عليكم {name} 🌸\nشكراً على الثقة ديالك 🙏\nتوصلنا بالطلب ديالك:\n📦 {product}\n{qty_line}\n💰 المجموع: {total} درهم — الدفع عند الاستلام 🚚\n📍 المدينة: {city}\n🏠 العنوان: {address}\n\nالطلب ديالك محجوز ليك دابا ✅\nباش نصيفطوه ليك، غير جاوبنا بكلمة « مؤكد » ✅\nوإلا بغيتي تبدل شي حاجة (العنوان ولا الكمية) كتب لينا هنا 👇";
+
+type OrderLite = { customer_name: string; customer_city: string; customer_address: string; total_amount_mad: number | null };
+type ItemLite = { product_name: string; unit_price: number; quantity: number };
+
+/** Variables : {name} {product} {qty} {qty_line} {price} {total} {city} {address}.
+ *  {qty_line} = « 🔢 الكمية: N » seulement si le client a pris plus d'une pièce. */
+function orderVars(o: OrderLite, items: ItemLite[]): Record<string, string> {
+  const qty = items.reduce((n, i) => n + Number(i.quantity || 1), 0);
+  const sum = items.reduce((n, i) => n + Number(i.unit_price || 0) * Number(i.quantity || 1), 0);
+  const total = Number(o.total_amount_mad || 0) || sum;
+  return {
+    name: o.customer_name ?? "", city: o.customer_city ?? "", address: o.customer_address ?? "",
+    product: items.map((i) => i.product_name).join(" + "),
+    qty: String(qty), qty_line: qty > 1 ? `🔢 الكمية: ${qty} قطع` : "",
+    price: String(total), total: String(total),
+  };
+}
+
 function fillTemplate(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? "");
+  // Une ligne qui ne contient que des variables vides (ex. {qty_line} pour 1 pièce) disparaît.
+  return template.split("\n").flatMap((line) => {
+    const out = line.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? "");
+    return /\{\w+\}/.test(line) && out.trim() === "" ? [] : [out];
+  }).join("\n");
 }
 
 /** Meta veut le numéro SANS "+" (ex: 212612345678) */
@@ -52,16 +76,15 @@ export async function generateManualWhatsAppConfirmation(orderId: string): Promi
   await requireRole([...MANAGER]);
 
   const settings = await getSettings();
-  const template = settings?.message_template ??
-    "السلام عليكم {name} 🌸\nتوصلنا بالطلب ديالك ديال {product} بثمن {price}درهم.\nبغينا غير نأكدو معاك المعلومات:\n📍 المدينة: {city}\n🏠 العنوان: {address}\nواش هاد المعلومات صحيحة؟";
+  const template = settings?.message_template || DEFAULT_CONFIRM_TEMPLATE;
 
   const { data: order } = await supabaseAdmin
     .from("orders")
-    .select("id, customer_name, customer_phone, customer_city, customer_address")
+    .select("id, customer_name, customer_phone, customer_city, customer_address, total_amount_mad")
     .eq("id", orderId)
     .single();
   if (!order) return { success: false, error: "Commande introuvable." };
-  const o = order as { id: string; customer_name: string; customer_phone: string; customer_city: string; customer_address: string };
+  const o = order as { id: string; customer_name: string; customer_phone: string; customer_city: string; customer_address: string; total_amount_mad: number | null };
 
   const { data: items } = await supabaseAdmin
     .from("order_items")
@@ -69,15 +92,7 @@ export async function generateManualWhatsAppConfirmation(orderId: string): Promi
     .eq("order_id", orderId);
   const firstItem = (items ?? [])[0] as { product_id: string; product_name: string; unit_price: number; quantity: number } | undefined;
   if (!firstItem) return { success: false, error: "Commande sans articles." };
-
-  const totalPrice = firstItem.unit_price * firstItem.quantity;
-  const message = fillTemplate(template, {
-    name:    o.customer_name,
-    product: firstItem.product_name,
-    price:   String(totalPrice),
-    city:    o.customer_city,
-    address: o.customer_address,
-  });
+  const message = fillTemplate(template, orderVars(o, (items ?? []) as ItemLite[]));
 
   const phone = toMetaFormat(o.customer_phone);
   const waLink = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
@@ -107,11 +122,11 @@ export async function sendOrderConfirmationWhatsApp(orderId: string): Promise<{
 
     const { data: order } = await supabaseAdmin
       .from("orders")
-      .select("id, customer_name, customer_phone, customer_city, customer_address")
+      .select("id, customer_name, customer_phone, customer_city, customer_address, total_amount_mad")
       .eq("id", orderId)
       .single();
     if (!order) return { sent: false, reason: "Commande introuvable." };
-    const o = order as { id: string; customer_name: string; customer_phone: string; customer_city: string; customer_address: string };
+    const o = order as { id: string; customer_name: string; customer_phone: string; customer_city: string; customer_address: string; total_amount_mad: number | null };
 
     const { data: items } = await supabaseAdmin
       .from("order_items")
@@ -119,18 +134,10 @@ export async function sendOrderConfirmationWhatsApp(orderId: string): Promise<{
       .eq("order_id", orderId);
     const firstItem = (items ?? [])[0] as { product_id: string; product_name: string; unit_price: number; quantity: number } | undefined;
     if (!firstItem) return { sent: false, reason: "Commande sans articles." };
-
-    const totalPrice = firstItem.unit_price * firstItem.quantity;
     const phone = toMetaFormat(o.customer_phone);
     const creds: MetaCreds = { accessToken: settings.access_token, phoneNumberId: settings.phone_number_id };
 
-    const text = fillTemplate(settings.message_template, {
-      name:    o.customer_name,
-      product: firstItem.product_name,
-      price:   String(totalPrice),
-      city:    o.customer_city,
-      address: o.customer_address,
-    });
+    const text = fillTemplate(settings.message_template, orderVars(o, (items ?? []) as ItemLite[]));
 
     const textRes = await sendWhatsAppText(creds, phone, text);
     await supabaseAdmin.from("whatsapp_message_log").insert({
