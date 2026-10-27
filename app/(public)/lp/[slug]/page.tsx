@@ -507,9 +507,9 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 @media (min-width:900px){.sp-sticky{max-width:520px;margin:0 auto}}
 .sp-urg{background:#fef2f2;color:#b91c1c;border:1px dashed #fca5a5;text-align:center;font-weight:800;font-size:13.5px;padding:7px 10px;border-radius:10px;margin:4px 0 6px;animation:sp-urg-p 1.6s ease-in-out infinite}
 @keyframes sp-urg-p{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(220,38,38,.0)}50%{transform:scale(1.02);box-shadow:0 0 0 5px rgba(220,38,38,.12)}}
-.sp-mq{background:linear-gradient(90deg,var(--c-badge),#f97316,var(--c-badge));background-size:200% 100%;animation:sp-mq-bg 6s linear infinite;color:#fff;overflow:hidden;font-size:13px;font-weight:800;padding:7px 0;white-space:nowrap}
+.sp-mq{direction:ltr;background:linear-gradient(90deg,var(--c-badge),#f97316,var(--c-badge));background-size:200% 100%;animation:sp-mq-bg 6s linear infinite;color:#fff;overflow:hidden;font-size:13px;font-weight:800;padding:7px 0;white-space:nowrap}
 .sp-mq-t{display:flex;width:max-content;animation:sp-mq 22s linear infinite}
-.sp-mq-g{display:flex;flex-shrink:0}
+.sp-mq-g{display:flex;flex-shrink:0;min-width:100vw;justify-content:space-around}
 .sp-mq-g span{padding:0 22px;position:relative}
 .sp-mq-g span:after{content:"•";position:absolute;left:-4px;opacity:.7}
 @keyframes sp-mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
