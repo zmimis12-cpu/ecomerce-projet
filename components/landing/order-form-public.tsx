@@ -114,6 +114,10 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
             tiktok_pixel_id: tiktokPixelId ?? null, tiktok_ttp: getCookie("_ttp"),
             tiktok_ttclid: new URLSearchParams(window.location.search).get("ttclid"),
             creative_code: getCreativeCode(),
+            // Google Ads : clic reconnu dans « Sources »
+            ...(() => { const q = new URLSearchParams(window.location.search); const o: Record<string, string> = {};
+              for (const k of ["gclid", "gbraid", "wbraid", "utm_source", "utm_campaign"]) { const v = q.get(k); if (v) o[k] = v.slice(0, 200); }
+              return Object.keys(o).length ? { tracking: o } : {}; })(),
           }),
         }).catch(() => {});
       } catch { /* jamais bloquant */ }
@@ -212,6 +216,10 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
             tiktok_ttp: getCookie("_ttp"),
             tiktok_ttclid: new URLSearchParams(window.location.search).get("ttclid"),
             creative_code: getCreativeCode(),
+            // Google Ads : clic reconnu dans « Sources »
+            ...(() => { const q = new URLSearchParams(window.location.search); const o: Record<string, string> = {};
+              for (const k of ["gclid", "gbraid", "wbraid", "utm_source", "utm_campaign"]) { const v = q.get(k); if (v) o[k] = v.slice(0, 200); }
+              return Object.keys(o).length ? { tracking: o } : {}; })(),
           }),
         });
         const data = await res.json() as {

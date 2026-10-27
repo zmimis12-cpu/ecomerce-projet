@@ -290,6 +290,11 @@ export async function POST(request: NextRequest) {
       tiktok_client_ua:  request.headers.get("user-agent")?.slice(0, 255) ?? null,
       creative_id:       creativeId,
       creative_code:     creativeCode,
+      ...(body.tracking && typeof body.tracking === "object"
+        ? { metadata: Object.fromEntries(Object.entries(body.tracking as Record<string, unknown>)
+            .filter(([k, v]) => ["gclid", "gbraid", "wbraid", "utm_source", "utm_campaign"].includes(k) && typeof v === "string")
+            .map(([k, v]) => [k, String(v).slice(0, 200)])) }
+        : {}),
     } as never)
     .select("id, order_number")
     .single();
