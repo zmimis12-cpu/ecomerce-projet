@@ -245,7 +245,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
 
             const wt = window as unknown as { ttq?: { identify: (...args: unknown[]) => void; track: (...args: unknown[]) => void } };
             wt.ttq?.identify({ phone_number: toInternationalMorocco(form.customer_phone) });
-            wt.ttq?.track("SubmitForm", { value: total, currency: "MAD", content_id: product.id, content_name: product.name });
+            wt.ttq?.track("SubmitForm", { value: total, currency: "MAD", content_id: product.id, content_type: "product", content_name: product.name }, { event_id: `lead_${data.orderNumber ?? ""}` }); // = event_id serveur → dédupliqué
             w.dataLayer?.push({ event: "generate_lead", value: total, currency: "MAD", item_name: product.name });
             window.scrollTo({top:0,behavior:"smooth"});
           }

@@ -664,18 +664,12 @@ export async function sendTikTokPurchaseIfNeeded(orderId: string): Promise<void>
     .maybeSingle();
   const itemData = item as { product_id: string; product_name: string } | null;
 
-  const { data: settings } = await supabaseAdmin
-    .from("ad_platform_settings")
-    .select("access_token, is_active")
-    .eq("platform", "tiktok")
-    .maybeSingle();
-  const s = settings as { access_token: string; is_active: boolean } | null;
-  if (!s?.access_token || !s.is_active) return;
-
-  const { sendTikTokCompletePayment } = await import("@/lib/tiktok/events-api");
+  const { sendTikTokCompletePayment, getTikTokEventsToken } = await import("@/lib/tiktok/events-api");
+  const ttToken = await getTikTokEventsToken();
+  if (!ttToken) return;
   const res = await sendTikTokCompletePayment({
     pixelId: o.tiktok_pixel_id,
-    accessToken: s.access_token,
+    accessToken: ttToken,
     value: o.total_amount_mad,
     currency: "MAD",
     phone: o.customer_phone,

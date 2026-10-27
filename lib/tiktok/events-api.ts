@@ -92,3 +92,50 @@ export async function sendTikTokCompletePayment(input: TikTokPurchaseInput): Pro
   }
   return { ok: true };
 }
+
+/** Token pour l'Events API : compte TikTok connecté (OAuth, Réglages → Pubs) en priorité, sinon ancien réglage. */
+export async function getTikTokEventsToken(): Promise<string | null> {
+  try {
+    const { activeTikTokAccounts } = await import("@/lib/ads/tiktok-accounts");
+    const acc = (await activeTikTokAccounts()).find((a) => a.token);
+    if (acc?.token) return acc.token;
+  } catch { /* ancien réglage */ }
+  const { supabaseAdmin } = await import("@/lib/supabase/admin");
+  const { data } = await supabaseAdmin.from("ad_platform_settings").select("access_token, is_active").eq("platform", "tiktok").maybeSingle();
+  const s = data as { access_token: string; is_active: boolean } | null;
+  return s?.is_active && s.access_token ? s.access_token : null;
+}
+
+/** Commande reçue (formulaire) → « SubmitForm » + « PlaceAnOrder » côté SERVEUR.
+ *  event_id SubmitForm = `lead_<n° commande>` = celui du pixel navigateur → TikTok déduplique. */
+export async function sendTikTokLead(input: {
+  pixelId: string; accessToken: string; value: number; phone: string; orderNumber: string;
+  ttp?: string | null; ttclid?: string | null; clientIp?: string | null; clientUserAgent?: string | null;
+  productId: string; productName?: string; pageUrl?: string | null;
+}): Promise<{ ok: boolean; error?: string }> {
+  const user: Record<string, unknown> = { phone: [sha256(toInternationalMorocco(input.phone))] };
+  if (input.ttp) user.ttp = input.ttp;
+  if (input.ttclid) user.ttclid = input.ttclid;
+  if (input.clientIp) user.ip = input.clientIp;
+  if (input.clientUserAgent) user.user_agent = input.clientUserAgent;
+  const properties = {
+    value: input.value, currency: "MAD", content_id: input.productId, content_type: "product",
+    contents: [{ content_id: input.productId, content_name: input.productName ?? "", quantity: 1, price: input.value }],
+  };
+  const page = input.pageUrl ? { url: input.pageUrl } : undefined;
+  const t = Math.floor(Date.now() / 1000);
+  const res = await fetch("https://business-api.tiktok.com/open_api/v1.3/event/track/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Access-Token": input.accessToken },
+    body: JSON.stringify({
+      event_source: "web", event_source_id: input.pixelId,
+      data: [
+        { event: "SubmitForm", event_time: t, event_id: `lead_${input.orderNumber}`, user, properties, page },
+        { event: "PlaceAnOrder", event_time: t, event_id: `order_${input.orderNumber}`, user, properties, page },
+      ],
+    }),
+  }).catch((e) => ({ ok: false, json: async () => ({ message: String(e) }) }) as unknown as Response);
+  const json = await res.json().catch(() => ({})) as { code?: number; message?: string };
+  if (!res.ok || (json.code !== undefined && json.code !== 0)) return { ok: false, error: `TikTok ${json.code ?? ""} ${json.message ?? ""}` };
+  return { ok: true };
+}

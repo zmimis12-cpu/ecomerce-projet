@@ -361,6 +361,27 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  // ── 9a-bis. TikTok côté SERVEUR (Events API) : SubmitForm + PlaceAnOrder,
+  // dédupliqué avec le pixel navigateur (même event_id) → TikTok optimise sur les vraies commandes.
+  const ttPixel = typeof body.tiktok_pixel_id === "string" ? body.tiktok_pixel_id.trim() : "";
+  if (ttPixel) {
+    after(async () => {
+      try {
+        const { getTikTokEventsToken, sendTikTokLead } = await import("@/lib/tiktok/events-api");
+        const token = await getTikTokEventsToken();
+        if (!token) return;
+        const r = await sendTikTokLead({
+          pixelId: ttPixel, accessToken: token, value: subtotal, phone: normalizedPhone, orderNumber: String(orderNumber),
+          ttp: typeof body.tiktok_ttp === "string" ? body.tiktok_ttp : null,
+          ttclid: typeof body.tiktok_ttclid === "string" ? body.tiktok_ttclid : null,
+          clientIp: ip, clientUserAgent: request.headers.get("user-agent"),
+          productId: p.id, productName: p.name, pageUrl: request.headers.get("referer"),
+        });
+        if (!r.ok) console.error("[tiktok-lead]", r.error);
+      } catch { /* ne bloque jamais la commande */ }
+    });
+  }
+
   // ── 9b. Envoi WhatsApp de confirmation — EN ARRIÈRE-PLAN, ne bloque plus
   // jamais la réponse au client. Avant: `await` ici faisait attendre le
   // client 5-7s (parfois plus, en cas de lenteur/échec Meta API) avant de
