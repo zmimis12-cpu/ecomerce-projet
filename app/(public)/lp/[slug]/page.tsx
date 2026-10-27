@@ -134,6 +134,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const heroVidIsImg = /\.(webp|gif|avif|png|jpe?g)(\?|$)/i.test(heroVid);
 
   const topBarText = d.topBar || offerBar;
+  const animItems = d.animBar ? d.animBarItems.split("|").map((x) => x.trim()).filter(Boolean).slice(0, 8) : [];
   const orderSub = d.orderSub || formNote;
   const finalText = d.finalText || subline;
   const finalCta = d.finalCta || ctaText;
@@ -359,7 +360,18 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             <style>{CSS}</style>
 
       <div className="sp" dir="rtl" lang="ar" style={colorVars}>
-        {d.showTopBar && topBarText && <div className="sp-top">{topBarText}</div>}
+        {animItems.length > 0 ? (
+          // Bande défilante 100 % CSS (aucun JS, aucune image) → ne ralentit pas la page
+          <div className="sp-mq" aria-label={animItems.join(" · ")}>
+            <div className="sp-mq-t" dir="ltr">
+              {[0, 1].map((k) => (
+                <div key={k} className="sp-mq-g" aria-hidden={k === 1}>
+                  {animItems.map((t, i) => <span key={i} dir="rtl">{t}</span>)}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : d.showTopBar && topBarText && <div className="sp-top">{topBarText}</div>}
         {d.showStoreHeader && <StoreHeader current={slug} products={storeProducts.map((x) => ({ slug: x.slug, title: x.title, image: x.image, price: x.price }))} />}
 
         {hasHero && d.heroPosition === "top" && heroEl}
@@ -493,7 +505,16 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 .sp-sticky{position:fixed;left:12px;right:12px;bottom:12px;z-index:50;background:var(--c-primary);color:#fff;text-align:center;font-weight:800;font-size:16px;padding:14px;border-radius:14px;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.25);transition:opacity .2s,transform .2s}
 .sp-sticky.sp-hide{opacity:0;transform:translateY(120%);pointer-events:none}
 @media (min-width:900px){.sp-sticky{max-width:520px;margin:0 auto}}
-.sp-urg{background:#fef2f2;color:#b91c1c;border:1px dashed #fca5a5;text-align:center;font-weight:800;font-size:13.5px;padding:7px 10px;border-radius:10px;margin:4px 0 6px}
+.sp-urg{background:#fef2f2;color:#b91c1c;border:1px dashed #fca5a5;text-align:center;font-weight:800;font-size:13.5px;padding:7px 10px;border-radius:10px;margin:4px 0 6px;animation:sp-urg-p 1.6s ease-in-out infinite}
+@keyframes sp-urg-p{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(220,38,38,.0)}50%{transform:scale(1.02);box-shadow:0 0 0 5px rgba(220,38,38,.12)}}
+.sp-mq{background:linear-gradient(90deg,var(--c-badge),#f97316,var(--c-badge));background-size:200% 100%;animation:sp-mq-bg 6s linear infinite;color:#fff;overflow:hidden;font-size:13px;font-weight:800;padding:7px 0;white-space:nowrap}
+.sp-mq-t{display:flex;width:max-content;animation:sp-mq 22s linear infinite}
+.sp-mq-g{display:flex;flex-shrink:0}
+.sp-mq-g span{padding:0 22px;position:relative}
+.sp-mq-g span:after{content:"•";position:absolute;left:-4px;opacity:.7}
+@keyframes sp-mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes sp-mq-bg{from{background-position:0 0}to{background-position:200% 0}}
+@media (prefers-reduced-motion:reduce){.sp-mq-t,.sp-mq,.sp-urg{animation:none}}
 .sp-angle-sub{display:none;font-size:14px;font-weight:700;color:#374151;margin:0 0 6px;line-height:1.6}
 .sp-trust{margin-top:10px;display:flex;flex-direction:column;gap:6px}
 .sp-open{margin:0;background:#fffbeb;color:#92400e;border:1.5px solid #fbbf24;text-align:center;font-weight:800;font-size:13.5px;padding:7px 10px;border-radius:10px;line-height:1.5}

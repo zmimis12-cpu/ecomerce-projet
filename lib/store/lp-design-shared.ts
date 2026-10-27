@@ -64,6 +64,8 @@ export type LpDesign = {
   callNoteText: string;
   urgency: boolean;                  // bande d'urgence (seulement si c'est vrai)
   urgencyText: string;
+  animBar: boolean;                  // bande défilante animée tout en haut (attire l'attention)
+  animBarItems: string;              // messages séparés par « | »
   proofTitle: string;
   proofImages: string[];             // vraies photos (colis préparés, livraisons, captures WhatsApp avec accord)
   angles: { codes: string; headline: string; sub: string; image: string }[]; // titre + photo hero selon la pub (?cr=V009 ou ?av=couple) → même message pub ↔ page
@@ -85,6 +87,7 @@ export const DEFAULT_LP_DESIGN: LpDesign = {
   openBeforePay: false, openBeforePayText: "📦 تقدر تحل الكولية وتشوف المنتج قبل ما تخلص",
   callNote: true, callNoteText: "📞 كنتاصلو بيك قبل ما نصيفطو — إلا بدلتي رأيك ما كتخلص والو",
   urgency: false, urgencyText: "🔥 الكمية محدودة — اطلب دابا باش تضمن ديالك",
+  animBar: true, animBarItems: "🚚 التوصيل مجاني لجميع المدن | ⏳ العرض لفترة محدودة | 🔥 الكمية محدودة — قربات تسالي | 💵 الدفع عند الاستلام",
   proofTitle: "📦 صور حقيقية من الطلبيات ديالنا", proofImages: [], angles: [],
 };
 

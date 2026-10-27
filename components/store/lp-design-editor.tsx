@@ -260,6 +260,11 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
               {d.urgency && T("urgencyText", "Texte")}
             </div>
             <div className="space-y-2">
+              <h3 className="text-sm font-semibold">7 · Bande animée en haut (défile)</h3>
+              {B("animBar", "Afficher la bande défilante (remplace la barre du haut)")}
+              {d.animBar && T("animBarItems", "Messages séparés par « | »", "🚚 التوصيل مجاني | 🔥 الكمية محدودة")}
+            </div>
+            <div className="space-y-2">
               <h3 className="text-sm font-semibold">2 · Vidéo du produit en haut (à la place de la photo)</h3>
               {T("heroVideo", "Lien .webp / .gif animé (conseillé, rapide) ou .mp4 court", "vide = photo hero")}
               <p className="text-xs text-muted-foreground">5–8 s, sans son, en boucle. La photo hero s&apos;affiche pendant le chargement. Garde le fichier léger (&lt; 1 MB).</p>
