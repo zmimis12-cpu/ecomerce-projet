@@ -468,61 +468,45 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           le client). On garde une valeur par défaut pour ne pas casser Digylog
           qui a besoin de ce champ pour générer le bon de livraison. */}
 
-      {/* City — custom searchable dropdown */}
+      {/* City — le client ÉCRIT sa ville (pas obligé de la trouver dans la liste) ;
+          le système choisit automatiquement la ville Digylog la plus proche. */}
       <div style={{ marginBottom:"14px", position:"relative" }}>
         <label style={LBL}>المدينة *</label>
-        <div
-          onClick={() => setCityOpen(o => !o)}
-          style={{...INP(!!errors.customer_city), display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer", height:"54px", padding:"0 14px"}}
-        >
-          <span style={{color: form.customer_city ? "#111827" : "#9ca3af"}}>
-            {form.customer_city
-              ? `${form.customer_city}${cityArabicLabel(form.customer_city) ? ` (${cityArabicLabel(form.customer_city)})` : ""}`
-              : "اختر مدينتك"}
-          </span>
-          <span style={{fontSize:"12px", color:"#9ca3af"}}>▼</span>
-        </div>
-        {cityOpen && (
-          <div style={{
-            position:"absolute", top:"100%", left:0, right:0, zIndex:200,
-            background:"#fff", border:"2px solid #16a34a", borderRadius:"12px",
-            boxShadow:"0 8px 24px rgba(0,0,0,.15)", overflow:"hidden",
-          }}>
-            <div style={{padding:"8px"}}>
-              <input
-                type="text"
-                value={citySearch}
-                onChange={(e) => setCitySearch(e.target.value)}
-                placeholder="ابحث عن مدينتك..."
-                autoFocus
-                style={{
-                  width:"100%", height:"40px", border:"1px solid #e5e7eb",
-                  borderRadius:"8px", padding:"0 12px", fontSize:"14px",
-                  fontFamily:"var(--font-cairo),sans-serif", outline:"none",
-                  boxSizing:"border-box",
-                }}
-              />
-            </div>
-            <div style={{maxHeight:"200px", overflowY:"auto"}}>
-              {cities
-                .filter(c => citySearchMatches(c, citySearch))
-                .map(c => (
-                  <div key={c}
-                    onMouseDown={(e) => { e.preventDefault(); set("customer_city", c); setCityOpen(false); setCitySearch(""); }}
-                    style={{
-                      padding:"10px 16px", cursor:"pointer", fontSize:"14px",
-                      fontFamily:"var(--font-cairo),sans-serif",
-                      borderBottom:"1px solid #f3f4f6",
-                      background: form.customer_city === c ? "#f0fdf4" : "#fff",
-                      color: form.customer_city === c ? "#16a34a" : "#111",
-                      fontWeight: form.customer_city === c ? 700 : 400,
-                    }}
-                  >{c}{cityArabicLabel(c) ? ` (${cityArabicLabel(c)})` : ""}</div>
-                ))
-              }
-            </div>
-          </div>
+        <input
+          type="text"
+          value={citySearch || form.customer_city}
+          onChange={(e) => { const v = e.target.value; setCitySearch(v); set("customer_city", bestCity(cities, v) ?? v); setCityOpen(true); }}
+          onFocus={() => setCityOpen(true)}
+          onBlur={() => { setCityOpen(false); const m = bestCity(cities, citySearch); if (m) { set("customer_city", m); setCitySearch(""); } }}
+          placeholder="كتب المدينة ديالك"
+          autoComplete="address-level2"
+          style={{...INP(!!errors.customer_city), height:"54px", padding:"0 14px"}}
+        />
+        {citySearch.trim() && form.customer_city && form.customer_city !== citySearch && (
+          <p style={{margin:"4px 2px 0", fontSize:"12px", color:"#16a34a", fontWeight:700}}>
+            ✅ {form.customer_city}{cityArabicLabel(form.customer_city) ? ` (${cityArabicLabel(form.customer_city)})` : ""}
+          </p>
         )}
+        {cityOpen && citySearch.trim().length >= 2 && (() => {
+          const list = cities.filter(c => citySearchMatches(c, citySearch)).slice(0, 6);
+          return list.length > 0 && (
+            <div style={{
+              position:"absolute", top:"100%", left:0, right:0, zIndex:200,
+              background:"#fff", border:"2px solid #16a34a", borderRadius:"12px",
+              boxShadow:"0 8px 24px rgba(0,0,0,.15)", overflow:"hidden", maxHeight:"220px", overflowY:"auto",
+            }}>
+              {list.map(c => (
+                <div key={c}
+                  onMouseDown={(e) => { e.preventDefault(); set("customer_city", c); setCityOpen(false); setCitySearch(""); }}
+                  style={{
+                    padding:"10px 16px", cursor:"pointer", fontSize:"14px",
+                    fontFamily:"var(--font-cairo),sans-serif", borderBottom:"1px solid #f3f4f6",
+                  }}
+                >{c}{cityArabicLabel(c) ? ` (${cityArabicLabel(c)})` : ""}</div>
+              ))}
+            </div>
+          );
+        })()}
         {ERR(errors.customer_city)}
       </div>
 
@@ -723,6 +707,19 @@ function transliterateArabicToLatin(s: string): string {
     "ن":"n", "ه":"h", "و":"ou", "ي":"i", "ى":"a", "ة":"a", "ء":"", " ":" ",
   };
   return s.split("").map((c) => map[c] ?? c).join("");
+}
+
+/** Ville de la liste la plus proche de ce que le client a écrit (null si rien de sûr). */
+function bestCity(cities: string[], typed: string): string | null {
+  const q = stripAccents(typed.trim().toLowerCase());
+  if (q.length < 3 && !/[\u0600-\u06FF]{2,}/.test(q)) return null;
+  const norm = (c: string) => stripAccents(c.toLowerCase());
+  const exact = cities.find((c) => norm(c) === q || c === typed.trim());
+  if (exact) return exact;
+  const hits = cities.filter((c) => citySearchMatches(c, typed));
+  if (!hits.length) return null;
+  const starts = hits.filter((c) => norm(c).startsWith(q));
+  return (starts.length ? starts : hits).sort((a, b) => a.length - b.length)[0];
 }
 
 function citySearchMatches(cityName: string, query: string): boolean {
