@@ -59,10 +59,8 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   const [submitted, setSubmitted]    = useState(false);
   const [errors, setErrors]          = useState<Record<string, string>>({});
   const [serverError, setServerError]= useState("");
-  const [citySearch, setCitySearch]  = useState("");
   // Une sélection de variantes par pièce (index 0 = pièce 1, etc.)
   const [selectedVariants, setSelectedVariants] = useState<Record<string,string>[]>([{}]);
-  const [cityOpen, setCityOpen]      = useState(false);
   const [bundle, setBundle]          = useState<number>(() => {
     const list = offersProp?.length ? offersProp : [];
     return (list.find((o) => o.isDefault) ?? list[0])?.qty ?? 1;
@@ -198,6 +196,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           method:"POST", headers:{"Content-Type":"application/json"},
           body: JSON.stringify({
             ...form,
+            customer_city: bestCity(cities, form.customer_city) ?? form.customer_city.trim(),
             customer_address: form.customer_address.trim() || "سيتم تأكيد العنوان عبر الهاتف",
             quantity:     offer.qty,
             offer_id:     offer.id,
@@ -474,39 +473,12 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         <label style={LBL}>المدينة *</label>
         <input
           type="text"
-          value={citySearch || form.customer_city}
-          onChange={(e) => { const v = e.target.value; setCitySearch(v); set("customer_city", bestCity(cities, v) ?? v); setCityOpen(true); }}
-          onFocus={() => setCityOpen(true)}
-          onBlur={() => { setCityOpen(false); const m = bestCity(cities, citySearch); if (m) { set("customer_city", m); setCitySearch(""); } }}
+          value={form.customer_city}
+          onChange={(e) => set("customer_city", e.target.value)}
           placeholder="كتب المدينة ديالك"
           autoComplete="address-level2"
           style={{...INP(!!errors.customer_city), height:"54px", padding:"0 14px"}}
         />
-        {citySearch.trim() && form.customer_city && form.customer_city !== citySearch && (
-          <p style={{margin:"4px 2px 0", fontSize:"12px", color:"#16a34a", fontWeight:700}}>
-            ✅ {form.customer_city}{cityArabicLabel(form.customer_city) ? ` (${cityArabicLabel(form.customer_city)})` : ""}
-          </p>
-        )}
-        {cityOpen && citySearch.trim().length >= 2 && (() => {
-          const list = cities.filter(c => citySearchMatches(c, citySearch)).slice(0, 6);
-          return list.length > 0 && (
-            <div style={{
-              position:"absolute", top:"100%", left:0, right:0, zIndex:200,
-              background:"#fff", border:"2px solid #16a34a", borderRadius:"12px",
-              boxShadow:"0 8px 24px rgba(0,0,0,.15)", overflow:"hidden", maxHeight:"220px", overflowY:"auto",
-            }}>
-              {list.map(c => (
-                <div key={c}
-                  onMouseDown={(e) => { e.preventDefault(); set("customer_city", c); setCityOpen(false); setCitySearch(""); }}
-                  style={{
-                    padding:"10px 16px", cursor:"pointer", fontSize:"14px",
-                    fontFamily:"var(--font-cairo),sans-serif", borderBottom:"1px solid #f3f4f6",
-                  }}
-                >{c}{cityArabicLabel(c) ? ` (${cityArabicLabel(c)})` : ""}</div>
-              ))}
-            </div>
-          );
-        })()}
         {ERR(errors.customer_city)}
       </div>
 
