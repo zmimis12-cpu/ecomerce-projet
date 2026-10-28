@@ -19,6 +19,8 @@ interface OrderFormProps {
   products: Product[];
   agents: Agent[];
   creatives?: CreativeOption[];
+  /** Agent call center : prix catalogue, pas de coûts/profit, pas de choix d'agent ni vidéo */
+  agentMode?: boolean;
   onSubmit: (fd: FormData) => Promise<{
     success: boolean;
     errors?: Record<string, string>;
@@ -41,7 +43,7 @@ function agentDisplayName(a: Agent): string {
   return `${a.full_name} — ${AVAILABILITY_LABEL[status] ?? status}`;
 }
 
-export function OrderForm({ products, agents, creatives = [], onSubmit }: OrderFormProps) {
+export function OrderForm({ products, agents, creatives = [], agentMode = false, onSubmit }: OrderFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -100,7 +102,7 @@ export function OrderForm({ products, agents, creatives = [], onSubmit }: OrderF
           ? `Commande ${result.orderNumber} créée — ⚠️ doublon suspect détecté.`
           : `Commande ${result.orderNumber} créée !`;
         setToast({ type: result.isDuplicate ? "error" : "success", msg });
-        setTimeout(() => { router.push(`/admin/orders/${result.orderId}`); }, 1200);
+        setTimeout(() => { router.push(agentMode ? `/admin/call-center/orders/${result.orderId}` : `/admin/orders/${result.orderId}`); }, 1200);
       } else {
         setErrors(result.errors ?? {});
         setToast({ type: "error", msg: result.errors?._form ?? "Erreur." });
@@ -170,7 +172,7 @@ export function OrderForm({ products, agents, creatives = [], onSubmit }: OrderF
               />
             </Field>
 
-            <Field label="Prix total produits (MAD)" error={errors.custom_subtotal}>
+            {!agentMode && <Field label="Prix total produits (MAD)" error={errors.custom_subtotal}>
               <input
                 type="number" min="0" step="0.01"
                 value={priceOverride}
@@ -185,7 +187,7 @@ export function OrderForm({ products, agents, creatives = [], onSubmit }: OrderF
                   ↺ Revenir au prix catalogue ({catalogSubtotal.toFixed(2)})
                 </button>
               )}
-            </Field>
+            </Field>}
 
             <Field label="Frais de livraison (MAD)">
               <input
@@ -202,9 +204,9 @@ export function OrderForm({ products, agents, creatives = [], onSubmit }: OrderF
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-lg bg-slate-50 p-4">
               <CalcStat label="Sous-total"     value={`${subtotal.toFixed(2)} MAD`} />
               <CalcStat label="Total commande" value={`${totalAmount.toFixed(2)} MAD`} />
-              <CalcStat label="Coût total"     value={`${cogs.toFixed(2)} MAD`} />
-              <CalcStat label="Profit estimé"  value={`${estProfit.toFixed(2)} MAD`}
-                className={estProfit >= 0 ? "text-green-600 font-bold" : "text-red-600 font-bold"} />
+              {!agentMode && <CalcStat label="Coût total"     value={`${cogs.toFixed(2)} MAD`} />}
+              {!agentMode && <CalcStat label="Profit estimé"  value={`${estProfit.toFixed(2)} MAD`}
+                className={estProfit >= 0 ? "text-green-600 font-bold" : "text-red-600 font-bold"} />}
             </div>
           )}
         </Section>
@@ -221,7 +223,7 @@ export function OrderForm({ products, agents, creatives = [], onSubmit }: OrderF
               </select>
             </Field>
 
-            <Field label="Vidéo (éditeur) — pour WhatsApp / téléphone">
+            {!agentMode && <Field label="Vidéo (éditeur) — pour WhatsApp / téléphone">
               <CreativeSelect
                 creatives={creatives}
                 productId={values.product_id}
@@ -230,9 +232,9 @@ export function OrderForm({ products, agents, creatives = [], onSubmit }: OrderF
                 disabled={isPending}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
               />
-            </Field>
+            </Field>}
 
-            <Field label="Assigner à un agent">
+            {!agentMode && <Field label="Assigner à un agent">
               {agents.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-2">
                   Aucun agent call center actif.
@@ -247,7 +249,7 @@ export function OrderForm({ products, agents, creatives = [], onSubmit }: OrderF
                   ))}
                 </select>
               )}
-            </Field>
+            </Field>}
 
             <Field label="Notes" className="sm:col-span-2">
               <textarea value={values.notes} onChange={(e) => set("notes", e.target.value)}
