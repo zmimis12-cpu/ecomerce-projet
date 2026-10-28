@@ -9,7 +9,13 @@ export const dynamic = "force-dynamic";
 
 export default async function ProductsPage() {
   const session = await requireRole(["super_admin", "admin", "manager", "finance", "viewer", "call_center_agent"]);
-  const [products] = await Promise.all([getProducts()]);
+  let [products] = await Promise.all([getProducts()]);
+  // Agent call center : seulement les produits que l'admin lui a attribués (fiche agent)
+  if (session.role === "call_center_agent") {
+    const { agentProductList } = await import("@/lib/call-center/agent-products");
+    const mine = new Set(await agentProductList(session.authId));
+    products = products.filter((p) => mine.has(p.id));
+  }
   const canManage = hasRole(session.role, ["super_admin", "admin", "manager"]);
 
   return (

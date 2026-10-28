@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 export const metadata: Metadata = { title: "Mes Gains — Call Center" };
 export const dynamic = "force-dynamic";
 
-const COMMISSION_PER_ORDER = 3;
 
 export default async function MyEarningsPage() {
   const session = await requireRole(["call_center_agent", "super_admin", "admin", "manager"]);
@@ -23,7 +22,13 @@ export default async function MyEarningsPage() {
     .order("updated_at", { ascending: false });
 
   const orders = (deliveredOrders ?? []) as { id: string; order_number: string; total_amount_mad: number; updated_at: string }[];
-  const totalEarned = orders.length * COMMISSION_PER_ORDER;
+  // Rémunération réglée par l'admin sur la fiche agent (commission / salaire / les deux)
+  const { agentEarnings, PAY_BASIS_LABEL, usesCommission, usesSalary } = await import("@/lib/call-center/pay");
+  const earn = await agentEarnings(agentId);
+  const p = earn.pay;
+  const totalEarned = earn.total;
+  const payLabel = p.mode === "product" ? "Par commande payée"
+    : [usesSalary(p) ? `${p.salary} MAD / mois` : "", usesCommission(p) ? `${p.amount} MAD ${PAY_BASIS_LABEL[p.basis]}` : ""].filter(Boolean).join(" + ");
 
   // Payment records
   const { data: payments } = await supabaseAdmin
@@ -51,15 +56,15 @@ export default async function MyEarningsPage() {
           Mes Gains
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Commissions basées sur les commandes livrées et payées uniquement.
+          Selon la rémunération fixée par l&apos;administration.
         </p>
       </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Commission / livraison", val: mad(COMMISSION_PER_ORDER), icon: Award,         cls: "" },
-          { label: "Livrés payés",           val: String(orders.length),     icon: CheckCircle,   cls: "text-emerald-700" },
+          { label: "Ma rémunération",       val: payLabel,                  icon: Award,         cls: "text-base" },
+          { label: "Commandes comptées",    val: String(earn.count),        icon: CheckCircle,   cls: "text-emerald-700" },
           { label: "Total gagné",            val: mad(totalEarned),          icon: Award,         cls: "text-emerald-700" },
           { label: "Non payé",               val: mad(totalRemaining),       icon: totalRemaining > 0 ? AlertTriangle : CheckCircle, cls: totalRemaining > 0 ? "text-amber-700" : "text-green-700" },
         ].map((k) => (
@@ -96,7 +101,7 @@ export default async function MyEarningsPage() {
                   <p className="text-sm font-mono font-medium">{o.order_number}</p>
                   <p className="text-xs text-muted-foreground">{new Date(o.updated_at).toLocaleDateString("fr-MA")}</p>
                 </div>
-                <p className="text-xs text-emerald-600 font-bold">+{mad(COMMISSION_PER_ORDER)}</p>
+                {usesCommission(p) && <p className="text-xs text-emerald-600 font-bold">+{mad(p.amount)}</p>}
               </div>
             ))}
           </div>

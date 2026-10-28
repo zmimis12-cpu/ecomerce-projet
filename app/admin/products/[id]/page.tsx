@@ -41,6 +41,10 @@ export default async function ProductDetailPage({
   ]);
   const product = await getProduct(id);
   if (!product) notFound();
+  if (session.role === "call_center_agent") {
+    const { agentProductList } = await import("@/lib/call-center/agent-products");
+    if (!(await agentProductList(session.authId)).includes(id)) notFound();
+  }
 
   const canManage = hasRole(session.role, ["super_admin", "admin", "manager"]);
   const whatsappMedia = canManage ? await listProductWhatsAppMedia(id) : [];
