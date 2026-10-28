@@ -156,7 +156,7 @@ export async function getCallCenterOrderDetail(id: string) {
 
   const { data, error } = await supabase
     .from("orders")
-    .select("id, order_number, customer_name, customer_phone, customer_city, customer_address, customer_region, status, call_status, call_attempts, last_call_at, assigned_to, notes, created_at, total_amount_mad, delivery_tracking_number")
+    .select("id, order_number, customer_name, customer_phone, customer_city, customer_address, customer_region, status, call_status, call_attempts, last_call_at, assigned_to, notes, created_at, total_amount_mad, delivery_tracking_number, delivery_external_status, delivery_external_status_id, delivery_driver_phone, delivery_reported_to")
     .eq("id", id)
     .single();
 

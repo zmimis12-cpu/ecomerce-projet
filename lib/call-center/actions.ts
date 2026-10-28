@@ -246,3 +246,23 @@ export async function autoAssignOrders(): Promise<{ success: boolean; assigned: 
   revalidatePath("/admin/call-center");
   return { success: true, assigned, skipped: orders.length - assigned };
 }
+/** Agent / admin : corriger nom, ville, adresse du client — avant l'envoi au livreur seulement. */
+export async function updateCcCustomer(orderId: string, data: { name: string; city: string; address: string }): Promise<{ ok: boolean; error?: string }> {
+  const session = await requireRole([...CC_ROLES]);
+  const { data: o } = await supabaseAdmin.from("orders").select("assigned_to, status, delivery_tracking_number").eq("id", orderId).maybeSingle();
+  const ord = o as { assigned_to: string | null; status: string; delivery_tracking_number: string | null } | null;
+  if (!ord) return { ok: false, error: "Commande introuvable" };
+  if (session.role === "call_center_agent" && ord.assigned_to !== session.authId) return { ok: false, error: "Non autorisé" };
+  if (ord.delivery_tracking_number || !["new", "pending", "confirmed", "no_answer"].includes(ord.status))
+    return { ok: false, error: "Déjà envoyée au livreur : modification impossible ici" };
+  const name = String(data.name ?? "").trim().slice(0, 120);
+  const city = String(data.city ?? "").trim().slice(0, 80);
+  const address = String(data.address ?? "").trim().slice(0, 300);
+  if (!name || !city) return { ok: false, error: "Nom et ville obligatoires" };
+  const { error } = await supabaseAdmin.from("orders")
+    .update({ customer_name: name, customer_city: city, customer_address: address, updated_at: new Date().toISOString() } as never).eq("id", orderId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/admin/call-center/orders/${orderId}`);
+  revalidatePath(`/admin/orders/${orderId}`);
+  return { ok: true };
+}
