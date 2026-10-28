@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 
 import { agentEarnings, PAY_MODE_LABEL, PAY_BASIS_LABEL } from "@/lib/call-center/pay";
 import { AgentPayForm } from "@/components/call-center/agent-pay-form";
+import { AgentProductsForm } from "@/components/call-center/agent-products-form";
+import { agentProductList } from "@/lib/call-center/agent-products";
 
 export const metadata: Metadata = { title: "Agent — Call Center" };
 export const dynamic = "force-dynamic";
@@ -61,7 +63,10 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ ag
   const deliveredPaid = orderRows.filter((o) => o.status === "paid").length;
   // Gains : ce mois + depuis le début, selon la rémunération réglée pour cet agent
   const monthStart = new Date().toISOString().slice(0, 8) + "01";
-  const [earnMonth, earnAll] = await Promise.all([agentEarnings(a.id, monthStart), agentEarnings(a.id)]);
+  const [earnMonth, earnAll, agentProds, { data: prodRows }] = await Promise.all([
+    agentEarnings(a.id, monthStart), agentEarnings(a.id), agentProductList(a.id),
+    supabaseAdmin.from("products").select("id, name").eq("is_active", true).order("name"),
+  ]);
   const pay = earnAll.pay;
   const payLine = pay.mode === "product" ? `${earnAll.count} commandes payées × coût confirmation fiche produit`
     : pay.mode === "salary" ? `${pay.salary} MAD / mois`
@@ -124,6 +129,8 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ ag
       </div>
 
       <AgentPayForm userId={a.id} initial={{ mode: pay.mode, basis: pay.basis, amount: pay.amount, salary: pay.salary }} since={pay.since.startsWith("1970") ? new Date().toISOString() : pay.since} />
+
+      <AgentProductsForm userId={a.id} products={(prodRows ?? []) as { id: string; name: string }[]} initial={agentProds} />
 
       {/* Recent orders */}
       {orderRows.length > 0 && (

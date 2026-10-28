@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       .eq("customer_phone", normalizedPhone)
       .gte("created_at", since24h)
       .not("status", "in", '("cancelled","returned")'),
-    findAvailableAgent(),
+    findAvailableAgent({ id: pid || null, slug: pslug || null }),
     creativeCode
       ? supabaseAdmin.from("creatives" as never).select("id").eq("code", creativeCode).maybeSingle()
       : Promise.resolve({ data: null }),

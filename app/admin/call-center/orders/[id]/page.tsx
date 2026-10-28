@@ -10,6 +10,9 @@ import { StatusBadge } from "@/components/orders/status-badge";
 import { hasRole } from "@/lib/auth/roles";
 import type { OrderStatus } from "@/types/orders";
 import type { CallResult } from "@/types/call-center";
+import { MessageCircle } from "lucide-react";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { CC_WA_LABEL, normalizeCcWa, fillCcWa, waLink, type CcWaKey } from "@/lib/call-center/whatsapp-templates";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +39,16 @@ export default async function CCOrderCallPage({ params }: { params: Promise<{ id
   // For the CallTimer client component to work after call, we pass a key
   // based on call_attempts so it resets when a call is logged
   const timerKey = `call-${id}-${order.call_attempts}`;
+
+  // Messages WhatsApp manuels (modifiables dans Call center → Agents)
+  const { data: waRow } = await supabaseAdmin.from("app_settings").select("value").eq("key", "cc_whatsapp_templates").maybeSingle();
+  const waTpl = normalizeCcWa((waRow as { value?: unknown } | null)?.value);
+  const ox = order as typeof order & { total_amount_mad?: number | null; delivery_tracking_number?: string | null };
+  const waVars = {
+    name: order.customer_name, city: order.customer_city, address: order.customer_address,
+    product: items.map((i) => i.product_name).join(" + "), total: ox.total_amount_mad ?? "",
+    order: order.order_number, tracking: ox.delivery_tracking_number ?? "",
+  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
@@ -113,6 +126,19 @@ export default async function CCOrderCallPage({ params }: { params: Promise<{ id
           orderId={id}
           customerPhone={order.customer_phone}
         />
+      </div>
+
+      {/* WhatsApp manuel */}
+      <div className="rounded-xl border bg-card p-5 space-y-3">
+        <h3 className="text-sm font-semibold flex items-center gap-2"><MessageCircle className="h-4 w-4 text-green-600" /> WhatsApp</h3>
+        <div className="flex flex-wrap gap-2">
+          {(Object.keys(CC_WA_LABEL) as CcWaKey[]).map((k) => (
+            <a key={k} href={waLink(order.customer_phone, fillCcWa(waTpl[k], waVars))} target="_blank" rel="noopener noreferrer"
+              className="rounded-lg bg-green-600 text-white px-3 py-2 text-sm font-semibold hover:bg-green-700">
+              {CC_WA_LABEL[k]}
+            </a>
+          ))}
+        </div>
       </div>
 
       {/* Previous calls */}

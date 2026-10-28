@@ -124,15 +124,25 @@ export async function getCallCenterOrders(
   const orderIds = rows.map((o) => o.id);
   const { data: items } = await supabase
     .from("order_items")
-    .select("order_id, product_name, product_sku")
+    .select("order_id, product_id, product_name, product_sku")
     .in("order_id", orderIds);
 
   const itemMap: Record<string, { product_name: string; product_sku: string }> = {};
-  for (const it of (items ?? []) as unknown as { order_id: string; product_name: string; product_sku: string }[]) {
+  const pidsOf: Record<string, (string | null)[]> = {};
+  for (const it of (items ?? []) as unknown as { order_id: string; product_id: string | null; product_name: string; product_sku: string }[]) {
     if (!itemMap[it.order_id]) itemMap[it.order_id] = it;
+    (pidsOf[it.order_id] ??= []).push(it.product_id);
   }
 
-  return rows.map((o) => ({
+  // L'agent ne voit que les commandes de ses produits (réglé sur sa fiche agent)
+  let visible = rows;
+  if (options.isAgent && options.authId) {
+    const { readAgentProducts, agentAllows } = await import("@/lib/call-center/agent-products");
+    const allowed = await readAgentProducts();
+    visible = rows.filter((o) => agentAllows(allowed, options.authId!, pidsOf[o.id] ?? []));
+  }
+
+  return visible.map((o) => ({
     ...o,
     agent_name: o.assigned_to ? (agentMap[o.assigned_to] ?? null) : null,
     first_product_name: itemMap[o.id]?.product_name ?? null,
@@ -146,7 +156,7 @@ export async function getCallCenterOrderDetail(id: string) {
 
   const { data, error } = await supabase
     .from("orders")
-    .select("id, order_number, customer_name, customer_phone, customer_city, customer_address, customer_region, status, call_status, call_attempts, last_call_at, assigned_to, notes, created_at")
+    .select("id, order_number, customer_name, customer_phone, customer_city, customer_address, customer_region, status, call_status, call_attempts, last_call_at, assigned_to, notes, created_at, total_amount_mad, delivery_tracking_number")
     .eq("id", id)
     .single();
 

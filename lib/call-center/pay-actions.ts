@@ -39,3 +39,37 @@ export async function saveAgentPay(userId: string, input: AgentPay & { since?: s
   revalidatePath("/admin");
   return { ok: true };
 }
+
+/** Produits attribués à l'agent (vide = tous). */
+export async function saveAgentProducts(userId: string, productIds: string[]): Promise<{ ok: boolean; error?: string }> {
+  await requireRole(["super_admin", "admin"]);
+  const ids = [...new Set(productIds.filter((x) => typeof x === "string" && x.length < 64))];
+  const { data: row } = await supabaseAdmin.from("call_center_agents" as never)
+    .select("id, metadata").eq("user_id", userId).maybeSingle();
+  let error: { message: string } | null = null;
+  if (row) {
+    const r = row as { id: string; metadata: Record<string, unknown> | null };
+    ({ error } = await supabaseAdmin.from("call_center_agents" as never)
+      .update({ metadata: { ...(r.metadata ?? {}), products: ids } } as never).eq("id", r.id));
+  } else {
+    const { data: u } = await supabaseAdmin.from("users").select("full_name").eq("id", userId).maybeSingle();
+    ({ error } = await supabaseAdmin.from("call_center_agents" as never).insert({
+      user_id: userId, display_name: (u as { full_name?: string } | null)?.full_name ?? "Agent", active: true,
+      metadata: { products: ids },
+    } as never));
+  }
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/admin/call-center/agents/${userId}`);
+  return { ok: true };
+}
+
+/** Messages WhatsApp manuels du call center. */
+export async function saveCcWhatsappTemplates(t: { no_answer: string; confirm: string; shipped: string }): Promise<{ ok: boolean; error?: string }> {
+  await requireRole(["super_admin", "admin"]);
+  const value = { no_answer: String(t.no_answer ?? "").slice(0, 2000), confirm: String(t.confirm ?? "").slice(0, 2000), shipped: String(t.shipped ?? "").slice(0, 2000) };
+  const { error } = await supabaseAdmin.from("app_settings")
+    .upsert({ key: "cc_whatsapp_templates", value, category: "call_center", label: "Messages WhatsApp call center", description: "Messages WhatsApp manuels call center" } as never, { onConflict: "key" });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/call-center/agents");
+  return { ok: true };
+}

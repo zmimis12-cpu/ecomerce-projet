@@ -4,6 +4,9 @@ import { ChevronLeft } from "lucide-react";
 import { requireRole } from "@/lib/auth/session";
 import { getAgentStats } from "@/lib/call-center/queries";
 import { LiveAgentsTable } from "@/components/call-center/live-agents-table";
+import { CcWhatsappEditor } from "@/components/call-center/cc-whatsapp-editor";
+import { normalizeCcWa } from "@/lib/call-center/whatsapp-templates";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = { title: "Agents — Call Center" };
 export const dynamic = "force-dynamic";
@@ -12,7 +15,10 @@ export default async function AgentsPage() {
   await requireRole(["super_admin", "admin", "manager"]);
 
   // Use getAgentStats — same logic as agent detail page
-  const agents = await getAgentStats();
+  const [agents, { data: waRow }] = await Promise.all([
+    getAgentStats(),
+    supabaseAdmin.from("app_settings").select("value").eq("key", "cc_whatsapp_templates").maybeSingle(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -29,6 +35,7 @@ export default async function AgentsPage() {
         <p className="text-sm text-muted-foreground mt-1">Performance et statistiques des agents.</p>
       </div>
       <LiveAgentsTable initialAgents={agents} />
+      <CcWhatsappEditor initial={normalizeCcWa((waRow as { value?: unknown } | null)?.value)} />
     </div>
   );
 }

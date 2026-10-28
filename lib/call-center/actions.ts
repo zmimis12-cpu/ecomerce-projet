@@ -218,8 +218,10 @@ export async function autoAssignOrders(): Promise<{ success: boolean; assigned: 
   const agentList = (agents ?? []) as { id: string }[];
   if (!agentList.length) return { success: true, assigned: 0, skipped: 0 };
 
-  const { data: unassigned } = await supabase.from("orders").select("id").is("assigned_to", null).in("status", ["new", "confirmed", "no_answer"]).order("created_at", { ascending: true }).limit(100);
-  const orders = (unassigned ?? []) as { id: string }[];
+  const { readAgentProducts, agentAllows } = await import("@/lib/call-center/agent-products");
+  const allowed = await readAgentProducts();
+  const { data: unassigned } = await supabase.from("orders").select("id, order_items(product_id)").is("assigned_to", null).in("status", ["new", "confirmed", "no_answer"]).order("created_at", { ascending: true }).limit(100);
+  const orders = (unassigned ?? []) as { id: string; order_items: { product_id: string | null }[] | null }[];
   if (!orders.length) return { success: true, assigned: 0, skipped: 0 };
 
   const { data: counts } = await supabase.from("orders").select("assigned_to").in("assigned_to", agentList.map((a) => a.id)).in("status", ["new", "confirmed", "no_answer"]);
@@ -232,8 +234,9 @@ export async function autoAssignOrders(): Promise<{ success: boolean; assigned: 
 
   let assigned = 0;
   for (const order of orders) {
-    const agent = [...countMap.entries()].sort((a, b) => a[1] - b[1])[0];
-    if (!agent) break;
+    const pids = (order.order_items ?? []).map((i) => i.product_id);
+    const agent = [...countMap.entries()].filter(([id]) => agentAllows(allowed, id, pids)).sort((a, b) => a[1] - b[1])[0];
+    if (!agent) continue; // aucun agent ne traite ce produit
 
     await supabase.from("orders").update({ assigned_to: agent[0], assigned_at: new Date().toISOString(), call_status: "pending_call" } as never).eq("id", order.id);
     countMap.set(agent[0], (countMap.get(agent[0]) ?? 0) + 1);

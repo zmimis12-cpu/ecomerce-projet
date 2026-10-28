@@ -5,6 +5,7 @@
  * Server-side only — uses supabaseAdmin to bypass RLS.
  */
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { readAgentProducts, agentAllows } from "@/lib/call-center/agent-products";
 
 const TERMINAL_STATUSES = ["confirmed", "refused", "delivered", "paid", "cancelled", "returned"];
 
@@ -13,7 +14,7 @@ const TERMINAL_STATUSES = ["confirmed", "refused", "delivered", "paid", "cancell
  * "Available" = role call_center_agent + is_active = true.
  * "Least busy" = fewest orders with non-terminal status assigned to them.
  */
-export async function findAvailableAgent(): Promise<string | null> {
+export async function findAvailableAgent(product?: { id?: string | null; slug?: string | null }): Promise<string | null> {
   // Get all active call center agents
   const { data: agents } = await supabaseAdmin
     .from("users")
@@ -23,7 +24,19 @@ export async function findAvailableAgent(): Promise<string | null> {
 
   if (!agents || agents.length === 0) return null;
 
-  const agentList = agents as { id: string }[];
+  let agentList = agents as { id: string }[];
+
+  // Produits attribués par agent (fiche agent) : on n'assigne qu'aux agents qui traitent ce produit
+  const allowed = await readAgentProducts();
+  if (allowed.size && product && (product.id || product.slug)) {
+    let pid = product.id || null;
+    if (!pid && product.slug) {
+      const { data: p } = await supabaseAdmin.from("products").select("id").eq("slug", product.slug).maybeSingle();
+      pid = (p as { id: string } | null)?.id ?? null;
+    }
+    if (pid) agentList = agentList.filter((a) => agentAllows(allowed, a.id, [pid]));
+  }
+  if (!agentList.length) return null;
   const agentIds  = agentList.map((a) => a.id);
 
   // Count open orders per agent

@@ -14,18 +14,22 @@ export async function getMyAssignedOrders() {
 
   const { data } = await supabase
     .from("orders")
-    .select(`id, order_number, customer_name, customer_phone, customer_city, total_amount_mad, status, call_status, assigned_at, callback_scheduled_at, callback_reason, order_items(product_name, quantity)`)
+    .select(`id, order_number, customer_name, customer_phone, customer_city, total_amount_mad, status, call_status, assigned_at, callback_scheduled_at, callback_reason, order_items(product_id, product_name, quantity)`)
     .eq("assigned_to", session.authId)
     .in("status", ["new", "confirmed", "no_answer", "pending"])
     .order("created_at", { ascending: false })
     .limit(100);
 
-  return (data ?? []) as {
+  const rows = (data ?? []) as {
     id: string; order_number: string; customer_name: string; customer_phone: string; customer_city: string;
     total_amount_mad: number; status: string; call_status: string | null;
     assigned_at: string | null; callback_scheduled_at: string | null; callback_reason: string | null;
-    order_items: { product_name: string; quantity: number }[];
+    order_items: { product_id: string | null; product_name: string; quantity: number }[];
   }[];
+  // Seulement les produits attribués à cet agent (fiche agent)
+  const { readAgentProducts, agentAllows } = await import("@/lib/call-center/agent-products");
+  const allowed = await readAgentProducts();
+  return rows.filter((o) => agentAllows(allowed, session.authId, (o.order_items ?? []).map((i) => i.product_id)));
 }
 
 export async function getMyStats() {
