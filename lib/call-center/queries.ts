@@ -5,11 +5,6 @@ type UserRow = { id: string; full_name: string; email: string; availability_stat
 type OrderRow = { assigned_to: string; status: string; call_status: string | null };
 type LogRow = { agent_id: string; disposition: string; duration_seconds: number | null };
 
-async function getCommissionPerOrder(): Promise<number> {
-  const { data } = await supabaseAdmin.from("app_settings").select("value").eq("key", "cc_commission_per_order").maybeSingle();
-  return Number((data as { value?: string } | null)?.value ?? 3);
-}
-
 export async function getAgentStats(): Promise<AgentStats[]> {
   // Same source as Settings → Users: public.users
   const { data: agents } = await supabaseAdmin
@@ -31,7 +26,8 @@ export async function getAgentStats(): Promise<AgentStats[]> {
 
   const orderRows = (orders ?? []) as unknown as OrderRow[];
   const logRows   = (callLogs ?? []) as unknown as LogRow[];
-  const commissionPerOrder = await getCommissionPerOrder();
+  const { agentEarnings } = await import("@/lib/call-center/pay");
+  const earnings = new Map(await Promise.all(rows.map(async (a) => [a.id, (await agentEarnings(a.id)).total] as const)));
 
   return rows.map((a): AgentStats => {
     const agentOrders = orderRows.filter((o) => o.assigned_to === a.id);
@@ -75,7 +71,7 @@ availability_status: (() => {
       fake_orders: fakeOrders,
       duplicates,
       delivered_paid: deliveredPaid,
-      commission_mad: deliveredPaid * commissionPerOrder,
+      commission_mad: earnings.get(a.id) ?? 0,
       confirmation_rate: callsMade === 0 ? 0 : Math.round((confirmed / callsMade) * 100),
       fake_rate: callsMade === 0 ? 0 : Math.round((fakeOrders / callsMade) * 100),
       avg_duration_sec: avgDur,

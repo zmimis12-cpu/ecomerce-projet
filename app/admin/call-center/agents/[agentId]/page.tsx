@@ -6,10 +6,8 @@ import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { cn } from "@/lib/utils";
 
-async function getCommissionPerOrder(): Promise<number> {
-  const { data } = await supabaseAdmin.from("app_settings").select("value").eq("key", "cc_commission_per_order").maybeSingle();
-  return Number((data as { value?: string } | null)?.value ?? 3);
-}
+import { agentEarnings, PAY_MODE_LABEL, PAY_BASIS_LABEL } from "@/lib/call-center/pay";
+import { AgentPayForm } from "@/components/call-center/agent-pay-form";
 
 export const metadata: Metadata = { title: "Agent — Call Center" };
 export const dynamic = "force-dynamic";
@@ -61,8 +59,13 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ ag
 
   const confirmed    = logRows.filter((l) => l.disposition === "confirmed").length;
   const deliveredPaid = orderRows.filter((o) => o.status === "paid").length;
-  const commissionRate = await getCommissionPerOrder();
-  const commission   = deliveredPaid * commissionRate;
+  // Gains : ce mois + depuis le début, selon la rémunération réglée pour cet agent
+  const monthStart = new Date().toISOString().slice(0, 8) + "01";
+  const [earnMonth, earnAll] = await Promise.all([agentEarnings(a.id, monthStart), agentEarnings(a.id)]);
+  const pay = earnAll.pay;
+  const payLine = pay.mode === "product" ? `${earnAll.count} commandes payées × coût confirmation fiche produit`
+    : pay.mode === "salary" ? `${pay.salary} MAD / mois`
+    : `${pay.mode === "hybrid" ? `${pay.salary} MAD / mois + ` : ""}${earnAll.count} × ${pay.amount} MAD ${PAY_BASIS_LABEL[pay.basis]}`;
 
   const availColor = {
     available: "bg-green-100 text-green-700",
@@ -115,10 +118,12 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ ag
       <div className="rounded-xl border border-emerald-200 bg-emerald-50/30 px-5 py-4 flex items-center gap-3">
         <Award className="h-6 w-6 text-emerald-600 shrink-0" />
         <div>
-          <p className="font-semibold text-emerald-800">Commission totale : {commission.toFixed(2)} MAD</p>
-          <p className="text-xs text-emerald-700">{deliveredPaid} livrés × {commissionRate} MAD</p>
+          <p className="font-semibold text-emerald-800">Ce mois : {earnMonth.total.toFixed(2)} MAD · Total : {earnAll.total.toFixed(2)} MAD</p>
+          <p className="text-xs text-emerald-700">{PAY_MODE_LABEL[pay.mode]} — {payLine}</p>
         </div>
       </div>
+
+      <AgentPayForm userId={a.id} initial={{ mode: pay.mode, basis: pay.basis, amount: pay.amount, salary: pay.salary }} since={pay.since.startsWith("1970") ? new Date().toISOString() : pay.since} />
 
       {/* Recent orders */}
       {orderRows.length > 0 && (

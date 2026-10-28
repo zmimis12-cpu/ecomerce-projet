@@ -22,7 +22,7 @@ export default async function CommissionsPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Commissions Agents</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Basé sur commandes livrées et payées uniquement.
+            Selon la rémunération réglée sur chaque fiche agent (commission, salaire ou les deux).
           </p>
         </div>
         {totalRemaining > 0 && (
@@ -39,7 +39,7 @@ export default async function CommissionsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-secondary/30">
-              {["Agent", "Disponibilité", "Livrés payés", "Commission/cmd", "Total gagné", "Total payé", "Restant dû", "Action"].map((h) => (
+              {["Agent", "Disponibilité", "Commandes comptées", "Rémunération", "Total gagné", "Total payé", "Restant dû", "Action"].map((h) => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -70,7 +70,7 @@ export default async function CommissionsPage() {
                   <td className="px-4 py-3">
                     <span className="font-bold font-mono text-emerald-700">{a.deliveredPaid}</span>
                   </td>
-                  <td className="px-4 py-3 font-mono text-muted-foreground">3 MAD</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{a.payLabel}</td>
                   <td className="px-4 py-3 font-mono font-semibold">{mad(a.earned)}</td>
                   <td className="px-4 py-3 font-mono text-green-700">{mad(a.totalPaid)}</td>
                   <td className="px-4 py-3">

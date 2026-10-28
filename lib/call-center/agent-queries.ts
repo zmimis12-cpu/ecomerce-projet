@@ -3,13 +3,9 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth/session";
+import { agentEarnings, PAY_MODE_LABEL, PAY_BASIS_LABEL, usesCommission, usesSalary } from "@/lib/call-center/pay";
 
 const CC_ROLES = ["super_admin", "admin", "manager", "call_center_agent"] as const;
-
-async function getCommissionPerOrder(): Promise<number> {
-  const { data } = await supabaseAdmin.from("app_settings").select("value").eq("key", "cc_commission_per_order").maybeSingle();
-  return Number((data as { value?: string } | null)?.value ?? 3);
-}
 
 export async function getMyAssignedOrders() {
   const session = await requireRole([...CC_ROLES]);
@@ -54,8 +50,7 @@ export async function getMyStats() {
   const delivered = ordRows.filter((o) => ["delivered", "paid"].includes(o.status)).length;
   const returned = ordRows.filter((o) => o.status === "returned").length;
 
-  const commission = await getCommissionPerOrder();
-  const commissionEarned = deliveredPaid * commission;
+  const commissionEarned = (await agentEarnings(agentId)).total;
   const confirmRate = callsMade > 0 ? Math.round((confirmed / callsMade) * 100) : 0;
   const deliveryRate = confirmed > 0 ? Math.round((delivered / confirmed) * 100) : 0;
 
@@ -68,15 +63,16 @@ export async function getMyCommissions() {
 
   const { data: deliveredOrders } = await supabaseAdmin.from("orders").select("id, order_number, total_amount_mad, updated_at").eq("assigned_to", agentId).eq("status", "paid");
   const delivered = (deliveredOrders ?? []) as { id: string; order_number: string; total_amount_mad: number; updated_at: string }[];
-  const COMMISSION_PER_ORDER = await getCommissionPerOrder();
-  const totalEarned = delivered.length * COMMISSION_PER_ORDER;
+  const earn = await agentEarnings(agentId);
+  const COMMISSION_PER_ORDER = usesCommission(earn.pay) ? earn.pay.amount : 0;
+  const totalEarned = earn.total;
 
   const { data: payments } = await supabaseAdmin.from("call_center_agent_payments").select("*").eq("agent_id", agentId).order("period_start", { ascending: false });
   const paymentRows = (payments ?? []) as { id: string; period_start: string; period_end: string; delivered_paid_count: number; gross_amount: number; paid_amount: number; remaining_amount: number; status: string; paid_at: string | null; notes: string | null }[];
   const totalPaid = paymentRows.reduce((s, p) => s + (p.paid_amount ?? 0), 0);
   const totalRemaining = totalEarned - totalPaid;
 
-  return { commissionPerOrder: COMMISSION_PER_ORDER, totalDeliveredPaid: delivered.length, totalEarned, totalPaid, totalRemaining, payments: paymentRows, recentOrders: delivered.slice(0, 20) };
+  return { commissionPerOrder: COMMISSION_PER_ORDER, totalDeliveredPaid: earn.count, totalEarned, totalPaid, totalRemaining, payments: paymentRows, recentOrders: delivered.slice(0, 20) };
 }
 
 export async function getMyCallbacks() {
@@ -90,10 +86,10 @@ export async function getMyCallbacks() {
 export async function recordAgentPayment(params: { agentId: string; periodStart: string; periodEnd: string; paidAmount: number; notes?: string }): Promise<{ success: boolean; error?: string }> {
   const session = await requireRole(["super_admin", "admin", "manager"]);
 
-  const COMMISSION_PER_ORDER = await getCommissionPerOrder();
-  const { data: orders } = await supabaseAdmin.from("orders").select("id").eq("assigned_to", params.agentId).eq("status", "paid").gte("updated_at", `${params.periodStart}T00:00:00`).lte("updated_at", `${params.periodEnd}T23:59:59`);
-  const count = (orders ?? []).length;
-  const gross = count * COMMISSION_PER_ORDER;
+  const earn = await agentEarnings(params.agentId, params.periodStart, params.periodEnd);
+  const COMMISSION_PER_ORDER = usesCommission(earn.pay) ? earn.pay.amount : 0;
+  const count = earn.count;
+  const gross = earn.total;
   const isFullyPaid = params.paidAmount >= gross;
 
   const { error } = await supabaseAdmin.from("call_center_agent_payments").insert({
@@ -112,34 +108,39 @@ export async function recordAgentPayment(params: { agentId: string; periodStart:
 export async function getAllAgentsCommissions() {
   await requireRole(["super_admin", "admin", "manager"]);
 
+  // Même source que la liste des agents : public.users (rôle call_center_agent)
   const { data: agents } = await supabaseAdmin
-    .from("cc_agents")
-    .select("id, full_name, email, active, availability, commission")
-    .eq("active", true)
+    .from("users")
+    .select("id, full_name, email, availability_status")
+    .eq("role", "call_center_agent")
+    .eq("is_active", true)
     .order("full_name");
 
   if (!agents || agents.length === 0) return [];
 
-  type AgentRow = { id: string; full_name: string; email: string | null; availability: string | null; commission: number };
-  const agentRows = agents as unknown as AgentRow[];
-  const results: { id: string; full_name: string; email: string; availability_status: string; deliveredPaid: number; earned: number; totalPaid: number; remaining: number }[] = [];
+  type AgentRow = { id: string; full_name: string; email: string | null; availability_status: string | null };
+  const results: { id: string; full_name: string; email: string; availability_status: string; deliveredPaid: number; payLabel: string; earned: number; totalPaid: number; remaining: number }[] = [];
 
-  for (const agent of agentRows) {
-    const { data: orders } = await supabaseAdmin.from("orders").select("id").eq("assigned_to", agent.id).eq("status", "paid");
-    const deliveredPaid = (orders ?? []).length;
-    const earned = deliveredPaid * (agent.commission ?? 3);
-    const { data: payments } = await supabaseAdmin.from("call_center_agent_payments").select("paid_amount").eq("agent_id", agent.id);
+  for (const agent of agents as unknown as AgentRow[]) {
+    const [earn, { data: payments }] = await Promise.all([
+      agentEarnings(agent.id),
+      supabaseAdmin.from("call_center_agent_payments").select("paid_amount").eq("agent_id", agent.id),
+    ]);
     const totalPaid = ((payments ?? []) as { paid_amount: number }[]).reduce((s, p) => s + (p.paid_amount ?? 0), 0);
+    const p = earn.pay;
+    const payLabel = p.mode === "product" ? PAY_MODE_LABEL.product
+      : [usesSalary(p) ? `${p.salary} MAD/mois` : "", usesCommission(p) ? `${p.amount} MAD ${PAY_BASIS_LABEL[p.basis]}` : ""].filter(Boolean).join(" + ");
 
     results.push({
       id: agent.id,
       full_name: agent.full_name,
       email: agent.email ?? "",
-      availability_status: agent.availability ?? "offline",
-      deliveredPaid,
-      earned,
+      availability_status: agent.availability_status ?? "offline",
+      deliveredPaid: earn.count,
+      payLabel,
+      earned: earn.total,
       totalPaid,
-      remaining: earned - totalPaid,
+      remaining: Math.round((earn.total - totalPaid) * 100) / 100,
     });
   }
 

@@ -84,8 +84,8 @@ export default async function AgentDashboardPage() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: "Commission / livraison", val: mad(commissions.commissionPerOrder), cls: "" },
-            { label: "Total livré payé",       val: commissions.totalDeliveredPaid,      cls: "text-emerald-700 text-2xl font-bold" },
+            { label: "Commission / commande", val: mad(commissions.commissionPerOrder), cls: "" },
+            { label: "Commandes comptées",       val: commissions.totalDeliveredPaid,      cls: "text-emerald-700 text-2xl font-bold" },
             { label: "Total gagné",            val: mad(commissions.totalEarned),        cls: "text-emerald-700 font-bold" },
             { label: "Non payé",               val: mad(commissions.totalRemaining),     cls: commissions.totalRemaining > 0 ? "text-amber-700 font-bold" : "text-green-700" },
           ].map((k) => (

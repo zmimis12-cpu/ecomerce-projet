@@ -528,7 +528,18 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   // Confirmation (coût exact de la fiche produit, 1 fois par commande payée) → carte "Confirmation"
   // … seulement si la commande a été traitée par un AGENT (sinon personne n'est payé pour la confirmer)
   const hasAgent = (r: (typeof activeRows)[number]) => !!r.assigned_to && agentIds.has(r.assigned_to);
-  total_call_center_cost = Math.round(activeRows.filter((r) => r.is_paid && hasAgent(r)).reduce((s2, r) => s2 + (confCost.get(r.id) ?? 0), 0) * 100) / 100;
+  // Rémunération call center réglée PAR AGENT (fiche agent → Rémunération) :
+  // coût confirmation fiche produit (défaut) / commission par commande / salaire fixe / salaire + commission.
+  const { readAgentPays, callCenterCost } = await import("@/lib/call-center/pay");
+  const agentPays = await readAgentPays();
+  const ccRes = callCenterCost(
+    rows.filter(hasAgent).map((r) => ({ id: r.id, status: r.status, is_paid: r.is_paid, assigned_to: r.assigned_to,
+      everConfirmed: everConfirmedIds.has(r.id), everShipped: everShippedIds.has(r.id) })),
+    agentPays, confCost,
+    filter ? new Date(filter.from + "T00:00:00Z") : null,
+    filter ? new Date(new Date(filter.to + "T00:00:00Z").getTime() + 86_400_000) : null,
+  );
+  total_call_center_cost = ccRes.total;
 
   const real_profit_before_ads = Math.round(
     activeRows.filter((r) => r.is_paid).reduce((s, r) => s + orderMargin(r), 0) * 100) / 100;
@@ -553,7 +564,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   ) / 100;
 
   // Marge pas encore encaissée (la pub de ces commandes est déjà dépensée)
-  const pending_profit = Math.round(pendingRows.reduce((s, r) => s + orderMargin(r) - (hasAgent(r) ? confCost.get(r.id) ?? 0 : 0), 0) * 100) / 100;
+  const pending_profit = Math.round(pendingRows.reduce((s, r) => s + orderMargin(r) - (ccRes.perOrder.get(r.id) ?? 0), 0) * 100) / 100;
   // Info seulement (pas compté) : marge possible des commandes encore en route
   const transit_margin = Math.round(transitRows.reduce((s, r) => s + orderMargin(r), 0) * 100) / 100;
   const transit_count = transitRows.length;
