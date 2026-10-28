@@ -2,16 +2,16 @@
 /**
  * CallTimer — core agent interaction component.
  * - Live timer
- * - 20s anti-fake lock on "Confirmed"
+ * - Numéro affiché + appel direct (tel:), statuts disponibles tout de suite (plus de délai)
  * - fake_order + duplicate + callback_requested
  * - Callback date/time scheduling
  */
 import { useState, useEffect, useRef, useTransition } from "react";
 import { logCall, scheduleCallback } from "@/lib/call-center/actions";
-import { MIN_CONFIRM_SECONDS, CALL_RESULT_LABELS, CALL_RESULT_COLORS } from "@/types/call-center";
+import { CALL_RESULT_LABELS } from "@/types/call-center";
 import type { CallResult } from "@/types/call-center";
 import { cn } from "@/lib/utils";
-import { Phone, PhoneOff, Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Phone, Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 interface CallTimerProps {
   orderId:       string;
@@ -40,6 +40,7 @@ export function CallTimer({ orderId, customerPhone }: CallTimerProps) {
   function endCall(result: CallResult) {
     if (intervalRef.current) clearInterval(intervalRef.current);
     const dur = elapsed;
+    if (!startRef.current) startRef.current = new Date().toISOString(); // statut posé sans démarrer le chrono
     setPhase("done");
 
     // Callback scheduling
@@ -73,23 +74,7 @@ export function CallTimer({ orderId, customerPhone }: CallTimerProps) {
   // Cleanup on unmount
   useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
 
-  const canConfirm   = elapsed >= MIN_CONFIRM_SECONDS;
-  const secRemaining = Math.max(0, MIN_CONFIRM_SECONDS - elapsed);
   const fmt          = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-
-  // ── IDLE ──────────────────────────────────────────────────────────────────
-  if (phase === "idle") return (
-    <div className="space-y-4">
-      <button type="button" onClick={startCall}
-        className="w-full flex items-center justify-center gap-2 rounded-xl bg-green-600 text-white py-5 text-lg font-bold hover:bg-green-700 transition-colors active:scale-[0.98]">
-        <Phone className="h-6 w-6" />
-        Démarrer l&apos;appel
-      </button>
-      <p className="text-center text-xs text-muted-foreground">
-        Le bouton &quot;Confirmé&quot; sera débloqué après {MIN_CONFIRM_SECONDS}s d&apos;appel.
-      </p>
-    </div>
-  );
 
   // ── DONE ──────────────────────────────────────────────────────────────────
   if (phase === "done") return (
@@ -109,59 +94,40 @@ export function CallTimer({ orderId, customerPhone }: CallTimerProps) {
     </div>
   );
 
-  // ── CALLING ───────────────────────────────────────────────────────────────
+  // ── APPEL + STATUTS (sans délai) ─────────────────────────────────────────
   return (
     <div className="space-y-4">
-      {/* Timer display */}
-      <div className={cn(
-        "rounded-xl p-5 text-center border-2 transition-colors",
-        canConfirm ? "border-green-400 bg-green-50" : "border-orange-300 bg-orange-50"
-      )}>
-        <div className="flex items-center justify-center gap-2 mb-1">
-          <Clock className={cn("h-5 w-5", canConfirm ? "text-green-600" : "text-orange-500")} />
-          <span className={cn("text-4xl font-mono font-bold tabular-nums", canConfirm ? "text-green-700" : "text-orange-600")}>
-            {fmt(elapsed)}
-          </span>
+      {/* Numéro + appel direct */}
+      <a href={`tel:${customerPhone}`} onClick={() => { if (phase !== "calling") startCall(); }}
+        className="w-full flex items-center justify-center gap-3 rounded-xl bg-green-600 text-white py-4 hover:bg-green-700 transition-colors active:scale-[0.98]">
+        <Phone className="h-6 w-6" />
+        <span className="text-2xl font-bold font-mono tracking-wide" dir="ltr">{customerPhone}</span>
+      </a>
+      {phase === "calling" && (
+        <div className="flex items-center justify-center gap-2 text-green-700">
+          <Clock className="h-4 w-4" />
+          <span className="font-mono font-bold tabular-nums">{fmt(elapsed)}</span>
         </div>
-        {!canConfirm && (
-          <p className="text-xs text-orange-600 font-medium">
-            ⏳ Confirmation disponible dans {secRemaining}s
-          </p>
-        )}
-        {canConfirm && (
-          <p className="text-xs text-green-600 font-semibold">✓ Confirmation débloquée</p>
-        )}
-      </div>
+      )}
 
       {/* Notes */}
       <textarea value={notes} onChange={(e) => setNotes(e.target.value)}
         placeholder="Notes sur l'appel…" rows={2}
         className="flex w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
 
-      {/* Callback date (shown always for flexibility) */}
+      {/* Callback date */}
       <div className="flex items-center gap-2">
         <label className="text-xs text-muted-foreground whitespace-nowrap">Rappel le :</label>
         <input type="datetime-local" value={callbackAt} onChange={(e) => setCallbackAt(e.target.value)}
           className="flex-1 h-8 rounded-lg border bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-ring" />
       </div>
 
-      {/* Result buttons */}
+      {/* Statuts */}
       <div className="grid grid-cols-2 gap-2">
-        {/* CONFIRMED — locked until 20s */}
-        <button type="button"
-          onClick={() => canConfirm && endCall("confirmed")}
-          disabled={!canConfirm || isPending}
-          className={cn(
-            "col-span-2 flex items-center justify-center gap-2 rounded-xl py-4 text-base font-bold transition-all",
-            canConfirm
-              ? "bg-green-600 text-white hover:bg-green-700 active:scale-[0.98]"
-              : "bg-gray-100 text-gray-400 cursor-not-allowed"
-          )}>
-          <CheckCircle2 className="h-5 w-5" />
-          {canConfirm ? "✓ Confirmer la commande" : `Confirmer (attendre ${secRemaining}s)`}
+        <button type="button" onClick={() => endCall("confirmed")} disabled={isPending}
+          className="col-span-2 flex items-center justify-center gap-2 rounded-xl py-4 text-base font-bold bg-green-600 text-white hover:bg-green-700 active:scale-[0.98] disabled:opacity-50">
+          <CheckCircle2 className="h-5 w-5" /> ✓ Confirmer la commande
         </button>
-
-        {/* Other results */}
         {([
           ["refused",            "Refusé",           "bg-red-100 text-red-700 hover:bg-red-200"],
           ["no_answer",          "Sans réponse",      "bg-orange-100 text-orange-700 hover:bg-orange-200"],
@@ -170,19 +136,11 @@ export function CallTimer({ orderId, customerPhone }: CallTimerProps) {
           ["fake_order",         "🚫 Fausse commande","bg-red-200 text-red-900 hover:bg-red-300"],
           ["duplicate",          "⚠ Doublon",         "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"],
         ] as [CallResult, string, string][]).map(([result, label, cls]) => (
-          <button key={result} type="button"
-            onClick={() => endCall(result)}
-            disabled={isPending}
+          <button key={result} type="button" onClick={() => endCall(result)} disabled={isPending}
             className={cn("rounded-xl py-3 text-sm font-semibold transition-colors disabled:opacity-50", cls)}>
             {label}
           </button>
         ))}
-
-        {/* End call without result */}
-        <button type="button" onClick={() => endCall("no_answer")} disabled={isPending}
-          className="col-span-2 flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors">
-          <PhoneOff className="h-4 w-4" /> Terminer l&apos;appel
-        </button>
       </div>
     </div>
   );

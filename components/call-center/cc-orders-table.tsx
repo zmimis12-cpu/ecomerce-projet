@@ -116,9 +116,10 @@ export function CCOrdersTable({ orders, agents, canManage, mode = "all" }: CCOrd
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-sm truncate max-w-[130px]">{order.customer_name}</p>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <a href={`tel:${order.customer_phone}`} onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-1 text-sm font-mono font-semibold text-green-700 hover:underline" dir="ltr">
                         <Phone className="h-3 w-3" />{order.customer_phone}
-                      </div>
+                      </a>
                       <p className="text-xs text-muted-foreground">{order.customer_city}</p>
                     </td>
                     <td className="px-4 py-3">
