@@ -106,7 +106,7 @@ export default async function ProductDetailPage({
       </div>
 
       {/* Landing page URL */}
-      <LandingPageUrl slug={product.slug} />
+      {session.role !== "call_center_agent" && <LandingPageUrl slug={product.slug} />}
 
       {/* Status badge */}
       <div className="flex items-center gap-2">
