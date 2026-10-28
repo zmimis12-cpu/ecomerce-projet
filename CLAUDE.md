@@ -12,7 +12,8 @@ Lis ce fichier en entier au début de chaque conversation. Zack (propriétaire) 
 
 ## Stack
 Next.js 15 (app router) · Supabase · Vercel. Landing pages : `app/(public)/lp/[slug]/page.tsx` (design réglable : `lib/store/lp-design-shared.ts`, app_settings `lp_design` global + perSlug, cache ~5 min). Formulaire : `components/landing/order-form-public.tsx` → `app/api/public/orders/route.ts`.
-Accès : clé Supabase service dans `env.env` (SUPABASE_SERVICE_ROLE_KEY), REST `https://nccufqvnxoftzovfsako.supabase.co/rest/v1`. Tokens pubs dans `app_settings` : `meta_accounts` (liste, champ `token`), `tiktok_accounts`.
+Accès : clé Supabase service dans `env.env` (SUPABASE_SERVICE_ROLE_KEY), REST `https://nccufqvnxoftzovfsako.supabase.co/rest/v1`. Tokens pubs dans `app_settings` : `meta_accounts` (liste, champ `token` — sert au sync/dashboard, PAS d'accès à la page), `tiktok_accounts`.
+**Pour créer / modifier des pubs Meta : utiliser `app_settings` key `meta_launch_token` → champ `token`** (system user « deals » 122109782439502904, n'expire jamais, accès page Hajtek Zone 1165019800018717 + Instagram 17841475526156405 + compte act_1765551261341640). Ne rien demander à Zack côté Business Manager : ce token marche déjà.
 Pour lancer du code serveur hors Next : `SUPABASE_SERVICE_ROLE_KEY=… NEXT_PUBLIC_SUPABASE_URL=https://nccufqvnxoftzovfsako.supabase.co npx tsx script.ts`.
 
 ## Business
