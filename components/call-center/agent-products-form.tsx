@@ -16,7 +16,7 @@ export function AgentProductsForm({ userId, products, initial }: {
     <div className="rounded-xl border bg-card p-5 space-y-3">
       <div className="flex items-center gap-2 font-semibold"><Package className="h-4 w-4" /> Produits de l&apos;agent</div>
       <p className="text-xs text-muted-foreground">
-        L&apos;agent ne reçoit et ne voit que les commandes des produits cochés. Rien de coché = tous les produits.
+        L&apos;agent ne reçoit et ne voit que les commandes des produits cochés. Rien de coché = il ne voit aucune commande.
       </p>
       <div className="grid gap-1.5 sm:grid-cols-2 max-h-64 overflow-y-auto">
         {products.map((p) => (
@@ -32,7 +32,7 @@ export function AgentProductsForm({ userId, products, initial }: {
           className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold disabled:opacity-50">
           {pending ? "…" : "Enregistrer"}
         </button>
-        <span className="text-xs text-muted-foreground">{sel.size ? `${sel.size} produit(s)` : "Tous les produits"}</span>
+        <span className="text-xs text-muted-foreground">{sel.size ? `${sel.size} produit(s)` : "Aucun produit"}</span>
         {msg && <span className="text-xs">{msg}</span>}
       </div>
     </div>

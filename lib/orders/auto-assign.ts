@@ -28,14 +28,13 @@ export async function findAvailableAgent(product?: { id?: string | null; slug?: 
 
   // Produits attribués par agent (fiche agent) : on n'assigne qu'aux agents qui traitent ce produit
   const allowed = await readAgentProducts();
-  if (allowed.size && product && (product.id || product.slug)) {
-    let pid = product.id || null;
-    if (!pid && product.slug) {
-      const { data: p } = await supabaseAdmin.from("products").select("id").eq("slug", product.slug).maybeSingle();
-      pid = (p as { id: string } | null)?.id ?? null;
-    }
-    if (pid) agentList = agentList.filter((a) => agentAllows(allowed, a.id, [pid]));
+  // (aucun produit attribué à un agent = il ne reçoit rien ; aucun agent pour ce produit = l'admin assigne)
+  let pid = product?.id || null;
+  if (!pid && product?.slug) {
+    const { data: p } = await supabaseAdmin.from("products").select("id").eq("slug", product.slug).maybeSingle();
+    pid = (p as { id: string } | null)?.id ?? null;
   }
+  agentList = agentList.filter((a) => agentAllows(allowed, a.id, [pid]));
   if (!agentList.length) return null;
   const agentIds  = agentList.map((a) => a.id);
 

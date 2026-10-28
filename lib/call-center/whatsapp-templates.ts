@@ -3,16 +3,19 @@
  * Modifiables depuis l'admin (app_settings « cc_whatsapp_templates »). Utilisable client + serveur.
  * Variables : {name} {product} {total} {city} {address} {order} {tracking}
  */
-export type CcWaKey = "no_answer" | "confirm" | "shipped";
+export type CcWaKey = "new_order" | "no_answer" | "confirm" | "shipped";
 export type CcWaTemplates = Record<CcWaKey, string>;
 
 export const CC_WA_LABEL: Record<CcWaKey, string> = {
+  new_order: "Nouvelle commande (demander confirmation)",
   no_answer: "Pas de réponse",
-  confirm: "Confirmation",
+  confirm: "Commande confirmée",
   shipped: "Expédition",
 };
 
 export const CC_WA_DEFAULTS: CcWaTemplates = {
+  new_order:
+    "السلام عليكم {name} 🌸\nمعاك HajtekZone، توصلنا بالطلب ديالك 🙏\n📦 {product}\n💰 المجموع: {total} درهم — الدفع عند الاستلام\n📍 {city}\n\nواش نأكدو ليك الطلب ونصيفطوه؟ جاوبنا بكلمة « مؤكد » ✅\nوإلا بغيتي تبدل شي حاجة (العنوان ولا الكمية) كتب لينا هنا 👇",
   no_answer:
     "السلام عليكم {name} 🌸\nعيطنا ليك باش نأكدو الطلب ديالك ديال {product} وما جاوبتيش 📞\nإلا كنتي مازال بغيتيه، جاوبنا هنا بكلمة « مؤكد » ✅ ولا قول لينا وقتاش نعيطو ليك.",
   confirm:
@@ -24,7 +27,7 @@ export const CC_WA_DEFAULTS: CcWaTemplates = {
 export function normalizeCcWa(v: unknown): CcWaTemplates {
   const o = (v && typeof v === "object" ? v : {}) as Partial<CcWaTemplates>;
   const pick = (k: CcWaKey) => (typeof o[k] === "string" && o[k]!.trim() ? o[k]! : CC_WA_DEFAULTS[k]);
-  return { no_answer: pick("no_answer"), confirm: pick("confirm"), shipped: pick("shipped") };
+  return { new_order: pick("new_order"), no_answer: pick("no_answer"), confirm: pick("confirm"), shipped: pick("shipped") };
 }
 
 export function fillCcWa(tpl: string, vars: Record<string, string | number | null | undefined>): string {

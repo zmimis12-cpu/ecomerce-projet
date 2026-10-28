@@ -64,9 +64,10 @@ export async function saveAgentProducts(userId: string, productIds: string[]): P
 }
 
 /** Messages WhatsApp manuels du call center. */
-export async function saveCcWhatsappTemplates(t: { no_answer: string; confirm: string; shipped: string }): Promise<{ ok: boolean; error?: string }> {
+export async function saveCcWhatsappTemplates(t: { new_order: string; no_answer: string; confirm: string; shipped: string }): Promise<{ ok: boolean; error?: string }> {
   await requireRole(["super_admin", "admin"]);
-  const value = { no_answer: String(t.no_answer ?? "").slice(0, 2000), confirm: String(t.confirm ?? "").slice(0, 2000), shipped: String(t.shipped ?? "").slice(0, 2000) };
+  const cut = (x: unknown) => String(x ?? "").slice(0, 2000);
+  const value = { new_order: cut(t.new_order), no_answer: cut(t.no_answer), confirm: cut(t.confirm), shipped: cut(t.shipped) };
   const { error } = await supabaseAdmin.from("app_settings")
     .upsert({ key: "cc_whatsapp_templates", value, category: "call_center", label: "Messages WhatsApp call center", description: "Messages WhatsApp manuels call center" } as never, { onConflict: "key" });
   if (error) return { ok: false, error: error.message };

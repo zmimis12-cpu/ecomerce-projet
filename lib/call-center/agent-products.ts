@@ -1,6 +1,6 @@
 /**
  * lib/call-center/agent-products.ts — produits attribués à chaque agent call center.
- * call_center_agents.metadata.products = [product_id…] ; liste vide / absente = tous les produits.
+ * call_center_agents.metadata.products = [product_id…] ; liste vide / absente = AUCUN produit (l'admin attribue).
  * Utilisé par l'auto-assignation et les listes de l'agent (il ne voit que ses produits). Server only.
  */
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -15,12 +15,11 @@ export async function readAgentProducts(): Promise<Map<string, string[]>> {
   return out;
 }
 
-/** L'agent peut-il traiter une commande contenant ces produits ? (aucune restriction = oui) */
+/** L'agent peut-il traiter une commande contenant ces produits ? Aucun produit attribué = non. */
 export function agentAllows(map: Map<string, string[]>, agentId: string, productIds: (string | null | undefined)[]): boolean {
   const list = map.get(agentId);
-  if (!list || !list.length) return true;
+  if (!list || !list.length) return false;
   const ids = productIds.filter(Boolean) as string[];
-  if (!ids.length) return true;
   return ids.some((id) => list.includes(id));
 }
 

@@ -12,7 +12,6 @@ export const dynamic = "force-dynamic";
 const TABS = [
   { key: "pending", label: "À appeler" },
   { key: "called", label: "Appelés" },
-  { key: "converted", label: "Commandes créées" },
   { key: "not_interested", label: "Pas intéressés" },
   { key: "all", label: "Tous" },
 ];
