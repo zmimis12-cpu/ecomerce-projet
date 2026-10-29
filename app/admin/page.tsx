@@ -172,9 +172,14 @@ export default async function AdminDashboardPage({
               <KpiCard label="À Collecter"     value={mad(summary.pending_collection)}
                 icon={AlertTriangle} variant="amber"
                 sub="Livrées non payées" />
-              <KpiCard label="Net à Recevoir"   value={mad((summary as {net_a_recevoir?:number}).net_a_recevoir ?? 0)}
-                icon={AlertTriangle} variant="green"
-                sub="Après frais livraison du transporteur (Digylog / Speedaf)" />
+              {(summary.net_a_recevoir_by_carrier ?? []).map((c) => (
+                <KpiCard key={c.carrier} label={`Net à Recevoir — ${c.label}`} value={mad(c.amount)}
+                  icon={AlertTriangle} variant="default"
+                  sub={`${c.count} livrée${c.count > 1 ? "s" : ""} non payée${c.count > 1 ? "s" : ""}, après frais`} />
+              ))}
+              <KpiCard label="Net à Recevoir — Total" value={mad((summary as {net_a_recevoir?:number}).net_a_recevoir ?? 0)}
+                icon={AlertTriangle} variant="green" highlight
+                sub="Toutes sociétés de livraison, après frais" />
               <KpiCard label="Net Collecté"     value={mad((summary as {net_collected?:number}).net_collected ?? 0)}
                 icon={TrendingUp} variant="green" highlight
                 sub="Digylog / Speedaf (net des frais) + livreur propre (montant intégral)" />

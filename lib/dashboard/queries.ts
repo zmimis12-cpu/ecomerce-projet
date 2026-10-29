@@ -29,6 +29,8 @@ export interface DashboardSummary {
   total_return_losses:    number;
   pending_collection:     number;
   net_a_recevoir:         number;
+  /** Net à recevoir par société de livraison (livrées non payées, après frais) */
+  net_a_recevoir_by_carrier?: { carrier: "digylog" | "speedaf" | "self"; label: string; amount: number; count: number }[];
   net_collected:          number;  // Argent déjà collecté par Digylog, net des frais de livraison
   self_delivery_count:    number;  // Commandes livrées par un livreur propre (pas Digylog)
   self_delivery_revenue:  number;
@@ -315,6 +317,20 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   const net_a_recevoir = activeRows
     .filter((r) => DELIVERED_STATUSES.has(r.status) && !r.is_paid)
     .reduce((s, r) => s + (r.total_amount_mad ?? 0) - deliveryFee(carrierFees, carrierOf(r), r.customer_city, null), 0);
+  // … détail par société de livraison
+  const { CARRIER_LABEL } = await import("@/lib/delivery/carrier-fees-shared");
+  const netByCarrier = new Map<"digylog" | "speedaf" | "self", { amount: number; count: number }>();
+  for (const r of activeRows.filter((r) => DELIVERED_STATUSES.has(r.status) && !r.is_paid)) {
+    const c = carrierOf(r);
+    const cur = netByCarrier.get(c) ?? { amount: 0, count: 0 };
+    cur.amount += (r.total_amount_mad ?? 0) - deliveryFee(carrierFees, c, r.customer_city, null);
+    cur.count += 1;
+    netByCarrier.set(c, cur);
+  }
+  const net_a_recevoir_by_carrier = (["digylog", "speedaf", "self"] as const).map((c) => ({
+    carrier: c, label: CARRIER_LABEL[c],
+    amount: Math.round((netByCarrier.get(c)?.amount ?? 0) * 100) / 100, count: netByCarrier.get(c)?.count ?? 0,
+  }));
 
   // Net déjà collecté = commandes payées, montant collecté - frais de livraison réel.
   // NOTE: actual_delivery_cost (default 35) et delivery_cost_real_mad (default 0) ne
@@ -575,7 +591,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     delivered_count, paid_count, returned_count, refused_count,
     no_answer_count, cancelled_count, cancelled_after_confirm, shipped_count,
     estimated_revenue, real_revenue, estimated_profit, real_profit,
-    total_cogs, total_delivery_cost, total_return_losses, pending_collection, net_a_recevoir,
+    total_cogs, total_delivery_cost, total_return_losses, pending_collection, net_a_recevoir, net_a_recevoir_by_carrier,
     net_collected, total_ads_spend, real_profit_net_ads, ads_spent_info, ads_charged_meta, ads_charged_error,
     self_delivery_count, self_delivery_revenue, digylog_count, speedaf_count,
     total_call_center_cost, total_other_expenses, true_final_profit,
