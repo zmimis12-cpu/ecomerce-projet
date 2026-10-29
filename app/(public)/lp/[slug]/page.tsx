@@ -325,7 +325,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const heroEl = angleHero && !(heroVid && !heroVidIsImg) ? (
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img id="sp-hero-img" data-src={(heroVid || heroImg) ?? ""} alt={product.name} className="sp-hero" fetchPriority="high" decoding="async" />
+      <img id="sp-hero-img" data-src={(heroVid || heroImg) ?? ""} alt={product.name} className="sp-hero" style={{ aspectRatio: d.heroRatio === "auto" ? "auto" : d.heroRatio, objectFit: d.heroRatio === "auto" ? "contain" : "cover" }} fetchPriority="high" decoding="async" />
       <script dangerouslySetInnerHTML={{ __html: `(function(){var e=document.getElementById('sp-hero-img');if(!e)return;var u=e.getAttribute('data-src');try{${angleJs}if(m&&m.i)u=m.i;}catch(x){}var f0='${(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "")}',d0=e.getAttribute('data-src')||'';e.onerror=function(){var n=+(e.getAttribute('data-err')||0);e.setAttribute('data-err',n+1);var c=e.src||'';if(n===0&&c.indexOf('/media/')>-1&&f0){e.src=f0+'/storage/v1/object/public/'+c.split('/media/')[1];}else if(n<=1&&d0&&c.indexOf(d0.split('/').pop())<0){e.src=d0;}};e.src=u;})();` }} />
     </>
   ) : heroVid && !heroVidIsImg ? (
@@ -333,7 +333,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     <video src={heroVid} poster={heroImg ?? undefined} className="sp-hero" autoPlay muted loop playsInline preload="metadata" aria-label={product.name} />
   ) : (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={(heroVid || heroImg) ?? ""} alt={product.name} className="sp-hero" fetchPriority={d.heroPosition === "top" ? "high" : "auto"} loading={d.heroPosition === "top" ? "eager" : "lazy"} decoding="async" />
+    <img src={(heroVid || heroImg) ?? ""} alt={product.name} className="sp-hero" style={{ aspectRatio: d.heroRatio === "auto" ? "auto" : d.heroRatio, objectFit: d.heroRatio === "auto" ? "contain" : "cover" }} fetchPriority={d.heroPosition === "top" ? "high" : "auto"} loading={d.heroPosition === "top" ? "eager" : "lazy"} decoding="async" />
   );
   const hasHero = !!(heroImg || heroVid || angleHero);
   // Formulaire tout en haut (sauf si « photo en haut » est choisi) : le client commande sans descendre

@@ -122,6 +122,14 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
               <option value="hidden">Pas de grande photo</option>
             </select>
           </L>
+          <L t="Format de la photo principale">
+            <select className={field} value={d.heroRatio} onChange={(e) => set("heroRatio", e.target.value as LpDesign["heroRatio"])}>
+              <option value="1/1">Carré 1:1 (recadre si l'image est plus haute)</option>
+              <option value="4/5">Vertical 4:5 (affiches avec texte, pas de recadrage)</option>
+              <option value="9/16">Très vertical 9:16 (story)</option>
+              <option value="auto">Taille réelle de l'image</option>
+            </select>
+          </L>
           {B("offersAfterFields", "Choix de la quantité SOUS les champs nom / téléphone / ville (sinon au-dessus)")}
           {B("formFirst", "Formulaire juste sous la photo (avant les icônes et les autres blocs)")}
           {B("offerThumbs", "Petite photo du produit sur chaque offre (1 / 2 / 3 pièces)")}
