@@ -97,6 +97,9 @@ export function CallTimer({ orderId, customerPhone }: CallTimerProps) {
   // ── APPEL + STATUTS (sans délai) ─────────────────────────────────────────
   return (
     <div className="space-y-4">
+      {toast?.type === "error" && (
+        <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">✕ {toast.msg}</div>
+      )}
       {/* Numéro + appel direct */}
       <a href={`tel:${customerPhone}`} onClick={() => { if (phase !== "calling") startCall(); }}
         className="w-full flex items-center justify-center gap-3 rounded-xl bg-green-600 text-white py-4 hover:bg-green-700 transition-colors active:scale-[0.98]">

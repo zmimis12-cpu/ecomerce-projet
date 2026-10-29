@@ -44,7 +44,7 @@ export async function getMyStats() {
   const confirmed = logRows.filter((l) => l.disposition === "confirmed").length;
   const refused = logRows.filter((l) => l.disposition === "refused").length;
   const noAnswer = logRows.filter((l) => l.disposition === "no_answer").length;
-  const fakeOrders = logRows.filter((l) => l.disposition === "fake_order").length;
+  const fakeOrders = logRows.filter((l) => (l.disposition === "fake_order" || l.disposition === "invalid")).length;
   const durations = logRows.map((l) => l.duration_seconds).filter((d): d is number => d !== null);
   const avgDuration = durations.length > 0 ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length) : 0;
 

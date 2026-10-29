@@ -36,7 +36,7 @@ export async function getAgentStats(): Promise<AgentStats[]> {
     const confirmed   = agentOrders.filter((o) => o.status === "confirmed" || o.call_status === "confirmed").length;
     const refused     = agentOrders.filter((o) => o.status === "refused").length;
     const noAnswer    = agentLogs.filter((l) => l.disposition === "no_answer").length;
-    const fakeOrders  = agentLogs.filter((l) => l.disposition === "fake_order").length;
+    const fakeOrders  = agentLogs.filter((l) => (l.disposition === "fake_order" || l.disposition === "invalid")).length;
     const duplicates = agentLogs.filter((l) => l.disposition === "duplicate").length;
 
     const durations = agentLogs

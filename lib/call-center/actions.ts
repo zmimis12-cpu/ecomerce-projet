@@ -66,8 +66,9 @@ export async function logCall(data: {
     phone_dialed:     data.phoneDialed,
     call_direction:   "outbound",
     duration_seconds: data.durationSeconds,
-    disposition:      data.result,
-    notes:            data.notes || null,
+    // l'enum call_disposition n'a pas "fake_order" → stocké comme "invalid" (le vrai résultat reste dans orders.call_status)
+    disposition:      data.result === "fake_order" ? "invalid" : data.result,
+    notes:            data.result === "fake_order" ? `[Fausse commande] ${data.notes || ""}`.trim() : (data.notes || null),
     call_started_at:  data.startedAt,
     call_ended_at:    data.endedAt,
   } as never);
