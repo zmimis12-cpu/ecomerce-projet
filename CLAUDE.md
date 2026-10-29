@@ -29,13 +29,13 @@ Règles Zack :
 - Nouvelles pubs live à **20:00 Maroc**.
 - Placements **uniquement** : Facebook feed/story/reels + Instagram stream/story/reels (pas Audience Network/apps/Messenger…).
 - Scaling = augmenter la campagne gagnante (~+20/30 %/nuit), **pas de nouvelle grosse campagne**. Nouvelles vidéos → campagne **test ABO 5 $/vidéo**, gagnante copiée dans la CBO.
-Campagnes (29/10 00:35) : Projecteur CBO 120251697189060189 à 25 $ → ad set Large 120251697189430189 (V030) + ad set « Large V046+V048 » 120251772147840189 (min 6 $, V044 V046 V048) · Test projecteur 120251741211160189 : seule V044 active · Split CBO 120251697187250189 à 30 $ (Large V010 ; Lookalike 120251701422530189 en PAUSE, 0 cmd) · Test Split 120251754661160189 : seule V050 active (V049, V051 coupés) · Scale 120251727174590189 en PAUSE (ne pas réactiver).
+Campagnes (29/10 00:35) : Projecteur CBO 120251697189060189 à 25 $ → ad set Large 120251697189430189 (V030) + ad set « Large V046+V048 » 120251772147840189 (min 6 $, V044 V048 ; V046 en pause 29/10) · V031 réactivée par Zack dans le Large · Test projecteur 120251741211160189 : seule V044 active · Split CBO 120251697187250189 à 30 $ (Large V010 ; Lookalike 120251701422530189 en PAUSE, 0 cmd) · Test Split 120251754661160189 : seule V050 active (V049, V051 coupés) · Scale 120251727174590189 en PAUSE (ne pas réactiver).
 Économie (28/10) : Split marge ≈ 142 DH/livrée, CPL max ≈ 85 DH → produit rentable à scaler. Projecteur marge ≈ 78 DH/livrée, CPL max ≈ 38–45 DH. Zack valide chaque action pub par lettre (A, B…) avant exécution.
 Codes vidéo V0xx : table `creatives` (+ `creative_ads` ad_id ↔ creative), lien LP `?cr=V0xx` (titre/hero par avatar via `angles` du lp_design).
 Analyse automatique chaque nuit 00:05 (tâche planifiée séparée) ; journal dans app_settings `night_ads_log`.
 
 ## TikTok
-Compte odtdeals_adv 7688685995371773958 (USD) connecté en OAuth. Pixel DAPRTBJC77UFPT8022K0 sur toutes les LP ; SubmitForm + PlaceAnOrder envoyés côté serveur (`lib/tiktok/events-api.ts`). Budget minimum TikTok 20 $/ad group. Scopes Ads + Creative Management OK depuis 28/10 (upload vidéo + identité TT_USER dealsodt f89a0ae3-0fc7-5696-aaed-2743b5ea27f5). Campagne SPLIT – TikTok V010 (ad group 1880315828854114, 20 $, ON_WEB_ORDER, Maroc 2542007). Dépense synchronisée auto (cron 15 min).
+Compte odtdeals_adv 7688685995371773958 (USD) connecté en OAuth. Pixel DAPRTBJC77UFPT8022K0 sur toutes les LP ; SubmitForm + PlaceAnOrder envoyés côté serveur (`lib/tiktok/events-api.ts`). Budget minimum TikTok 20 $/ad group. Scopes Ads + Creative Management OK depuis 28/10 (upload vidéo + identité TT_USER dealsodt f89a0ae3-0fc7-5696-aaed-2743b5ea27f5). Campagne SPLIT – TikTok V010 (ad group 1880315828854114, 20 $, ON_WEB_ORDER, Maroc 2542007) EN PAUSE depuis 29/10 (12,7 $, 0 commande). Dépense synchronisée auto (cron 15 min).
 
 ## Pages admin utiles
 Dashboard (profit net réel, pub réelle prélevée) · Sources pub `/admin/sources` (rentabilité Meta/TikTok/Google, Instagram vs Facebook) · Après livraison `/admin/products/livraison` · Paniers abandonnés (message WhatsApp modifiable) · Éditeurs vidéos (taux par vidéo).
