@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { AgentPresence } from "@/components/call-center/agent-presence";
 import { requireRole } from "@/lib/auth/session";
 import { getMyStats, getMyCallbacks, getMyCommissions, getMyAssignedOrders } from "@/lib/call-center/agent-queries";
-import { CheckCircle2, XCircle, Clock, Award, TrendingUp, CalendarClock, AlertTriangle } from "lucide-react";
+import { CheckCircle2, XCircle, Award, TrendingUp, CalendarClock, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +22,6 @@ export default async function AgentDashboardPage() {
   const pendingOrders   = orders.filter((o) => !["confirmed", "refused", "cancelled"].includes(o.status));
   const callbacksDueNow = callbacks.filter((c) => new Date(c.callback_scheduled_at) <= new Date());
 
-  function fmt(s: number) { return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
   function mad(n: number) { return n.toLocaleString("fr-MA", { minimumFractionDigits: 2 }) + " MAD"; }
 
   return (
@@ -57,13 +56,13 @@ export default async function AgentDashboardPage() {
       {/* KPI cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Confirmés",          val: stats.confirmed,          icon: CheckCircle2, cls: "text-green-700" },
-          { label: "Taux confirmation",  val: `${stats.confirmRate}%`,  icon: TrendingUp,   cls: stats.confirmRate >= 60 ? "text-green-700" : "text-amber-600" },
-          { label: "Durée moy. appel",   val: fmt(stats.avgDuration),   icon: Clock,        cls: "" },
-          { label: "Livrés payés",       val: stats.deliveredPaid,      icon: Award,        cls: "text-emerald-700" },
-          { label: "Taux livraison",     val: `${stats.deliveryRate}%`, icon: TrendingUp,   cls: stats.deliveryRate >= 60 ? "text-green-700" : "text-amber-600" },
-          { label: "Refus",              val: stats.refused,            icon: XCircle,      cls: "text-red-600" },
-          { label: "Fausses commandes",  val: stats.fakeOrders,         icon: AlertTriangle,cls: stats.fakeOrders > 0 ? "text-red-600" : "text-muted-foreground" },
+          { label: "Confirmées",         val: stats.confirmed,          icon: CheckCircle2, cls: "text-green-700", sub: `sur ${stats.treated} commandes traitées` },
+          { label: "Taux confirmation",  val: `${stats.confirmRate}%`,  icon: TrendingUp,   cls: stats.confirmRate >= 75 ? "text-green-700" : "text-amber-600", sub: "confirmées / traitées" },
+          { label: "Livrées",            val: stats.delivered,          icon: Award,        cls: "text-emerald-700", sub: `${stats.inTransit} en route` },
+          { label: "Taux livraison",     val: `${stats.deliveryRate}%`, icon: TrendingUp,   cls: stats.deliveryRate >= 75 ? "text-green-700" : "text-amber-600", sub: stats.finished ? `livrées / ${stats.finished} colis terminés` : "aucun colis terminé" },
+          { label: "Payées",             val: stats.deliveredPaid,      icon: Award,        cls: "text-emerald-700", sub: "virement reçu" },
+          { label: "Refus",              val: stats.refused,            icon: XCircle,      cls: "text-red-600", sub: "" },
+          { label: "Fausses commandes",  val: stats.fakeOrders,         icon: AlertTriangle,cls: stats.fakeOrders > 0 ? "text-red-600" : "text-muted-foreground", sub: "" },
         ].map((k) => (
           <div key={k.label} className="rounded-xl border bg-card p-4">
             <div className="flex items-center gap-1.5 mb-2">
@@ -71,6 +70,7 @@ export default async function AgentDashboardPage() {
               <p className="text-xs text-muted-foreground">{k.label}</p>
             </div>
             <p className={cn("text-2xl font-bold", k.cls)}>{k.val}</p>
+            {k.sub && <p className="text-[11px] text-muted-foreground mt-0.5">{k.sub}</p>}
           </div>
         ))}
       </div>

@@ -27,6 +27,8 @@ export async function getAgentStats(): Promise<AgentStats[]> {
   const orderRows = (orders ?? []) as unknown as OrderRow[];
   const logRows   = (callLogs ?? []) as unknown as LogRow[];
   const { agentEarnings } = await import("@/lib/call-center/pay");
+  const { agentRates } = await import("@/lib/call-center/rates");
+  const rates = await agentRates(rows.map((a) => a.id));
   const earnings = new Map(await Promise.all(rows.map(async (a) => [a.id, (await agentEarnings(a.id)).total] as const)));
 
   return rows.map((a): AgentStats => {
@@ -65,14 +67,15 @@ availability_status: (() => {
       last_seen_at: a.last_seen_at,
       total_assigned: agentOrders.length,
       calls_made: callsMade,
-      confirmed,
-      refused,
+      confirmed: rates.get(a.id)?.confirmed ?? confirmed,
+      refused: rates.get(a.id)?.refused ?? refused,
       no_answer: noAnswer,
       fake_orders: fakeOrders,
       duplicates,
-      delivered_paid: deliveredPaid,
+      delivered_paid: rates.get(a.id)?.delivered ?? deliveredPaid,
       commission_mad: earnings.get(a.id) ?? 0,
-      confirmation_rate: callsMade === 0 ? 0 : Math.round((confirmed / callsMade) * 100),
+      // exact : commandes confirmées / commandes traitées (pas les appels)
+      confirmation_rate: rates.get(a.id)?.confirmRate ?? 0,
       fake_rate: callsMade === 0 ? 0 : Math.round((fakeOrders / callsMade) * 100),
       avg_duration_sec: avgDur,
     };

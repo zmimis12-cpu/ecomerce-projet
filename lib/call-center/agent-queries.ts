@@ -55,10 +55,13 @@ export async function getMyStats() {
   const returned = ordRows.filter((o) => o.status === "returned").length;
 
   const commissionEarned = (await agentEarnings(agentId)).total;
-  const confirmRate = callsMade > 0 ? Math.round((confirmed / callsMade) * 100) : 0;
-  const deliveryRate = confirmed > 0 ? Math.round((delivered / confirmed) * 100) : 0;
-
-  return { callsMade, confirmed, refused, noAnswer, fakeOrders, avgDuration, deliveredPaid, delivered, returned, commissionEarned, confirmRate, deliveryRate, totalAssigned: ordRows.length };
+  // Taux exacts sur les commandes (mêmes définitions que le dashboard)
+  const { agentRates } = await import("@/lib/call-center/rates");
+  const r = (await agentRates([agentId])).get(agentId)!;
+  const confirmRate = r.confirmRate;
+  const deliveryRate = r.deliveryRate;
+  void confirmed; void refused; void fakeOrders;
+  return { callsMade, confirmed: r.confirmed, treated: r.treated, shipped: r.shipped, inTransit: r.inTransit, finished: r.delivered + r.returned, refused: r.refused, noAnswer, fakeOrders: r.fake, avgDuration, deliveredPaid: r.paid, delivered: r.delivered, returned, commissionEarned, confirmRate, deliveryRate, totalAssigned: ordRows.length };
 }
 
 export async function getMyCommissions() {
