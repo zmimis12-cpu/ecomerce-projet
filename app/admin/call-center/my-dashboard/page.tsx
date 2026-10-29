@@ -57,7 +57,6 @@ export default async function AgentDashboardPage() {
       {/* KPI cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Appels effectués",   val: stats.callsMade,          icon: Phone,        cls: "" },
           { label: "Confirmés",          val: stats.confirmed,          icon: CheckCircle2, cls: "text-green-700" },
           { label: "Taux confirmation",  val: `${stats.confirmRate}%`,  icon: TrendingUp,   cls: stats.confirmRate >= 60 ? "text-green-700" : "text-amber-600" },
           { label: "Durée moy. appel",   val: fmt(stats.avgDuration),   icon: Clock,        cls: "" },
