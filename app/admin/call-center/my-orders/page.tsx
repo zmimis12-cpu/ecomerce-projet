@@ -21,7 +21,7 @@ export default async function MyOrdersPage() {
     .then((s) => s.from("orders").select(`
       id, order_number, customer_name, customer_phone,
       customer_city, customer_address, status, call_status,
-      call_attempts, last_call_at, assigned_to, notes, created_at, total_amount_mad, delivery_external_status, delivery_external_status_id, delivery_driver_phone, delivery_reported_to
+      call_attempts, last_call_at, assigned_to, notes, created_at, total_amount_mad, order_items(product_name, product_sku), delivery_external_status, delivery_external_status_id, delivery_driver_phone, delivery_reported_to
     `)
     .eq("assigned_to", session.authId)
     .order("created_at", { ascending: false })
@@ -34,13 +34,15 @@ export default async function MyOrdersPage() {
     assigned_to: string | null; notes: string | null; created_at: string; total_amount_mad: number;
     agent_name: string | null; first_product_name: string | null; first_product_sku: string | null;
   };
-  const orders = ((allOrders ?? []) as unknown as O[]).map((o) => ({ ...o, agent_name: null, first_product_name: null, first_product_sku: null }));
+  type OI = O & { order_items?: { product_name: string; product_sku: string }[] | null };
+  const orders = ((allOrders ?? []) as unknown as OI[]).map(({ order_items, ...o }) => ({
+    ...o, agent_name: null,
+    first_product_name: order_items?.[0]?.product_name ?? null, first_product_sku: order_items?.[0]?.product_sku ?? null,
+  }));
 
-  // Group by status
-  const confirmed  = orders.filter((o) => o.status === "confirmed").length;
-  const refused    = orders.filter((o) => o.status === "refused").length;
-  const delivered  = orders.filter((o) => ["delivered", "paid"].includes(o.status)).length;
-  const pending    = orders.filter((o) => ["new", "no_answer", "pending"].includes(o.status)).length;
+  // Chiffres exacts sur les commandes (historique : une commande confirmée puis expédiée reste « confirmée »)
+  const { agentRates } = await import("@/lib/call-center/rates");
+  const r = (await agentRates([session.authId])).get(session.authId)!;
 
   return (
     <>
@@ -67,14 +69,19 @@ export default async function MyOrdersPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "En attente",  val: pending,   cls: "text-primary"     },
-          { label: "Confirmés",   val: confirmed, cls: "text-green-700"   },
-          { label: "Refusés",     val: refused,   cls: "text-red-600"     },
-          { label: "Livrés",      val: delivered, cls: "text-emerald-700" },
+          { label: "Total commandes", val: r.assigned,                 cls: "",                 sub: `${r.treated} traitées` },
+          { label: "Confirmées",      val: r.confirmed,                cls: "text-green-700",   sub: `taux ${r.confirmRate} %` },
+          { label: "Sans réponse",    val: r.noAnswer,                 cls: "text-primary",     sub: "à rappeler" },
+          { label: "Refusées",        val: r.refused,                  cls: "text-red-600",     sub: "" },
+          { label: "Fausses / annulées", val: r.cancelled,             cls: "text-muted-foreground", sub: `dont ${r.fake} fausses` },
+          { label: "En route",        val: r.inTransit,                cls: "text-blue-700",    sub: `${r.shipped} expédiées` },
+          { label: "Livrées",         val: r.delivered,                cls: "text-emerald-700", sub: r.delivered + r.returned ? `taux ${r.deliveryRate} %` : "aucun colis terminé" },
+          { label: "Retours",         val: r.returned,                 cls: "text-red-600",     sub: "" },
         ].map((s) => (
           <div key={s.label} className="rounded-xl border bg-card p-4">
             <p className="text-xs text-muted-foreground mb-1">{s.label}</p>
             <p className={cn("text-2xl font-bold", s.cls)}>{s.val}</p>
+            {s.sub && <p className="text-[11px] text-muted-foreground mt-0.5">{s.sub}</p>}
           </div>
         ))}
       </div>
