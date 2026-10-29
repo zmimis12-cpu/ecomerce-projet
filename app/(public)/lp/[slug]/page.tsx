@@ -164,12 +164,14 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     form: (
       <W><div id="sp-form" className="sp-card">
         {d.urgency && d.urgencyText && <div className="sp-urg">{d.urgencyText}</div>}
-        <h1 className="sp-title" id="sp-title" suppressHydrationWarning>{title}</h1>
+        <h1 className="sp-title" id="sp-title" suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: title.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") }} />
         {angles.length > 0 && (
           // Même message pub ↔ page : ?cr=V009 → titre de l'angle de cette pub (sans recharger, page toujours en cache)
           <script dangerouslySetInnerHTML={{ __html: `(function(){try{${angleJs}if(!m)return;function ap(){var t=document.getElementById('sp-title');if(t&&m.h&&t.textContent!==m.h)t.textContent=m.h;var s=document.getElementById('sp-angle-sub');if(s&&m.s&&s.textContent!==m.s){s.textContent=m.s;s.style.display='block';}}ap();setTimeout(ap,600);setTimeout(ap,2000);window.addEventListener('load',ap);}catch(e){}})();` }} />
         )}
-        <p className="sp-angle-sub" id="sp-angle-sub" suppressHydrationWarning />
+        {/* rempli par le script d'angle avant/après l'hydratation → contenu non géré par React (évite l'erreur #418) */}
+        <p className="sp-angle-sub" id="sp-angle-sub" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: "" }} />
         <div className="sp-price">
           <span className="sp-now">{one.price.toFixed(0)} DH</span>
           {d.showOldPrice && oldShown > one.price && <span className="sp-old">{oldShown.toFixed(0)} DH</span>}
