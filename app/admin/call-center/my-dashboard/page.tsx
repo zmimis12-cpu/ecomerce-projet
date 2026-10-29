@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { AgentPresence } from "@/components/call-center/agent-presence";
 import { requireRole } from "@/lib/auth/session";
 import { getMyStats, getMyCallbacks, getMyCommissions, getMyAssignedOrders } from "@/lib/call-center/agent-queries";
-import { Phone, CheckCircle2, XCircle, Clock, Award, TrendingUp, CalendarClock, AlertTriangle } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Award, TrendingUp, CalendarClock, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
