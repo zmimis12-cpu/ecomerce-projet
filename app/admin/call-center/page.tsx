@@ -7,7 +7,7 @@ import { LiveAgentsTable } from "@/components/call-center/live-agents-table";
 import { AgentPresence } from "@/components/call-center/agent-presence";
 import {
   Phone, PhoneCall, PhoneOff, PhoneMissed,
-  Users, ListTodo, Award, CalendarClock, UserCheck,
+  Users, ListTodo, Award, CalendarClock, UserCheck, AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +37,7 @@ export default async function CallCenterPage() {
       .select("id, assigned_to, call_status, status")
       .not("status", "in", '("cancelled","returned")'),
     supabaseAdmin.from("call_logs")
-      .select("id, agent_id, disposition")
+      .select("id, agent_id, disposition, order_id")
       .gte("created_at", today.toISOString()),
     supabaseAdmin.from("orders")
       .select("id")
@@ -53,18 +53,18 @@ export default async function CallCenterPage() {
   const logs     = (todayLogs ?? []) as L[];
   const cbCount  = (callbacks ?? []).length;
 
-  const assigned   = orders.filter((o) => o.assigned_to).length;
-  const unassigned = orders.filter((o) => !o.assigned_to).length;
-  const confirmed  = orders.filter((o) => o.call_status === "confirmed").length;
-  const refused    = orders.filter((o) => o.call_status === "refused").length;
-  const noAnswer   = orders.filter((o) => o.call_status === "no_answer").length;
-  const paid       = orders.filter((o) => o.status === "paid").length;
-  const confRate   = assigned === 0 ? 0 : Math.round((confirmed / assigned) * 100);
+  // Chiffres exacts sur les COMMANDES traitées par le call center (mêmes définitions que le dashboard)
+  const { agentRates, sumRates } = await import("@/lib/call-center/rates");
+  const tot = sumRates(await agentRates(agents.map((a) => a.agent_id)));
+  const unassigned = orders.filter((o) => !o.assigned_to && ["new", "pending", "no_answer", "confirmed"].includes(o.status)).length;
 
-  const todayConfirmed = logs.filter((l) => l.disposition === "confirmed").length;
-  const todayRefused   = logs.filter((l) => l.disposition === "refused").length;
-  const todayNoAnswer  = logs.filter((l) => l.disposition === "no_answer").length;
-  const todayCalls     = logs.length;
+  // Aujourd'hui = commandes distinctes (pas le nombre d'appels)
+  const distinct = (d: string) => new Set(logs.filter((l) => l.disposition === d).map((l) => (l as L & { order_id?: string }).order_id ?? l.id)).size;
+  const todayConfirmed = distinct("confirmed");
+  const todayRefused   = distinct("refused");
+  const todayNoAnswer  = distinct("no_answer");
+  const todayCalls     = new Set(logs.map((l) => (l as L & { order_id?: string }).order_id ?? l.id)).size;
+  void todayNoAnswer;
 
   const agentsOnline  = agents.filter((a) => a.availability_status === "available").length;
   const agentsInCall  = agents.filter((a) => a.availability_status === "in_call").length;
@@ -107,27 +107,36 @@ export default async function CallCenterPage() {
           <Kpi icon={<Award className="h-4 w-4"/>}    label="Commissions tot." value={`${totalComm.toFixed(0)} MAD`} />
         </div>
 
-        {/* Orders KPIs */}
+        {/* Orders KPIs — commandes assignées aux agents, depuis le début */}
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Commandes</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Commandes (call center, depuis le début)</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <Kpi icon={<Phone className="h-4 w-4"/>}       label="Total"         value={orders.length} />
-            <Kpi icon={<PhoneCall className="h-4 w-4"/>}   label="Assignées"     value={assigned} />
-            <Kpi icon={<PhoneMissed className="h-4 w-4"/>} label="Non assignées" value={unassigned} warn={unassigned > 0} />
-            <Kpi icon={<PhoneCall className="h-4 w-4"/>}   label="Confirmées"    value={confirmed} positive />
-            <Kpi icon={<PhoneOff className="h-4 w-4"/>}    label="Refusées"      value={refused} negative />
-            <Kpi icon={<PhoneCall className="h-4 w-4"/>}   label="Taux conf."    value={`${confRate}%`}
-              positive={confRate >= 50} negative={confRate < 30} />
+            <Kpi icon={<Phone className="h-4 w-4"/>}       label="Assignées"      value={tot.assigned} />
+            <Kpi icon={<PhoneCall className="h-4 w-4"/>}   label="Traitées"       value={tot.treated} />
+            <Kpi icon={<PhoneCall className="h-4 w-4"/>}   label="Confirmées"     value={tot.confirmed} positive />
+            <Kpi icon={<PhoneCall className="h-4 w-4"/>}   label="Taux confirmation" value={`${tot.confirmRate}%`}
+              positive={tot.confirmRate >= 75} negative={tot.confirmRate < 60} />
+            <Kpi icon={<PhoneMissed className="h-4 w-4"/>} label="Sans réponse"   value={tot.noAnswer} warn={tot.noAnswer > 0} />
+            <Kpi icon={<PhoneOff className="h-4 w-4"/>}    label="Refusées"       value={tot.refused} negative={tot.refused > 0} />
+            <Kpi icon={<PhoneOff className="h-4 w-4"/>}    label="Annulées"       value={tot.cancelled} />
+            <Kpi icon={<AlertTriangle className="h-4 w-4"/>} label="Fausses commandes" value={tot.fake} negative={tot.fake > 0} />
+            <Kpi icon={<PhoneCall className="h-4 w-4"/>}   label="Expédiées"      value={tot.shipped} />
+            <Kpi icon={<PhoneCall className="h-4 w-4"/>}   label="En route"       value={tot.inTransit} />
+            <Kpi icon={<Award className="h-4 w-4"/>}       label="Livrées"        value={tot.delivered} positive />
+            <Kpi icon={<Award className="h-4 w-4"/>}       label="Taux livraison" value={tot.delivered + tot.returned ? `${tot.deliveryRate}%` : "—"}
+              positive={tot.deliveryRate >= 75} negative={tot.delivered + tot.returned > 0 && tot.deliveryRate < 60} />
+            <Kpi icon={<PhoneMissed className="h-4 w-4"/>} label="Non assignées (à traiter)" value={unassigned} warn={unassigned > 0} />
           </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">Taux confirmation = confirmées / traitées · Taux livraison = livrées / (livrées + retours), colis en route exclus.</p>
         </div>
 
         {/* Today KPIs */}
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Aujourd&apos;hui</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Kpi icon={<Phone className="h-4 w-4"/>}          label="Appels"        value={todayCalls} />
-            <Kpi icon={<PhoneCall className="h-4 w-4"/>}      label="Confirmés"     value={todayConfirmed} positive />
-            <Kpi icon={<PhoneOff className="h-4 w-4"/>}       label="Refusés"       value={todayRefused} negative={todayRefused > 0} />
+            <Kpi icon={<Phone className="h-4 w-4"/>}          label="Commandes appelées" value={todayCalls} />
+            <Kpi icon={<PhoneCall className="h-4 w-4"/>}      label="Confirmées"    value={todayConfirmed} positive />
+            <Kpi icon={<PhoneOff className="h-4 w-4"/>}       label="Refusées"      value={todayRefused} negative={todayRefused > 0} />
             <Kpi icon={<CalendarClock className="h-4 w-4"/>}  label="Rappels dus"   value={cbCount} warn={cbCount > 0} />
           </div>
         </div>

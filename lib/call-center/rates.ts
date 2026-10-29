@@ -13,7 +13,7 @@ const DELIVERED = new Set(["delivered", "paid", "exchanged"]);
 
 export type AgentRates = {
   assigned: number; treated: number; confirmed: number; shipped: number; delivered: number; paid: number;
-  refused: number; fake: number; returned: number; inTransit: number; confirmRate: number; deliveryRate: number;
+  refused: number; fake: number; returned: number; inTransit: number; noAnswer: number; cancelled: number; confirmRate: number; deliveryRate: number;
 };
 
 export async function agentRates(agentIds: string[]): Promise<Map<string, AgentRates>> {
@@ -45,8 +45,18 @@ export async function agentRates(agentIds: string[]): Promise<Map<string, AgentR
       refused: mine.filter((o) => o.status === "refused" || o.call_status === "refused").length,
       fake: mine.filter((o) => o.call_status === "fake_order").length,
       returned: returned.length, inTransit: inTransit.length,
+      noAnswer: mine.filter((o) => o.status === "no_answer").length, cancelled: mine.filter((o) => o.status === "cancelled").length,
       confirmRate: pct(confirmed.length, treated.length), deliveryRate: pct(delivered.length, delivered.length + returned.length),
     });
   }
   return out;
+}
+
+/** Total de tous les agents (vue globale). */
+export function sumRates(m: Map<string, AgentRates>): AgentRates {
+  const t = { assigned: 0, treated: 0, confirmed: 0, shipped: 0, delivered: 0, paid: 0, refused: 0, fake: 0, returned: 0, inTransit: 0, noAnswer: 0, cancelled: 0, confirmRate: 0, deliveryRate: 0 };
+  for (const r of m.values()) for (const k of Object.keys(t) as (keyof AgentRates)[]) if (k !== "confirmRate" && k !== "deliveryRate") t[k] += r[k];
+  t.confirmRate = t.treated ? Math.round((t.confirmed / t.treated) * 100) : 0;
+  t.deliveryRate = t.delivered + t.returned ? Math.round((t.delivered / (t.delivered + t.returned)) * 100) : 0;
+  return t;
 }

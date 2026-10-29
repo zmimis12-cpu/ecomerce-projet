@@ -90,8 +90,8 @@ export function LiveAgentsTable({ initialAgents }: { initialAgents: AgentStats[]
   }
 
   const HEADERS = [
-    "Agent", "Disponibilité", "Assignées", "Appels", "Confirmés",
-    "Livrés payés", "Commission", "Fausses", "Taux conf.", "Durée moy.", ""
+    "Agent", "Disponibilité", "Assignées", "Appels", "Confirmées",
+    "Livrées", "Commission", "Fausses", "Taux conf.", "Durée moy.", ""
   ];
 
   return (

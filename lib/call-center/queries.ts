@@ -70,7 +70,7 @@ availability_status: (() => {
       confirmed: rates.get(a.id)?.confirmed ?? confirmed,
       refused: rates.get(a.id)?.refused ?? refused,
       no_answer: noAnswer,
-      fake_orders: fakeOrders,
+      fake_orders: rates.get(a.id)?.fake ?? fakeOrders,
       duplicates,
       delivered_paid: rates.get(a.id)?.delivered ?? deliveredPaid,
       commission_mad: earnings.get(a.id) ?? 0,
