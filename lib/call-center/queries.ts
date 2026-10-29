@@ -90,7 +90,7 @@ export async function getCallCenterOrders(
 
   let query = supabase
     .from("orders")
-    .select("id, order_number, customer_name, customer_phone, customer_city, customer_address, status, call_status, call_attempts, last_call_at, assigned_to, notes, created_at")
+    .select("id, order_number, customer_name, customer_phone, customer_city, customer_address, status, call_status, call_attempts, last_call_at, assigned_to, notes, created_at, delivery_external_status, delivery_external_status_id, delivery_driver_phone, delivery_reported_to")
     .not("status", "in", '("cancelled","returned","paid","delivered")')
     .order("created_at", { ascending: false })
     .limit(200);

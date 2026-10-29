@@ -97,4 +97,9 @@ export interface CallCenterOrder {
   first_product_name: string | null;
   first_product_sku: string | null;
   created_at: string;
+  /** Suivi livraison (webhook / synchro Digylog) */
+  delivery_external_status?: string | null;
+  delivery_external_status_id?: number | null;
+  delivery_driver_phone?: string | null;
+  delivery_reported_to?: string | null;
 }

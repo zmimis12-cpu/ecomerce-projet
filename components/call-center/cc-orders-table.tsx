@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { CallResultBadge } from "./call-result-badge";
 import { StatusBadge } from "@/components/orders/status-badge";
+import { DigylogStatusBadge } from "@/components/orders/digylog-status-badge";
 import { AgentAssignment, BulkAssignToolbar } from "./agent-assignment";
 import { cn } from "@/lib/utils";
 import type { CallCenterOrder } from "@/types/call-center";
@@ -132,6 +133,12 @@ export function CCOrdersTable({ orders, agents, canManage, mode = "all" }: CCOrd
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={order.status as OrderStatus} />
+                      {order.delivery_external_status && (
+                        <div className="mt-1">
+                          <DigylogStatusBadge label={order.delivery_external_status} id={order.delivery_external_status_id ?? null}
+                            reportedTo={order.delivery_reported_to ?? null} driverPhone={order.delivery_driver_phone ?? null} />
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {order.call_status

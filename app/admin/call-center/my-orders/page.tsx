@@ -21,7 +21,7 @@ export default async function MyOrdersPage() {
     .then((s) => s.from("orders").select(`
       id, order_number, customer_name, customer_phone,
       customer_city, customer_address, status, call_status,
-      call_attempts, last_call_at, assigned_to, notes, created_at, total_amount_mad
+      call_attempts, last_call_at, assigned_to, notes, created_at, total_amount_mad, delivery_external_status, delivery_external_status_id, delivery_driver_phone, delivery_reported_to
     `)
     .eq("assigned_to", session.authId)
     .order("created_at", { ascending: false })
