@@ -142,6 +142,7 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
           {B("showOldPrice", "Ancien prix barré")}
           {B("showCodBar", "Bande verte livraison / paiement à la livraison")}
           {B("freeShip", "Grand bandeau « Livraison gratuite » au-dessus du formulaire")}
+          {B("trust3", "Bloc 3 garanties (paiement / livraison / retour) sous le bouton")}
           {B("askAddress", "Champ « العنوان » dans le formulaire")}
           {d.askAddress && B("addressRequired", "… adresse obligatoire")}
           {B("showWhatsapp", "Bouton WhatsApp sous le formulaire")}
@@ -159,6 +160,7 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
           {T("badge", "Badge offre")}
           {T("codBar", "Bande verte")}
           {T("freeShipText", "Texte du bandeau livraison gratuite")}
+          {T("trust3Text", "Bloc 3 garanties — titre|sous-titre ; titre|sous-titre ; titre|sous-titre (infos vraies uniquement)")}
           {T("orderTitle", "Titre au-dessus du formulaire")}
           {T("orderSub", "Sous-titre du formulaire", "vide = réassurance de la landing page")}
           {T("whyTitle", "Titre « pourquoi »", "vide = titre de la section scénarios")}

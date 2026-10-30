@@ -200,6 +200,20 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             {d.callNote && d.callNoteText && <p className="sp-call">{d.callNoteText}</p>}
           </div>
         )}
+        {d.trust3 && d.trust3Text && (
+          <div className="sp-t3">
+            {d.trust3Text.split(";").map((x) => x.split("|").map((y) => y.trim())).filter((x) => x[0]).slice(0, 3).map(([t, sub], i) => (
+              <div key={i} className="sp-t3-i">
+                <span className="sp-t3-ic" aria-hidden="true">
+                  {i === 0 ? <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                  : i === 1 ? <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                  : <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>}
+                </span>
+                <b>{t}</b>{sub && <small>{sub}</small>}
+              </div>
+            ))}
+          </div>
+        )}
         {orderSub && <p className="sp-order-sub">{orderSub}</p>}
         {d.showWhatsapp && waHref && <a className="sp-wa" href={waHref} target="_blank" rel="noopener noreferrer">واتساب — تواصل معنا</a>}
       </div></W>
@@ -509,6 +523,7 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 .sp-foot a{color:#cbd5e1;text-decoration:none}
 .sp-foot-copy{color:#64748b;font-size:11.5px}
 .sp-openbig{margin:0 0 8px;padding:11px 10px;border-radius:14px;background:#fef3c7;color:#92400e;border:2px solid #f59e0b;text-align:center;font-weight:900;font-size:18px;line-height:1.35}
+.sp-t3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0 4px;padding:12px 6px;background:#fff;border-radius:18px;box-shadow:0 2px 12px rgba(0,0,0,.06)}.sp-t3-i{display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px}.sp-t3-ic{width:46px;height:46px;border-radius:50%;background:#dcfce7;color:#16a34a;display:flex;align-items:center;justify-content:center;margin-bottom:4px}.sp-t3-i b{font-size:15px;font-weight:800;color:#0f172a}.sp-t3-i small{font-size:12.5px;color:#64748b}
 .sp-freeship{margin:10px 0 6px;padding:12px 10px;border-radius:14px;background:#16a34a;color:#fff;text-align:center;font-weight:900;font-size:20px;line-height:1.3;box-shadow:0 4px 14px rgba(22,163,74,.35)}
 .sp-sticky{position:fixed;left:12px;right:12px;bottom:12px;z-index:50;background:var(--c-primary);color:#fff;text-align:center;font-weight:800;font-size:16px;padding:14px;border-radius:14px;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.25);transition:opacity .2s,transform .2s}
 .sp-sticky.sp-hide{opacity:0;transform:translateY(120%);pointer-events:none}

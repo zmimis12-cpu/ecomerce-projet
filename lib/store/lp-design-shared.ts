@@ -39,6 +39,8 @@ export type LpDesign = {
   showCodBar: boolean;
   freeShip: boolean;                 // grand bandeau « livraison gratuite » juste au-dessus du formulaire
   freeShipText: string;
+  trust3: boolean;                   // bloc 3 garanties (paiement / livraison / retour) sous le bouton commander
+  trust3Text: string;                // « titre|sous-titre ; titre|sous-titre ; titre|sous-titre » — seulement des infos VRAIES
   askAddress: boolean;
   addressRequired: boolean;
   showWhatsapp: boolean;
@@ -77,7 +79,7 @@ export type LpDesign = {
 export const DEFAULT_LP_DESIGN: LpDesign = {
   blocks: LP_BLOCKS.map((b) => ({ key: b.key, on: true })),
   heroSource: "product", heroImage: "", heroPosition: "top", heroRatio: "auto", formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
-  showOldPrice: true, showCodBar: true, freeShip: true, freeShipText: "🚚 التوصيل مجاني لجميع المدن", askAddress: true, addressRequired: false, showWhatsapp: true, showWhatsappFloat: true,
+  showOldPrice: true, showCodBar: true, freeShip: true, freeShipText: "🚚 التوصيل مجاني لجميع المدن", trust3: true, trust3Text: "الدفع|عند الاستلام ; التوصيل|24-72h ; إرجاع|خلال 7 أيام", askAddress: true, addressRequired: false, showWhatsapp: true, showWhatsappFloat: true,
   sticky: true, showFooter: true,
   topBar: "", badge: "عرض خاص", codBar: "🚚 التوصيل لجميع المدن | الدفع عند الاستلام", orderTitle: "🛒 اطلب الآن", orderSub: "",
   videoTitle: "شاهد كيف يعمل", videoSub: "فيديو توضيحي يبين لك جودة الصورة وسهولة الاستعمال",
