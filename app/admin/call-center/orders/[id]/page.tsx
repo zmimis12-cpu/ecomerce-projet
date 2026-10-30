@@ -12,6 +12,8 @@ import type { OrderStatus } from "@/types/orders";
 import type { CallResult } from "@/types/call-center";
 import { MessageCircle, Truck } from "lucide-react";
 import { CcCustomerEdit } from "@/components/call-center/cc-customer-edit";
+import { CcQtyEdit } from "@/components/call-center/cc-qty-edit";
+import { qtyPriceTable } from "@/lib/call-center/qty-price";
 import { DigylogStatusBadge } from "@/components/orders/digylog-status-badge";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { CC_WA_LABEL, normalizeCcWa, fillCcWa, waLink, type CcWaKey } from "@/lib/call-center/whatsapp-templates";
@@ -41,6 +43,10 @@ export default async function CCOrderCallPage({ params }: { params: Promise<{ id
   // For the CallTimer client component to work after call, we pass a key
   // based on call_attempts so it resets when a call is logged
   const timerKey = `call-${id}-${order.call_attempts}`;
+  const oq = order as unknown as { landing_page_slug?: string | null; delivery_tracking_number?: string | null };
+  const qtyLocked = !!oq.delivery_tracking_number || !["new", "pending", "confirmed", "no_answer"].includes(order.status);
+  const priceTables = await Promise.all(items.map((it) =>
+    qtyPriceTable(it.product_id, items.length === 1 ? oq.landing_page_slug ?? null : null, Number(it.unit_price) || 0, Math.max(5, it.quantity))));
 
   // Messages WhatsApp manuels (modifiables dans Call center → Agents)
   const { data: waRow } = await supabaseAdmin.from("app_settings").select("value").eq("key", "cc_whatsapp_templates").maybeSingle();
@@ -48,7 +54,7 @@ export default async function CCOrderCallPage({ params }: { params: Promise<{ id
   const ox = order as typeof order & {
     total_amount_mad?: number | null; delivery_tracking_number?: string | null;
     delivery_external_status?: string | null; delivery_external_status_id?: number | null;
-    delivery_driver_phone?: string | null; delivery_reported_to?: string | null;
+    delivery_driver_phone?: string | null; delivery_reported_to?: string | null; shipping_charge?: number | null;
   };
   // Suivi livraison (webhooks / synchro Digylog) : statuts, livreur, motif, lieu
   const { data: evRows } = ox.delivery_tracking_number
@@ -145,22 +151,27 @@ export default async function CCOrderCallPage({ params }: { params: Promise<{ id
         </div>
       )}
 
-      {/* Products — no price for agents */}
+      {/* Produits — prix visibles, quantité modifiable (prix recalculé auto) */}
       {items.length > 0 && (
         <div className="rounded-xl border bg-card p-5 space-y-3">
           <h3 className="text-sm font-semibold">Produits</h3>
           <div className="divide-y">
-            {items.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 py-2.5">
-                <Package className="h-4 w-4 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="text-sm font-medium">{item.product_name}</p>
-                  <p className="text-xs text-muted-foreground font-mono">
-                    {item.product_sku} × {item.quantity}
-                  </p>
+            {items.map((item, i) => (
+              <div key={item.id} className="py-2.5 space-y-2">
+                <div className="flex items-center gap-3">
+                  <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">{item.product_name}</p>
+                    <p className="text-xs text-muted-foreground">Prix unitaire : <span dir="ltr">{Number(item.unit_price)} DH</span></p>
+                  </div>
                 </div>
+                <CcQtyEdit orderId={id} itemId={item.id} qty={item.quantity} prices={priceTables[i]} locked={qtyLocked} />
               </div>
             ))}
+          </div>
+          <div className="flex items-center justify-between border-t pt-3">
+            <span className="text-sm text-muted-foreground">Total à encaisser{Number(ox.shipping_charge ?? 0) > 0 ? ` (dont livraison ${Number(ox.shipping_charge)} DH)` : ""}</span>
+            <span className="text-2xl font-bold" dir="ltr">{Number(ox.total_amount_mad ?? 0)} DH</span>
           </div>
         </div>
       )}

@@ -127,7 +127,10 @@ export function CCOrdersTable({ orders, agents, canManage, mode = "all" }: CCOrd
                       {order.first_product_name ? (
                         <>
                           <p className="text-xs truncate max-w-[140px]">{order.first_product_name}</p>
-                          <p className="text-xs text-muted-foreground font-mono">{order.first_product_sku}</p>
+                          <p className="text-xs text-muted-foreground">
+                            × {(order as { first_product_qty?: number | null }).first_product_qty ?? 1}
+                            {(order as { total_amount_mad?: number | null }).total_amount_mad != null && <> · <span className="font-semibold text-foreground" dir="ltr">{Number((order as { total_amount_mad?: number | null }).total_amount_mad)} DH</span></>}
+                          </p>
                         </>
                       ) : <span className="text-xs text-muted-foreground">—</span>}
                     </td>

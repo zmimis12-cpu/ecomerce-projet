@@ -21,7 +21,7 @@ export default async function MyOrdersPage() {
     .then((s) => s.from("orders").select(`
       id, order_number, customer_name, customer_phone,
       customer_city, customer_address, status, call_status,
-      call_attempts, last_call_at, assigned_to, notes, created_at, total_amount_mad, order_items(product_name, product_sku), delivery_external_status, delivery_external_status_id, delivery_driver_phone, delivery_reported_to
+      call_attempts, last_call_at, assigned_to, notes, created_at, total_amount_mad, order_items(product_name, product_sku, quantity), delivery_external_status, delivery_external_status_id, delivery_driver_phone, delivery_reported_to
     `)
     .eq("assigned_to", session.authId)
     .order("created_at", { ascending: false })
@@ -34,10 +34,11 @@ export default async function MyOrdersPage() {
     assigned_to: string | null; notes: string | null; created_at: string; total_amount_mad: number;
     agent_name: string | null; first_product_name: string | null; first_product_sku: string | null;
   };
-  type OI = O & { order_items?: { product_name: string; product_sku: string }[] | null };
+  type OI = O & { order_items?: { product_name: string; product_sku: string; quantity?: number }[] | null };
   const orders = ((allOrders ?? []) as unknown as OI[]).map(({ order_items, ...o }) => ({
     ...o, agent_name: null,
     first_product_name: order_items?.[0]?.product_name ?? null, first_product_sku: order_items?.[0]?.product_sku ?? null,
+    first_product_qty: order_items?.[0]?.quantity ?? null,
   }));
 
   // Chiffres exacts sur les commandes (historique : une commande confirmée puis expédiée reste « confirmée »)

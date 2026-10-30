@@ -93,7 +93,7 @@ export async function getCallCenterOrders(
 
   let query = supabase
     .from("orders")
-    .select("id, order_number, customer_name, customer_phone, customer_city, customer_address, status, call_status, call_attempts, last_call_at, assigned_to, notes, created_at, delivery_external_status, delivery_external_status_id, delivery_driver_phone, delivery_reported_to")
+    .select("id, order_number, customer_name, customer_phone, customer_city, customer_address, status, call_status, call_attempts, last_call_at, assigned_to, notes, created_at, total_amount_mad, delivery_external_status, delivery_external_status_id, delivery_driver_phone, delivery_reported_to")
     .not("status", "in", '("cancelled","returned","paid","delivered")')
     .order("created_at", { ascending: false })
     .limit(200);
@@ -127,12 +127,12 @@ export async function getCallCenterOrders(
   const orderIds = rows.map((o) => o.id);
   const { data: items } = await supabase
     .from("order_items")
-    .select("order_id, product_id, product_name, product_sku")
+    .select("order_id, product_id, product_name, product_sku, quantity")
     .in("order_id", orderIds);
 
-  const itemMap: Record<string, { product_name: string; product_sku: string }> = {};
+  const itemMap: Record<string, { product_name: string; product_sku: string; quantity?: number }> = {};
   const pidsOf: Record<string, (string | null)[]> = {};
-  for (const it of (items ?? []) as unknown as { order_id: string; product_id: string | null; product_name: string; product_sku: string }[]) {
+  for (const it of (items ?? []) as unknown as { order_id: string; product_id: string | null; product_name: string; product_sku: string; quantity: number }[]) {
     if (!itemMap[it.order_id]) itemMap[it.order_id] = it;
     (pidsOf[it.order_id] ??= []).push(it.product_id);
   }
@@ -150,6 +150,7 @@ export async function getCallCenterOrders(
     agent_name: o.assigned_to ? (agentMap[o.assigned_to] ?? null) : null,
     first_product_name: itemMap[o.id]?.product_name ?? null,
     first_product_sku: itemMap[o.id]?.product_sku ?? null,
+    first_product_qty: itemMap[o.id]?.quantity ?? null,
   }));
 }
 
@@ -159,7 +160,7 @@ export async function getCallCenterOrderDetail(id: string) {
 
   const { data, error } = await supabase
     .from("orders")
-    .select("id, order_number, customer_name, customer_phone, customer_city, customer_address, customer_region, status, call_status, call_attempts, last_call_at, assigned_to, notes, created_at, total_amount_mad, delivery_tracking_number, delivery_external_status, delivery_external_status_id, delivery_driver_phone, delivery_reported_to")
+    .select("id, order_number, customer_name, customer_phone, customer_city, customer_address, customer_region, status, call_status, call_attempts, last_call_at, assigned_to, notes, created_at, total_amount_mad, delivery_tracking_number, delivery_external_status, delivery_external_status_id, delivery_driver_phone, delivery_reported_to, landing_page_slug, shipping_charge")
     .eq("id", id)
     .single();
 
@@ -167,13 +168,13 @@ export async function getCallCenterOrderDetail(id: string) {
   const order = data as unknown as CallCenterOrder;
 
   const [{ data: items }, { data: logs }] = await Promise.all([
-    supabase.from("order_items").select("id, product_name, product_sku, quantity").eq("order_id", id),
+    supabase.from("order_items").select("id, product_id, product_name, product_sku, quantity, unit_price").eq("order_id", id),
     supabase.from("call_logs").select("id, agent_id, disposition, duration_seconds, notes, call_started_at, created_at").eq("order_id", id).order("created_at", { ascending: false }).limit(10),
   ]);
 
   return {
     order,
-    items: (items ?? []) as unknown as { id: string; product_name: string; product_sku: string; quantity: number }[],
+    items: (items ?? []) as unknown as { id: string; product_id: string | null; product_name: string; product_sku: string; quantity: number; unit_price: number }[],
     logs: (logs ?? []) as unknown as CallLog[],
   };
 }

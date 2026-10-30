@@ -267,3 +267,53 @@ export async function updateCcCustomer(orderId: string, data: { name: string; ci
   revalidatePath(`/admin/orders/${orderId}`);
   return { ok: true };
 }
+
+/** Confirmatrice : changer la quantité d'un produit → prix recalculé automatiquement (offres LP sinon prix catalogue × qté). */
+export async function updateCcQuantity(orderId: string, itemId: string, qty: number): Promise<{ ok: boolean; error?: string; total?: number }> {
+  const session = await requireRole([...CC_ROLES]);
+  const q = Math.floor(Number(qty));
+  if (!Number.isFinite(q) || q < 1 || q > 20) return { ok: false, error: "Quantité invalide (1 à 20)" };
+  const { data: o } = await supabaseAdmin.from("orders")
+    .select("assigned_to, status, delivery_tracking_number, landing_page_slug, shipping_charge, discount_amount").eq("id", orderId).maybeSingle();
+  const ord = o as { assigned_to: string | null; status: string; delivery_tracking_number: string | null; landing_page_slug: string | null; shipping_charge: number | null; discount_amount: number | null } | null;
+  if (!ord) return { ok: false, error: "Commande introuvable" };
+  if (session.role === "call_center_agent" && ord.assigned_to !== session.authId) return { ok: false, error: "Non autorisé" };
+  if (ord.delivery_tracking_number || !["new", "pending", "confirmed", "no_answer"].includes(ord.status))
+    return { ok: false, error: "Déjà envoyée au livreur : modification impossible ici" };
+
+  const { data: its } = await supabaseAdmin.from("order_items").select("id, product_id, quantity, unit_price, unit_cost_mad").eq("order_id", orderId);
+  const items = (its ?? []) as { id: string; product_id: string | null; quantity: number; unit_price: number; unit_cost_mad: number | null }[];
+  const it = items.find((x) => x.id === itemId);
+  if (!it) return { ok: false, error: "Produit introuvable" };
+
+  const { qtyPriceTable } = await import("@/lib/call-center/qty-price");
+  const table = await qtyPriceTable(it.product_id, items.length === 1 ? ord.landing_page_slug : null, Number(it.unit_price) || 0, q);
+  const line = table[q];
+  const unitPrice = Math.round((line / q) * 100) / 100;
+
+  let unitCost = Number(it.unit_cost_mad ?? 0);
+  if (it.product_id) {
+    const { data: p } = await supabaseAdmin.from("products")
+      .select("total_cost_mad, ads_cost_mad, confirmation_cost_mad, shipping_cost_mad, purchase_price_mad, packaging_cost_mad").eq("id", it.product_id).maybeSingle();
+    if (p) { const { orderCost } = await import("@/lib/orders/cost"); unitCost = orderCost(p as never, q).unitEffective; }
+  }
+  const { error: e1 } = await supabaseAdmin.from("order_items")
+    .update({ quantity: q, unit_price: unitPrice, unit_cost_mad: unitCost } as never).eq("id", itemId);
+  if (e1) return { ok: false, error: e1.message };
+
+  const all = items.map((x) => x.id === itemId ? { ...x, quantity: q, unit_price: unitPrice, unit_cost_mad: unitCost } : x);
+  const subtotal = Math.round(all.reduce((s, x) => s + Number(x.unit_price) * x.quantity, 0) * 100) / 100;
+  const cogs = Math.round(all.reduce((s, x) => s + Number(x.unit_cost_mad ?? 0) * x.quantity, 0) * 100) / 100;
+  const ship = Number(ord.shipping_charge ?? 0), disc = Number(ord.discount_amount ?? 0);
+  const { error: e2 } = await supabaseAdmin.from("orders")
+    .update({ subtotal, cogs_total: cogs, estimated_profit: subtotal - disc + ship - cogs, updated_at: new Date().toISOString() } as never).eq("id", orderId);
+  if (e2) return { ok: false, error: e2.message };
+
+  await supabaseAdmin.from("order_status_history").insert({
+    order_id: orderId, from_status: ord.status, to_status: ord.status, changed_by: session.authId,
+    notes: `Quantité modifiée par le call center : ${it.quantity} → ${q} (prix ${line} DH).`,
+  } as never);
+  revalidatePath(`/admin/call-center/orders/${orderId}`);
+  revalidatePath(`/admin/orders/${orderId}`);
+  return { ok: true, total: subtotal - disc + ship };
+}
