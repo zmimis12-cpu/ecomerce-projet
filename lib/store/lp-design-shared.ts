@@ -76,7 +76,7 @@ export type LpDesign = {
 
 export const DEFAULT_LP_DESIGN: LpDesign = {
   blocks: LP_BLOCKS.map((b) => ({ key: b.key, on: true })),
-  heroSource: "product", heroImage: "", heroPosition: "top", heroRatio: "1/1", formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
+  heroSource: "product", heroImage: "", heroPosition: "top", heroRatio: "auto", formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
   showOldPrice: true, showCodBar: true, freeShip: true, freeShipText: "🚚 التوصيل مجاني لجميع المدن", askAddress: true, addressRequired: false, showWhatsapp: true, showWhatsappFloat: true,
   sticky: true, showFooter: true,
   topBar: "", badge: "عرض خاص", codBar: "🚚 التوصيل لجميع المدن | الدفع عند الاستلام", orderTitle: "🛒 اطلب الآن", orderSub: "",
@@ -116,7 +116,7 @@ export function normalizeDesign(v: Partial<LpDesign> | undefined | null): LpDesi
   const angles = (Array.isArray(v?.angles) ? v!.angles : []).slice(0, 20)
     .map((a) => ({ codes: str(a?.codes), headline: str(a?.headline), sub: str(a?.sub), image: str((a as { image?: unknown })?.image) })).filter((a) => a.codes || a.headline || a.image);
   const heroPosition = d.heroPosition === "after_form" || d.heroPosition === "hidden" ? d.heroPosition : "top";
-  const heroRatio = (["1/1", "4/5", "9/16", "auto"] as const).includes(d.heroRatio as never) ? d.heroRatio : "1/1";
+  const heroRatio = (["1/1", "4/5", "9/16", "auto"] as const).includes(d.heroRatio as never) ? d.heroRatio : "auto";
   return { ...d, heroPosition, heroRatio, blocks, tiles, galleryImages, proofImages, angles };
 }
 
