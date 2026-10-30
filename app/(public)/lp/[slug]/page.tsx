@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getLandingPage } from "@/lib/public/queries";
 import { OrderFormPublic, FALLBACK_CITIES } from "@/components/landing/order-form-public";
+import { LpFunnelTracker } from "@/components/landing/lp-funnel-tracker";
 import { normalizeOffers } from "@/lib/landing-pages/offers";
 import { getStoreProducts, getBumpsFor } from "@/lib/store/catalog";
 import { StoreHeader } from "@/components/store/store-header";
@@ -182,6 +183,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </span>
         </div>
         {d.orderTitle && <p className="sp-order-h">{d.orderTitle}</p>}
+        <LpFunnelTracker slug={slug} />
         <OrderFormPublic product={product} productSlug={slug} ctaText={ctaText}
           b1={b1} b2={b2} b3={b3} offers={offers} askAddress={d.askAddress} addressRequired={d.addressRequired}
           pixelId={pixel || undefined} tiktokPixelId={tt || undefined}

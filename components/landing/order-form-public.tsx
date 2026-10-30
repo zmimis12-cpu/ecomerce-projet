@@ -52,6 +52,11 @@ interface Props {
   offersAfterFields?: boolean;
 }
 
+/** Mesure du parcours LP (lu par components/landing/lp-funnel-tracker.tsx). Ne bloque jamais. */
+function lpf(t: string, f?: string) {
+  try { window.dispatchEvent(new CustomEvent("lpf", { detail: { t, f } })); } catch { /* rien */ }
+}
+
 export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [], askAddress = false, addressRequired = false, offerImage = null, offersAfterFields = true }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -167,7 +172,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   }
 
   function set(key: string, val: string) {
-    if (key !== "website") trackInitiateCheckoutOnce(); // ignore le honeypot anti-bot
+    if (key !== "website") { trackInitiateCheckoutOnce(); lpf("f", key); } // ignore le honeypot anti-bot
     setForm((f) => ({ ...f, [key]: val }));
     setErrors((e) => { const n={...e}; delete n[key]; return n; });
   }
@@ -187,7 +192,9 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     if (missingVariant) newErrors.variants = bundle > 1
       ? "المرجو اختيار الخيارات لكل قطعة"
       : "المرجو اختيار الخيارات";
+    lpf("click");
     if (Object.keys(newErrors).length > 0) {
+      lpf("err", Object.keys(newErrors).join(","));
       setErrors(newErrors);
       // Bouton fixe « اشتري الآن » cliqué loin du formulaire : on ramène le client aux champs à remplir
       formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -227,6 +234,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           errors?:Record<string,string>; error?:string;
         };
         if (data.success) {
+          lpf("ok");
           setSubmitted(true);
           // Conversion tracking — fires only on confirmed order creation.
           // "Lead" (not "Purchase") since payment happens on delivery (COD),
@@ -257,9 +265,9 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
             w.dataLayer?.push({ event: "generate_lead", value: total, currency: "MAD", item_name: product.name });
             window.scrollTo({top:0,behavior:"smooth"});
           }
-        } else if (data.errors) { setErrors(data.errors); }
-        else { setServerError(data.error ?? "حدث خطأ. حاول مجدداً."); }
-      } catch { setServerError("خطأ في الاتصال. حاول مجدداً."); }
+        } else if (data.errors) { lpf("err", "srv:" + Object.keys(data.errors).join(",")); setErrors(data.errors); }
+        else { lpf("err", "srv"); setServerError(data.error ?? "حدث خطأ. حاول مجدداً."); }
+      } catch { lpf("err", "net"); setServerError("خطأ في الاتصال. حاول مجدداً."); }
     });
   }
 
