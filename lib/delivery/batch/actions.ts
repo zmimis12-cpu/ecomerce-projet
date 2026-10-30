@@ -1229,9 +1229,35 @@ export async function generateRecapAndLabels(batchId: string): Promise<{
       try {
         const res = await fetch(url);
         if (!res.ok) return;
-        const jpg = await sharp(Buffer.from(await res.arrayBuffer()), { limitInputPixels: false })
-          .rotate().resize(200, 200, { fit: "cover" }).grayscale().normalize().jpeg({ quality: 80 }).toBuffer();
-        photoByKey.set(p.id, await recapDoc.embedJpg(jpg));
+        // Imprimante thermique = noir OU blanc : fond transparent → blanc (sinon tache noire),
+        // produit entier visible (contain), puis contours (les produits blancs restent visibles)
+        // + tramage Floyd–Steinberg (les volumes) → la photo garde ses formes au lieu de faire des taches.
+        const S = 160;
+        const { data: px } = await sharp(Buffer.from(await res.arrayBuffer()), { limitInputPixels: false })
+          .rotate().flatten({ background: "#ffffff" })
+          .resize(S, S, { fit: "contain", background: "#ffffff" })
+          .grayscale().normalize().blur(0.6)
+          .raw().toBuffer({ resolveWithObject: true });
+        const out = Buffer.alloc(S * S, 255);
+        const g = new Float32Array(S * S);
+        for (let i = 0; i < S * S; i++) g[i] = Math.min(255, px[i] * 1.1 + 15);
+        for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+          const i = y * S + x, v = g[i], n = v < 128 ? 0 : 255, err = v - n;
+          out[i] = n;
+          if (x + 1 < S) g[i + 1] += err * 7 / 16;
+          if (y + 1 < S) {
+            if (x > 0) g[i + S - 1] += err * 3 / 16;
+            g[i + S] += err * 5 / 16;
+            if (x + 1 < S) g[i + S + 1] += err / 16;
+          }
+        }
+        for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
+          const i = y * S + x;
+          const lap = Math.abs(8 * px[i] - px[i - 1] - px[i + 1] - px[i - S] - px[i + S] - px[i - S - 1] - px[i - S + 1] - px[i + S - 1] - px[i + S + 1]);
+          if (lap > 28) out[i] = 0;
+        }
+        const png = await sharp(out, { raw: { width: S, height: S, channels: 1 } }).png().toBuffer();
+        photoByKey.set(p.id, await recapDoc.embedPng(png));
       } catch (e) { console.error("[recap] photo", p.name, e); }
     }));
   } catch (e) { console.error("[recap] photos", e); }
