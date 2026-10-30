@@ -37,6 +37,8 @@ export type LpDesign = {
   showDiscount: boolean;
   showOldPrice: boolean;
   showCodBar: boolean;
+  freeShip: boolean;                 // grand bandeau « livraison gratuite » juste au-dessus du formulaire
+  freeShipText: string;
   askAddress: boolean;
   addressRequired: boolean;
   showWhatsapp: boolean;
@@ -75,7 +77,7 @@ export type LpDesign = {
 export const DEFAULT_LP_DESIGN: LpDesign = {
   blocks: LP_BLOCKS.map((b) => ({ key: b.key, on: true })),
   heroSource: "product", heroImage: "", heroPosition: "top", heroRatio: "1/1", formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
-  showOldPrice: true, showCodBar: true, askAddress: true, addressRequired: false, showWhatsapp: true, showWhatsappFloat: true,
+  showOldPrice: true, showCodBar: true, freeShip: true, freeShipText: "🚚 التوصيل مجاني لجميع المدن", askAddress: true, addressRequired: false, showWhatsapp: true, showWhatsappFloat: true,
   sticky: true, showFooter: true,
   topBar: "", badge: "عرض خاص", codBar: "🚚 التوصيل لجميع المدن | الدفع عند الاستلام", orderTitle: "🛒 اطلب الآن", orderSub: "",
   videoTitle: "شاهد كيف يعمل", videoSub: "فيديو توضيحي يبين لك جودة الصورة وسهولة الاستعمال",

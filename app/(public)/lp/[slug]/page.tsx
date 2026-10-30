@@ -182,6 +182,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             {d.showBadge && d.badge && <span className="sp-b-red">{d.badge}</span>}
           </span>
         </div>
+        {d.freeShip && d.freeShipText && <div className="sp-freeship">{d.freeShipText}</div>}
         {d.orderTitle && <p className="sp-order-h">{d.orderTitle}</p>}
         <LpFunnelTracker slug={slug} />
         <OrderFormPublic product={product} productSlug={slug} ctaText={ctaText}
@@ -506,6 +507,7 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 .sp-foot-top{display:flex;justify-content:space-between;align-items:center;max-width:560px;margin:0 auto 6px;color:#fff}
 .sp-foot a{color:#cbd5e1;text-decoration:none}
 .sp-foot-copy{color:#64748b;font-size:11.5px}
+.sp-freeship{margin:10px 0 6px;padding:12px 10px;border-radius:14px;background:#16a34a;color:#fff;text-align:center;font-weight:900;font-size:20px;line-height:1.3;box-shadow:0 4px 14px rgba(22,163,74,.35)}
 .sp-sticky{position:fixed;left:12px;right:12px;bottom:12px;z-index:50;background:var(--c-primary);color:#fff;text-align:center;font-weight:800;font-size:16px;padding:14px;border-radius:14px;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.25);transition:opacity .2s,transform .2s}
 .sp-sticky.sp-hide{opacity:0;transform:translateY(120%);pointer-events:none}
 @media (min-width:900px){.sp-sticky{max-width:520px;margin:0 auto}}

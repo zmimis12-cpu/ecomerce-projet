@@ -59,7 +59,7 @@ export function presetOffers(kind: "standard" | "buy1get4" | "buy2get3" | "buy3g
     ];
     case "buy2get3": return [
       { id: "o1", qty: 1, price: p },
-      { id: "o2", qty: 3, price: p * 2, label: "خود 3 وخلّص 2", badge: "الأكثر طلباً", isDefault: true },
+      { id: "o2", qty: 3, price: p * 2, label: "خود 3 وخلّص 2", isDefault: true },
     ];
     case "buy3get4": return [
       { id: "o1", qty: 1, price: p },
@@ -68,7 +68,7 @@ export function presetOffers(kind: "standard" | "buy1get4" | "buy2get3" | "buy3g
     ];
     default: return [
       { id: "o1", qty: 1, price: p },
-      { id: "o2", qty: 2, price: Math.round(p * 1.8), badge: "الأكثر طلباً", isDefault: true },
+      { id: "o2", qty: 2, price: Math.round(p * 1.8), isDefault: true },
       { id: "o3", qty: 3, price: Math.round(p * 2.4) },
     ];
   }
