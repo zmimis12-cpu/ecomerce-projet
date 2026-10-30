@@ -87,6 +87,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, errors: validation.errors }, { status: 422 });
   }
 
+  // Exemples / numéros bidon (ancien placeholder recopié, 0612345678…) → refusés poliment, pas de fausse commande
+  const fakePhone = /^0?6?12345678$|^0?(\d)\1{8}$/.test(String(customer_phone).replace(/\D/g, "").replace(/^212/, "0"));
+  const fakeCity = /كتب المدينة/.test(String(customer_city));
+  const fakeName = /^مثال/.test(String(customer_name).trim());
+  if (fakePhone || fakeCity || fakeName) {
+    const errors: Record<string, string> = {};
+    if (fakePhone) errors.customer_phone = "دخل رقم الهاتف ديالك الصحيح";
+    if (fakeCity) errors.customer_city = "دخل المدينة ديالك";
+    if (fakeName) errors.customer_name = "دخل الاسم ديالك";
+    return NextResponse.json({ success: false, errors }, { status: 422 });
+  }
+
   const normalizedPhone = validation.phone!;
 
   // ── 3+4. Rate limit, produit, LP, commandes récentes, agent — EN PARALLÈLE ──

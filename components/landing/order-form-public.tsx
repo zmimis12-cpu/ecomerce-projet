@@ -466,7 +466,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         <label style={LBL}>الاسم الكامل *</label>
         <input type="text" value={form.customer_name}
           onChange={(e) => set("customer_name", e.target.value)}
-          placeholder="مثال: محمد الأحمدي" style={INP(!!errors.customer_name)} required />
+          placeholder="الاسم الكامل" style={INP(!!errors.customer_name)} required />
         {ERR(errors.customer_name)}
       </div>
 
@@ -475,7 +475,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         <label style={LBL}>رقم الهاتف *</label>
         <input type="tel" value={form.customer_phone}
           onChange={(e) => set("customer_phone", e.target.value)}
-          placeholder="0612345678" style={INP(!!errors.customer_phone)} required />
+          placeholder="06 / 07 ..." style={INP(!!errors.customer_phone)} required />
         {ERR(errors.customer_phone)}
       </div>
 
@@ -491,7 +491,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           type="text"
           value={form.customer_city}
           onChange={(e) => set("customer_city", e.target.value)}
-          placeholder="كتب المدينة ديالك"
+          placeholder="المدينة"
           autoComplete="address-level2"
           style={{...INP(!!errors.customer_city), height:"54px", padding:"0 14px"}}
         />
