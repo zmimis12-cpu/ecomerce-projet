@@ -379,7 +379,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       <script dangerouslySetInnerHTML={{ __html:
         `document.documentElement.lang="ar";document.documentElement.dir="rtl";try{navigator.sendBeacon("/api/public/lp-view",JSON.stringify({slug:${JSON.stringify(slug)}}))}catch(e){}
         (function(){function buy(){var f=document.getElementById('sp-order-form');if(!f){var c=document.getElementById('sp-form');if(c)c.scrollIntoView({behavior:'smooth'});return;}if(f.requestSubmit)f.requestSubmit();else f.dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));}document.addEventListener('click',function(e){var t=e.target;if(t&&t.closest&&t.closest('#sp-buy')){e.preventDefault();buy();}});})();
-        (function(){function go(){var b=document.getElementById('sp-sticky'),f=document.getElementById('sp-form');if(!f||!('IntersectionObserver' in window))return;var w=document.getElementById('sp-wa-float');new IntersectionObserver(function(e){if(b)b.classList.toggle('sp-hide',e[0].isIntersecting);if(w)w.classList.toggle('sp-hide-wa',e[0].isIntersecting);},{threshold:0}).observe(document.getElementById('sp-order-form')||f);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`
+        (function(){function go(){var b=document.getElementById('sp-sticky'),f=document.getElementById('sp-form'),bar=document.getElementById('sp-bar'),of=document.getElementById('sp-order-form');if(bar&&of&&('IntersectionObserver' in window)){new IntersectionObserver(function(e){bar.classList.toggle('sp-bar-hide',e[0].isIntersecting);},{threshold:0}).observe(of);}if(!f||!('IntersectionObserver' in window))return;var w=document.getElementById('sp-wa-float');new IntersectionObserver(function(e){if(b)b.classList.toggle('sp-hide',e[0].isIntersecting);if(w)w.classList.toggle('sp-hide-wa',e[0].isIntersecting);},{threshold:0}).observe(document.getElementById('sp-order-form')||f);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`
       }} />
             <style>{CSS}</style>
 
@@ -438,7 +438,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         {!d.showFooter && <div style={{ height: 96 }} />}
 
         {barAlways && (
-          <div className="sp-bar">
+          <div className="sp-bar" id="sp-bar">
             <button type="button" id="sp-buy" className="sp-bar-buy">{stickyText}</button>
             {d.showWhatsappFloat && waHref && (
               <a href={waHref} target="_blank" rel="noopener noreferrer" className="sp-bar-wa" aria-label="تواصل عبر واتساب">
@@ -559,6 +559,7 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 .sp-bar-buy{flex:1;height:56px;border:0;border-radius:9999px;background:var(--c-primary);color:#fff;font-family:var(--font-cairo),sans-serif;font-size:19px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.18);animation:sp-buy-pulse 2.4s infinite}
 .sp-bar-wa{flex:0 0 56px;height:56px;border-radius:50%;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.18)}
 @keyframes sp-buy-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
+.sp-bar{transition:transform .2s,opacity .2s}.sp-bar.sp-bar-hide{transform:translateY(110%);opacity:0;pointer-events:none}
 @media (min-width:900px){.sp-bar{max-width:560px;margin:0 auto;left:0;right:0}}
 .sp-wa-float{position:fixed;bottom:84px;left:16px;z-index:60;width:56px;height:56px;border-radius:50%;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.25);transition:opacity .2s,transform .2s;animation:sp-wa-pulse 2.4s infinite}
 .sp-wa-float.sp-hide-wa{opacity:0;pointer-events:none;transform:scale(.6)}
