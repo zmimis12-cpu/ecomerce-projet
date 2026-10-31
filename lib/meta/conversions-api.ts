@@ -34,7 +34,7 @@ export interface PurchaseEventInput {
   clientUserAgent?: string | null;
   eventId: string;        // = order id, pour dédupliquer si rejoué
   eventTime?: number;     // secondes UNIX (défaut : maintenant) — Meta refuse > 7 jours
-  eventName?: "Purchase" | "Lead";
+  eventName?: "Purchase" | "Lead" | "OrderConfirmed";
   actionSource?: "website" | "other" | "chat";
   contentIds?: string[];
 }

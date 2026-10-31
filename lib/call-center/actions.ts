@@ -109,6 +109,8 @@ export async function logCall(data: {
 
   if (data.result === "confirmed") {
     syncOrderToGoogleSheets(data.orderId, "confirmed").catch(console.error);
+    // Meta apprend sur les commandes CONFIRMÉES (événement OrderConfirmed via Conversions API)
+    import("@/lib/meta/confirmed-event").then((m) => m.sendMetaConfirmedIfNeeded(data.orderId)).catch(console.error);
   }
 
   return { success: true };

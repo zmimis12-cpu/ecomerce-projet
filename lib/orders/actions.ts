@@ -334,6 +334,10 @@ export async function updateOrderStatus(
   }
 
   // Trigger Google Sheets sync — mark pending first, then sync in background
+  if (newStatus === "confirmed") {
+    // Meta apprend sur les commandes CONFIRMÉES (événement OrderConfirmed via Conversions API)
+    import("@/lib/meta/confirmed-event").then((m) => m.sendMetaConfirmedIfNeeded(orderId)).catch(console.error);
+  }
   if (newStatus === "confirmed" || newStatus === "returned") {
     // Mark as pending immediately so we can detect failures
     const supabaseAdmin = (await import("@/lib/supabase/admin")).supabaseAdmin;
