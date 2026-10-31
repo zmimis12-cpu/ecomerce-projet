@@ -182,8 +182,12 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             {d.showBadge && d.badge && <span className="sp-b-red">{d.badge}</span>}
           </span>
         </div>
-        {d.freeShip && d.freeShipText && <div className="sp-freeship">{d.freeShipText}</div>}
-        {d.openBeforePay && d.openBeforePayText && <div className="sp-openbig">{d.openBeforePayText}</div>}
+        {((d.freeShip && d.freeShipText) || (d.openBeforePay && d.openBeforePayText)) && (
+          <div className="sp-promo2">
+            {d.freeShip && d.freeShipText && <div className="sp-freeship">{d.freeShipText}</div>}
+            {d.openBeforePay && d.openBeforePayText && <div className="sp-openbig">{d.openBeforePayText}</div>}
+          </div>
+        )}
         {d.orderTitle && <p className="sp-order-h">{d.orderTitle}</p>}
         <LpFunnelTracker slug={slug} />
         <OrderFormPublic product={product} productSlug={slug} ctaText={ctaText}
@@ -522,9 +526,12 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 .sp-foot-top{display:flex;justify-content:space-between;align-items:center;max-width:560px;margin:0 auto 6px;color:#fff}
 .sp-foot a{color:#cbd5e1;text-decoration:none}
 .sp-foot-copy{color:#64748b;font-size:11.5px}
-.sp-openbig{margin:0 0 8px;padding:11px 10px;border-radius:14px;background:#fef3c7;color:#92400e;border:2px solid #f59e0b;text-align:center;font-weight:900;font-size:18px;line-height:1.35}
+.sp-promo2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0 6px}
+/* Téléphone : photo principale entière mais moins haute → le formulaire apparaît dans le 1er écran */
+@media (max-width:600px){.sp-hero{max-height:290px;width:auto;max-width:100%;object-fit:contain!important;background:transparent}}
+.sp-openbig{margin:0;padding:8px 6px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:#fef3c7;color:#92400e;border:2px solid #f59e0b;text-align:center;font-weight:900;font-size:14.5px;line-height:1.3}
 .sp-t3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0 4px;padding:12px 6px;background:#fff;border-radius:18px;box-shadow:0 2px 12px rgba(0,0,0,.06)}.sp-t3-i{display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px}.sp-t3-ic{width:46px;height:46px;border-radius:50%;background:#dcfce7;color:#16a34a;display:flex;align-items:center;justify-content:center;margin-bottom:4px}.sp-t3-i b{font-size:15px;font-weight:800;color:#0f172a}.sp-t3-i small{font-size:12.5px;color:#64748b}
-.sp-freeship{margin:10px 0 6px;padding:12px 10px;border-radius:14px;background:#16a34a;color:#fff;text-align:center;font-weight:900;font-size:20px;line-height:1.3;box-shadow:0 4px 14px rgba(22,163,74,.35)}
+.sp-freeship{margin:0;padding:8px 6px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:#16a34a;color:#fff;text-align:center;font-weight:900;font-size:15px;line-height:1.3;box-shadow:0 4px 14px rgba(22,163,74,.35)}
 .sp-sticky{position:fixed;left:12px;right:12px;bottom:12px;z-index:50;background:var(--c-primary);color:#fff;text-align:center;font-weight:800;font-size:16px;padding:14px;border-radius:14px;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.25);transition:opacity .2s,transform .2s}
 .sp-sticky.sp-hide{opacity:0;transform:translateY(120%);pointer-events:none}
 @media (min-width:900px){.sp-sticky{max-width:520px;margin:0 auto}}
