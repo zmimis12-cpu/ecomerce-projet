@@ -379,7 +379,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       <script dangerouslySetInnerHTML={{ __html:
         `document.documentElement.lang="ar";document.documentElement.dir="rtl";try{navigator.sendBeacon("/api/public/lp-view",JSON.stringify({slug:${JSON.stringify(slug)}}))}catch(e){}
         (function(){function buy(){var f=document.getElementById('sp-order-form');if(!f){var c=document.getElementById('sp-form');if(c)c.scrollIntoView({behavior:'smooth'});return;}if(f.requestSubmit)f.requestSubmit();else f.dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));}document.addEventListener('click',function(e){var t=e.target;if(t&&t.closest&&t.closest('#sp-buy')){e.preventDefault();buy();}});})();
-        (function(){function go(){var b=document.getElementById('sp-sticky'),f=document.getElementById('sp-form');if(!f||!('IntersectionObserver' in window))return;var w=document.getElementById('sp-wa-float');new IntersectionObserver(function(e){if(b)b.classList.toggle('sp-hide',e[0].isIntersecting);if(w)w.classList.toggle('sp-hide-wa',e[0].isIntersecting);},{threshold:0.05}).observe(f);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`
+        (function(){function go(){var b=document.getElementById('sp-sticky'),f=document.getElementById('sp-form');if(!f||!('IntersectionObserver' in window))return;var w=document.getElementById('sp-wa-float');new IntersectionObserver(function(e){if(b)b.classList.toggle('sp-hide',e[0].isIntersecting);if(w)w.classList.toggle('sp-hide-wa',e[0].isIntersecting);},{threshold:0}).observe(document.getElementById('sp-order-form')||f);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`
       }} />
             <style>{CSS}</style>
 
@@ -528,7 +528,7 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 .sp-foot-copy{color:#64748b;font-size:11.5px}
 .sp-promo2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0 6px}
 /* Téléphone : photo principale entière mais moins haute → le formulaire apparaît dans le 1er écran */
-@media (max-width:600px){.sp-hero{max-height:290px;width:auto;max-width:100%;object-fit:contain!important;background:transparent}}
+@media (max-width:600px){.sp-hero{max-height:260px;width:auto;max-width:100%;object-fit:contain!important;background:transparent}}
 .sp-openbig{margin:0;padding:8px 6px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:#fef3c7;color:#92400e;border:2px solid #f59e0b;text-align:center;font-weight:900;font-size:14.5px;line-height:1.3}
 .sp-t3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0 4px;padding:12px 6px;background:#fff;border-radius:18px;box-shadow:0 2px 12px rgba(0,0,0,.06)}.sp-t3-i{display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px}.sp-t3-ic{width:46px;height:46px;border-radius:50%;background:#dcfce7;color:#16a34a;display:flex;align-items:center;justify-content:center;margin-bottom:4px}.sp-t3-i b{font-size:15px;font-weight:800;color:#0f172a}.sp-t3-i small{font-size:12.5px;color:#64748b}
 .sp-freeship{margin:0;padding:8px 6px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:#16a34a;color:#fff;text-align:center;font-weight:900;font-size:15px;line-height:1.3;box-shadow:0 4px 14px rgba(22,163,74,.35)}
