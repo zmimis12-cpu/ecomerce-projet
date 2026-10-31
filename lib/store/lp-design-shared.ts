@@ -73,7 +73,7 @@ export type LpDesign = {
   animBarItems: string;              // messages séparés par « | »
   proofTitle: string;
   proofImages: string[];             // vraies photos (colis préparés, livraisons, captures WhatsApp avec accord)
-  angles: { codes: string; headline: string; sub: string; image: string }[]; // titre + photo hero selon la pub (?cr=V009 ou ?av=couple) → même message pub ↔ page
+  angles: { codes: string; headline: string; sub: string; image: string; page?: string }[]; // titre + photo hero selon la pub (?cr=V009 ou ?av=couple) → même message pub ↔ page ; page = slug d'une LP complète dédiée à cet avatar
 };
 
 export const DEFAULT_LP_DESIGN: LpDesign = {
@@ -116,7 +116,7 @@ export function normalizeDesign(v: Partial<LpDesign> | undefined | null): LpDesi
   const galleryImages = (Array.isArray(v?.galleryImages) ? v!.galleryImages : []).filter((x) => typeof x === "string" && x).slice(0, 20);
   const proofImages = (Array.isArray(v?.proofImages) ? v!.proofImages : []).filter((x) => typeof x === "string" && x).slice(0, 12);
   const angles = (Array.isArray(v?.angles) ? v!.angles : []).slice(0, 20)
-    .map((a) => ({ codes: str(a?.codes), headline: str(a?.headline), sub: str(a?.sub), image: str((a as { image?: unknown })?.image) })).filter((a) => a.codes || a.headline || a.image);
+    .map((a) => ({ codes: str(a?.codes), headline: str(a?.headline), sub: str(a?.sub), image: str((a as { image?: unknown })?.image), page: str((a as { page?: unknown })?.page).trim().replace(/[^\w\u0600-\u06FF-]/g, "") })).filter((a) => a.codes || a.headline || a.image || a.page);
   const heroPosition = d.heroPosition === "after_form" || d.heroPosition === "hidden" ? d.heroPosition : "top";
   const heroRatio = (["1/1", "4/5", "9/16", "auto"] as const).includes(d.heroRatio as never) ? d.heroRatio : "auto";
   return { ...d, heroPosition, heroRatio, blocks, tiles, galleryImages, proofImages, angles };

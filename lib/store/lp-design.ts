@@ -31,3 +31,19 @@ export async function getLpDesignFor(slug: string): Promise<LpDesign> {
     return DEFAULT_LP_DESIGN;
   }
 }
+
+/** Pages complètes par avatar : { slug: { CODE_PUB: slugDeLaPageDédiée } } (lu par le middleware via /api/public/lp-variants). */
+export async function getLpVariants(): Promise<Record<string, Record<string, string>>> {
+  try {
+    const s = await cached();
+    const out: Record<string, Record<string, string>> = {};
+    for (const [slug, raw] of Object.entries(s.perSlug)) {
+      const d = normalizeDesign(raw);
+      for (const a of d.angles) {
+        if (!a.page || a.page === slug) continue;
+        for (const c of a.codes.split(/[,\s]+/).map((x) => x.trim().toUpperCase()).filter(Boolean)) (out[slug] ??= {})[c] = a.page;
+      }
+    }
+    return out;
+  } catch { return {}; }
+}

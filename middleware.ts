@@ -9,6 +9,25 @@ import { NextResponse, type NextRequest } from "next/server";
 // The admin stays accessible only on the Vercel deployment URL (ecomerce-projet.vercel.app)
 const PUBLIC_DOMAIN = (process.env.NEXT_PUBLIC_LP_DOMAIN ?? "").replace(/^https?:\/\//, "").replace(/\/$/, "");
 
+// ── Pages complètes par avatar : /lp/split?cr=V010 → /lp/split-karate (même lien de pub) ──
+// Carte lue sur /api/public/lp-variants (cache CDN 5 min) + cache mémoire de l'instance → quasi aucun appel.
+let variantsCache: { at: number; map: Record<string, Record<string, string>> } | null = null;
+async function variantFor(request: NextRequest, slug: string): Promise<string | null> {
+  const sp = request.nextUrl.searchParams;
+  const codes = [sp.get("cr"), sp.get("av")].filter(Boolean).map((x) => String(x).trim().toUpperCase());
+  if (!codes.length || !slug) return null;
+  if (!variantsCache || Date.now() - variantsCache.at > 300_000) {
+    try {
+      const r = await fetch(new URL("/api/public/lp-variants", request.nextUrl.origin), { signal: AbortSignal.timeout(1500) });
+      variantsCache = { at: Date.now(), map: r.ok ? await r.json() : (variantsCache?.map ?? {}) };
+    } catch { variantsCache = { at: Date.now(), map: variantsCache?.map ?? {} }; }
+  }
+  const m = variantsCache.map[slug];
+  if (!m) return null;
+  for (const c of codes) if (m[c]) return m[c];
+  return null;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const host = request.headers.get("host") ?? "";
@@ -44,6 +63,8 @@ export async function middleware(request: NextRequest) {
     ) {
       const url = request.nextUrl.clone();
       url.pathname = `/lp${pathname}`;
+      const v1 = await variantFor(request, pathname.slice(1));
+      if (v1) url.pathname = `/lp/${v1}`;
       const requestHeaders = new Headers(request.headers);
       requestHeaders.set("x-pathname", url.pathname);
       requestHeaders.set("x-public-domain", "1");
@@ -76,7 +97,17 @@ export async function middleware(request: NextRequest) {
   ) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-pathname", pathname);
-    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    const lpSlug = pathname.startsWith("/lp/") ? pathname.slice(4).split("/")[0] : "";
+    const v2 = lpSlug ? await variantFor(request, decodeURIComponent(lpSlug)) : null;
+    let res: NextResponse;
+    if (v2) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/lp/${v2}`;
+      requestHeaders.set("x-pathname", url.pathname);
+      res = NextResponse.rewrite(url, { request: { headers: requestHeaders } });
+    } else {
+      res = NextResponse.next({ request: { headers: requestHeaders } });
+    }
 
     if (pathname.startsWith("/lp/") || pathname.startsWith("/p/") || pathname.startsWith("/lp-classic/")) {
       // Même raison: pas de X-Frame-Options sur les landing pages publiques.
