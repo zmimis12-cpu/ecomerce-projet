@@ -479,7 +479,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     <>
     <form id="sp-order-form" ref={formRef} onSubmit={handleSubmit} style={{ fontFamily:"var(--font-cairo),sans-serif", scrollMarginTop:"12px" }}>
       {/* Honeypot */}
-      <input type="text" name="website" value={form.website}
+      <input type="text" name="website" autoComplete="off" value={form.website}
         onChange={(e) => set("website", e.target.value)}
         style={{ position:"absolute", width:1, height:1, overflow:"hidden", clip:"rect(0 0 0 0)", opacity:0, pointerEvents:"none" }}
         tabIndex={-1} aria-hidden="true" />

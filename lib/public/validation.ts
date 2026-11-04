@@ -24,7 +24,14 @@ export interface ValidationResult {
 const MA_MOBILE_RE = /^(?:\+?212|0)(6|7)\d{8}$/;
 
 export function normalizePhone(raw: string): string | null {
-  const digits = raw.replace(/[\s\-\.]/g, "");
+  // Chiffres arabes (٠١٢…), persans (۰۱۲…) et pleine largeur (０１２…) → 0123… ; 00212… → +212… ; 6XXXXXXXX (sans 0) → 06XXXXXXXX
+  let digits = raw
+    .replace(/[\u0660-\u0669]/g, (c) => String(c.charCodeAt(0) - 0x0660))
+    .replace(/[\u06F0-\u06F9]/g, (c) => String(c.charCodeAt(0) - 0x06F0))
+    .replace(/[\uFF10-\uFF19]/g, (c) => String(c.charCodeAt(0) - 0xFF10))
+    .replace(/[\s\-\.\(\)\u200e\u200f\u202a-\u202e]/g, "");
+  if (digits.startsWith("00212")) digits = "+" + digits.slice(2);
+  if (/^[67]\d{8}$/.test(digits)) digits = "0" + digits;
   if (!MA_MOBILE_RE.test(digits)) return null;
 
   // Normalize to 0XXXXXXXXX format
