@@ -272,7 +272,12 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         {d.videoSub && <p className="sp-h2-sub">{d.videoSub}</p>}
         <div className="sp-video">
           {videoEmbed
-            ? <iframe src={videoEmbed} title={d.videoTitle || product.name} loading="lazy" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+            ? <button type="button" className="sp-yt" data-yt={videoEmbed} aria-label={d.videoTitle || "Vidéo"}>
+                {/* Image légère : le lecteur YouTube (~800 Ko) ne se charge que si le client appuie */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`https://i.ytimg.com/vi/${yt![1]}/hqdefault.jpg`} alt="" loading="lazy" fetchPriority="low" decoding="async" />
+                <span aria-hidden="true">▶</span>
+              </button>
             : <video src={d.videoUrl} controls playsInline preload="none" poster={heroImg ?? undefined} />}
         </div>
       </section></W>
@@ -394,7 +399,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       )}
       <script dangerouslySetInnerHTML={{ __html:
         `document.documentElement.lang="ar";document.documentElement.dir="rtl";try{navigator.sendBeacon("/api/public/lp-view",JSON.stringify({slug:${JSON.stringify(slug)}}))}catch(e){}
-        (function(){function buy(){var f=document.getElementById('sp-order-form');if(!f){var c=document.getElementById('sp-form');if(c)c.scrollIntoView({behavior:'smooth'});return;}if(f.requestSubmit)f.requestSubmit();else f.dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));}document.addEventListener('click',function(e){var t=e.target;if(t&&t.closest&&t.closest('#sp-buy')){e.preventDefault();buy();}});})();
+        (function(){function buy(){var f=document.getElementById('sp-order-form');if(!f){var c=document.getElementById('sp-form');if(c)c.scrollIntoView({behavior:'smooth'});return;}if(f.requestSubmit)f.requestSubmit();else f.dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));}document.addEventListener('click',function(e){var t=e.target;if(t&&t.closest&&t.closest('#sp-buy')){e.preventDefault();buy();}var y=t&&t.closest&&t.closest('.sp-yt');if(y){var f=document.createElement('iframe');f.src=y.getAttribute('data-yt')+'&autoplay=1';f.allow='autoplay; encrypted-media; picture-in-picture';f.allowFullscreen=true;y.replaceWith(f);}});})();
         (function(){function go(){var b=document.getElementById('sp-sticky'),f=document.getElementById('sp-form');if(!f||!('IntersectionObserver' in window))return;var w=document.getElementById('sp-wa-float');new IntersectionObserver(function(e){if(b)b.classList.toggle('sp-hide',e[0].isIntersecting);if(w)w.classList.toggle('sp-hide-wa',e[0].isIntersecting);},{threshold:0.05}).observe(f);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`
       }} />
             <style>{CSS}</style>
@@ -508,6 +513,7 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 .sp-h2-sub{text-align:center;font-size:13px;color:#6b7280;margin:4px 0 14px}
 .sp-bl ul{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:8px}.sp-bl li{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px 12px;font-size:15px;font-weight:600;line-height:1.5}.sp-bl-btn{display:block;text-align:center;margin:0 auto}
 .sp-video{position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:#000;box-shadow:0 6px 24px rgba(0,0,0,.12)}
+.sp-yt{position:absolute;inset:0;width:100%;height:100%;border:0;padding:0;background:#000;cursor:pointer}.sp-yt img{width:100%;height:100%;object-fit:cover;opacity:.9}.sp-yt span{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(220,38,38,.92);color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center}
 .sp-video iframe,.sp-video video{position:absolute;inset:0;width:100%;height:100%;border:0}
 .sp-why{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 .sp-why-i{background:#fff;border-radius:14px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.04)}
