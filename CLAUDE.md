@@ -46,3 +46,7 @@ Compte odtdeals_adv 7688685995371773958 (USD) connecté en OAuth. Pixel DAPRTBJC
 
 ## Pages admin utiles
 Dashboard (profit net réel, pub réelle prélevée) · Sources pub `/admin/sources` (rentabilité Meta/TikTok/Google, Instagram vs Facebook) · Après livraison `/admin/products/livraison` · Paniers abandonnés (message WhatsApp modifiable) · Éditeurs vidéos (taux par vidéo).
+
+## Selfie Screen A2 (03/11)
+Produit « selfie phone » 549 DH (achat 300) · LP /lp/selfie-screen-a2 (1 seule LP pour 4 avatars, photos dans lp_design perSlug, compatible Android + iPhone confirmé par Zack). Vidéos V060–V067 (AVA1 TikTok V060/61, AVA2 vendeurs V062/63, AVA3 maquillage V064/65, AVA4 voyage V066/67 ; pair = problem, impair = product aware).
+Lancé 04/11 ~00:15 sur les 3 comptes (Dealsdt 120251865140460189, HZ2 120261237717690537, HZ3 52538209324126) : ABO 8 ad sets × 5 $ par compte (120 $/jour au total). **Jamais en pause de nuit** (choix de Zack). Méthode de Zack : même produit sur plusieurs comptes/pages avec petit budget.
