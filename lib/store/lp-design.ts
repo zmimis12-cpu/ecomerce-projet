@@ -39,6 +39,8 @@ export async function getLpVariants(): Promise<Record<string, Record<string, str
     const out: Record<string, Record<string, string>> = {};
     for (const [slug, raw] of Object.entries(s.perSlug)) {
       const d = normalizeDesign(raw);
+      // Test A/B : « __AB » = "slugVersion2:pourcentage" (le middleware choisit et garde la version par visiteur)
+      if (d.abSlug && d.abSlug !== slug && d.abPct > 0) (out[slug] ??= {}).__AB = `${d.abSlug}:${d.abPct}`;
       for (const a of d.angles) {
         if (!a.page || a.page === slug) continue;
         for (const c of a.codes.split(/[,\s]+/).map((x) => x.trim().toUpperCase()).filter(Boolean)) (out[slug] ??= {})[c] = a.page;

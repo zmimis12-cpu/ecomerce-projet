@@ -119,6 +119,12 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const reviews = ((revSec?.items as { name: string; city: string; stars: number; text: string }[] | undefined) ?? []);
   const customerPhotos = (lp.customer_photos as string[] | undefined) ?? [];
   const faqItems = ((sec("faq")?.items as { q: string; a: string }[] | undefined) ?? []);
+  const bulletGroups = d.bulletGroups.split(/\n\s*\n/).map((blk) => {
+    const lines = blk.split("\n").map((l) => l.trim()).filter(Boolean);
+    const items = lines.filter((l) => /^[-•✅*]/.test(l)).map((l) => l.replace(/^[-•✅*]\s*/, ""));
+    const title = lines.find((l) => !/^[-•✅*]/.test(l)) ?? "";
+    return { title, items };
+  }).filter((g) => g.items.length);
   const gty = ((sec("guarantees")?.items as Ico[] | undefined) ?? []).slice(0, 4);
 
   // Vidéo : YouTube → iframe, sinon fichier vidéo
@@ -221,6 +227,15 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         {orderSub && <p className="sp-order-sub">{orderSub}</p>}
         {d.showWhatsapp && waHref && <a className="sp-wa" href={waHref} target="_blank" rel="noopener noreferrer">واتساب — تواصل معنا</a>}
       </div></W>
+    ),
+    bullets: bulletGroups.length > 0 && (
+      <W>{bulletGroups.map((g, i) => (
+        <section key={i} className="sp-sec sp-bl">
+          {g.title && <h2 className="sp-h2">{g.title}</h2>}
+          <ul>{g.items.map((t, j) => <li key={j}>✅ {t}</li>)}</ul>
+          <a href="#sp-form" className="sp-final-btn sp-bl-btn">{d.bulletCta || "👈 اضغط هنا للطلب"}</a>
+        </section>
+      ))}</W>
     ),
     proof: d.proofImages.length > 0 && (
       <W><section className="sp-sec">
@@ -490,6 +505,7 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 .sp-sec{margin-top:28px}
 .sp-h2{text-align:center;font-size:20px;font-weight:900;margin:0}
 .sp-h2-sub{text-align:center;font-size:13px;color:#6b7280;margin:4px 0 14px}
+.sp-bl ul{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:8px}.sp-bl li{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px 12px;font-size:15px;font-weight:600;line-height:1.5}.sp-bl-btn{display:block;text-align:center;margin:0 auto}
 .sp-video{position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:#000;box-shadow:0 6px 24px rgba(0,0,0,.12)}
 .sp-video iframe,.sp-video video{position:absolute;inset:0;width:100%;height:100%;border:0}
 .sp-why{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}

@@ -12,10 +12,11 @@ const PUBLIC_DOMAIN = (process.env.NEXT_PUBLIC_LP_DOMAIN ?? "").replace(/^https?
 // ── Pages complètes par avatar : /lp/split?cr=V010 → /lp/split-karate (même lien de pub) ──
 // Carte lue sur /api/public/lp-variants (cache CDN 5 min) + cache mémoire de l'instance → quasi aucun appel.
 let variantsCache: { at: number; map: Record<string, Record<string, string>> } | null = null;
+const abCookies = new WeakMap<NextRequest, { name: string; value: string }>(); // cookie A/B à poser sur la réponse (par requête)
 async function variantFor(request: NextRequest, slug: string): Promise<string | null> {
   const sp = request.nextUrl.searchParams;
   const codes = [sp.get("cr"), sp.get("av")].filter(Boolean).map((x) => String(x).trim().toUpperCase());
-  if (!codes.length || !slug) return null;
+  if (!slug) return null;
   if (!variantsCache || Date.now() - variantsCache.at > 300_000) {
     try {
       const r = await fetch(new URL("/api/public/lp-variants", request.nextUrl.origin), { signal: AbortSignal.timeout(1500) });
@@ -25,7 +26,20 @@ async function variantFor(request: NextRequest, slug: string): Promise<string | 
   const m = variantsCache.map[slug];
   if (!m) return null;
   for (const c of codes) if (m[c]) return m[c];
+  // Test A/B : même lien de pub, une partie des visiteurs voit la 2e version (toujours la même pour un visiteur)
+  if (m.__AB) {
+    const [to, pctS] = m.__AB.split(":");
+    const ck = `lpab_${slug}`.slice(0, 60);
+    let v = request.cookies.get(ck)?.value;
+    if (v !== "a" && v !== "b") { v = Math.random() * 100 < Number(pctS || 0) ? "b" : "a"; abCookies.set(request, { name: ck, value: v }); }
+    return v === "b" && to ? to : null;
+  }
   return null;
+}
+function withAb(res: NextResponse, request: NextRequest) {
+  const abSet = abCookies.get(request);
+  if (abSet) res.cookies.set(abSet.name, abSet.value, { maxAge: 60 * 60 * 24 * 30, path: "/", sameSite: "lax" });
+  return res;
 }
 
 export async function middleware(request: NextRequest) {
@@ -77,7 +91,7 @@ export async function middleware(request: NextRequest) {
       res.headers.set("X-Content-Type-Options", "nosniff");
       res.headers.set("Referrer-Policy", "same-origin"); // rien n'est envoyé aux autres sites ; utile pour rester dans la boutique (app/page.tsx)
       res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-      return res;
+      return withAb(res, request);
     }
 
     // Root of public domain → show a neutral page (not admin redirect)
@@ -116,7 +130,7 @@ export async function middleware(request: NextRequest) {
       res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
     }
 
-    return res;
+    return withAb(res, request);
   }
 
   let supabaseResponse = NextResponse.next({ request });

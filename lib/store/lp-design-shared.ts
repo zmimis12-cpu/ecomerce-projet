@@ -2,6 +2,7 @@
 export const LP_BLOCKS = [
   { key: "quick", label: "Icônes rapides sous la photo (avantages)" },
   { key: "form", label: "Prix + formulaire de commande" },
+  { key: "bullets", label: "Listes de points (style « مميزات ») + bouton commander après chaque liste" },
   { key: "proof", label: "Preuves réelles (photos de colis / livraisons / messages clients)" },
   { key: "problems", label: "Problèmes du client (liste ❌ + photo)" },
   { key: "who", label: "Pour qui ? (les avatars)" },
@@ -74,6 +75,10 @@ export type LpDesign = {
   animBarItems: string;              // messages séparés par « | »
   proofTitle: string;
   proofImages: string[];             // vraies photos (colis préparés, livraisons, captures WhatsApp avec accord)
+  bulletGroups: string;              // listes de points : « Titre » puis « - point » par ligne, ligne vide entre 2 listes
+  bulletCta: string;                 // texte du bouton après chaque liste
+  abSlug: string;                    // test A/B : slug de la 2e version (même lien pub) — vide = pas de test
+  abPct: number;                     // % des visiteurs envoyés vers la 2e version
   angles: { codes: string; headline: string; sub: string; image: string; page?: string }[]; // titre + photo hero selon la pub (?cr=V009 ou ?av=couple) → même message pub ↔ page ; page = slug d'une LP complète dédiée à cet avatar
 };
 
@@ -95,6 +100,7 @@ export const DEFAULT_LP_DESIGN: LpDesign = {
   urgency: false, urgencyText: "🔥 الكمية محدودة — اطلب دابا باش تضمن ديالك",
   animBar: true, animBarItems: "🚚 التوصيل مجاني لجميع المدن | ⏳ العرض لفترة محدودة | 🔥 الكمية محدودة — قربات تسالي | 💵 الدفع عند الاستلام",
   proofTitle: "📦 صور حقيقية من الطلبيات ديالنا", proofImages: [], angles: [],
+  bulletGroups: "", bulletCta: "👈 اضغط هنا للطلب — الدفع عند الاستلام", abSlug: "", abPct: 50,
 };
 
 export type LpDesignStore = { global: LpDesign; perSlug: Record<string, LpDesign> };
@@ -120,7 +126,9 @@ export function normalizeDesign(v: Partial<LpDesign> | undefined | null): LpDesi
     .map((a) => ({ codes: str(a?.codes), headline: str(a?.headline), sub: str(a?.sub), image: str((a as { image?: unknown })?.image), page: str((a as { page?: unknown })?.page).trim().replace(/[^\w\u0600-\u06FF-]/g, "") })).filter((a) => a.codes || a.headline || a.image || a.page);
   const heroPosition = d.heroPosition === "after_form" || d.heroPosition === "hidden" ? d.heroPosition : "top";
   const heroRatio = (["1/1", "4/5", "9/16", "auto"] as const).includes(d.heroRatio as never) ? d.heroRatio : "auto";
+  const abPct = Math.min(100, Math.max(0, Math.round(Number(d.abPct) || 0)));
+  const abSlug = str(d.abSlug).trim().replace(/[^\w\u0600-\u06FF-]/g, "");
   const heroMaxH = Math.min(700, Math.max(200, Math.round(Number(d.heroMaxH) || 310)));
-  return { ...d, heroPosition, heroRatio, heroMaxH, blocks, tiles, galleryImages, proofImages, angles };
+  return { ...d, abPct, abSlug, heroPosition, heroRatio, heroMaxH, blocks, tiles, galleryImages, proofImages, angles };
 }
 

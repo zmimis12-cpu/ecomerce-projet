@@ -309,6 +309,24 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
             );
           })()}
 
+          <div className="space-y-2 border-t pt-3">
+            <h3 className="text-sm font-semibold">Listes de points (bloc « Listes de points »)</h3>
+            <p className="text-xs text-muted-foreground">Une ligne = titre de la liste, puis une ligne « - point » par avantage. Ligne vide entre deux listes. Un bouton commander s&apos;affiche après chaque liste. Seulement des infos VRAIES.</p>
+            <textarea dir="auto" rows={8} className={cn(field, "h-auto py-2")} value={d.bulletGroups} placeholder={"أهم المميزات\n- ...\n- ...\n\nمميزات أخرى\n- ..."} onChange={(e) => set("bulletGroups", e.target.value)} />
+            <L t="Texte du bouton après chaque liste"><input dir="auto" className={field} value={d.bulletCta} onChange={(e) => set("bulletCta", e.target.value)} /></L>
+          </div>
+
+          {!isGlobal && (
+            <div className="space-y-2 border-t pt-3">
+              <h3 className="text-sm font-semibold">Test A/B (même lien de pub, aucune pub modifiée)</h3>
+              <p className="text-xs text-muted-foreground">Une partie des visiteurs de cette page voit une 2e version (une autre landing page). Chaque visiteur garde toujours la même version. Vide = pas de test.</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <L t="Slug de la 2e version (ex. jihaz-tamdid-3-v2)"><input className={field} value={d.abSlug} onChange={(e) => set("abSlug", e.target.value)} /></L>
+                <L t="% des visiteurs vers la 2e version"><input type="number" min={0} max={100} className={field} value={d.abPct} onChange={(e) => set("abPct", Number(e.target.value) || 0)} /></L>
+              </div>
+            </div>
+          )}
+
           {!isGlobal && (
             <div className="space-y-2 border-t pt-3">
               <div className="flex items-center justify-between">
