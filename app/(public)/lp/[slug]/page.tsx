@@ -190,8 +190,18 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         </div>
         {((d.freeShip && d.freeShipText) || (d.openBeforePay && d.openBeforePayText)) && (
           <div className="sp-promo2">
-            {d.freeShip && d.freeShipText && <div className="sp-freeship">{d.freeShipText}</div>}
-            {d.openBeforePay && d.openBeforePayText && <div className="sp-openbig">{d.openBeforePayText}</div>}
+            {d.freeShip && d.freeShipText && (
+              <div className="sp-pb sp-pb-g">
+                <span className="sp-pb-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></span>
+                <span className="sp-pb-t">{d.freeShipText.replace(/^[\p{Extended_Pictographic}\uFE0F\s]+/u, "")}</span>
+              </div>
+            )}
+            {d.openBeforePay && d.openBeforePayText && (
+              <div className="sp-pb sp-pb-o">
+                <span className="sp-pb-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/><path d="m8.5 10.5 2 2 4-4"/></svg></span>
+                <span className="sp-pb-t">{d.openBeforePayText.replace(/^[\p{Extended_Pictographic}\uFE0F\s]+/u, "")}</span>
+              </div>
+            )}
           </div>
         )}
         {d.orderTitle && <p className="sp-order-h">{d.orderTitle}</p>}
@@ -550,9 +560,14 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 .sp-foot-top{display:flex;justify-content:space-between;align-items:center;max-width:560px;margin:0 auto 6px;color:#fff}
 .sp-foot a{color:#cbd5e1;text-decoration:none}
 .sp-foot-copy{color:#64748b;font-size:11.5px}
-.sp-promo2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0 6px}
+.sp-promo2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 6px}
+.sp-pb{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:14px;background:#fff;border:1.5px solid #e5e7eb;box-shadow:0 2px 10px rgba(15,23,42,.06);text-align:right}
+.sp-pb-ic{flex-shrink:0;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.sp-pb-t{font-size:13.5px;font-weight:800;line-height:1.35;color:#0f172a}
+.sp-pb-g{border-color:#bbf7d0;background:linear-gradient(180deg,#f0fdf4,#fff)}.sp-pb-g .sp-pb-ic{background:#16a34a;color:#fff;box-shadow:0 3px 10px rgba(22,163,74,.35)}
+.sp-pb-o{border-color:#fde68a;background:linear-gradient(180deg,#fffbeb,#fff)}.sp-pb-o .sp-pb-ic{background:#f59e0b;color:#fff;box-shadow:0 3px 10px rgba(245,158,11,.35)}
 /* Téléphone : photo principale entière mais moins haute → le formulaire apparaît dans le 1er écran */
-@media (max-width:600px){.sp-hero{max-height:310px;width:auto;max-width:100%;object-fit:contain!important;background:transparent}.sp-card{margin-top:6px;padding-top:10px}.sp-title{margin-top:0}.sp-price{margin-bottom:2px}.sp-promo2{margin:4px 0 2px}.sp-promo2>div{padding-top:6px;padding-bottom:6px}.sp-order-h{font-size:17px;margin-top:4px}}
+@media (max-width:600px){.sp-hero{max-height:310px;width:auto;max-width:100%;object-fit:contain!important;background:transparent}.sp-card{margin-top:6px;padding-top:10px}.sp-title{margin-top:0}.sp-price{margin-bottom:2px}.sp-promo2{margin:4px 0 2px}.sp-promo2>div{padding-top:6px;padding-bottom:6px}.sp-pb-t{font-size:12.5px}.sp-order-h{font-size:17px;margin-top:4px}}
 .sp-openbig{margin:0;padding:8px 6px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:#fef3c7;color:#92400e;border:2px solid #f59e0b;text-align:center;font-weight:900;font-size:14.5px;line-height:1.3}
 .sp-t3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0 4px;padding:12px 6px;background:#fff;border-radius:18px;box-shadow:0 2px 12px rgba(0,0,0,.06)}.sp-t3-i{display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px}.sp-t3-ic{width:46px;height:46px;border-radius:50%;background:#dcfce7;color:#16a34a;display:flex;align-items:center;justify-content:center;margin-bottom:4px}.sp-t3-i b{font-size:15px;font-weight:800;color:#0f172a}.sp-t3-i small{font-size:12.5px;color:#64748b}
 .sp-freeship{margin:0;padding:8px 6px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:#16a34a;color:#fff;text-align:center;font-weight:900;font-size:15px;line-height:1.3;box-shadow:0 4px 14px rgba(22,163,74,.35)}
