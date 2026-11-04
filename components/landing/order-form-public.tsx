@@ -50,6 +50,8 @@ interface Props {
   offerImage?: string | null;
   showTotalBox?: boolean;
   submitText?: string;
+  formFrame?: boolean;
+  formFrameTitle?: string;
   /** Quantité sous les champs nom / téléphone / ville (true) ou au-dessus (false) */
   offersAfterFields?: boolean;
 }
@@ -59,7 +61,7 @@ function lpf(t: string, f?: string) {
   try { window.dispatchEvent(new CustomEvent("lpf", { detail: { t, f } })); } catch { /* rien */ }
 }
 
-export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [], askAddress = false, addressRequired = false, offerImage = null, offersAfterFields = true, showTotalBox = false, submitText = "اطلب الآن" }: Props) {
+export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [], askAddress = false, addressRequired = false, offerImage = null, offersAfterFields = true, showTotalBox = false, submitText = "اطلب الآن", formFrame = true, formFrameTitle = "👇 للطلب عمّر المعلومات ديالك" }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
   useEffect(() => { getCreativeCode(); }, []); // mémorise ?cr= dès l'arrivée
@@ -479,7 +481,13 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
 
   return (
     <>
-    <form id="sp-order-form" ref={formRef} onSubmit={handleSubmit} style={{ fontFamily:"var(--font-cairo),sans-serif", scrollMarginTop:"12px" }}>
+    <form id="sp-order-form" ref={formRef} onSubmit={handleSubmit} style={{ fontFamily:"var(--font-cairo),sans-serif", scrollMarginTop:"12px",
+      ...(formFrame ? { border:"2px solid #16a34a", borderRadius:"18px", padding:"0 14px 16px", background:"#fff", boxShadow:"0 8px 26px rgba(22,163,74,.16)", overflow:"hidden" } : {}) }}>
+      {formFrame && (
+        <div style={{ margin:"0 -14px 14px", padding:"10px 14px", background:"linear-gradient(180deg,#22c55e,#16a34a)", color:"#fff", textAlign:"center", fontSize:"16px", fontWeight:900 }}>
+          {formFrameTitle}
+        </div>
+      )}
       {/* Honeypot */}
       <input type="text" name="website" autoComplete="off" value={form.website}
         onChange={(e) => set("website", e.target.value)}

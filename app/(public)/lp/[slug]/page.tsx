@@ -201,7 +201,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           pixelId={pixel || undefined} tiktokPixelId={tt || undefined}
           variants={(Array.isArray(lp.variant_options) ? lp.variant_options : []) as { name: string; options: { label: string; image?: string }[] }[]}
           bumps={d.showBumps ? bumps : []} cities={cities}
-          offerImage={d.offerThumbs ? (productImgs[0] ?? heroImg) : null} offersAfterFields={d.offersAfterFields} showTotalBox={d.showTotalBox} submitText={d.submitText || "اطلب الآن"} />
+          offerImage={d.offerThumbs ? (productImgs[0] ?? heroImg) : null} offersAfterFields={d.offersAfterFields} showTotalBox={d.showTotalBox} submitText={d.submitText || "اطلب الآن"} formFrame={d.formFrame} formFrameTitle={d.formFrameTitle || "👇 للطلب عمّر المعلومات ديالك"} />
         {/* Rassurances juste sous le bouton (au moment de décider) — le formulaire reste dans le 1er écran */}
         {((d.openBeforePay && d.openBeforePayText) || (d.callNote && d.callNoteText) || (d.showCodBar && d.codBar)) && (
           <div className="sp-trust">
