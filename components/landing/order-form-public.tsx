@@ -358,7 +358,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
                 <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
                   {offerImage && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={offerImage} alt="" loading="eager" decoding="async"
+                    <img src={offerImage} alt="" loading="lazy" fetchPriority="low" decoding="async"
                       style={{ width:"52px", height:"52px", borderRadius:"10px", objectFit:"cover", flexShrink:0, border:"1px solid #e5e7eb", background:"#fff" }} />
                   )}
                   <div style={{ width:"18px", height:"18px", borderRadius:"50%", flexShrink:0,

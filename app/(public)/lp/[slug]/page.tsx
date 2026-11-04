@@ -243,7 +243,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         <div className="sp-proof">
           {d.proofImages.map((src, i) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={i} src={src} alt="" loading="lazy" decoding="async" />
+            <img key={i} src={src} alt="" loading="lazy" fetchPriority="low" decoding="async" />
           ))}
         </div>
       </section></W>
@@ -254,7 +254,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         <div className="sp-pain">{painPoints.map((t, i) => <div key={i}>❌ {t}</div>)}</div>
         {d.problemImage && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={d.problemImage} alt="" loading="lazy" decoding="async" className="sp-more" />
+          <img src={d.problemImage} alt="" loading="lazy" fetchPriority="low" decoding="async" className="sp-more" />
         )}
       </section></W>
     ),
@@ -292,7 +292,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       <W><section className="sp-feature">
         <div className="sp-feature-txt"><h3>{featureTitle}</h3><p>{featureText}</p></div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={featureImg} alt="" loading="lazy" decoding="async" />
+        <img src={featureImg} alt="" loading="lazy" fetchPriority="low" decoding="async" />
       </section></W>
     ),
     tiles: tiles.length > 0 && (
@@ -300,7 +300,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         {tiles.map((t, i) => (
           <div key={i} className="sp-tile">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={t.src} alt="" loading="lazy" decoding="async" />
+            <img src={t.src} alt="" loading="lazy" fetchPriority="low" decoding="async" />
             {t.text && <span>{t.text}</span>}
           </div>
         ))}
@@ -308,7 +308,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     ),
     gallery: moreImgs.length > 0 && (
       // eslint-disable-next-line @next/next/no-img-element
-      <W>{moreImgs.map((src, i) => <img key={i} src={src} alt="" loading="lazy" decoding="async" className="sp-more" />)}</W>
+      <W>{moreImgs.map((src, i) => <img key={i} src={src} alt="" loading="lazy" fetchPriority="low" decoding="async" className="sp-more" />)}</W>
     ),
     crosssell: <div className="sp-cross"><CrossSell products={storeProducts} exclude={slug} title={d.crossTitle || "عروض و منتجات مكملة"} /></div>,
     reviews: (reviews.length > 0 || customerPhotos.length > 0) && (
@@ -323,14 +323,14 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               <p>{r.text}</p>
               {customerPhotos[i] && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={customerPhotos[i]} alt="" loading="lazy" decoding="async" />
+                <img src={customerPhotos[i]} alt="" loading="lazy" fetchPriority="low" decoding="async" />
               )}
             </div>
           ))}
           {customerPhotos.slice(reviews.length).map((src, i) => (
             <div key={`p${i}`} className="sp-rev sp-rev-photo">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt="" loading="lazy" decoding="async" />
+              <img src={src} alt="" loading="lazy" fetchPriority="low" decoding="async" />
             </div>
           ))}
         </div>
@@ -353,7 +353,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         </div>
         {heroImg && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={heroImg} alt="" loading="lazy" decoding="async" />
+          <img src={heroImg} alt="" loading="lazy" fetchPriority="low" decoding="async" />
         )}
       </section></W>
     ),
@@ -362,8 +362,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const heroEl = angleHero && !(heroVid && !heroVidIsImg) ? (
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img id="sp-hero-img" data-src={(heroVid || heroImg) ?? ""} alt={product.name} className="sp-hero" style={{ aspectRatio: d.heroRatio === "auto" ? "auto" : d.heroRatio, height: d.heroRatio === "auto" ? "auto" : undefined, objectFit: d.heroRatio === "auto" ? "contain" : "cover" }} fetchPriority="high" decoding="async" />
-      <script dangerouslySetInnerHTML={{ __html: `(function(){var e=document.getElementById('sp-hero-img');if(!e)return;var u=e.getAttribute('data-src');try{${angleJs}if(m&&m.i)u=m.i;}catch(x){}var f0='${(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "")}',d0=e.getAttribute('data-src')||'';e.onerror=function(){var n=+(e.getAttribute('data-err')||0);e.setAttribute('data-err',n+1);var c=e.src||'';if(n===0&&c.indexOf('/media/')>-1&&f0){e.src=f0+'/storage/v1/object/public/'+c.split('/media/')[1];}else if(n<=1&&d0&&c.indexOf(d0.split('/').pop())<0){e.src=d0;}};e.src=u;})();` }} />
+      <img id="sp-hero-img" data-src={(heroVid || heroImg) ?? ""} alt={product.name} className="sp-hero" style={{ minHeight: `min(${d.heroMaxH}px, 86vw)`, aspectRatio: d.heroRatio === "auto" ? "auto" : d.heroRatio, height: d.heroRatio === "auto" ? "auto" : undefined, objectFit: d.heroRatio === "auto" ? "contain" : "cover" }} fetchPriority="high" decoding="async" />
+      <script dangerouslySetInnerHTML={{ __html: `(function(){var e=document.getElementById('sp-hero-img');if(!e)return;var u=e.getAttribute('data-src');try{${angleJs}if(m&&m.i)u=m.i;}catch(x){}e.addEventListener('load',function(){e.style.minHeight='0'});var f0='${(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "")}',d0=e.getAttribute('data-src')||'';e.onerror=function(){var n=+(e.getAttribute('data-err')||0);e.setAttribute('data-err',n+1);var c=e.src||'';if(n===0&&c.indexOf('/media/')>-1&&f0){e.src=f0+'/storage/v1/object/public/'+c.split('/media/')[1];}else if(n<=1&&d0&&c.indexOf(d0.split('/').pop())<0){e.src=d0;}};e.src=u;})();` }} />
     </>
   ) : heroVid && !heroVidIsImg ? (
     // Vidéo courte en boucle, sans son : la photo s'affiche d'abord (poster), la vidéo démarre ensuite
@@ -381,14 +381,15 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
   return (
     <>
+      <script dangerouslySetInnerHTML={{ __html: "(function(){var q=[],done=0;function run(){if(done)return;done=1;for(var i=0;i<q.length;i++){try{q[i]()}catch(e){}}q=[]}window.__spLater=function(f){done?f():q.push(f)};setTimeout(run,2500);['touchstart','scroll','keydown'].forEach(function(ev){addEventListener(ev,run,{once:true,passive:true})});function hook(){var h=document.querySelector('.sp-hero');if(!h||h.tagName!=='IMG'){run();return}if(h.complete&&h.naturalWidth)setTimeout(run,200);else{h.addEventListener('load',function(){setTimeout(run,200)});h.addEventListener('error',run)}}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',hook);else hook();})();" }} />
       {pixel && (
         <script dangerouslySetInnerHTML={{ __html:
-          `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');${pixel.split(/[,\s]+/).filter(Boolean).map((id) => `fbq('init','${id}',{autoConfig:true});`).join("")}fbq('track','PageView');fbq('track','ViewContent',{content_name:'${pname}',content_ids:['${product.id}'],content_type:'product',value:${price},currency:'MAD'});`
+          `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];(window.__spLater||function(f){f()})(function(){t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)})}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');${pixel.split(/[,\s]+/).filter(Boolean).map((id) => `fbq('init','${id}',{autoConfig:true});`).join("")}fbq('track','PageView');fbq('track','ViewContent',{content_name:'${pname}',content_ids:['${product.id}'],content_type:'product',value:${price},currency:'MAD'});`
         }} />
       )}
       {tt && (
         <script dangerouslySetInnerHTML={{ __html:
-          `!function (w, d, t) {w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<e.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var a=document.createElement("script");a.type="text/javascript",a.async=!0,a.src=i+"?sdkid="+e+"&lib="+t;var s=document.getElementsByTagName("script")[0];s.parentNode.insertBefore(a,s)};ttq.load('${tt}');ttq.page();ttq.track('ViewContent',{content_id:'${product.id}',content_name:'${pname}',value:${price},currency:'MAD'});}(window, document, 'ttq');`
+          `!function (w, d, t) {w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<e.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var a=document.createElement("script");a.type="text/javascript",a.async=!0,a.src=i+"?sdkid="+e+"&lib="+t;var s=document.getElementsByTagName("script")[0];s.parentNode.insertBefore(a,s)};(window.__spLater||function(f){f()})(function(){ttq.load('${tt}')});ttq.page();ttq.track('ViewContent',{content_id:'${product.id}',content_name:'${pname}',value:${price},currency:'MAD'});}(window, document, 'ttq');`
         }} />
       )}
       <script dangerouslySetInnerHTML={{ __html:
