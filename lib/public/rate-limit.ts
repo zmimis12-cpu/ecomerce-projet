@@ -7,7 +7,9 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createHash } from "crypto";
 
-const MAX_REQUESTS = 3;
+// 12 et pas 3 : au Maroc, beaucoup de clients mobiles (Maroc Telecom, Orange, inwi) partagent la MÊME adresse IP (CGNAT).
+// Avec 3, le 4e client d'un même opérateur en 10 min était refusé. Les doublons sont déjà bloqués par numéro de téléphone.
+const MAX_REQUESTS = 12;
 const WINDOW_MS    = 10 * 60 * 1000; // 10 minutes
 
 /** Hash an IP address with a secret salt — never store raw IPs */
