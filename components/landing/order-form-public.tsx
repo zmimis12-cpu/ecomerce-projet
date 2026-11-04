@@ -48,6 +48,7 @@ interface Props {
   addressRequired?: boolean;
   /** Petite photo du produit sur chaque carte d'offre (1 / 2 / 3 pièces) */
   offerImage?: string | null;
+  showTotalBox?: boolean;
   /** Quantité sous les champs nom / téléphone / ville (true) ou au-dessus (false) */
   offersAfterFields?: boolean;
 }
@@ -57,7 +58,7 @@ function lpf(t: string, f?: string) {
   try { window.dispatchEvent(new CustomEvent("lpf", { detail: { t, f } })); } catch { /* rien */ }
 }
 
-export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [], askAddress = false, addressRequired = false, offerImage = null, offersAfterFields = true }: Props) {
+export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [], askAddress = false, addressRequired = false, offerImage = null, offersAfterFields = true, showTotalBox = false }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
   useEffect(() => { getCreativeCode(); }, []); // mémorise ?cr= dès l'arrivée
@@ -339,16 +340,16 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   const choiceBlock = (
     <>
       {/* Offres (masquées s'il n'y a qu'une seule offre) */}
-      <div style={{ marginBottom:"18px", display: offers.length > 1 ? undefined : "none" }}>
+      <div style={{ marginBottom:"12px", display: offers.length > 1 ? undefined : "none" }}>
         <label style={LBL}>اختار العرض</label>
-        <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+        <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
           {offers.map((o) => {
             const on = o.id === offer.id;
             const save = savings(o, unitPrice);
             return (
               <button key={o.id} type="button" onClick={() => changeOffer(o)}
                 style={{ position:"relative", display:"flex", justifyContent:"space-between", alignItems:"center",
-                  padding:"12px 14px", borderRadius:"12px",
+                  padding:"7px 12px", borderRadius:"12px",
                   border:`2px solid ${on ? "#16a34a" : "#e5e7eb"}`, background: on ? "#f0fdf4" : "#fff",
                   cursor:"pointer", fontFamily:"var(--font-cairo),sans-serif", transition:"border-color .15s,background .15s", textAlign:"right" }}>
                 {o.badge && (
@@ -359,7 +360,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
                   {offerImage && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={offerImage} alt="" loading="lazy" fetchPriority="low" decoding="async"
-                      style={{ width:"52px", height:"52px", borderRadius:"10px", objectFit:"cover", flexShrink:0, border:"1px solid #e5e7eb", background:"#fff" }} />
+                      style={{ width:"40px", height:"40px", borderRadius:"8px", objectFit:"cover", flexShrink:0, border:"1px solid #e5e7eb", background:"#fff" }} />
                   )}
                   <div style={{ width:"18px", height:"18px", borderRadius:"50%", flexShrink:0,
                     border:`2px solid ${on ? "#16a34a" : "#d1d5db"}`, background: on ? "#16a34a" : "transparent",
@@ -569,8 +570,8 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         </div>
       )}
 
-      {/* Total */}
-      <div style={{ borderRadius:"12px", background:"#f0fdf4",
+      {/* Total (le total est déjà écrit sur le bouton → bloc optionnel, réglable dans l'admin) */}
+      {showTotalBox && <div style={{ borderRadius:"12px", background:"#f0fdf4",
         border:"1px solid #bbf7d0", padding:"14px 16px", marginBottom:"18px" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <p style={{ fontSize:"13px", color:"#4b5563", fontWeight:600 }}>المجموع</p>
@@ -583,7 +584,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           fontWeight:600, marginTop:"6px" }}>
           الدفع عند الاستلام فقط
         </p>
-      </div>
+      </div>}
 
       {serverError && (
         <div style={{ borderRadius:"12px", background:"#fef2f2",
