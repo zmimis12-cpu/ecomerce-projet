@@ -382,6 +382,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         (function(){function go(){var b=document.getElementById('sp-sticky'),f=document.getElementById('sp-form');if(!f||!('IntersectionObserver' in window))return;var w=document.getElementById('sp-wa-float');new IntersectionObserver(function(e){if(b)b.classList.toggle('sp-hide',e[0].isIntersecting);if(w)w.classList.toggle('sp-hide-wa',e[0].isIntersecting);},{threshold:0.05}).observe(f);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`
       }} />
             <style>{CSS}</style>
+            {d.heroMaxH !== 310 && <style>{`@media (max-width:600px){.sp-hero{max-height:${d.heroMaxH}px}}`}</style>}
 
       <div className="sp" dir="rtl" lang="ar" style={colorVars}>
         {animItems.length > 0 ? (

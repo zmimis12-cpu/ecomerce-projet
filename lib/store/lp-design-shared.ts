@@ -24,6 +24,7 @@ export type LpDesign = {
   heroSource: "product" | "banner";  // photo principale : 1re photo produit ou bannière (hero_image) de la LP
   heroImage: string;                 // photo principale CHOISIE (par landing page) — prioritaire sur heroSource
   heroPosition: "top" | "after_form" | "hidden"; // photo en haut puis formulaire (défaut) / formulaire puis photo / pas de photo
+  heroMaxH: number;                  // hauteur max de la photo principale sur mobile (px) — 310 par défaut
   heroRatio: "1/1" | "4/5" | "9/16" | "auto"; // format de la photo principale (carré par défaut ; 4/5 = affiche complète sans recadrage)
   formFirst: boolean;                // formulaire juste sous la photo (avant les icônes et autres blocs)
   stickyAlways: boolean;             // barre fixe « اشتري الآن » + WhatsApp visible sur toute la page
@@ -78,7 +79,7 @@ export type LpDesign = {
 
 export const DEFAULT_LP_DESIGN: LpDesign = {
   blocks: LP_BLOCKS.map((b) => ({ key: b.key, on: true })),
-  heroSource: "product", heroImage: "", heroPosition: "top", heroRatio: "auto", formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
+  heroSource: "product", heroImage: "", heroPosition: "top", heroRatio: "auto", heroMaxH: 310, formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
   showOldPrice: true, showCodBar: true, freeShip: true, freeShipText: "🚚 التوصيل مجاني لجميع المدن", trust3: true, trust3Text: "الدفع|عند الاستلام ; التوصيل|24-72h ; إرجاع|خلال 7 أيام", askAddress: true, addressRequired: false, showWhatsapp: true, showWhatsappFloat: true,
   sticky: true, showFooter: true,
   topBar: "", badge: "عرض خاص", codBar: "🚚 التوصيل لجميع المدن | الدفع عند الاستلام", orderTitle: "🛒 اطلب الآن", orderSub: "",
@@ -119,6 +120,7 @@ export function normalizeDesign(v: Partial<LpDesign> | undefined | null): LpDesi
     .map((a) => ({ codes: str(a?.codes), headline: str(a?.headline), sub: str(a?.sub), image: str((a as { image?: unknown })?.image), page: str((a as { page?: unknown })?.page).trim().replace(/[^\w\u0600-\u06FF-]/g, "") })).filter((a) => a.codes || a.headline || a.image || a.page);
   const heroPosition = d.heroPosition === "after_form" || d.heroPosition === "hidden" ? d.heroPosition : "top";
   const heroRatio = (["1/1", "4/5", "9/16", "auto"] as const).includes(d.heroRatio as never) ? d.heroRatio : "auto";
-  return { ...d, heroPosition, heroRatio, blocks, tiles, galleryImages, proofImages, angles };
+  const heroMaxH = Math.min(700, Math.max(200, Math.round(Number(d.heroMaxH) || 310)));
+  return { ...d, heroPosition, heroRatio, heroMaxH, blocks, tiles, galleryImages, proofImages, angles };
 }
 

@@ -130,6 +130,9 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
               <option value="9/16">Très vertical 9:16 (story, coupe beaucoup)</option>
             </select>
           </L>
+          <L t="Taille de la photo principale sur mobile (hauteur max en px, 310 = défaut, 400 = grande)">
+            <input type="number" min={200} max={700} step={10} className={field} value={d.heroMaxH} onChange={(e) => set("heroMaxH", Number(e.target.value) || 310)} />
+          </L>
           {B("offersAfterFields", "Choix de la quantité SOUS les champs nom / téléphone / ville (sinon au-dessus)")}
           {B("formFirst", "Formulaire juste sous la photo (avant les icônes et les autres blocs)")}
           {B("offerThumbs", "Petite photo du produit sur chaque offre (1 / 2 / 3 pièces)")}
