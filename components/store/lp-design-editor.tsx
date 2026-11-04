@@ -133,6 +133,7 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
           <L t="Taille de la photo principale sur mobile (hauteur max en px, 310 = défaut, 400 = grande)">
             <input type="number" min={200} max={700} step={10} className={field} value={d.heroMaxH} onChange={(e) => set("heroMaxH", Number(e.target.value) || 310)} />
           </L>
+          <L t="Texte du bouton commander (court, ex. اطلب الآن)"><input dir="auto" className={field} value={d.submitText} onChange={(e) => set("submitText", e.target.value)} /></L>
           {B("showTotalBox", "Bloc « المجموع » au-dessus du bouton commander (le total est déjà écrit sur le bouton)")}
           {B("offersAfterFields", "Choix de la quantité SOUS les champs nom / téléphone / ville (sinon au-dessus)")}
           {B("formFirst", "Formulaire juste sous la photo (avant les icônes et les autres blocs)")}

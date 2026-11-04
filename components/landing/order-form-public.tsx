@@ -49,6 +49,7 @@ interface Props {
   /** Petite photo du produit sur chaque carte d'offre (1 / 2 / 3 pièces) */
   offerImage?: string | null;
   showTotalBox?: boolean;
+  submitText?: string;
   /** Quantité sous les champs nom / téléphone / ville (true) ou au-dessus (false) */
   offersAfterFields?: boolean;
 }
@@ -58,7 +59,7 @@ function lpf(t: string, f?: string) {
   try { window.dispatchEvent(new CustomEvent("lpf", { detail: { t, f } })); } catch { /* rien */ }
 }
 
-export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [], askAddress = false, addressRequired = false, offerImage = null, offersAfterFields = true, showTotalBox = false }: Props) {
+export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [], askAddress = false, addressRequired = false, offerImage = null, offersAfterFields = true, showTotalBox = false, submitText = "اطلب الآن" }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
   useEffect(() => { getCreativeCode(); }, []); // mémorise ?cr= dès l'arrivée
@@ -595,16 +596,18 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         </div>
       )}
 
-      <button type="submit" disabled={isPending}
-        style={{ display:"block", width:"100%",
-          background: isPending ? "#9ca3af" : "#16a34a",
-          color:"#fff", fontSize:"clamp(15px,4vw,17px)", fontWeight:800,
-          padding:"15px 24px", borderRadius:"12px",
-          border:"none", cursor: isPending ? "not-allowed" : "pointer",
+      <style>{`@keyframes spBtnPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}.sp-submit{animation:spBtnPulse 1.6s ease-in-out infinite}.sp-submit:disabled{animation:none}`}</style>
+      <button type="submit" disabled={isPending} className="sp-submit"
+        style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"2px", width:"100%", minHeight:"62px",
+          background: isPending ? "#9ca3af" : "linear-gradient(180deg,#22c55e,#16a34a)",
+          color:"#fff", padding:"10px 20px", borderRadius:"14px",
+          border:"none", borderBottom: isPending ? "none" : "4px solid #15803d", cursor: isPending ? "not-allowed" : "pointer",
           fontFamily:"var(--font-cairo),sans-serif", boxSizing:"border-box",
-          boxShadow: isPending ? "none" : "0 3px 14px rgba(22,163,74,.28)",
-          transition:"background .15s" }}>
-        {isPending ? "جاري إرسال الطلب…" : `${ctaText} — ${total.toFixed(0)} درهم`}
+          boxShadow: isPending ? "none" : "0 6px 18px rgba(22,163,74,.35)" }}>
+        {isPending ? <span style={{ fontSize:"18px", fontWeight:800 }}>جاري إرسال الطلب…</span> : (<>
+          <span style={{ fontSize:"clamp(20px,5.6vw,23px)", fontWeight:900, lineHeight:1.2 }}>🛒 {submitText}</span>
+          <span style={{ fontSize:"13px", fontWeight:700, opacity:.95 }}>{total.toFixed(0)} درهم · الدفع عند الاستلام</span>
+        </>)}
       </button>
 
       <p style={{ textAlign:"center", fontSize:"11px", color:"#9ca3af", marginTop:"10px" }}>

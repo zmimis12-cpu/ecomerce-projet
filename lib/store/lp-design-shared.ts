@@ -31,7 +31,8 @@ export type LpDesign = {
   stickyAlways: boolean;             // barre fixe « اشتري الآن » + WhatsApp visible sur toute la page
   offerThumbs: boolean;              // petite photo du produit sur chaque offre (1 / 2 / 3 pièces)
   offersAfterFields: boolean;
-  showTotalBox: boolean;             // bloc « المجموع » au-dessus du bouton (le total est déjà sur le bouton)        // quantité sous les champs nom / téléphone / ville
+  showTotalBox: boolean;
+  submitText: string;                // texte du bouton commander (court) — le prix s'affiche en petit dessous             // bloc « المجموع » au-dessus du bouton (le total est déjà sur le bouton)        // quantité sous les champs nom / téléphone / ville
   showStoreHeader: boolean;          // logo + menu « القائمة »
   crossAtBottom: boolean;            // autres produits toujours tout en bas (la page reste centrée sur LE produit — mieux pour Meta)
   showBumps: boolean;                // upsells « أضف لطلبك » dans le formulaire
@@ -85,7 +86,7 @@ export type LpDesign = {
 
 export const DEFAULT_LP_DESIGN: LpDesign = {
   blocks: LP_BLOCKS.map((b) => ({ key: b.key, on: true })),
-  heroSource: "product", heroImage: "", heroPosition: "top", heroRatio: "auto", heroMaxH: 310, formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, showTotalBox: false, crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
+  heroSource: "product", heroImage: "", heroPosition: "top", heroRatio: "auto", heroMaxH: 310, formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, showTotalBox: false, submitText: "اطلب الآن", crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
   showOldPrice: true, showCodBar: true, freeShip: true, freeShipText: "🚚 التوصيل مجاني لجميع المدن", trust3: true, trust3Text: "الدفع|عند الاستلام ; التوصيل|24-72h ; إرجاع|خلال 7 أيام", askAddress: true, addressRequired: false, showWhatsapp: true, showWhatsappFloat: true,
   sticky: true, showFooter: true,
   topBar: "", badge: "عرض خاص", codBar: "🚚 التوصيل لجميع المدن | الدفع عند الاستلام", orderTitle: "🛒 اطلب الآن", orderSub: "",
