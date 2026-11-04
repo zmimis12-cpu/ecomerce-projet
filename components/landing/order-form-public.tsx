@@ -71,10 +71,11 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     return (list.find((o) => o.isDefault) ?? list[0])?.qty ?? 1;
   });
   const hasFiredInitiateCheckout = useRef(false);
-  const [form, setForm] = useState({
+  const [formState, setForm] = useState({
     customer_name:"", customer_phone:"", customer_city:"",
     customer_address:"سيتم تأكيد العنوان عبر الهاتف", notes:"", website:"",
   });
+  const form = formState;
 
   // InitiateCheckout — se déclenche une seule fois, à la première interaction
   // réelle avec le formulaire (pas au chargement de la page, ça c'est ViewContent).
@@ -177,9 +178,32 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     setErrors((e) => { const n={...e}; delete n[key]; return n; });
   }
 
+  /** Valeurs tapées AVANT que la page soit active (téléphone lent) : visibles dans les champs mais pas dans l'état React. */
+  function domVal(n: string) {
+    const el = formRef.current?.elements.namedItem(n) as HTMLInputElement | null;
+    return el?.value?.trim() ?? "";
+  }
+  function withDom<T extends typeof form>(f: T): T {
+    const out = { ...f };
+    for (const k of ["customer_name", "customer_phone", "customer_city"] as const) if (!out[k].trim() && domVal(k)) out[k] = domVal(k);
+    const a = domVal("customer_address"); if (a && (out.customer_address === "سيتم تأكيد العنوان عبر الهاتف" || !out.customer_address.trim())) out.customer_address = a;
+    return out;
+  }
+
+  // Page devenue active : on récupère ce que le client a déjà tapé, et s'il a déjà cliqué « commander », on envoie.
+  useEffect(() => {
+    const f = withDom(form);
+    if (f.customer_name !== form.customer_name || f.customer_phone !== form.customer_phone || f.customer_city !== form.customer_city || f.customer_address !== form.customer_address) setForm(f);
+    const w = window as unknown as { __spReady?: boolean; __spPending?: number };
+    w.__spReady = true;
+    if (w.__spPending) { w.__spPending = 0; setTimeout(() => formRef.current?.requestSubmit(), 200); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setServerError("");
+    const form = withDom(formState);
     // Validate city
     const newErrors: Record<string, string> = {};
     if (!form.customer_name.trim()) newErrors.customer_name = "الاسم مطلوب";
@@ -452,6 +476,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   );
 
   return (
+    <>
     <form id="sp-order-form" ref={formRef} onSubmit={handleSubmit} style={{ fontFamily:"var(--font-cairo),sans-serif", scrollMarginTop:"12px" }}>
       {/* Honeypot */}
       <input type="text" name="website" value={form.website}
@@ -464,7 +489,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
       {/* Name */}
       <div style={{ marginBottom:"14px" }}>
         <label style={LBL}>الاسم الكامل *</label>
-        <input type="text" value={form.customer_name}
+        <input type="text" name="customer_name" autoComplete="name" value={form.customer_name}
           onChange={(e) => set("customer_name", e.target.value)}
           placeholder="الاسم الكامل" style={INP(!!errors.customer_name)} required />
         {ERR(errors.customer_name)}
@@ -473,7 +498,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
       {/* Phone */}
       <div style={{ marginBottom:"14px" }}>
         <label style={LBL}>رقم الهاتف *</label>
-        <input type="tel" value={form.customer_phone}
+        <input type="tel" name="customer_phone" autoComplete="tel" value={form.customer_phone}
           onChange={(e) => set("customer_phone", e.target.value)}
           placeholder="06 / 07 ..." style={INP(!!errors.customer_phone)} required />
         {ERR(errors.customer_phone)}
@@ -489,6 +514,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         <label style={LBL}>المدينة *</label>
         <input
           type="text"
+          name="customer_city"
           value={form.customer_city}
           onChange={(e) => set("customer_city", e.target.value)}
           placeholder="المدينة"
@@ -501,7 +527,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
       {askAddress && (
         <div style={{ marginBottom:"14px" }}>
           <label style={LBL}>العنوان{addressRequired ? " *" : ""}</label>
-          <input type="text" autoComplete="street-address"
+          <input type="text" name="customer_address" autoComplete="street-address"
             placeholder="الحي، الزنقة، رقم المنزل..."
             onChange={(e) => set("customer_address", e.target.value)}
             style={INP(!!errors.customer_address)} />
@@ -584,6 +610,8 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         بياناتك محفوظة وآمنة · الدفع عند الاستلام فقط
       </p>
     </form>
+    <script dangerouslySetInnerHTML={{ __html: "(function(){var f=document.getElementById('sp-order-form');if(!f||window.__spReady)return;f.addEventListener('submit',function(e){if(!window.__spReady){e.preventDefault();window.__spPending=1;var b=f.querySelector('button[type=submit]');if(b)b.style.opacity='.6';}},true);})();" }} />
+    </>
   );
 }
 
