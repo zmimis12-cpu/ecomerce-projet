@@ -46,7 +46,8 @@ export async function sendMetaPurchaseEvent(input: PurchaseEventInput): Promise<
     ph: [sha256(toInternationalMorocco(input.phone).replace("+", ""))],
     ct: [sha256(normalizeForMeta(input.city))],
     country: [sha256(input.country ?? "ma")],
-    external_id: [sha256(input.eventId)],
+    // Identifiant client STABLE = téléphone haché (même client = même ID sur toutes ses commandes) → meilleure correspondance Meta
+    external_id: [sha256(toInternationalMorocco(input.phone).replace("+", ""))],
   };
   if (input.fullName?.trim()) {
     const parts = input.fullName.trim().split(/\s+/);
