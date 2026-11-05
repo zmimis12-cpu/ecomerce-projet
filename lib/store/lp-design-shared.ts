@@ -33,7 +33,8 @@ export type LpDesign = {
   offersAfterFields: boolean;
   showTotalBox: boolean;
   submitText: string;
-  clarityId: string;                 // Microsoft Clarity (enregistrements des visites) — vide = désactivé
+  clarityId: string;
+  template: "classic" | "bm";         // modèle visuel : classique ou « bm » (barre rouge, bandeaux bleus, boutons orange — style LP COD concurrentes)                 // Microsoft Clarity (enregistrements des visites) — vide = désactivé
   formFrame: boolean;                // formulaire encadré (bordure verte + bandeau titre)
   formFrameTitle: string;                // texte du bouton commander (court) — le prix s'affiche en petit dessous             // bloc « المجموع » au-dessus du bouton (le total est déjà sur le bouton)        // quantité sous les champs nom / téléphone / ville
   showStoreHeader: boolean;          // logo + menu « القائمة »
@@ -89,7 +90,7 @@ export type LpDesign = {
 
 export const DEFAULT_LP_DESIGN: LpDesign = {
   blocks: LP_BLOCKS.map((b) => ({ key: b.key, on: true })),
-  heroSource: "product", heroImage: "", heroPosition: "top", heroRatio: "auto", heroMaxH: 310, formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, showTotalBox: false, submitText: "اطلب الآن", clarityId: "", formFrame: true, formFrameTitle: "👇 للطلب عمّر المعلومات ديالك", crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
+  heroSource: "product", heroImage: "", heroPosition: "top", heroRatio: "auto", heroMaxH: 310, formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, showTotalBox: false, submitText: "اطلب الآن", clarityId: "", template: "classic", formFrame: true, formFrameTitle: "👇 للطلب عمّر المعلومات ديالك", crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
   showOldPrice: true, showCodBar: true, freeShip: true, freeShipText: "🚚 التوصيل مجاني لجميع المدن", trust3: true, trust3Text: "الدفع|عند الاستلام ; التوصيل|24-72h ; إرجاع|خلال 7 أيام", askAddress: true, addressRequired: false, showWhatsapp: true, showWhatsappFloat: true,
   sticky: true, showFooter: true,
   topBar: "", badge: "عرض خاص", codBar: "🚚 التوصيل لجميع المدن | الدفع عند الاستلام", orderTitle: "🛒 اطلب الآن", orderSub: "",

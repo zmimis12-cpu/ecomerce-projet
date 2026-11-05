@@ -160,6 +160,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     "--c-bg": d.colorBg || DEFAULT_LP_DESIGN.colorBg,
   } as React.CSSProperties;
 
+  const isBm = d.template === "bm";
   const W = ({ children }: { children: React.ReactNode }) => <div className="sp-wrap">{children}</div>;
 
   const blocks: Record<LpBlockKey, React.ReactNode> = {
@@ -240,9 +241,13 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     ),
     bullets: bulletGroups.length > 0 && (
       <W>{bulletGroups.map((g, i) => (
-        <section key={i} className="sp-sec sp-bl">
+        <section key={i} className={`sp-sec sp-bl${isBm && i % 2 === 1 ? " bm-dark" : ""}`}>
           {g.title && <h2 className="sp-h2">{g.title}</h2>}
-          <ul>{g.items.map((t, j) => <li key={j}>✅ {t}</li>)}</ul>
+          {isBm && moreImgs[i] && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={moreImgs[i]} alt="" loading="lazy" fetchPriority="low" decoding="async" className="sp-more bm-img" />
+          )}
+          <ul>{g.items.map((t, j) => <li key={j}>{t}</li>)}</ul>
           <a href="#sp-form" className="sp-final-btn sp-bl-btn">{d.bulletCta || "👈 اضغط هنا للطلب"}</a>
         </section>
       ))}</W>
@@ -352,7 +357,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       </section></W>
     ),
     faq: faqItems.length > 0 && (
-      <W><section className="sp-sec"><h2 className="sp-h2">{d.faqTitle}</h2><FaqAccordion items={faqItems} /></section></W>
+      <W><section className="sp-sec sp-faq"><h2 className="sp-h2">{d.faqTitle}</h2><FaqAccordion items={faqItems} /></section></W>
     ),
     guarantees: gty.length > 0 && (
       <W><div className="sp-gty">
@@ -420,7 +425,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             <style>{CSS}</style>
             {d.heroMaxH !== 310 && <style>{`@media (max-width:600px){.sp-hero{max-height:${d.heroMaxH}px}}`}</style>}
 
-      <div className="sp" dir="rtl" lang="ar" style={colorVars}>
+      <div className={isBm ? "sp bm" : "sp"} dir="rtl" lang="ar" style={colorVars}>
+        {isBm && <a href="#sp-form" className="bm-top"><span aria-hidden="true">👉</span> {d.submitText || "أطلب الآن"}</a>}
         {animItems.length > 0 ? (
           // Bande défilante 100 % CSS (aucun JS, aucune image) → ne ralentit pas la page
           <div className="sp-mq" aria-label={animItems.join(" · ")}>
@@ -526,6 +532,21 @@ body{margin:0;background:#fff;overflow-x:hidden;width:100%;position:relative}
 .sp-sec{margin-top:28px}
 .sp-h2{text-align:center;font-size:20px;font-weight:900;margin:0}
 .sp-h2-sub{text-align:center;font-size:13px;color:#6b7280;margin:4px 0 14px}
+.sp-bl li::before{content:"✅ "}
+.bm{--c-bg:#fff;background:#fff}.bm .sp-mq,.bm .sp-top{display:none}
+.bm-top{position:sticky;top:0;z-index:60;display:flex;align-items:center;justify-content:center;gap:10px;background:#e10600;color:#fff;font-weight:900;font-size:21px;padding:9px 10px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.bm .sp-title{color:#169fb8;font-size:26px;font-weight:900;text-align:center;line-height:1.35}
+.bm .sp-card{border:3px dotted #444;border-radius:6px;box-shadow:none;background:#fff}
+.bm .sp-h2{background:#1f3f93;color:#fff;font-size:23px;padding:12px 10px;margin:22px -16px 14px;border-radius:0}
+.bm .sp-bl ul{gap:12px}.bm .sp-bl li{background:none;border:0;border-radius:0;padding:0 26px 0 0;position:relative;font-size:16px;font-weight:600;line-height:1.7;color:#222}
+.bm .sp-bl li::before{content:"«";position:absolute;right:0;top:-2px;color:#16a34a;font-size:22px;font-weight:900}
+.bm .sp-bl.bm-dark ul{background:#141414;border-radius:14px;padding:16px 14px}.bm .sp-bl.bm-dark li{color:#fff}
+.bm .sp-bl.bm-dark li::before{content:"✓";top:3px;width:20px;height:20px;border-radius:50%;background:#22c55e;color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center}
+.bm .bm-img{border-radius:6px;margin:0 auto 14px;display:block}
+@keyframes bmPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.bm .sp-bl-btn,.bm .sp-final-btn{display:table;margin:14px auto 4px;background:linear-gradient(180deg,#ff9a1f,#f26a00);color:#fff;font-size:22px;font-weight:900;padding:10px 42px;border-radius:999px;box-shadow:0 4px 12px rgba(242,106,0,.35);animation:bmPulse 1.4s ease-in-out infinite}
+.bm .sp-submit{border-radius:999px!important}
+.bm .sp-faq{background:#141414;color:#fff;border-radius:14px;padding:16px}.bm .sp-faq .sp-h2{background:none;color:#29c4e6;margin:0 0 10px;padding:0}.bm .sp-faq *{color:#fff!important;background:transparent!important;border-color:#333!important}
 .sp-bl ul{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:8px}.sp-bl li{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px 12px;font-size:15px;font-weight:600;line-height:1.5}.sp-bl-btn{display:block;text-align:center;margin:0 auto}
 .sp-video{position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:#000;box-shadow:0 6px 24px rgba(0,0,0,.12)}
 .sp-yt{position:absolute;inset:0;width:100%;height:100%;border:0;padding:0;background:#000;cursor:pointer}.sp-yt img{width:100%;height:100%;object-fit:cover;opacity:.9}.sp-yt span{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(220,38,38,.92);color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center}
