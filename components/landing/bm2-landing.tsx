@@ -20,15 +20,18 @@ export function Bm2Landing(p: {
   return (
     <div className="b2" dir="rtl" lang="ar">
       <style>{CSS}</style>
+      <header className="b2-head">
+        {p.logo && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={p.logo} alt="" className="b2-logo" width={44} height={44} decoding="async" />
+        )}
+        <span className="b2-brand">{p.storeName}</span>
+      </header>
       <a href="#sp-form" className="b2-top">
         <span className="b2-hand" aria-hidden="true">👉</span>
         <span>{p.topText}</span>
       </a>
 
-      {p.logo && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={p.logo} alt={p.storeName} className="b2-logo" width={72} height={72} fetchPriority="low" decoding="async" />
-      )}
       <h1 className="b2-title" id="sp-title" style={{ color: p.titleColor }} suppressHydrationWarning>{p.title}</h1>
       {p.titleScript && <script dangerouslySetInnerHTML={{ __html: p.titleScript }} />}
       <p className="b2-sub" id="sp-angle-sub" suppressHydrationWarning>{p.subtitle}</p>
@@ -126,9 +129,11 @@ const CSS = `
 html,body{background:#fff;margin:0}
 .b2{max-width:520px;margin:0 auto;background:#fff;color:#1f2937;font-family:var(--font-cairo),"Cairo",Tahoma,sans-serif;padding:0 0 24px;overflow-x:hidden}
 .b2 *{box-sizing:border-box}
-.b2-top{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:center;gap:12px;margin:10px 10px 0;background:#e60000;color:#fff;text-decoration:none;font-size:clamp(22px,6.4vw,27px);font-weight:800;min-height:58px;padding:6px 52px;box-shadow:0 2px 6px rgba(0,0,0,.18)}
+.b2-head{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 10px 0}
+.b2-logo{width:44px;height:44px;border-radius:50%;display:block}
+.b2-brand{font-size:20px;font-weight:900;letter-spacing:.5px;color:#111;direction:ltr}
+.b2-top{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:center;gap:12px;margin:8px 10px 0;animation:b2in .6s ease-out both,b2top 2.4s ease-in-out .8s infinite;background:#e60000;color:#fff;text-decoration:none;font-size:clamp(22px,6.4vw,27px);font-weight:800;min-height:58px;padding:6px 52px;box-shadow:0 2px 6px rgba(0,0,0,.18)}
 .b2-hand{position:absolute;left:16px;font-size:24px;filter:brightness(0) invert(1)}
-.b2-logo{display:block;width:72px;height:72px;margin:12px auto 0;border-radius:50%}
 .b2-title{margin:10px 10px 0;text-align:center;font-size:clamp(28px,8.4vw,38px);line-height:1.2;font-weight:900}
 .b2-sub{margin:10px 10px 12px;text-align:center;font-size:clamp(20px,5.8vw,25px);font-weight:800;color:#111}
 .b2-sub:empty{display:none}
@@ -157,6 +162,10 @@ html,body{background:#fff;margin:0}
 .b2-ck{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#22c55e;color:#fff;font-size:15px;font-weight:900;display:flex;align-items:center;justify-content:center;margin-top:5px}
 .b2-cta-w{text-align:center;margin:20px 0 0}
 .b2-cta{display:inline-block;min-width:58%;background:linear-gradient(180deg,#f79a1e,#ec5a14);color:#fff;text-decoration:none;font-size:clamp(25px,7.4vw,32px);font-weight:900;padding:12px 32px;border-radius:9999px;box-shadow:0 4px 12px rgba(236,90,20,.35);animation:b2p 1.5s ease-in-out infinite}
+@keyframes b2in{from{opacity:0;transform:translateY(-24px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes b2top{0%,100%{transform:scale(1)}45%{transform:scale(1.035)}55%{transform:scale(1.035)}}
+.b2-hand{animation:b2hand 1.2s ease-in-out infinite}
+@keyframes b2hand{0%,100%{transform:translateX(0)}50%{transform:translateX(7px)}}
 @keyframes b2p{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
 .b2-faq{margin:28px 10px 0;background:#0b0b0b;border-radius:14px;padding:22px 18px 8px;text-align:center}
 .b2-faq-h{margin:0 0 14px;color:#2fa7bb;font-size:clamp(25px,7.2vw,32px);font-weight:900}
@@ -167,5 +176,5 @@ html,body{background:#fff;margin:0}
 .b2-wa-t{background:#f3f4f6;color:#111;font-size:15px;font-weight:600;padding:8px 14px;border-radius:16px;box-shadow:0 2px 6px rgba(0,0,0,.12)}
 .b2-foot{margin-top:26px;padding-bottom:70px;text-align:center;font-size:12px;color:#6b7280;line-height:2}
 .b2-foot a{color:#6b7280}
-@media (prefers-reduced-motion:reduce){.b2-cta{animation:none}}
+@media (prefers-reduced-motion:reduce){.b2-cta,.b2-top,.b2-hand{animation:none}}
 `;
