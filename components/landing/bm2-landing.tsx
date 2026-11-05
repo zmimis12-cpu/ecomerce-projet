@@ -63,7 +63,7 @@ export function Bm2Landing(p: {
             </ul>
           ) : (
             <ul className="b2-list">
-              {g.items.map((t, k) => <li key={k}><span className="b2-ch" aria-hidden="true">«</span><span>{t}</span></li>)}
+              {g.items.map((t, k) => <li key={k}><span className="b2-ch" aria-hidden="true">»</span><span>{t}</span></li>)}
             </ul>
           )}
           {cta}
