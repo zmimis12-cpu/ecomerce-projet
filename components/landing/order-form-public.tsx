@@ -348,6 +348,96 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   ) : null;
 
   // Choix de la quantité (+ variantes) : sous les champs (par défaut) ou au-dessus
+  const variantBlock = (
+    <>
+      {/* Variants — plusieurs pièces : une ligne compacte par pièce, déjà pré-remplie */}
+      {activeVariants.length > 0 && bundle > 1 && (
+        <div style={{marginBottom:"14px",padding:"10px 12px",borderRadius:"14px",border:"1px solid #e5e7eb",background:"#fafafa"}}>
+          <div style={{fontSize:"12px",fontWeight:700,color:"#374151",marginBottom:"8px"}}>
+            {activeVariants[0].name} لكل قطعة <span style={{fontWeight:400,color:"#6b7280"}}>(مختار مسبقاً — تقدر تبدل)</span>
+          </div>
+          {Array.from({ length: bundle }).map((_, unit) => (
+            <div key={unit} style={{display:"flex",alignItems:"center",gap:"8px",marginBottom: unit < bundle - 1 ? "10px" : 0,paddingBottom: unit < bundle - 1 ? "10px" : 0,borderBottom: unit < bundle - 1 ? "1px dashed #e5e7eb" : "none"}}>
+              <span style={{minWidth:"58px",fontSize:"12px",fontWeight:700,color:"#111827"}}>القطعة {unit + 1}</span>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:"6px",flex:1}}>
+                {activeVariants.map((v) => v.options.filter(o => o.label.trim()).map((opt, oi) => {
+                  const on = selectedVariants[unit]?.[v.name] === opt.label;
+                  return (
+                    <button key={v.name + oi} type="button" onClick={() => pickVariant(unit, v.name, opt.label)}
+                      style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:"6px",minWidth:0,padding:"5px 8px 5px 5px",borderRadius:"9999px",
+                        border:`2px solid ${on ? "#16a34a" : "#e5e7eb"}`,background:on ? "#f0fdf4" : "#fff",
+                        color:on ? "#16a34a" : "#374151",fontWeight:on ? 700 : 500,fontSize:"12px",cursor:"pointer",
+                        fontFamily:"var(--font-cairo),sans-serif"}}>
+                      {opt.image && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={opt.image} alt="" loading="lazy" style={{width:"26px",height:"26px",borderRadius:"50%",objectFit:"cover"}} />
+                      )}
+                      {opt.label.trim()}
+                    </button>
+                  );
+                }))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Une seule pièce : grandes cartes avec photo */}
+      {activeVariants.length > 0 && bundle === 1 && Array.from({ length: 1 }).map((_, unit) => (
+        <div key={unit} style={bundle > 1 ? {
+          marginBottom:"14px", padding:"12px", borderRadius:"14px",
+          border:"1px dashed #d1d5db", background:"#fafafa",
+        } : undefined}>
+          {bundle > 1 && (
+            <div style={{fontWeight:700,fontSize:"14px",marginBottom:"10px",color:"#111827"}}>
+              القطعة {unit + 1}
+            </div>
+          )}
+          {activeVariants.map((v, vi) => (
+            <div key={vi} style={{marginBottom:"14px"}}>
+              <label style={bm ? { ...LBL, display:"block", textAlign:"right" } : LBL}>{v.name} *</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"10px"}}>
+                {v.options.filter(o => o.label.trim()).map((opt, oi) => {
+                  const isSelected = selectedVariants[unit]?.[v.name] === opt.label;
+                  return (
+                    <button
+                      key={oi}
+                      type="button"
+                      onClick={() => pickVariant(unit, v.name, opt.label)}
+                      style={{
+                        display:"flex", flexDirection: opt.image ? "column" : "row",
+                        alignItems:"center", gap: opt.image ? "6px" : "0",
+                        padding: opt.image ? "8px" : "10px 18px",
+                        borderRadius:"14px",border:"2px solid",
+                        borderColor: isSelected ? "#16a34a" : "#e5e7eb",
+                        background: isSelected ? "#f0fdf4" : "#fff",
+                        color: isSelected ? "#16a34a" : "#374151",
+                        fontWeight: isSelected ? 700 : 400,
+                        fontSize:"13px",cursor:"pointer",
+                        fontFamily:"var(--font-cairo),sans-serif",
+                        transition:"all .15s",
+                        boxShadow: isSelected ? "0 2px 8px rgba(22,163,74,.15)" : "none",
+                      }}
+                    >
+                      {opt.image && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={opt.image} alt={opt.label}
+                          style={{
+                            width:"64px",height:"64px",borderRadius:"10px",objectFit:"cover",
+                            border: isSelected ? "2px solid #16a34a" : "1px solid #e5e7eb",
+                          }} />
+                      )}
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+      {activeVariants.length > 0 && ERR(errors.variants)}
+    </>
+  );
   const choiceBlock = bm ? (
     <div style={{ marginBottom:"12px", position:"relative" }}>
       <select aria-label="اختار العرض" value={offer.id} onChange={(e) => { const o = offers.find((x) => x.id === e.target.value); if (o) changeOffer(o); }}
@@ -355,6 +445,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         {offers.map((o) => <option key={o.id} value={o.id}>{o.label || defaultLabel(o.qty)} ب {o.price.toFixed(0)} درهم</option>)}
       </select>
       <span aria-hidden="true" style={{ position:"absolute", left:"14px", top:"50%", transform:"translateY(-50%)", fontSize:"12px", color:"#374151", pointerEvents:"none" }}>⌄</span>
+      <div style={{ marginTop:"12px" }}>{variantBlock}</div>
     </div>
   ) : (
     <>
@@ -405,92 +496,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         </div>
       </div>
 
-      {/* Variants — plusieurs pièces : une ligne compacte par pièce, déjà pré-remplie */}
-      {activeVariants.length > 0 && bundle > 1 && (
-        <div style={{marginBottom:"14px",padding:"10px 12px",borderRadius:"14px",border:"1px solid #e5e7eb",background:"#fafafa"}}>
-          <div style={{fontSize:"12px",fontWeight:700,color:"#374151",marginBottom:"8px"}}>
-            {activeVariants[0].name} لكل قطعة <span style={{fontWeight:400,color:"#6b7280"}}>(مختار مسبقاً — تقدر تبدل)</span>
-          </div>
-          {Array.from({ length: bundle }).map((_, unit) => (
-            <div key={unit} style={{display:"flex",alignItems:"center",gap:"8px",marginBottom: unit < bundle - 1 ? "10px" : 0,paddingBottom: unit < bundle - 1 ? "10px" : 0,borderBottom: unit < bundle - 1 ? "1px dashed #e5e7eb" : "none"}}>
-              <span style={{minWidth:"58px",fontSize:"12px",fontWeight:700,color:"#111827"}}>القطعة {unit + 1}</span>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:"6px",flex:1}}>
-                {activeVariants.map((v) => v.options.filter(o => o.label.trim()).map((opt, oi) => {
-                  const on = selectedVariants[unit]?.[v.name] === opt.label;
-                  return (
-                    <button key={v.name + oi} type="button" onClick={() => pickVariant(unit, v.name, opt.label)}
-                      style={{display:"flex",alignItems:"center",justifyContent:"flex-start",gap:"6px",minWidth:0,padding:"5px 8px 5px 5px",borderRadius:"9999px",
-                        border:`2px solid ${on ? "#16a34a" : "#e5e7eb"}`,background:on ? "#f0fdf4" : "#fff",
-                        color:on ? "#16a34a" : "#374151",fontWeight:on ? 700 : 500,fontSize:"12px",cursor:"pointer",
-                        fontFamily:"var(--font-cairo),sans-serif"}}>
-                      {opt.image && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={opt.image} alt="" loading="lazy" style={{width:"26px",height:"26px",borderRadius:"50%",objectFit:"cover"}} />
-                      )}
-                      {opt.label.trim()}
-                    </button>
-                  );
-                }))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      {/* Une seule pièce : grandes cartes avec photo */}
-      {activeVariants.length > 0 && bundle === 1 && Array.from({ length: 1 }).map((_, unit) => (
-        <div key={unit} style={bundle > 1 ? {
-          marginBottom:"14px", padding:"12px", borderRadius:"14px",
-          border:"1px dashed #d1d5db", background:"#fafafa",
-        } : undefined}>
-          {bundle > 1 && (
-            <div style={{fontWeight:700,fontSize:"14px",marginBottom:"10px",color:"#111827"}}>
-              القطعة {unit + 1}
-            </div>
-          )}
-          {activeVariants.map((v, vi) => (
-            <div key={vi} style={{marginBottom:"14px"}}>
-              <label style={LBL}>{v.name} *</label>
-              <div style={{display:"flex",flexWrap:"wrap",gap:"10px"}}>
-                {v.options.filter(o => o.label.trim()).map((opt, oi) => {
-                  const isSelected = selectedVariants[unit]?.[v.name] === opt.label;
-                  return (
-                    <button
-                      key={oi}
-                      type="button"
-                      onClick={() => pickVariant(unit, v.name, opt.label)}
-                      style={{
-                        display:"flex", flexDirection: opt.image ? "column" : "row",
-                        alignItems:"center", gap: opt.image ? "6px" : "0",
-                        padding: opt.image ? "8px" : "10px 18px",
-                        borderRadius:"14px",border:"2px solid",
-                        borderColor: isSelected ? "#16a34a" : "#e5e7eb",
-                        background: isSelected ? "#f0fdf4" : "#fff",
-                        color: isSelected ? "#16a34a" : "#374151",
-                        fontWeight: isSelected ? 700 : 400,
-                        fontSize:"13px",cursor:"pointer",
-                        fontFamily:"var(--font-cairo),sans-serif",
-                        transition:"all .15s",
-                        boxShadow: isSelected ? "0 2px 8px rgba(22,163,74,.15)" : "none",
-                      }}
-                    >
-                      {opt.image && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={opt.image} alt={opt.label}
-                          style={{
-                            width:"64px",height:"64px",borderRadius:"10px",objectFit:"cover",
-                            border: isSelected ? "2px solid #16a34a" : "1px solid #e5e7eb",
-                          }} />
-                      )}
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      ))}
-      {activeVariants.length > 0 && ERR(errors.variants)}
+      {variantBlock}
 
     </>
   );
