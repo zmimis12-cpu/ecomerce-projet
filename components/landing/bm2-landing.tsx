@@ -14,7 +14,7 @@ export function Bm2Landing(p: {
   groups: Group[]; images: string[]; ctaText: string;
   reviewsTitle: string; reviewImages: string[];
   faqTitle: string; faq: { q: string; a: string }[];
-  storeName: string; logo?: string;
+  storeName: string; logo?: string; waHref?: string;
 }) {
   const cta = <div className="b2-cta-w"><a href="#sp-form" className="b2-cta">{p.ctaText}</a></div>;
   return (
@@ -97,6 +97,15 @@ export function Bm2Landing(p: {
         </section>
       )}
 
+      {p.waHref && (
+        <a href={p.waHref} target="_blank" rel="noopener noreferrer" className="b2-wa" aria-label="تواصل معنا فالواتساب">
+          <span className="b2-wa-ic" aria-hidden="true">
+            <svg viewBox="0 0 32 32" width="34" height="34" fill="#fff"><path d="M16 3C9 3 3.3 8.6 3.3 15.6c0 2.5.7 4.8 2 6.8L3 29l6.8-2.2c1.9 1 4 1.6 6.2 1.6 7 0 12.7-5.6 12.7-12.6S23 3 16 3zm0 23.1c-2 0-3.9-.6-5.6-1.6l-.4-.2-4 1.3 1.3-3.9-.3-.4a10.4 10.4 0 0 1-1.7-5.7C5.3 9.8 10.1 5.1 16 5.1s10.6 4.7 10.6 10.5S21.9 26.1 16 26.1zm5.8-7.8c-.3-.2-1.9-.9-2.2-1-.3-.1-.5-.2-.7.2l-1 1.2c-.2.2-.4.2-.7.1-.3-.2-1.3-.5-2.5-1.6-.9-.8-1.6-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.6.3-.5c.1-.2 0-.4 0-.6l-1-2.4c-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.2 1.1-1.2 2.8s1.2 3.2 1.4 3.5c.2.2 2.4 3.6 5.8 5 2.9 1.1 3.4.9 4 .8.6-.1 1.9-.8 2.2-1.5.3-.8.3-1.4.2-1.5-.1-.2-.3-.3-.6-.4z"/></svg>
+          </span>
+          <span className="b2-wa-t">تواصل معنا فالواتساب</span>
+        </a>
+      )}
+
       <footer className="b2-foot">
         <a href="/a-propos">من نحن</a> · <a href="/conditions">شروط البيع والاسترجاع</a> · <a href="/confidentialite">سياسة الخصوصية</a>
         <div>© {new Date().getFullYear()} {p.storeName}</div>
@@ -153,7 +162,10 @@ html,body{background:#fff;margin:0}
 .b2-faq-h{margin:0 0 14px;color:#2fa7bb;font-size:clamp(25px,7.2vw,32px);font-weight:900}
 .b2-faq-i h3{margin:0 0 10px;color:#2fa7bb;font-size:clamp(22px,6.4vw,28px);font-weight:900;line-height:1.3}
 .b2-faq-i p{margin:0 0 22px;color:#fff;font-size:clamp(16px,4.6vw,19px);line-height:1.7;white-space:pre-line}
-.b2-foot{margin-top:26px;text-align:center;font-size:12px;color:#6b7280;line-height:2}
+.b2-wa{position:fixed;right:12px;bottom:14px;z-index:60;display:flex;flex-direction:row;align-items:center;gap:8px;text-decoration:none}
+.b2-wa-ic{width:58px;height:58px;border-radius:50%;background:#25d366;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+.b2-wa-t{background:#f3f4f6;color:#111;font-size:15px;font-weight:600;padding:8px 14px;border-radius:16px;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.b2-foot{margin-top:26px;padding-bottom:70px;text-align:center;font-size:12px;color:#6b7280;line-height:2}
 .b2-foot a{color:#6b7280}
 @media (prefers-reduced-motion:reduce){.b2-cta{animation:none}}
 `;
