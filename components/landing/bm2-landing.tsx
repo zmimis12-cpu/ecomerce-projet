@@ -14,7 +14,7 @@ export function Bm2Landing(p: {
   groups: Group[]; images: string[]; ctaText: string;
   reviewsTitle: string; reviewImages: string[];
   faqTitle: string; faq: { q: string; a: string }[];
-  storeName: string;
+  storeName: string; logo?: string;
 }) {
   const cta = <div className="b2-cta-w"><a href="#sp-form" className="b2-cta">{p.ctaText}</a></div>;
   return (
@@ -25,6 +25,10 @@ export function Bm2Landing(p: {
         <span>{p.topText}</span>
       </a>
 
+      {p.logo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={p.logo} alt={p.storeName} className="b2-logo" width={72} height={72} fetchPriority="low" decoding="async" />
+      )}
       <h1 className="b2-title" id="sp-title" style={{ color: p.titleColor }} suppressHydrationWarning>{p.title}</h1>
       {p.titleScript && <script dangerouslySetInnerHTML={{ __html: p.titleScript }} />}
       <p className="b2-sub" id="sp-angle-sub" suppressHydrationWarning>{p.subtitle}</p>
@@ -115,7 +119,8 @@ html,body{background:#fff;margin:0}
 .b2 *{box-sizing:border-box}
 .b2-top{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:center;gap:12px;margin:10px 10px 0;background:#e60000;color:#fff;text-decoration:none;font-size:clamp(22px,6.4vw,27px);font-weight:800;min-height:58px;padding:6px 52px;box-shadow:0 2px 6px rgba(0,0,0,.18)}
 .b2-hand{position:absolute;left:16px;font-size:24px;filter:brightness(0) invert(1)}
-.b2-title{margin:14px 10px 0;text-align:center;font-size:clamp(28px,8.4vw,38px);line-height:1.2;font-weight:900}
+.b2-logo{display:block;width:72px;height:72px;margin:12px auto 0;border-radius:50%}
+.b2-title{margin:10px 10px 0;text-align:center;font-size:clamp(28px,8.4vw,38px);line-height:1.2;font-weight:900}
 .b2-sub{margin:10px 10px 12px;text-align:center;font-size:clamp(20px,5.8vw,25px);font-weight:800;color:#111}
 .b2-sub:empty{display:none}
 .b2-hero{margin:0 10px}
