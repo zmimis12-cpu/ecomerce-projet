@@ -489,7 +489,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         </div>
       )}
       {/* Honeypot */}
-      <input type="text" name="website" autoComplete="off" value={form.website}
+      <input type="text" name="hz_hp_x7" autoComplete="off" value={form.website}
         onChange={(e) => set("website", e.target.value)}
         style={{ position:"absolute", width:1, height:1, overflow:"hidden", clip:"rect(0 0 0 0)", opacity:0, pointerEvents:"none" }}
         tabIndex={-1} aria-hidden="true" />

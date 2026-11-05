@@ -67,10 +67,10 @@ export async function POST(request: NextRequest) {
   }
 
   // ── 1. Honeypot ──────────────────────────────────────────────────────────────
-  if (isHoneypotTriggered(String(website))) {
-    // Silent accept — bots think they succeeded
-    return NextResponse.json({ success: true, orderNumber: "ORD-BOT-001" });
-  }
+  // Champ anti-robot rempli : on NE JETTE PLUS la commande (le remplissage automatique du navigateur
+  // Facebook/Instagram peut le remplir chez de vrais clients → commandes perdues en silence).
+  // On l'enregistre normalement avec une note pour le call center.
+  const honeypotHit = isHoneypotTriggered(String(website));
 
   // ── 2. Validate ──────────────────────────────────────────────────────────────
   const validation = validateOrderInput({
@@ -283,7 +283,7 @@ export async function POST(request: NextRequest) {
       total_amount_mad:  subtotal,
       source:            "landing_page",
       landing_page_slug: pslug || p.slug,
-      notes:             notesWithVariants.trim() || null,
+      notes:             ([notesWithVariants.trim(), honeypotHit ? "⚠️ champ anti-robot rempli (à vérifier)" : ""].filter(Boolean).join(" — ")) || null,
       import_source:     "landing_page",
       assigned_to:       agentId,
       ip_hash:           hashIp(ip),

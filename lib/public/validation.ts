@@ -46,10 +46,8 @@ export function validateOrderInput(
 ): ValidationResult {
   const errors: Record<string, string> = {};
 
-  // 1. Honeypot — silent reject (return ok=true to not alert bots)
-  if (input.website && input.website.trim() !== "") {
-    return { ok: true, errors: {}, phone: "" }; // silently accept but caller should drop
-  }
+  // 1. Honeypot : plus de rejet silencieux (l'autocomplétion du navigateur Facebook peut le remplir
+  // chez de vrais clients). La route enregistre la commande avec une note.
 
   // 2. Name
   const name = input.customer_name.trim();

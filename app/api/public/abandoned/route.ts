@@ -15,7 +15,7 @@ const s = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n);
 export async function POST(request: NextRequest) {
   let body: Record<string, unknown>;
   try { body = await request.json(); } catch { return ok(); }
-  if (s(body.website, 200)) return ok(); // honeypot
+  // honeypot ignoré : l'autocomplétion du navigateur peut le remplir chez de vrais clients
 
   const phone = normalizePhone(s(body.customer_phone, 30));
   const productId = s(body.product_id, 40);
