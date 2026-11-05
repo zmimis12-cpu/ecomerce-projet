@@ -12,6 +12,7 @@ import { FaqAccordion } from "@/components/landing/faq-accordion";
 import { CrossSell } from "@/components/store/cross-sell";
 import { getLpDesignFor, DEFAULT_LP_DESIGN, type LpBlockKey } from "@/lib/store/lp-design";
 import { viaCdn } from "@/lib/media";
+import { Bm2Landing } from "@/components/landing/bm2-landing";
 
 // Landing page « simple » (style boutique COD rapide) :
 // photo → titre → prix → formulaire tout de suite → photos + 1 phrase → re-CTA.
@@ -399,6 +400,29 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     ? [...shown.filter((b) => b.key === "form"), ...shown.filter((b) => b.key !== "form")] : shown;
   const barAlways = d.sticky && d.stickyAlways;
 
+  // Modèle « BM2 » : page séparée (copie LP concurrente) — même formulaire, mêmes pixels / suivi
+  const bm2 = d.template === "bm2" ? (
+    <Bm2Landing
+      title={title} subtitle={String(lp.subtitle ?? lp.hero_subheadline ?? "")} titleColor={d.bmTitleColor || "#3aa0b4"} topText={d.submitText || "أطلب الآن"}
+      heroEl={heroEl}
+      titleScript={angles.length > 0 ? `(function(){try{${angleJs}if(!m)return;var t=document.getElementById('sp-title');if(t&&m.h)t.textContent=m.h;var s=document.getElementById('sp-angle-sub');if(s&&m.s)s.textContent=m.s;}catch(e){}})();` : undefined}
+      formTitle={d.formFrameTitle || "للطلب املأ الاستمارة التالية"} price={one.price} oldPrice={d.showOldPrice ? oldShown : null} stars={d.bmStars}
+      form={<>
+        <LpFunnelTracker slug={slug} />
+        <OrderFormPublic product={product} productSlug={slug} ctaText={ctaText} look="bm"
+          b1={b1} b2={b2} b3={b3} offers={offers} askAddress={d.askAddress} addressRequired={d.addressRequired}
+          pixelId={pixel || undefined} tiktokPixelId={tt || undefined}
+          variants={(Array.isArray(lp.variant_options) ? lp.variant_options : []) as { name: string; options: { label: string; image?: string }[] }[]}
+          bumps={d.showBumps ? bumps : []} cities={cities} submitText={d.bmBuyText || "إضغط هنا للشراء"} />
+      </>}
+      note={d.bmNote} badges={d.bmBadges.split("|").map((x) => x.trim()).filter(Boolean)}
+      groups={bulletGroups} images={moreImgs} ctaText={d.submitText || "أطلب الآن"}
+      reviewsTitle={d.bmReviewsTitle} reviewImages={d.proofImages}
+      faqTitle={d.bmFaqTitle} faq={faqItems.filter((f) => f.q && f.a)}
+      storeName={String(lp.store_name ?? "HajtekZone")}
+    />
+  ) : null;
+
   return (
     <>
       <script dangerouslySetInnerHTML={{ __html: "(function(){var q=[],done=0;function run(){if(done)return;done=1;for(var i=0;i<q.length;i++){try{q[i]()}catch(e){}}q=[]}window.__spLater=function(f){done?f():q.push(f)};setTimeout(run,2500);['touchstart','scroll','keydown'].forEach(function(ev){addEventListener(ev,run,{once:true,passive:true})});function hook(){var h=document.querySelector('.sp-hero');if(!h||h.tagName!=='IMG'){run();return}function fit(){h.style.minHeight='0'}if(h.complete&&h.naturalWidth){fit();setTimeout(run,200)}else{h.addEventListener('load',function(){fit();setTimeout(run,200)});h.addEventListener('error',function(){fit();run()})}}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',hook);else hook();})();" }} />
@@ -422,6 +446,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         (function(){function buy(){var f=document.getElementById('sp-order-form');if(!f){var c=document.getElementById('sp-form');if(c)c.scrollIntoView({behavior:'smooth'});return;}if(f.requestSubmit)f.requestSubmit();else f.dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));}document.addEventListener('click',function(e){var t=e.target;if(t&&t.closest&&t.closest('#sp-buy')){e.preventDefault();buy();}var y=t&&t.closest&&t.closest('.sp-yt');if(y){var f=document.createElement('iframe');f.src=y.getAttribute('data-yt')+'&autoplay=1';f.allow='autoplay; encrypted-media; picture-in-picture';f.allowFullscreen=true;y.replaceWith(f);}});})();
         (function(){function go(){var b=document.getElementById('sp-sticky'),f=document.getElementById('sp-form');if(!f||!('IntersectionObserver' in window))return;var w=document.getElementById('sp-wa-float');new IntersectionObserver(function(e){if(b)b.classList.toggle('sp-hide',e[0].isIntersecting);if(w)w.classList.toggle('sp-hide-wa',e[0].isIntersecting);},{threshold:0.05}).observe(f);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`
       }} />
+      {bm2 ?? (<>
             <style>{CSS}</style>
             {d.heroMaxH !== 310 && <style>{`@media (max-width:600px){.sp-hero{max-height:${d.heroMaxH}px}}`}</style>}
 
@@ -497,6 +522,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </a>
         )}
       </div>
+      </>)}
     </>
   );
 }

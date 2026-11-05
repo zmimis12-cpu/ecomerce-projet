@@ -54,6 +54,8 @@ interface Props {
   formFrameTitle?: string;
   /** Quantité sous les champs nom / téléphone / ville (true) ou au-dessus (false) */
   offersAfterFields?: boolean;
+  /** Apparence « bm » : champs arrondis sans titres, offre en liste déroulante, bouton vert simple (copie LP concurrente) */
+  look?: "default" | "bm";
 }
 
 /** Mesure du parcours LP (lu par components/landing/lp-funnel-tracker.tsx). Ne bloque jamais. */
@@ -61,7 +63,9 @@ function lpf(t: string, f?: string) {
   try { window.dispatchEvent(new CustomEvent("lpf", { detail: { t, f } })); } catch { /* rien */ }
 }
 
-export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [], askAddress = false, addressRequired = false, offerImage = null, offersAfterFields = true, showTotalBox = false, submitText = "اطلب الآن", formFrame = true, formFrameTitle = "👇 للطلب عمّر المعلومات ديالك" }: Props) {
+export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [], askAddress = false, addressRequired = false, offerImage = null, offersAfterFields = true, showTotalBox = false, submitText = "اطلب الآن", formFrame = true, formFrameTitle = "👇 للطلب عمّر المعلومات ديالك", look = "default" }: Props) {
+  const bm = look === "bm";
+  if (bm) formFrame = false;
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
   useEffect(() => { getCreativeCode(); }, []); // mémorise ?cr= dès l'arrivée
@@ -322,7 +326,11 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     </div>
   );
 
-  const INP = (err: boolean): React.CSSProperties => ({
+  const INP = (err: boolean): React.CSSProperties => bm ? ({
+    display:"block", width:"100%", height:"52px", borderRadius:"9999px", border:`1.5px solid ${err ? "#f87171" : "#9ca3af"}`,
+    background:"#fff", padding:"0 22px", fontSize:"16px", fontFamily:"var(--font-cairo),sans-serif",
+    boxSizing:"border-box", outline:"none", color:"#111827", WebkitAppearance:"none", appearance:"none", textAlign:"right",
+  }) : ({
     display:"block", width:"100%", height:"48px",
     borderRadius:"12px", border:`2px solid ${err ? "#f87171" : "#e5e7eb"}`,
     background:"#fff", padding:"0 14px",
@@ -332,7 +340,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     transition:"border-color .15s",
   });
   const LBL: React.CSSProperties = {
-    display:"block", fontSize:"13px", fontWeight:700,
+    display: bm ? "none" : "block", fontSize:"13px", fontWeight:700,
     color:"#374151", marginBottom:"5px",
   };
   const ERR = (msg: string) => msg ? (
@@ -340,7 +348,15 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   ) : null;
 
   // Choix de la quantité (+ variantes) : sous les champs (par défaut) ou au-dessus
-  const choiceBlock = (
+  const choiceBlock = bm ? (
+    <div style={{ marginBottom:"12px", position:"relative" }}>
+      <select aria-label="اختار العرض" value={offer.id} onChange={(e) => { const o = offers.find((x) => x.id === e.target.value); if (o) changeOffer(o); }}
+        style={{ ...INP(false), height:"46px", fontSize:"15px", paddingLeft:"34px", cursor:"pointer" }}>
+        {offers.map((o) => <option key={o.id} value={o.id}>{o.label || defaultLabel(o.qty)} ب {o.price.toFixed(0)} درهم</option>)}
+      </select>
+      <span aria-hidden="true" style={{ position:"absolute", left:"14px", top:"50%", transform:"translateY(-50%)", fontSize:"12px", color:"#374151", pointerEvents:"none" }}>⌄</span>
+    </div>
+  ) : (
     <>
       {/* Offres (masquées s'il n'y a qu'une seule offre) */}
       <div style={{ marginBottom:"12px", display: offers.length > 1 ? undefined : "none" }}>
@@ -497,7 +513,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
       {!offersAfterFields && choiceBlock}
 
       {/* Name */}
-      <div style={{ marginBottom:"14px" }}>
+      <div style={{ marginBottom: bm ? "12px" : "14px" }}>
         <label style={LBL}>الاسم الكامل *</label>
         <input type="text" name="customer_name" autoComplete="name" value={form.customer_name}
           onChange={(e) => set("customer_name", e.target.value)}
@@ -506,11 +522,11 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
       </div>
 
       {/* Phone */}
-      <div style={{ marginBottom:"14px" }}>
+      <div style={{ marginBottom: bm ? "12px" : "14px" }}>
         <label style={LBL}>رقم الهاتف *</label>
         <input type="tel" name="customer_phone" autoComplete="tel" value={form.customer_phone}
           onChange={(e) => set("customer_phone", e.target.value)}
-          placeholder="06 / 07 ..." style={INP(!!errors.customer_phone)} required />
+          placeholder={bm ? "رقم الهاتف" : "06 / 07 ..."} style={INP(!!errors.customer_phone)} required />
         {ERR(errors.customer_phone)}
       </div>
 
@@ -529,7 +545,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           onChange={(e) => set("customer_city", e.target.value)}
           placeholder="المدينة"
           autoComplete="address-level2"
-          style={{...INP(!!errors.customer_city), height:"54px", padding:"0 14px"}}
+          style={bm ? INP(!!errors.customer_city) : {...INP(!!errors.customer_city), height:"54px", padding:"0 14px"}}
         />
         {ERR(errors.customer_city)}
       </div>
@@ -605,6 +621,14 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
       )}
 
       <style>{`@keyframes spBtnPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}.sp-submit{animation:spBtnPulse 1.6s ease-in-out infinite}.sp-submit:disabled{animation:none}`}</style>
+      {bm ? (
+      <button type="submit" disabled={isPending} className="sp-submit"
+        style={{ display:"block", width:"100%", minHeight:"58px", background: isPending ? "#9ca3af" : "#6cbf3c", color:"#111",
+          borderRadius:"9999px", border:"none", cursor: isPending ? "not-allowed" : "pointer", fontFamily:"var(--font-cairo),sans-serif",
+          fontSize:"clamp(21px,6vw,25px)", fontWeight:900, padding:"8px 16px", boxSizing:"border-box" }}>
+        {isPending ? "جاري إرسال الطلب…" : submitText}
+      </button>
+      ) : (
       <button type="submit" disabled={isPending} className="sp-submit"
         style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"2px", width:"100%", minHeight:"62px",
           background: isPending ? "#9ca3af" : "linear-gradient(180deg,#22c55e,#16a34a)",
@@ -617,10 +641,11 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           <span style={{ fontSize:"13px", fontWeight:700, opacity:.95 }}>{total.toFixed(0)} درهم · الدفع عند الاستلام</span>
         </>)}
       </button>
+      )}
 
-      <p style={{ textAlign:"center", fontSize:"11px", color:"#9ca3af", marginTop:"10px" }}>
+      {!bm && <p style={{ textAlign:"center", fontSize:"11px", color:"#9ca3af", marginTop:"10px" }}>
         بياناتك محفوظة وآمنة · الدفع عند الاستلام فقط
-      </p>
+      </p>}
     </form>
     <script dangerouslySetInnerHTML={{ __html: "(function(){var f=document.getElementById('sp-order-form');if(!f||window.__spReady)return;f.addEventListener('submit',function(e){if(!window.__spReady){e.preventDefault();window.__spPending=1;var b=f.querySelector('button[type=submit]');if(b)b.style.opacity='.6';}},true);})();" }} />
     </>

@@ -138,8 +138,18 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
             <select className={field} value={d.template} onChange={(e) => set("template", e.target.value as LpDesign["template"])}>
               <option value="classic">Classique (actuel)</option>
               <option value="bm">« BM » — barre rouge en haut, bandeaux bleus, boutons orange, listes « (style LP COD concurrentes)</option>
+              <option value="bm2">« BM2 » — page séparée, copie de la LP concurrente (barre rouge, formulaire en pointillés, bandeaux bleus, FAQ noire)</option>
             </select>
           </L>
+          {d.template === "bm2" && (<>
+            <L t="BM2 — texte du bouton vert du formulaire"><input dir="auto" className={field} value={d.bmBuyText} onChange={(e) => set("bmBuyText", e.target.value)} /></L>
+            <L t="BM2 — ligne rouge sous le bouton"><input dir="auto" className={field} value={d.bmNote} onChange={(e) => set("bmNote", e.target.value)} /></L>
+            <L t="BM2 — 4 badges ronds (séparés par |)"><input dir="auto" className={field} value={d.bmBadges} onChange={(e) => set("bmBadges", e.target.value)} /></L>
+            <L t="BM2 — couleur du titre"><input className={field} value={d.bmTitleColor} onChange={(e) => set("bmTitleColor", e.target.value)} /></L>
+            <L t="BM2 — titre du bloc captures clients (photos = « vraies photos » plus bas)"><input dir="auto" className={field} value={d.bmReviewsTitle} onChange={(e) => set("bmReviewsTitle", e.target.value)} /></L>
+            <L t="BM2 — titre FAQ"><input dir="auto" className={field} value={d.bmFaqTitle} onChange={(e) => set("bmFaqTitle", e.target.value)} /></L>
+            {B("bmStars", "BM2 — étoiles ★★★★★ sous le prix")}
+          </>)}
           <L t="Microsoft Clarity — ID du projet (vide = désactivé)"><input className={field} value={d.clarityId} onChange={(e) => set("clarityId", e.target.value.trim())} /></L>
           {B("formFrame", "Formulaire encadré (bordure verte + bandeau titre)")}
           <L t="Titre du cadre du formulaire"><input dir="auto" className={field} value={d.formFrameTitle} onChange={(e) => set("formFrameTitle", e.target.value)} /></L>
