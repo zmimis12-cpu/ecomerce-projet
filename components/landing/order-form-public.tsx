@@ -439,12 +439,14 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     </>
   );
   const choiceBlock = bm ? (
-    <div style={{ marginBottom:"12px", position:"relative" }}>
+    <div style={{ marginBottom:"12px" }}>
+    <div style={{ position:"relative" }}>
       <select aria-label="اختار العرض" value={offer.id} onChange={(e) => { const o = offers.find((x) => x.id === e.target.value); if (o) changeOffer(o); }}
         style={{ ...INP(false), height:"46px", fontSize:"15px", paddingLeft:"34px", cursor:"pointer" }}>
         {offers.map((o) => <option key={o.id} value={o.id}>{o.label || defaultLabel(o.qty)} ب {o.price.toFixed(0)} درهم</option>)}
       </select>
       <span aria-hidden="true" style={{ position:"absolute", left:"14px", top:"50%", transform:"translateY(-50%)", fontSize:"12px", color:"#374151", pointerEvents:"none" }}>⌄</span>
+    </div>
       <div style={{ marginTop:"12px" }}>{variantBlock}</div>
     </div>
   ) : (
