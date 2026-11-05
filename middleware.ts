@@ -25,16 +25,20 @@ async function variantFor(request: NextRequest, slug: string): Promise<string | 
   }
   const m = variantsCache.map[slug];
   if (!m) return null;
-  for (const c of codes) if (m[c]) return m[c];
-  // Test A/B : même lien de pub, une partie des visiteurs voit la 2e version (toujours la même pour un visiteur)
-  if (m.__AB) {
-    const [to, pctS] = m.__AB.split(":");
-    const ck = `lpab_${slug}`.slice(0, 60);
+  // 1) page dédiée à l'avatar selon le code vidéo (?cr=)
+  let target: string | null = null;
+  for (const c of codes) if (m[c]) { target = m[c]; break; }
+  // 2) Test A/B de la page finale (même lien de pub, chaque visiteur garde toujours la même version)
+  const finalSlug = target ?? slug;
+  const ab = (target ? variantsCache.map[target]?.__AB : m.__AB) ?? null;
+  if (ab) {
+    const [to, pctS] = ab.split(":");
+    const ck = `lpab_${finalSlug}`.slice(0, 60);
     let v = request.cookies.get(ck)?.value;
     if (v !== "a" && v !== "b") { v = Math.random() * 100 < Number(pctS || 0) ? "b" : "a"; abCookies.set(request, { name: ck, value: v }); }
-    return v === "b" && to ? to : null;
+    if (v === "b" && to) return to;
   }
-  return null;
+  return target;
 }
 function withAb(res: NextResponse, request: NextRequest) {
   const abSet = abCookies.get(request);
