@@ -34,8 +34,10 @@ async function variantFor(request: NextRequest, slug: string): Promise<string | 
   if (ab) {
     const [to, pctS] = ab.split(":");
     const ck = `lpab_${finalSlug}`.slice(0, 60);
-    let v = request.cookies.get(ck)?.value;
-    if (v !== "a" && v !== "b") { v = Math.random() * 100 < Number(pctS || 0) ? "b" : "a"; abCookies.set(request, { name: ck, value: v }); }
+    const pct = Number(pctS || 0);
+    // 100 % / 0 % : tout le monde, même les visiteurs qui avaient déjà un cookie de l'ancien test
+    let v = pct >= 100 ? "b" : pct <= 0 ? "a" : request.cookies.get(ck)?.value;
+    if (v !== "a" && v !== "b") { v = Math.random() * 100 < pct ? "b" : "a"; abCookies.set(request, { name: ck, value: v }); }
     if (v === "b" && to) return to;
   }
   return target;
