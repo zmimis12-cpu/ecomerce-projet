@@ -14,7 +14,7 @@ export function Bm2Landing(p: {
   groups: Group[]; images: string[]; ctaText: string;
   reviewsTitle: string; reviewImages: string[];
   faqTitle: string; faq: { q: string; a: string }[];
-  storeName: string; logo?: string; waHref?: string;
+  storeName: string; logo?: string; waHref?: string; shipText?: string; stickyBottom?: boolean;
 }) {
   const cta = <div className="b2-cta-w"><a href="#sp-form" className="b2-cta">{p.ctaText}</a></div>;
   return (
@@ -40,6 +40,7 @@ export function Bm2Landing(p: {
 
       <div id="sp-form" className="b2-form">
         <h2 className="b2-form-h">{p.formTitle}</h2>
+        {p.shipText && <div className="b2-ship">{p.shipText}</div>}
         {p.oldPrice && p.oldPrice > p.price && <div className="b2-old">{p.oldPrice.toFixed(0)}د.م</div>}
         <div className="b2-now">{p.price.toFixed(0)}د.م</div>
         {p.stars && <div className="b2-stars" aria-hidden="true">★★★★★</div>}
@@ -109,6 +110,10 @@ export function Bm2Landing(p: {
         </a>
       )}
 
+      {p.stickyBottom && (<>
+        <a href="#sp-form" className="b2-bot" id="b2-bot">{p.ctaText}</a>
+        <script dangerouslySetInnerHTML={{ __html: "(function(){try{var b=document.getElementById('b2-bot'),f=document.getElementById('sp-form');if(!b||!f||!('IntersectionObserver' in window))return;new IntersectionObserver(function(e){b.classList.toggle('b2-bot-h',e[0].isIntersecting)},{threshold:0.15}).observe(f);}catch(e){}})();" }} />
+      </>)}
       <footer className="b2-foot">
         <a href="/a-propos">من نحن</a> · <a href="/conditions">شروط البيع والاسترجاع</a> · <a href="/confidentialite">سياسة الخصوصية</a>
         <div>© {new Date().getFullYear()} {p.storeName}</div>
@@ -173,7 +178,11 @@ html,body{background:#fff;margin:0}
 .b2-faq-i p{margin:0 0 22px;color:#fff;font-size:clamp(16px,4.6vw,19px);line-height:1.7;white-space:pre-line}
 .b2-wa{position:fixed;right:12px;bottom:14px;z-index:60;display:flex;flex-direction:row;align-items:center;gap:8px;text-decoration:none}
 .b2-wa-ic{width:58px;height:58px;border-radius:50%;background:#25d366;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+.b2-bot~.b2-wa .b2-wa-t,.b2:has(.b2-bot) .b2-wa-t{display:none}
 .b2-wa-t{background:#f3f4f6;color:#111;font-size:15px;font-weight:600;padding:8px 14px;border-radius:16px;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.b2-ship{display:inline-block;margin:4px 0 8px;background:#e8f8ec;color:#137a2e;border:1.5px solid #3dbf2f;border-radius:9999px;padding:5px 14px;font-size:clamp(15px,4.4vw,18px);font-weight:800}
+.b2-bot{position:fixed;left:10px;right:84px;bottom:12px;z-index:59;display:flex;align-items:center;justify-content:center;min-height:56px;border-radius:9999px;background:linear-gradient(180deg,#f79a1e,#ec5a14);color:#fff;text-decoration:none;font-size:clamp(21px,6vw,25px);font-weight:900;box-shadow:0 6px 16px rgba(236,90,20,.4);animation:b2p 1.5s ease-in-out infinite;transition:opacity .25s,transform .25s}
+.b2-bot-h{opacity:0;pointer-events:none;transform:translateY(90px)}
 .b2-foot{margin-top:26px;padding-bottom:70px;text-align:center;font-size:12px;color:#6b7280;line-height:2}
 .b2-foot a{color:#6b7280}
 @media (prefers-reduced-motion:reduce){.b2-cta,.b2-top,.b2-hand{animation:none}}
