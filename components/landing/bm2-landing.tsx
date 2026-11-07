@@ -33,8 +33,8 @@ export function Bm2Landing(p: {
       </a>
 
       <h1 className="b2-title" id="sp-title" style={{ color: p.titleColor }} suppressHydrationWarning>{p.title}</h1>
-      {p.titleScript && <script dangerouslySetInnerHTML={{ __html: p.titleScript }} />}
       <p className="b2-sub" id="sp-angle-sub" suppressHydrationWarning>{p.subtitle}</p>
+      {p.titleScript && <script dangerouslySetInnerHTML={{ __html: p.titleScript }} />}
 
       <div className="b2-hero">{p.heroEl}</div>
 
