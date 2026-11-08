@@ -143,6 +143,8 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
           </L>
           {d.template === "bm2" && (<>
             <L t="BM2 — texte du bouton vert du formulaire"><input dir="auto" className={field} value={d.bmBuyText} onChange={(e) => set("bmBuyText", e.target.value)} /></L>
+            <L t="BM2 — phrase de valeur sous le prix (vide = rien)"><input dir="auto" className={field} value={d.bmValue} onChange={(e) => set("bmValue", e.target.value)} /></L>
+            <L t="BM2 — tableau comparatif (1re ligne : titre|colonne A|colonne B ; puis : critère|A|B ; vide = pas de tableau)"><textarea dir="auto" rows={5} className={field} value={d.bmCompare} onChange={(e) => set("bmCompare", e.target.value)} /></L>
             <L t="BM2 — ligne rouge sous le bouton"><input dir="auto" className={field} value={d.bmNote} onChange={(e) => set("bmNote", e.target.value)} /></L>
             <L t="BM2 — 4 badges ronds (séparés par |)"><input dir="auto" className={field} value={d.bmBadges} onChange={(e) => set("bmBadges", e.target.value)} /></L>
             <L t="BM2 — couleur du titre"><input className={field} value={d.bmTitleColor} onChange={(e) => set("bmTitleColor", e.target.value)} /></L>

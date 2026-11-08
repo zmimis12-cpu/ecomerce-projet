@@ -14,8 +14,9 @@ export function Bm2Landing(p: {
   groups: Group[]; images: string[]; ctaText: string;
   reviewsTitle: string; reviewImages: string[];
   faqTitle: string; faq: { q: string; a: string }[];
-  storeName: string; logo?: string; waHref?: string; shipText?: string; stickyBottom?: boolean;
+  storeName: string; logo?: string; waHref?: string; shipText?: string; stickyBottom?: boolean; valueLine?: string; compare?: string;
 }) {
+  const cmp = (p.compare || "").split("\n").map((l) => l.split("|").map((x) => x.trim())).filter((r) => r.length >= 3 && r.some(Boolean));
   const cta = <div className="b2-cta-w"><a href="#sp-form" className="b2-cta">{p.ctaText}</a></div>;
   return (
     <div className="b2" dir="rtl" lang="ar">
@@ -43,6 +44,7 @@ export function Bm2Landing(p: {
         {p.shipText && <div className="b2-ship">{p.shipText}</div>}
         {p.oldPrice && p.oldPrice > p.price && <div className="b2-old">{p.oldPrice.toFixed(0)}د.م</div>}
         <div className="b2-now">{p.price.toFixed(0)}د.م</div>
+        {p.valueLine && <div className="b2-val">{p.valueLine}</div>}
         {p.stars && <div className="b2-stars" aria-hidden="true">★★★★★</div>}
         <div className="b2-f">{p.form}</div>
         {p.note && <p className="b2-note">{p.note}</p>}
@@ -57,6 +59,16 @@ export function Bm2Landing(p: {
           </div>
         )}
       </div>
+
+      {cmp.length > 1 && (
+        <section className="b2-sec">
+          <h2 className="b2-band">{cmp[0][0]}</h2>
+          <table className="b2-cmp">
+            <thead><tr><th></th><th className="b2-cmp-bad">{cmp[0][1]}</th><th className="b2-cmp-good">{cmp[0][2]}</th></tr></thead>
+            <tbody>{cmp.slice(1).map((r, i) => <tr key={i}><td>{r[0]}</td><td className="b2-cmp-bad">{r[1]}</td><td className="b2-cmp-good">{r[2]}</td></tr>)}</tbody>
+          </table>
+        </section>
+      )}
 
       {p.groups.map((g, i) => (
         <section key={i} className="b2-sec">
@@ -180,6 +192,13 @@ html,body{background:#fff;margin:0}
 .b2-wa-ic{width:58px;height:58px;border-radius:50%;background:#25d366;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.25)}
 .b2-bot~.b2-wa .b2-wa-t,.b2:has(.b2-bot) .b2-wa-t{display:none}
 .b2-wa-t{background:#f3f4f6;color:#111;font-size:15px;font-weight:600;padding:8px 14px;border-radius:16px;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.b2-val{margin:4px auto 6px;max-width:92%;font-size:clamp(15px,4.3vw,18px);font-weight:700;color:#1f2937;line-height:1.5}
+.b2-cmp{width:calc(100% - 20px);margin:16px 10px 0;border-collapse:separate;border-spacing:0;font-size:clamp(14px,4vw,17px);border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.b2-cmp th,.b2-cmp td{padding:11px 8px;text-align:center;border-bottom:1px solid #e5e7eb;line-height:1.45}
+.b2-cmp td:first-child{font-weight:800;color:#111;background:#f9fafb;text-align:right}
+.b2-cmp th{font-weight:900;font-size:clamp(14px,4vw,17px)}
+.b2-cmp th.b2-cmp-bad{background:#fee2e2;color:#991b1b}.b2-cmp td.b2-cmp-bad{color:#991b1b;background:#fff5f5}
+.b2-cmp th.b2-cmp-good{background:#dcfce7;color:#166534}.b2-cmp td.b2-cmp-good{color:#166534;background:#f0fdf4;font-weight:800}
 .b2-ship{display:inline-block;margin:4px 0 8px;background:#e8f8ec;color:#137a2e;border:1.5px solid #3dbf2f;border-radius:9999px;padding:5px 14px;font-size:clamp(15px,4.4vw,18px);font-weight:800}
 .b2-bot{position:fixed;left:10px;right:84px;bottom:12px;z-index:59;display:flex;align-items:center;justify-content:center;min-height:56px;border-radius:9999px;background:linear-gradient(180deg,#f79a1e,#ec5a14);color:#fff;text-decoration:none;font-size:clamp(21px,6vw,25px);font-weight:900;box-shadow:0 6px 16px rgba(236,90,20,.4);animation:b2p 1.5s ease-in-out infinite;transition:opacity .25s,transform .25s}
 .b2-bot-h{opacity:0;pointer-events:none;transform:translateY(90px)}
