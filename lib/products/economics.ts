@@ -77,6 +77,8 @@ export async function productEconomicsDetail(productId: string, period: string) 
   const goods = sum(paidOrders, (o) => perPiece * (qtyOf.get(o.id) ?? 1));
   const deliveryCost = sum(paidOrders, delFee);
   const marginBeforeAds = revenue - goods - deliveryCost;
+  const { data: ag } = await supabaseAdmin.from("call_center_agents").select("user_id");
+  const agentIds = new Set(((ag ?? []) as { user_id: string }[]).map((a) => a.user_id));
   const pendingMargin = sum(pendingOrders, marginOf) - pendingOrders.filter((o) => o.assigned_to && agentIds.has(o.assigned_to)).length * confirmation;
   const pendingRevenue = sum(pendingOrders, (o) => Number(o.total_amount_mad ?? 0));
 
@@ -89,8 +91,6 @@ export async function productEconomicsDetail(productId: string, period: string) 
   const adSpend = Object.values(adsByPlatform).reduce((a, b) => a + b, 0);
 
   // Call center (commandes payées traitées par un agent) + éditeurs
-  const { data: ag } = await supabaseAdmin.from("call_center_agents").select("user_id");
-  const agentIds = new Set(((ag ?? []) as { user_id: string }[]).map((a) => a.user_id));
   const { data: ccSet } = await supabaseAdmin.from("app_settings").select("value").eq("key", "cc_commission_per_order").maybeSingle();
   const ccPer = Number((ccSet as { value?: unknown } | null)?.value ?? 0) || 0;
   // Confirmation = coût exact de la fiche produit × commandes payées
