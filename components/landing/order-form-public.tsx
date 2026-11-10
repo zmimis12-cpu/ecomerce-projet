@@ -56,6 +56,8 @@ interface Props {
   offersAfterFields?: boolean;
   /** Apparence « bm » : champs arrondis sans titres, offre en liste déroulante, bouton vert simple (copie LP concurrente) */
   look?: "default" | "bm";
+  /** Formulaire bm simplifié : total sur le bouton, contrôle du téléphone, aide ville */
+  plus?: boolean;
 }
 
 /** Mesure du parcours LP (lu par components/landing/lp-funnel-tracker.tsx). Ne bloque jamais. */
@@ -63,7 +65,7 @@ function lpf(t: string, f?: string) {
   try { window.dispatchEvent(new CustomEvent("lpf", { detail: { t, f } })); } catch { /* rien */ }
 }
 
-export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [], askAddress = false, addressRequired = false, offerImage = null, offersAfterFields = true, showTotalBox = false, submitText = "اطلب الآن", formFrame = true, formFrameTitle = "👇 للطلب عمّر المعلومات ديالك", look = "default" }: Props) {
+export function OrderFormPublic({ product, productSlug, ctaText = "اطلب الآن", b1, b2, b3, offers: offersProp, cities = FALLBACK_CITIES, variants = [], pixelId, tiktokPixelId, bumps = [], askAddress = false, addressRequired = false, offerImage = null, offersAfterFields = true, showTotalBox = false, submitText = "اطلب الآن", formFrame = true, formFrameTitle = "👇 للطلب عمّر المعلومات ديالك", look = "default", plus = false }: Props) {
   const bm = look === "bm";
   if (bm) formFrame = false;
   const formRef = useRef<HTMLFormElement>(null);
@@ -216,6 +218,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
     const newErrors: Record<string, string> = {};
     if (!form.customer_name.trim()) newErrors.customer_name = "الاسم مطلوب";
     if (!form.customer_phone.trim()) newErrors.customer_phone = "رقم الهاتف مطلوب";
+    else if (plus) { const dg = form.customer_phone.replace(/\D/g, "").replace(/^212/, "0").replace(/^00212/, "0"); if (!/^0[5-7]\d{8}$/.test(dg)) newErrors.customer_phone = "رقم الهاتف خاصو 10 أرقام (مثال: 06XXXXXXXX)"; }
     if (!form.customer_city.trim()) newErrors.customer_city = "المدينة مطلوبة";
     const DEFAULT_ADDR = "سيتم تأكيد العنوان عبر الهاتف";
     if (askAddress && addressRequired && (!form.customer_address.trim() || form.customer_address === DEFAULT_ADDR)) newErrors.customer_address = "العنوان مطلوب";
@@ -532,7 +535,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
       {/* Phone */}
       <div style={{ marginBottom: bm ? "12px" : "14px" }}>
         <label style={LBL}>رقم الهاتف *</label>
-        <input type="tel" name="customer_phone" autoComplete="tel" value={form.customer_phone}
+        <input type="tel" inputMode="tel" name="customer_phone" autoComplete="tel" value={form.customer_phone}
           onChange={(e) => set("customer_phone", e.target.value)}
           placeholder={bm ? "رقم الهاتف" : "06 / 07 ..."} style={INP(!!errors.customer_phone)} required />
         {ERR(errors.customer_phone)}
@@ -551,11 +554,12 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           name="customer_city"
           value={form.customer_city}
           onChange={(e) => set("customer_city", e.target.value)}
-          placeholder="المدينة"
+          placeholder={plus ? "المدينة (مثال: الدار البيضاء)" : "المدينة"}
           autoComplete="address-level2"
           style={bm ? INP(!!errors.customer_city) : {...INP(!!errors.customer_city), height:"54px", padding:"0 14px"}}
         />
         {ERR(errors.customer_city)}
+        {plus && !errors.customer_city && <p style={{ fontSize:"12px", color:"#6b7280", marginTop:"4px", textAlign:"right" }}>كتب غير المدينة — العنوان كنأكدوه معاك فالتيليفون</p>}
       </div>
 
       {askAddress && (
@@ -634,7 +638,10 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
         style={{ display:"block", width:"100%", minHeight:"58px", background: isPending ? "#9ca3af" : "#6cbf3c", color:"#111",
           borderRadius:"9999px", border:"none", cursor: isPending ? "not-allowed" : "pointer", fontFamily:"var(--font-cairo),sans-serif",
           fontSize:"clamp(21px,6vw,25px)", fontWeight:900, padding:"8px 16px", boxSizing:"border-box" }}>
-        {isPending ? "جاري إرسال الطلب…" : submitText}
+        {isPending ? "جاري إرسال الطلب…" : plus ? (<span style={{ display:"flex", flexDirection:"column", alignItems:"center", lineHeight:1.2 }}>
+          <span>{submitText}</span>
+          <span style={{ fontSize:"14px", fontWeight:800 }}>المجموع: {total.toFixed(0)} درهم · الدفع عند الاستلام</span>
+        </span>) : submitText}
       </button>
       ) : (
       <button type="submit" disabled={isPending} className="sp-submit"

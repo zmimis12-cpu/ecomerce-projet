@@ -143,6 +143,9 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
           </L>
           {d.template === "bm2" && (<>
             <L t="BM2 — texte du bouton vert du formulaire"><input dir="auto" className={field} value={d.bmBuyText} onChange={(e) => set("bmBuyText", e.target.value)} /></L>
+            <L t="BM2 — vidéo démo en haut (lien .mp4 court, vide = photo)"><input dir="ltr" className={field} value={d.bmDemoVideo} onChange={(e) => set("bmDemoVideo", e.target.value)} /></L>
+            <L t="BM2 — image avant la vidéo (vide = photo du haut)"><input dir="ltr" className={field} value={d.bmDemoPoster} onChange={(e) => set("bmDemoPoster", e.target.value)} /></L>
+            <L t="BM2 — avantages courts sous la photo (séparés par |, vide = rien)"><input dir="auto" className={field} value={d.bmChips} onChange={(e) => set("bmChips", e.target.value)} /></L>
             <L t="BM2 — phrase de valeur sous le prix (vide = rien)"><input dir="auto" className={field} value={d.bmValue} onChange={(e) => set("bmValue", e.target.value)} /></L>
             <L t="BM2 — tableau comparatif (1re ligne : titre|colonne A|colonne B ; puis : critère|A|B ; vide = pas de tableau)"><textarea dir="auto" rows={5} className={field} value={d.bmCompare} onChange={(e) => set("bmCompare", e.target.value)} /></L>
             <L t="BM2 — ligne rouge sous le bouton"><input dir="auto" className={field} value={d.bmNote} onChange={(e) => set("bmNote", e.target.value)} /></L>
@@ -151,6 +154,7 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
             <L t="BM2 — titre du bloc captures clients (photos = « vraies photos » plus bas)"><input dir="auto" className={field} value={d.bmReviewsTitle} onChange={(e) => set("bmReviewsTitle", e.target.value)} /></L>
             <L t="BM2 — titre FAQ"><input dir="auto" className={field} value={d.bmFaqTitle} onChange={(e) => set("bmFaqTitle", e.target.value)} /></L>
             {B("bmStars", "BM2 — étoiles ★★★★★ sous le prix")}
+            {B("bmFormPlus", "BM2 — formulaire simplifié (total sur le bouton, contrôle du téléphone, aide pour la ville)")}
           </>)}
           <L t="Microsoft Clarity — ID du projet (vide = désactivé)"><input className={field} value={d.clarityId} onChange={(e) => set("clarityId", e.target.value.trim())} /></L>
           {B("formFrame", "Formulaire encadré (bordure verte + bandeau titre)")}

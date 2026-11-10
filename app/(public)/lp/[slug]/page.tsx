@@ -413,13 +413,13 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           b1={b1} b2={b2} b3={b3} offers={offers} askAddress={d.askAddress} addressRequired={d.addressRequired}
           pixelId={pixel || undefined} tiktokPixelId={tt || undefined}
           variants={(Array.isArray(lp.variant_options) ? lp.variant_options : []) as { name: string; options: { label: string; image?: string }[] }[]}
-          bumps={d.showBumps ? bumps : []} cities={cities} submitText={d.bmBuyText || "إضغط هنا للشراء"} />
+          bumps={d.showBumps ? bumps : []} cities={cities} submitText={d.bmBuyText || "إضغط هنا للشراء"} plus={d.bmFormPlus} />
       </>}
       note={d.bmNote} badges={d.bmBadges.split("|").map((x) => x.trim()).filter(Boolean)}
       groups={bulletGroups} images={moreImgs} ctaText={d.submitText || "أطلب الآن"}
       reviewsTitle={d.bmReviewsTitle} reviewImages={d.proofImages}
       faqTitle={d.bmFaqTitle} faq={faqItems.filter((f) => f.q && f.a)}
-      storeName={String(lp.store_name || "HajtekZone")} logo={lp.store_logo_url ? viaCdn(String(lp.store_logo_url)) : undefined} waHref={waHref || undefined} shipText={d.freeShip ? d.freeShipText : undefined} stickyBottom={d.sticky !== false} valueLine={d.bmValue || undefined} compare={d.bmCompare || undefined}
+      storeName={String(lp.store_name || "HajtekZone")} logo={lp.store_logo_url ? viaCdn(String(lp.store_logo_url)) : undefined} waHref={waHref || undefined} shipText={d.freeShip ? d.freeShipText : undefined} stickyBottom={d.sticky !== false} valueLine={d.bmValue || undefined} compare={d.bmCompare || undefined} demoVideo={d.bmDemoVideo || undefined} demoPoster={d.bmDemoPoster || undefined} chips={d.bmChips ? d.bmChips.split("|").map((x) => x.trim()).filter(Boolean) : undefined}
     />
   ) : null;
 

@@ -42,6 +42,10 @@ export type LpDesign = {
   bmReviewsTitle: string;            // « BM2 » : titre du bloc captures clients (photos = proofImages)
   bmFaqTitle: string;
   bmBuyText: string;
+  bmFormPlus: boolean;
+  bmDemoVideo: string;               // « BM2 » : courte vidéo (mp4) à la place de la photo du haut — chargée après la page
+  bmDemoPoster: string;              // « BM2 » : image affichée avant la vidéo (vide = photo du haut)
+  bmChips: string;                   // « BM2 » : avantages courts sous la photo/vidéo (séparés par |)               // « BM2 » : formulaire simplifié (total sur le bouton, contrôle du téléphone, aide ville)
   bmValue: string;                   // « BM2 » : phrase de valeur sous le prix
   bmCompare: string;                 // « BM2 » : tableau comparatif — 1re ligne = titre|colonne A|colonne B, puis critère|A|B                 // « BM2 » : texte du bouton vert du formulaire
   formFrame: boolean;                // formulaire encadré (bordure verte + bandeau titre)
@@ -99,7 +103,7 @@ export type LpDesign = {
 
 export const DEFAULT_LP_DESIGN: LpDesign = {
   blocks: LP_BLOCKS.map((b) => ({ key: b.key, on: true })),
-  heroSource: "product", heroImage: "", heroPosition: "top", heroRatio: "auto", heroMaxH: 310, formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, showTotalBox: false, submitText: "اطلب الآن", clarityId: "", template: "classic", bmNote: "التوصيل بالمجان والدفع عند الاستلام", bmBadges: "الدفع عند الاستلام|توصيل مجاني|شوف المنتج قبل ما تخلص|توصيل آمن", bmStars: false, bmTitleColor: "#3aa0b4", bmReviewsTitle: "آراء زبنائنا", bmFaqTitle: "الأسئلة الشائعة", bmBuyText: "إضغط هنا للشراء", bmValue: "", bmCompare: "", formFrame: true, formFrameTitle: "👇 للطلب عمّر المعلومات ديالك", crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
+  heroSource: "product", heroImage: "", heroPosition: "top", heroRatio: "auto", heroMaxH: 310, formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, showTotalBox: false, submitText: "اطلب الآن", clarityId: "", template: "classic", bmNote: "التوصيل بالمجان والدفع عند الاستلام", bmBadges: "الدفع عند الاستلام|توصيل مجاني|شوف المنتج قبل ما تخلص|توصيل آمن", bmStars: false, bmTitleColor: "#3aa0b4", bmReviewsTitle: "آراء زبنائنا", bmFaqTitle: "الأسئلة الشائعة", bmBuyText: "إضغط هنا للشراء", bmFormPlus: false, bmDemoVideo: "", bmDemoPoster: "", bmChips: "", bmValue: "", bmCompare: "", formFrame: true, formFrameTitle: "👇 للطلب عمّر المعلومات ديالك", crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
   showOldPrice: true, showCodBar: true, freeShip: true, freeShipText: "🚚 التوصيل مجاني لجميع المدن", trust3: true, trust3Text: "الدفع|عند الاستلام ; التوصيل|24-72h ; إرجاع|خلال 7 أيام", askAddress: true, addressRequired: false, showWhatsapp: true, showWhatsappFloat: true,
   sticky: true, showFooter: true,
   topBar: "", badge: "عرض خاص", codBar: "🚚 التوصيل لجميع المدن | الدفع عند الاستلام", orderTitle: "🛒 اطلب الآن", orderSub: "",
