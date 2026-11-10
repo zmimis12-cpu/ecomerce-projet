@@ -72,3 +72,5 @@ CPL max (≈50 % livrées) : Selfie 9,4 $ · Split 7,7 $ · Projecteur 5,7 $ · 
 - Règle 1874427930647227 « STOP TEST COSTCAP – 12 $ sans Lead » (adset, lifetime spend > 12 $ et 0 lead → pause).
 - Originaux intacts : Split 14,4 · Meuleuse 12 · Projecteur 12 · Tente 12. Total actif 62,40 $/j (Dealsdt/HZ3 = 0).
 - Tâche planifiée trig_01CPsedWCbQLS6TKqBsd9zhH : bilan quotidien 00:12 Casablanca, lecture seule.
+- 10/11 23:20 : copies HORS PUB pour validation — /lp/khaima-camping-v2 (vidéo démo ouverture en haut, avantages courts, formulaire simplifié) et /lp/projector-pro-v3 (formulaire simplifié : total sur le bouton, contrôle tél. 10 chiffres, aide ville, bumps off). Options admin BM2 : bmFormPlus, bmDemoVideo, bmDemoPoster, bmChips (off par défaut). Mise en prod = A/B à valider par Zack.
+- CRÉA 13/11 : vérif auto 12/11 23:00 (trig_01Tt6FrFdWXyEDQHwpLnV96o) — Meuleuse ≤ 6,1 $/confirmée, Split ≤ 8,4 $, 12 $/j chacun, +24 $ max.
