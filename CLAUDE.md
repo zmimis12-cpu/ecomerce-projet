@@ -65,3 +65,10 @@ CPL max (≈50 % livrées) : Selfie 9,4 $ · Split 7,7 $ · Projecteur 5,7 $ · 
 09/11 : Twist TEST en pause (14 $/cmd). Remplacé par Mini meuleuse 12V (produit sarokh-sghir, achat 150, vente 349/649/899, CPL max ≈ 7,6 $) · LP BM2 /lp/sarokh-sghir · campagne « MEULEUSE – TEST – HZ2 – ABO » lancée 09/11 00:00 (12 $/j, V101/V103/V105/V107 product aware ; V100–V107 dans creatives) · règle COUPE 15,2 $. Plan budget : montée +20 % max après 48 h bons (Tente/Split), pas de nouvelle CBO.
 10/11 00:38 (A validé) : Split TEST ad set 120261272644810537 passé 12 → 14,40 $ (+20 %). Règle : +20 % max, puis 48–72 h sans toucher ; si $/cmd monte 2 jours de suite → revenir au budget d'avant. Prochaine hausse Split possible le 12/11 au plus tôt.
 10/11 18:30 (E+F validés) : tests au 11/11 00:00, originaux intacts — E « COSTCAP » (cost cap, Lead) : Split 5 $ (120261337921570537), Tente 6 $ (120261337923780537), Meuleuse 5 $ (120261337926080537), 10 $/j chacun · F « CONFIRMÉES » ad set 120261337930370537 optimisé sur l'événement OrderConfirmed (pixel 2461 ≈ 48/semaine), 15 $/j, V010+V085+V091+V105+V103. Total HZ2 ≈ 119 $/j. Comparer à 72 h sur $/commande CONFIRMÉE. IDs /tmp/claude-0/ef/out.json.
+
+## 10/11 soir – plan 11/11 validé par Zack (exécuté)
+- Pausées : BARBECUE TEST 120261301569880537, 3 QODBAN TEST 120261272650040537, E TENTE COSTCAP 120261337923640537, F CONFIRMÉES 120261337929830537.
+- E Split adset 120261337921570537 et E Meuleuse adset 120261337926080537 : 6 $/j, cost cap 5 $/lead, départ 11/11 00:00.
+- Règle 1874427930647227 « STOP TEST COSTCAP – 12 $ sans Lead » (adset, lifetime spend > 12 $ et 0 lead → pause).
+- Originaux intacts : Split 14,4 · Meuleuse 12 · Projecteur 12 · Tente 12. Total actif 62,40 $/j (Dealsdt/HZ3 = 0).
+- Tâche planifiée trig_01CPsedWCbQLS6TKqBsd9zhH : bilan quotidien 00:12 Casablanca, lecture seule.
