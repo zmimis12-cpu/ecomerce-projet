@@ -32,13 +32,16 @@ async function variantFor(request: NextRequest, slug: string): Promise<string | 
   const finalSlug = target ?? slug;
   const ab = (target ? variantsCache.map[target]?.__AB : m.__AB) ?? null;
   if (ab) {
-    const [to, pctS] = ab.split(":");
-    const ck = `lpab_${finalSlug}`.slice(0, 60);
+    const [pair, pctS] = ab.split(":");
+    const [aTo, to] = pair.includes(">") ? pair.split(">") : ["", pair];
+    // cookie propre à chaque test (nouvelle version B = nouveau tirage, l'ancien cookie ne biaise pas)
+    const ck = (aTo ? `lpab_${finalSlug}_${to}` : `lpab_${finalSlug}`).slice(0, 60);
     const pct = Number(pctS || 0);
     // 100 % / 0 % : tout le monde, même les visiteurs qui avaient déjà un cookie de l'ancien test
     let v = pct >= 100 ? "b" : pct <= 0 ? "a" : request.cookies.get(ck)?.value;
     if (v !== "a" && v !== "b") { v = Math.random() * 100 < pct ? "b" : "a"; abCookies.set(request, { name: ck, value: v }); }
     if (v === "b" && to) return to;
+    if (v === "a" && aTo) return aTo;
   }
   return target;
 }

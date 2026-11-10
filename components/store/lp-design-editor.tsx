@@ -349,6 +349,7 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
               <p className="text-xs text-muted-foreground">Une partie des visiteurs de cette page voit une 2e version (une autre landing page). Chaque visiteur garde toujours la même version. Vide = pas de test.</p>
               <div className="grid gap-2 sm:grid-cols-2">
                 <L t="Slug de la 2e version (ex. jihaz-tamdid-3-v2)"><input className={field} value={d.abSlug} onChange={(e) => set("abSlug", e.target.value)} /></L>
+                <L t="Slug de la version A (vide = cette page)"><input className={field} value={d.abBaseSlug} onChange={(e) => set("abBaseSlug", e.target.value)} /></L>
                 <L t="% des visiteurs vers la 2e version"><input type="number" min={0} max={100} className={field} value={d.abPct} onChange={(e) => set("abPct", Number(e.target.value) || 0)} /></L>
               </div>
             </div>
