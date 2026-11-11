@@ -141,6 +141,7 @@ export interface OrderListItem {
   delivery_external_status_id: number | null;
   delivery_driver_phone?: string | null;
   delivery_reported_to?: string | null;
+  user_agent?: string | null; meta_fbc?: string | null; tiktok_ttclid?: string | null; gclid?: string | null; utm_source?: string | null;
   creative_code?: string | null;
   fulfillment_type?: string | null;   // "self_delivery" = notre livreur (jamais envoyé au transporteur)
   delivery_company?: string | null;

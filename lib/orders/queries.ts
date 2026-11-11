@@ -12,7 +12,8 @@ const ORDER_LIST_FIELDS = `
   delivery_external_status, delivery_external_status_id,
   delivery_driver_phone, delivery_reported_to, creative_code,
   delivery_status, delivery_last_sync_at, bl_id,
-  is_duplicate, duplicate_of, fulfillment_type, delivery_company, created_at
+  is_duplicate, duplicate_of, fulfillment_type, delivery_company, created_at,
+  user_agent, meta_fbc, tiktok_ttclid, gclid:metadata->>gclid, utm_source:metadata->>utm_source
 `;
 
 const ORDER_DETAIL_FIELDS = `
@@ -25,7 +26,8 @@ const ORDER_DETAIL_FIELDS = `
   notes, internal_notes, delivery_tracking_number, sync_error, import_source,
   delivery_external_status, delivery_external_status_id, delivery_driver_phone, delivery_reported_to, creative_code,
   source, is_duplicate, duplicate_of, is_exchange, exchange_of_order_id,
-  delivery_company_id, fulfillment_type, delivery_company, metadata, created_at, updated_at
+  delivery_company_id, fulfillment_type, delivery_company, metadata, created_at, updated_at,
+  user_agent, meta_fbc, tiktok_ttclid
 `;
 
 export interface OrderFilters {

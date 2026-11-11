@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import type { OrderListItem as Order, OrderStatus } from "@/types/orders";
 import { StatusBadge } from "./status-badge";
+import { orderSource } from "@/lib/analytics/source-label";
 import { DigylogStatusBadge } from "@/components/orders/digylog-status-badge";
 import { sendOrderToDigylog } from "@/lib/delivery/shipment-actions";
 import { sendOrderToSpeedaf, getCarrierLabel } from "@/lib/delivery/speedaf/actions";
@@ -191,7 +192,7 @@ export function OrderList({ orders, canManage, speedafEnabled = false }: OrderLi
     const matchStatus = statusFilter === "all" || o.status === statusFilter;
     const matchSearch = !q || [
       o.order_number, o.customer_name, o.customer_phone,
-      o.customer_city, o.delivery_tracking_number ?? "", o.creative_code ?? "",
+      o.customer_city, o.delivery_tracking_number ?? "", o.creative_code ?? "", orderSource(o)?.label ?? "",
     ].some((f) => f.toLowerCase().includes(q));
     return matchStatus && matchSearch;
   });
@@ -304,6 +305,10 @@ export function OrderList({ orders, canManage, speedafEnabled = false }: OrderLi
                       <Link href={`/admin/orders/${order.id}`} className="hover:text-primary">
                         {order.order_number}
                       </Link>
+                      {(() => { const src = orderSource(order); return src ? (
+                        <button type="button" onClick={() => setSearch(src.label)} title="Source de la commande — cliquer pour filtrer"
+                          className={`mt-1 block rounded px-1.5 py-0.5 text-[10px] font-semibold ${src.cls}`}>{src.label}</button>
+                      ) : null; })()}
                       {order.creative_code && (
                         <button
                           type="button"
