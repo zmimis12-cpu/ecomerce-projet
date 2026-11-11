@@ -157,6 +157,7 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
             {B("bmFormPlus", "BM2 — formulaire simplifié (total sur le bouton, contrôle du téléphone, aide pour la ville)")}
           </>)}
           <L t="Microsoft Clarity — ID du projet (vide = désactivé)"><input className={field} value={d.clarityId} onChange={(e) => set("clarityId", e.target.value.trim())} /></L>
+          <L t="Google Ads — conversion « AW-123456789/libellé » (vide = désactivé)"><input className={field} value={d.gadsTag} onChange={(e) => set("gadsTag", e.target.value.trim())} /></L>
           {B("formFrame", "Formulaire encadré (bordure verte + bandeau titre)")}
           <L t="Titre du cadre du formulaire"><input dir="auto" className={field} value={d.formFrameTitle} onChange={(e) => set("formFrameTitle", e.target.value)} /></L>
           {B("showTotalBox", "Bloc « المجموع » au-dessus du bouton commander (le total est déjà écrit sur le bouton)")}

@@ -426,6 +426,10 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   return (
     <>
       <script dangerouslySetInnerHTML={{ __html: "(function(){var q=[],done=0;function run(){if(done)return;done=1;for(var i=0;i<q.length;i++){try{q[i]()}catch(e){}}q=[]}window.__spLater=function(f){done?f():q.push(f)};setTimeout(run,2500);['touchstart','scroll','keydown'].forEach(function(ev){addEventListener(ev,run,{once:true,passive:true})});function hook(){var h=document.querySelector('.sp-hero');if(!h||h.tagName!=='IMG'){run();return}function fit(){h.style.minHeight='0'}if(h.complete&&h.naturalWidth){fit();setTimeout(run,200)}else{h.addEventListener('load',function(){fit();setTimeout(run,200)});h.addEventListener('error',function(){fit();run()})}}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',hook);else hook();})();" }} />
+      {/^AW-\d{6,15}\/[\w-]{4,40}$/.test(d.gadsTag) && (
+        // Google Ads : chargé APRÈS la photo principale (window.__spLater) ; conversion envoyée par le formulaire (window.__gadsSendTo)
+        <script dangerouslySetInnerHTML={{ __html: `window.__gadsSendTo=${JSON.stringify(d.gadsTag)};window.dataLayer=window.dataLayer||[];window.gtag=window.gtag||function(){dataLayer.push(arguments)};gtag('js',new Date());gtag('config',${JSON.stringify(d.gadsTag.split("/")[0])});(window.__spLater||function(f){f()})(function(){var s=document.createElement('script');s.async=1;s.src='https://www.googletagmanager.com/gtag/js?id='+${JSON.stringify(d.gadsTag.split("/")[0])};document.head.appendChild(s);});` }} />
+      )}
       {/^[a-z0-9]{6,20}$/i.test(d.clarityId) && (
         // Microsoft Clarity : chargé APRÈS la photo principale (window.__spLater) → ne ralentit pas la page.
         // Tags : produit/page + code vidéo (?cr=) pour filtrer les sessions par pub.

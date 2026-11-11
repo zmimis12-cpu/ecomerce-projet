@@ -298,6 +298,9 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
             wt.ttq?.identify({ phone_number: toInternationalMorocco(form.customer_phone) });
             wt.ttq?.track("SubmitForm", { value: total, currency: "MAD", content_id: product.id, content_type: "product", content_name: product.name }, { event_id: `lead_${data.orderNumber ?? ""}` }); // = event_id serveur → dédupliqué
             w.dataLayer?.push({ event: "generate_lead", value: total, currency: "MAD", item_name: product.name });
+            // Google Ads : conversion « commande » (ID de commande = transaction_id → pas de doublon)
+            { const wg = window as unknown as { gtag?: (...a: unknown[]) => void; __gadsSendTo?: string };
+              if (wg.gtag && wg.__gadsSendTo) wg.gtag("event", "conversion", { send_to: wg.__gadsSendTo, value: total, currency: "MAD", transaction_id: String(data.orderNumber ?? "") }); }
             window.scrollTo({top:0,behavior:"smooth"});
           }
         } else if (data.errors) { lpf("err", "srv:" + Object.keys(data.errors).join(",")); setErrors(data.errors); }
