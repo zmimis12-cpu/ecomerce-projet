@@ -300,6 +300,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
             w.dataLayer?.push({ event: "generate_lead", value: total, currency: "MAD", item_name: product.name });
             // Google Ads : conversion « commande » (ID de commande = transaction_id → pas de doublon)
             { const wg = window as unknown as { gtag?: (...a: unknown[]) => void; __gadsSendTo?: string };
+              if (wg.gtag && wg.__gadsSendTo) wg.gtag("set", "user_data", { phone_number: toInternationalMorocco(form.customer_phone) }); // conversions améliorées (Google hache le numéro)
               if (wg.gtag && wg.__gadsSendTo) wg.gtag("event", "conversion", { send_to: wg.__gadsSendTo, value: total, currency: "MAD", transaction_id: String(data.orderNumber ?? "") }); }
             window.scrollTo({top:0,behavior:"smooth"});
           }
