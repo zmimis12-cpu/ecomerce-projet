@@ -164,6 +164,14 @@ const PLATFORM_LABELS: Record<string, string> = {
   meta: "Meta", tiktok: "TikTok", google: "Google Ads", other: "Autre",
 };
 
+/** Lit une table filtrée par une longue liste d'IDs, par lots de 150 en parallèle (URL trop longue sinon). */
+async function inChunks<T>(ids: string[], run: (chunk: string[]) => PromiseLike<{ data: unknown[] | null }>): Promise<T[]> {
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += 150) chunks.push(ids.slice(i, i + 150));
+  const res = await Promise.all(chunks.map((c) => run(c)));
+  return res.flatMap((r) => (r.data ?? []) as T[]);
+}
+
 export async function getAdSpendByPlatform(filter?: DateFilter): Promise<{
   rows: AdSpendPlatformRow[];
   grand_total: number;
@@ -265,12 +273,17 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   const everConfirmedIds = new Set<string>();
   const everShippedIds   = new Set<string>();
   if (orderIds.length > 0) {
-    const { data: histRows } = await supabaseAdmin
+    // ⚡ par lots de 150 en parallèle : avec des centaines d'IDs l'adresse devient trop longue
+    // → la requête échouait après ~8 s (dashboard lent + « confirmés » faux sur les longues périodes)
+    const histChunks: string[][] = [];
+    for (let i = 0; i < orderIds.length; i += 150) histChunks.push(orderIds.slice(i, i + 150));
+    const histRes = await Promise.all(histChunks.map((c) => supabaseAdmin
       .from("order_status_history")
       .select("order_id, to_status")
       .in("to_status", ["confirmed", "sent_to_delivery"])
-      .in("order_id", orderIds);
-    for (const h of (histRows ?? []) as { order_id: string; to_status: string }[]) {
+      .in("order_id", c)));
+    const histRows = histRes.flatMap((r) => r.data ?? []);
+    for (const h of histRows as { order_id: string; to_status: string }[]) {
       if (h.to_status === "confirmed") everConfirmedIds.add(h.order_id);
       if (h.to_status === "sent_to_delivery") everShippedIds.add(h.order_id);
     }
@@ -516,10 +529,14 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
         ? Number(p.purchase_price_mad) + Number(p.packaging_cost_mad ?? 0)
         : (p.total_cost_mad ?? 0) - (p.ads_cost_mad ?? 0) - (p.confirmation_cost_mad ?? 0) - (p.shipping_cost_mad ?? 0)]));
     const unitConf = new Map(((prodCosts ?? []) as PC[]).map((p) => [p.id, Number(p.confirmation_cost_mad ?? 0)]));
-    for (let i = 0; i < idsForItems.length; i += 150) {
-      const { data: its } = await supabaseAdmin
-        .from("order_items").select("order_id, product_id, quantity")
-        .in("order_id", idsForItems.slice(i, i + 150));
+    // ⚡ tous les lots en parallèle (avant : l'un après l'autre)
+    const chunks: string[][] = [];
+    for (let i = 0; i < idsForItems.length; i += 150) chunks.push(idsForItems.slice(i, i + 150));
+    const [itemRes, exRes] = await Promise.all([
+      Promise.all(chunks.map((c) => supabaseAdmin.from("order_items").select("order_id, product_id, quantity").in("order_id", c))),
+      Promise.all(chunks.map((c) => supabaseAdmin.from("orders").select("id").eq("is_exchange", true).in("id", c))),
+    ]);
+    for (const { data: its } of itemRes) {
       for (const it of (its ?? []) as { order_id: string; product_id: string | null; quantity: number }[]) {
         const u = it.product_id ? unitGoods.get(it.product_id) : undefined;
         if (u === undefined) continue;
@@ -529,10 +546,7 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     }
     // Échange = simple remplacement : l'ancien produit revient en stock, donc
     // l'échange ne coûte PAS un produit de plus (seulement la livraison).
-    for (let i = 0; i < idsForItems.length; i += 150) {
-      const { data: exs } = await supabaseAdmin
-        .from("orders").select("id").eq("is_exchange", true)
-        .in("id", idsForItems.slice(i, i + 150));
+    for (const { data: exs } of exRes) {
       for (const e of (exs ?? []) as { id: string }[]) { goodsCost.set(e.id, 0); confCost.set(e.id, 0); }
     }
   }
@@ -796,21 +810,17 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
   const periodOrderIds = ((periodOrders ?? []) as { id: string }[]).map((o) => o.id);
   if (!periodOrderIds.length) return ps.map((p) => makeEmptyPerf(p, imageByProduct.get(p.id) ?? null, realAdSpendByProduct.get(p.id)));
 
-  const { data: items } = await supabase
-    .from("order_items")
-    .select("product_id,order_id")
-    .in("product_id", ps.map((p) => p.id))
-    .in("order_id", periodOrderIds.slice(0, 500));
+  const productIds = ps.map((p) => p.id);
+  const items = await inChunks<{ product_id: string; order_id: string }>(periodOrderIds, (c) => supabase
+    .from("order_items").select("product_id,order_id").in("product_id", productIds).in("order_id", c));
   if (!items?.length) return ps.map((p) => makeEmptyPerf(p, imageByProduct.get(p.id) ?? null, realAdSpendByProduct.get(p.id)));
 
   const orderIds = [...new Set((items as { order_id: string }[]).map((i) => i.order_id))];
 
-  const ordQ = supabase
+  const orders = await inChunks<unknown>(orderIds, (c) => supabase
     .from("orders")
     .select("id,status,is_paid,total_amount_mad,estimated_profit,real_profit_mad,cogs_total,delivery_cost_real_mad,return_cost_mad")
-    .in("id", orderIds);
-
-  const { data: orders } = await ordQ;
+    .in("id", c));
   type OrderRow = {
     id: string; status: string; is_paid: boolean; total_amount_mad: number;
     estimated_profit: number; real_profit_mad: number | null;
@@ -828,12 +838,12 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
   const everConfirmedIds = new Set<string>();
   const everShippedIds   = new Set<string>();
   if (orderIds.length > 0) {
-    const { data: histRows } = await supabaseAdmin
+    const histRows = await inChunks<{ order_id: string; to_status: string }>(orderIds, (c) => supabaseAdmin
       .from("order_status_history")
       .select("order_id, to_status")
       .in("to_status", ["confirmed", "sent_to_delivery"])
-      .in("order_id", orderIds);
-    for (const h of (histRows ?? []) as { order_id: string; to_status: string }[]) {
+      .in("order_id", c));
+    for (const h of histRows) {
       if (h.to_status === "confirmed") everConfirmedIds.add(h.order_id);
       if (h.to_status === "sent_to_delivery") everShippedIds.add(h.order_id);
     }
