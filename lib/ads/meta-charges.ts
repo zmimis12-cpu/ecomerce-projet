@@ -26,13 +26,16 @@ export async function getMetaChargedMad(from?: string, to?: string): Promise<Cha
   const results = await Promise.all(list.map(async (a) => {
     const id = act(a)!;
     try {
+      // Longue période (> 62 j ou « depuis le début ») : l'historique Meta est trop lourd (pages qui expirent) → dépense du compte
+      const days = from && to ? (Date.parse(to) - Date.parse(from)) / 86400000 : Infinity;
+      if (days > 62) throw new Error("longue période");
       const tok = encodeURIComponent(a.token);
       // ⚡ Seulement la période demandée (±2 jours) : avant, tout l'historique depuis 2023 (des dizaines de pages,
       // réponse trop grosse pour le cache → rappel de Meta à chaque ouverture du dashboard).
       const shift = (d: string, n: number) => { const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
       const since = from ? shift(from, -2) : "2023-01-01";
       const until = to ? `&until=${shift(to, 2)}` : "";
-      let next: string | undefined = `${META}/${id}/activities?fields=event_type,event_time,extra_data&limit=500&since=${since}${until}&access_token=${tok}`;
+      let next: string | undefined = `${META}/${id}/activities?fields=event_type,event_time,extra_data&limit=100&since=${since}${until}&access_token=${tok}`;
       let usd = 0, mad = 0, count = 0;
       for (let g = 0; next && g < 30; g++) {
         const res: Response = await fetch(next, { next: { revalidate: 900, tags: ["meta-charges"] } });
@@ -60,7 +63,8 @@ export async function getMetaChargedMad(from?: string, to?: string): Promise<Cha
       try {
         const tok = encodeURIComponent(a.token);
         const today = new Date().toISOString().slice(0, 10);
-        const tr = encodeURIComponent(JSON.stringify({ since: from ?? "2023-01-01", until: to ?? today }));
+        const min = new Date(); min.setUTCMonth(min.getUTCMonth() - 36); const minDay = min.toISOString().slice(0, 10); // Meta : 37 mois max
+        const tr = encodeURIComponent(JSON.stringify({ since: from && from > minDay ? from : minDay, until: to ?? today }));
         const res: Response = await fetch(`${META}/${id}/insights?fields=spend&time_range=${tr}&access_token=${tok}`, { next: { revalidate: 900, tags: ["meta-charges"] } });
         const json = await res.json();
         if (!res.ok || json.error) throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
