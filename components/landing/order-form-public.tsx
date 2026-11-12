@@ -304,7 +304,10 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
               if (wg.gtag && wg.__gadsSendTo) wg.gtag("event", "conversion", { send_to: wg.__gadsSendTo, value: total, currency: "MAD", transaction_id: String(data.orderNumber ?? "") }); }
             window.scrollTo({top:0,behavior:"smooth"});
           }
-        } else if (data.errors) { lpf("err", "srv:" + Object.keys(data.errors).join(",")); setErrors(data.errors); }
+        } else if (data.errors) { lpf("err", "srv:" + Object.keys(data.errors).join(","));
+          // Diagnostic sans le numéro : longueur + 2 premiers chiffres (ex. ph:9:61) → voir pourquoi le serveur refuse
+          if (data.errors.customer_phone) { const dg = form.customer_phone.replace(/\D/g, ""); lpf("err", `ph:${dg.length}:${dg.slice(0, 2)}`); }
+          setErrors(data.errors); }
         else { lpf("err", "srv"); setServerError(data.error ?? "حدث خطأ. حاول مجدداً."); }
       } catch { lpf("err", "net"); setServerError("خطأ في الاتصال. حاول مجدداً."); }
     });

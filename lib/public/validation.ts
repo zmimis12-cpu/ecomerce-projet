@@ -21,7 +21,8 @@ export interface ValidationResult {
 }
 
 // ─── Phone normalization ───────────────────────────────────────────────────────
-const MA_MOBILE_RE = /^(?:\+?212|0)(6|7)\d{8}$/;
+// Mobiles 06/07 + fixes 05/08 (le call center peut appeler un fixe)
+const MA_MOBILE_RE = /^(?:\+?212|0)[5-8]\d{8}$/;
 
 export function normalizePhone(raw: string): string | null {
   // Chiffres arabes (٠١٢…), persans (۰۱۲…) et pleine largeur (０１２…) → 0123… ; 00212… → +212… ; 6XXXXXXXX (sans 0) → 06XXXXXXXX
@@ -31,7 +32,11 @@ export function normalizePhone(raw: string): string | null {
     .replace(/[\uFF10-\uFF19]/g, (c) => String(c.charCodeAt(0) - 0xFF10))
     .replace(/[\s\-\.\(\)\u200e\u200f\u202a-\u202e]/g, "");
   if (digits.startsWith("00212")) digits = "+" + digits.slice(2);
-  if (/^[67]\d{8}$/.test(digits)) digits = "0" + digits;
+  // +212 06… / 212 06… (0 en trop après l'indicatif) → +2126…
+  digits = digits.replace(/^(\+?212)0(?=[5-8]\d{8}$)/, "$1");
+  // 0 tapé deux fois (006…)
+  if (/^00[5-8]\d{8}$/.test(digits)) digits = digits.slice(1);
+  if (/^[5-8]\d{8}$/.test(digits)) digits = "0" + digits;
   if (!MA_MOBILE_RE.test(digits)) return null;
 
   // Normalize to 0XXXXXXXXX format
@@ -58,7 +63,7 @@ export function validateOrderInput(
   // 3. Phone
   const phone = normalizePhone(input.customer_phone);
   if (!phone) {
-    errors.customer_phone = "رقم الهاتف غير صحيح (مثال: 0612345678)";
+    errors.customer_phone = "رقم الهاتف خاصو 10 أرقام ويبدا ب 06 ولا 07 (مثال: 06XXXXXXXX)";
   }
 
   // 4. City
