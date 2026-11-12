@@ -55,7 +55,21 @@ export async function getMetaChargedMad(from?: string, to?: string): Promise<Cha
       }
       return { label: a.label, usd, mad, count, error: null as string | null };
     } catch (e) {
-      return { label: a.label, usd: 0, mad: 0, count: 0, error: `${a.label}: ${e instanceof Error ? e.message : String(e)}` };
+      // Meta refuse parfois l'historique d'un compte très modifié (« unexpected error ») :
+      // on prend alors la DÉPENSE du compte sur la période (≈ ce qui sera prélevé) au lieu de l'oublier.
+      try {
+        const tok = encodeURIComponent(a.token);
+        const today = new Date().toISOString().slice(0, 10);
+        const tr = encodeURIComponent(JSON.stringify({ since: from ?? "2023-01-01", until: to ?? today }));
+        const res: Response = await fetch(`${META}/${id}/insights?fields=spend&time_range=${tr}&access_token=${tok}`, { next: { revalidate: 900, tags: ["meta-charges"] } });
+        const json = await res.json();
+        if (!res.ok || json.error) throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
+        const spend = Number(json.data?.[0]?.spend ?? 0);
+        const f = taxFactorFor(to ?? today, { pct: Number(a.taxPct ?? 0), since: a.taxSince ?? null });
+        return { label: `${a.label} (≈ dépense)`, usd: spend * f, mad: spend * f * rate, count: 0, error: null as string | null };
+      } catch {
+        return { label: a.label, usd: 0, mad: 0, count: 0, error: `${a.label}: ${e instanceof Error ? e.message : String(e)}` };
+      }
     }
   }));
   for (const r of results) {
