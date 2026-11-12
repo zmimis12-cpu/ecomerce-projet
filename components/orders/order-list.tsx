@@ -13,6 +13,8 @@ interface OrderListProps {
   orders:     Order[];
   canManage:  boolean;
   speedafEnabled?: boolean;
+  /** Badge source (Google / Facebook / Instagram…) — admins seulement */
+  showSource?: boolean;
 }
 
 // ── Mini stat card ─────────────────────────────────────────────────────────────
@@ -181,7 +183,7 @@ const STATUS_OPTIONS: { value: OrderStatus | "all"; label: string }[] = [
   { value:"cancelled",          label:"Annulé" },
 ];
 
-export function OrderList({ orders, canManage, speedafEnabled = false }: OrderListProps) {
+export function OrderList({ orders, canManage, speedafEnabled = false, showSource = false }: OrderListProps) {
   const [statusFilter, setStatus]   = useState<OrderStatus | "all">("all");
   const [search, setSearch]         = useState("");
   const [selected, setSelected]     = useState<string[]>([]);
@@ -192,7 +194,7 @@ export function OrderList({ orders, canManage, speedafEnabled = false }: OrderLi
     const matchStatus = statusFilter === "all" || o.status === statusFilter;
     const matchSearch = !q || [
       o.order_number, o.customer_name, o.customer_phone,
-      o.customer_city, o.delivery_tracking_number ?? "", o.creative_code ?? "", orderSource(o)?.label ?? "",
+      o.customer_city, o.delivery_tracking_number ?? "", o.creative_code ?? "", showSource ? (orderSource(o)?.label ?? "") : "",
     ].some((f) => f.toLowerCase().includes(q));
     return matchStatus && matchSearch;
   });
@@ -305,7 +307,7 @@ export function OrderList({ orders, canManage, speedafEnabled = false }: OrderLi
                       <Link href={`/admin/orders/${order.id}`} className="hover:text-primary">
                         {order.order_number}
                       </Link>
-                      {(() => { const src = orderSource(order); return src ? (
+                      {showSource && (() => { const src = orderSource(order); return src ? (
                         <button type="button" onClick={() => setSearch(src.label)} title="Source de la commande — cliquer pour filtrer"
                           className={`mt-1 block rounded px-1.5 py-0.5 text-[10px] font-semibold ${src.cls}`}>{src.label}</button>
                       ) : null; })()}

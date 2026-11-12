@@ -161,6 +161,13 @@ export async function getOrders(
       fulfillment_type: (o as unknown as Record<string,unknown>).fulfillment_type as string | null ?? null,
       delivery_company: (o as unknown as Record<string,unknown>).delivery_company as string | null ?? null,
       created_at: o.created_at,
+      user_agent: (o as unknown as Record<string,unknown>).user_agent as string | null ?? null,
+      meta_fbc: (o as unknown as Record<string,unknown>).meta_fbc as string | null ?? null,
+      tiktok_ttclid: (o as unknown as Record<string,unknown>).tiktok_ttclid as string | null ?? null,
+      gclid: (o as unknown as Record<string,unknown>).gclid as string | null ?? null,
+      gbraid: (o as unknown as Record<string,unknown>).gbraid as string | null ?? null,
+      wbraid: (o as unknown as Record<string,unknown>).wbraid as string | null ?? null,
+      utm_source: (o as unknown as Record<string,unknown>).utm_source as string | null ?? null,
     } as OrderListItem;
   });
   return { orders: merged as OrderListItem[], total: total || merged.length };

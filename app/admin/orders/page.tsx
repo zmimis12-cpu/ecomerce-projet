@@ -38,7 +38,7 @@ export default async function OrdersPage() {
         {canManage && <ImportBonRetourButton />}
         {canManage && <ExportCashPaidButton />}
       </div>
-      <OrderList orders={orders} canManage={canManage} speedafEnabled={speedafEnabled} />
+      <OrderList orders={orders} canManage={canManage} speedafEnabled={speedafEnabled} showSource={hasRole(session.role, ["super_admin", "admin"])} />
     </div>
   );
 }
