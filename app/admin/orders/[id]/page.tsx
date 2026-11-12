@@ -65,8 +65,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </Link>
           <span className="text-muted-foreground">/</span>
           <span className="text-sm font-mono font-medium">{order.order_number}</span>
-          {(() => { const o = order as unknown as { user_agent?: string | null; meta_fbc?: string | null; tiktok_ttclid?: string | null; source?: string | null; metadata?: { gclid?: string; utm_source?: string } | null };
-            const src = orderSource({ ...o, gclid: o.metadata?.gclid, utm_source: o.metadata?.utm_source });
+          {(() => { const o = order as unknown as { user_agent?: string | null; meta_fbc?: string | null; tiktok_ttclid?: string | null; source?: string | null; metadata?: { gclid?: string; gbraid?: string; wbraid?: string; utm_source?: string } | null };
+            const src = orderSource({ ...o, gclid: o.metadata?.gclid, gbraid: o.metadata?.gbraid, wbraid: o.metadata?.wbraid, utm_source: o.metadata?.utm_source });
             return src ? <span className={`rounded px-2 py-0.5 text-xs font-semibold ${src.cls}`} title="Source de la commande">{src.label}</span> : null; })()}
           {(order as unknown as { creative_code?: string | null }).creative_code && (
             <span className="rounded bg-fuchsia-100 px-2 py-0.5 text-xs font-semibold text-fuchsia-800"

@@ -13,7 +13,7 @@ const ORDER_LIST_FIELDS = `
   delivery_driver_phone, delivery_reported_to, creative_code,
   delivery_status, delivery_last_sync_at, bl_id,
   is_duplicate, duplicate_of, fulfillment_type, delivery_company, created_at,
-  user_agent, meta_fbc, tiktok_ttclid, gclid:metadata->>gclid, utm_source:metadata->>utm_source
+  user_agent, meta_fbc, tiktok_ttclid, gclid:metadata->>gclid, gbraid:metadata->>gbraid, wbraid:metadata->>wbraid, utm_source:metadata->>utm_source
 `;
 
 const ORDER_DETAIL_FIELDS = `
