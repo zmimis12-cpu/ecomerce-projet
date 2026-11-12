@@ -20,14 +20,19 @@ export async function getMetaChargedMad(from?: string, to?: string): Promise<Cha
   const seen = new Set<string>();
   const list = accounts.filter((a) => { const id = act(a); if (!id || seen.has(id)) return false; seen.add(id); return true; });
 
-  // ⚡ Tous les comptes EN PARALLÈLE, et toujours la MÊME requête (tout l'historique) :
+  // ⚡ Tous les comptes EN PARALLÈLE ; requête limitée à la période (gardée en cache 15 min).
   // la réponse est gardée en cache 15 min → changer le filtre de dates ne rappelle plus Meta,
   // on filtre les dates ici. Avant : 1 appel par compte, l'un après l'autre, à chaque filtre.
   const results = await Promise.all(list.map(async (a) => {
     const id = act(a)!;
     try {
       const tok = encodeURIComponent(a.token);
-      let next: string | undefined = `${META}/${id}/activities?fields=event_type,event_time,extra_data&limit=500&since=2023-01-01&access_token=${tok}`;
+      // ⚡ Seulement la période demandée (±2 jours) : avant, tout l'historique depuis 2023 (des dizaines de pages,
+      // réponse trop grosse pour le cache → rappel de Meta à chaque ouverture du dashboard).
+      const shift = (d: string, n: number) => { const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+      const since = from ? shift(from, -2) : "2023-01-01";
+      const until = to ? `&until=${shift(to, 2)}` : "";
+      let next: string | undefined = `${META}/${id}/activities?fields=event_type,event_time,extra_data&limit=500&since=${since}${until}&access_token=${tok}`;
       let usd = 0, mad = 0, count = 0;
       for (let g = 0; next && g < 30; g++) {
         const res: Response = await fetch(next, { next: { revalidate: 900, tags: ["meta-charges"] } });

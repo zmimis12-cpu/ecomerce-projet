@@ -456,12 +456,17 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
   // qui n'est jamais rempli et retombe sur un défaut trompeur.
   // Commission seulement si la commande a été traitée par un AGENT call center
   // (avant : toutes les commandes payées × commission, même sans agent).
-  const { data: ccAgents } = await supabaseAdmin.from("call_center_agents").select("user_id");
+  // ⚡ 3 lectures indépendantes en parallèle (avant : l'une après l'autre)
+  let expensesQ = supabaseAdmin.from("expenses").select("amount_mad");
+  if (filter) expensesQ = expensesQ.gte("expense_date", filter.from).lte("expense_date", filter.to);
+  const [{ data: ccAgents }, { data: commissionSetting }, { data: expenseRows }] = await Promise.all([
+    supabaseAdmin.from("call_center_agents").select("user_id"),
+    supabaseAdmin.from("app_settings").select("value").eq("key", "cc_commission_per_order").maybeSingle(),
+    expensesQ,
+  ]);
   const agentIds = new Set(((ccAgents ?? []) as { user_id: string }[]).map((a) => a.user_id));
   const paidOrdersCount = rows.filter((r) =>
     r.status === "paid" && r.is_paid && r.assigned_to && agentIds.has(r.assigned_to)).length;
-  const { data: commissionSetting } = await supabaseAdmin
-    .from("app_settings").select("value").eq("key", "cc_commission_per_order").maybeSingle();
   const commissionPerOrder = Number((commissionSetting as { value?: string } | null)?.value ?? 3);
   // Confirmation : désormais le coût EXACT de la fiche produit, déduit dans la
   // marge de chaque commande (voir orderMargin). Commission agents conservée
@@ -471,9 +476,6 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
 
   // Autres charges (domaine, abonnements... table expenses) — affichées à part,
   // frais généraux business, PAS déduites du profit par commande (pas liées à une vente précise).
-  let expensesQ = supabaseAdmin.from("expenses").select("amount_mad");
-  if (filter) expensesQ = expensesQ.gte("expense_date", filter.from).lte("expense_date", filter.to);
-  const { data: expenseRows } = await expensesQ;
   const total_other_expenses = Math.round(
     ((expenseRows ?? []) as { amount_mad: number }[]).reduce((s, e) => s + (e.amount_mad ?? 0), 0) * 100
   ) / 100;
