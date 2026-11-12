@@ -154,6 +154,7 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
             <L t="BM2 — titre du bloc captures clients (photos = « vraies photos » plus bas)"><input dir="auto" className={field} value={d.bmReviewsTitle} onChange={(e) => set("bmReviewsTitle", e.target.value)} /></L>
             <L t="BM2 — titre FAQ"><input dir="auto" className={field} value={d.bmFaqTitle} onChange={(e) => set("bmFaqTitle", e.target.value)} /></L>
             {B("bmStars", "BM2 — étoiles ★★★★★ sous le prix")}
+            {B("bmShort", "BM2 — version COURTE : photo d'abord, avantages, formulaire, FAQ courte (sans tableau ni sections longues)")}
             {B("bmFormPlus", "BM2 — formulaire simplifié (total sur le bouton, contrôle du téléphone, aide pour la ville)")}
           </>)}
           <L t="Microsoft Clarity — ID du projet (vide = désactivé)"><input className={field} value={d.clarityId} onChange={(e) => set("clarityId", e.target.value.trim())} /></L>

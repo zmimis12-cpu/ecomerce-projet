@@ -16,8 +16,16 @@ export function Bm2Landing(p: {
   faqTitle: string; faq: { q: string; a: string }[];
   storeName: string; logo?: string; waHref?: string; shipText?: string; stickyBottom?: boolean; valueLine?: string; compare?: string;
   demoVideo?: string; demoPoster?: string; chips?: string[];
+  /** Version COURTE : photo d'abord, avantages, formulaire, FAQ courte (pas de tableau / sections longues / captures) */
+  short?: boolean;
 }) {
   const cmp = (p.compare || "").split("\n").map((l) => l.split("|").map((x) => x.trim())).filter((r) => r.length >= 3 && r.some(Boolean));
+  const chips = p.chips && p.chips.length > 0 ? p.chips : p.short ? (p.groups[0]?.items ?? []).slice(0, 4).map((t) => t.split(":")[0].trim()) : [];
+  const titleEl = (<>
+      <h1 className={p.short ? "b2-title b2-title-s" : "b2-title"} id="sp-title" style={{ color: p.titleColor }} suppressHydrationWarning>{p.title}</h1>
+      <p className="b2-sub" id="sp-angle-sub" suppressHydrationWarning>{p.subtitle}</p>
+      {p.titleScript && <script dangerouslySetInnerHTML={{ __html: p.titleScript }} />}
+  </>);
   const cta = <div className="b2-cta-w"><a href="#sp-form" className="b2-cta">{p.ctaText}</a></div>;
   return (
     <div className="b2" dir="rtl" lang="ar">
@@ -34,16 +42,15 @@ export function Bm2Landing(p: {
         <span>{p.topText}</span>
       </a>
 
-      <h1 className="b2-title" id="sp-title" style={{ color: p.titleColor }} suppressHydrationWarning>{p.title}</h1>
-      <p className="b2-sub" id="sp-angle-sub" suppressHydrationWarning>{p.subtitle}</p>
-      {p.titleScript && <script dangerouslySetInnerHTML={{ __html: p.titleScript }} />}
+      {!p.short && titleEl}
 
       <div className="b2-hero">{p.demoVideo ? (<>
         {/* Vidéo démo : l'image s'affiche tout de suite, la vidéo ne se charge qu'après la page (LP rapide) */}
         <video id="b2-demo" className="sp-hero" width={480} height={683} poster={p.demoPoster} muted loop playsInline preload="none" data-src={p.demoVideo} />
         <script dangerouslySetInnerHTML={{ __html: "(function(){var v=document.getElementById('b2-demo');if(!v)return;function go(){v.src=v.getAttribute('data-src');var r=v.play();if(r&&r.catch)r.catch(function(){});}if(document.readyState==='complete')setTimeout(go,300);else window.addEventListener('load',function(){setTimeout(go,300);});})();" }} />
       </>) : p.heroEl}</div>
-      {p.chips && p.chips.length > 0 && <ul className="b2-chips">{p.chips.slice(0, 6).map((c, i) => <li key={i}>✓ {c}</li>)}</ul>}
+      {p.short && titleEl}
+      {chips.length > 0 && <ul className="b2-chips">{chips.slice(0, 6).map((c, i) => <li key={i}>✓ {c}</li>)}</ul>}
 
       <div id="sp-form" className="b2-form">
         <h2 className="b2-form-h">{p.formTitle}</h2>
@@ -66,7 +73,7 @@ export function Bm2Landing(p: {
         )}
       </div>
 
-      {cmp.length > 1 && (
+      {!p.short && cmp.length > 1 && (
         <section className="b2-sec">
           <h2 className="b2-band">{cmp[0][0]}</h2>
           <table className="b2-cmp">
@@ -76,7 +83,7 @@ export function Bm2Landing(p: {
         </section>
       )}
 
-      {p.groups.map((g, i) => (
+      {!p.short && p.groups.map((g, i) => (
         <section key={i} className="b2-sec">
           {g.title && <h2 className="b2-band">{g.title}</h2>}
           {p.images[i] && (
@@ -96,7 +103,7 @@ export function Bm2Landing(p: {
         </section>
       ))}
 
-      {p.reviewImages.length > 0 && (
+      {!p.short && p.reviewImages.length > 0 && (
         <section className="b2-sec">
           <h2 className="b2-band">{p.reviewsTitle}</h2>
           {p.reviewImages.map((u, i) => (
@@ -110,7 +117,7 @@ export function Bm2Landing(p: {
       {p.faq.length > 0 && (
         <section className="b2-faq">
           <h2 className="b2-faq-h">{p.faqTitle}</h2>
-          {p.faq.map((f, i) => (
+          {(p.short ? p.faq.slice(0, 4) : p.faq).map((f, i) => (
             <div key={i} className="b2-faq-i">
               <h3>{f.q}</h3>
               <p>{f.a}</p>
@@ -161,6 +168,7 @@ html,body{background:#fff;margin:0}
 .b2-sub{margin:10px 10px 12px;text-align:center;font-size:clamp(20px,5.8vw,25px);font-weight:800;color:#111}
 .b2-sub:empty{display:none}
 .b2-hero{margin:0 10px}
+.b2-title-s{font-size:clamp(20px,5.6vw,24px)!important;margin-top:10px!important}
 .b2-chips{list-style:none;margin:10px 10px 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .b2-chips li{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:10px;padding:7px 8px;font-size:14px;font-weight:800;text-align:center;line-height:1.3}
 .b2-hero .sp-hero{display:block;width:100%;height:auto;max-height:none;border:4px solid #6b6b6b;background:#fff;object-fit:cover}

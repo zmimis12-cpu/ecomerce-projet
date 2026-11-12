@@ -419,7 +419,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       groups={bulletGroups} images={moreImgs} ctaText={d.submitText || "أطلب الآن"}
       reviewsTitle={d.bmReviewsTitle} reviewImages={d.proofImages}
       faqTitle={d.bmFaqTitle} faq={faqItems.filter((f) => f.q && f.a)}
-      storeName={String(lp.store_name || "HajtekZone")} logo={lp.store_logo_url ? viaCdn(String(lp.store_logo_url)) : undefined} waHref={waHref || undefined} shipText={d.freeShip ? d.freeShipText : undefined} stickyBottom={d.sticky !== false} valueLine={d.bmValue || undefined} compare={d.bmCompare || undefined} demoVideo={d.bmDemoVideo || undefined} demoPoster={d.bmDemoPoster || undefined} chips={d.bmChips ? d.bmChips.split("|").map((x) => x.trim()).filter(Boolean) : undefined}
+      storeName={String(lp.store_name || "HajtekZone")} logo={lp.store_logo_url ? viaCdn(String(lp.store_logo_url)) : undefined} waHref={waHref || undefined} shipText={d.freeShip ? d.freeShipText : undefined} stickyBottom={d.sticky !== false} valueLine={d.bmValue || undefined} compare={d.bmCompare || undefined} short={d.bmShort} demoVideo={d.bmDemoVideo || undefined} demoPoster={d.bmDemoPoster || undefined} chips={d.bmChips ? d.bmChips.split("|").map((x) => x.trim()).filter(Boolean) : undefined}
     />
   ) : null;
 
