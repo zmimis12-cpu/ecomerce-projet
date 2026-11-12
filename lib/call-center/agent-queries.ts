@@ -112,6 +112,98 @@ export async function recordAgentPayment(params: { agentId: string; periodStart:
   return { success: true };
 }
 
+const AGENT_PROOF_BUCKET = "editor-payment-proofs"; // bucket privé (liens signés)
+
+/** Paiement agent avec mode de paiement + justificatif (photo/PDF). */
+export async function recordAgentPaymentForm(fd: FormData): Promise<{ success: boolean; error?: string; id?: string }> {
+  const session = await requireRole(["super_admin", "admin", "manager"]);
+  const { AGENT_PAY_METHODS, encodeAgentPayNotes } = await import("@/lib/call-center/agent-payment-meta");
+  const agentId = String(fd.get("agentId") ?? "");
+  const periodStart = String(fd.get("periodStart") ?? "");
+  const periodEnd = String(fd.get("periodEnd") ?? "");
+  const paidAmount = Number(fd.get("paidAmount") ?? 0);
+  const method = String(fd.get("method") ?? "");
+  const ref = String(fd.get("ref") ?? "").trim() || null;
+  const text = String(fd.get("notes") ?? "").trim();
+  const file = fd.get("proof") as File | null;
+  if (!agentId) return { success: false, error: "Agent manquant." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(periodStart) || !/^\d{4}-\d{2}-\d{2}$/.test(periodEnd)) return { success: false, error: "Période invalide." };
+  if (!(paidAmount >= 0)) return { success: false, error: "Montant invalide." };
+  if (!AGENT_PAY_METHODS.some((m) => m.key === method)) return { success: false, error: "Choisis le mode de paiement." };
+
+  let proof: string | null = null;
+  if (file && file.size > 0) {
+    if (file.size > 4.5 * 1024 * 1024) return { success: false, error: "Justificatif trop lourd (max 4,5 Mo)." };
+    if (!file.type.startsWith("image/") && file.type !== "application/pdf") return { success: false, error: "Justificatif : image ou PDF uniquement." };
+    const ext = (file.name.split(".").pop() || (file.type === "application/pdf" ? "pdf" : "jpg")).toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+    proof = `agents/${agentId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error: upErr } = await supabaseAdmin.storage.from(AGENT_PROOF_BUCKET)
+      .upload(proof, Buffer.from(await file.arrayBuffer()), { contentType: file.type, upsert: false });
+    if (upErr) return { success: false, error: `Envoi justificatif : ${upErr.message}` };
+  }
+
+  const earn = await agentEarnings(agentId, periodStart, periodEnd);
+  const perOrder = usesCommission(earn.pay) ? earn.pay.amount : 0;
+  const gross = earn.total;
+  const salary = Math.max(0, Math.round((gross - earn.count * perOrder) * 100) / 100);
+  const { data, error } = await supabaseAdmin.from("call_center_agent_payments").insert({
+    agent_id: agentId, period_start: periodStart, period_end: periodEnd,
+    delivered_paid_count: earn.count, commission_per_order: perOrder,
+    gross_amount: gross, paid_amount: paidAmount,
+    status: paidAmount >= gross ? "paid" : paidAmount > 0 ? "partially_paid" : "unpaid",
+    paid_at: paidAmount > 0 ? new Date().toISOString() : null,
+    paid_by: session.authId, notes: encodeAgentPayNotes({ text, method, ref, proof, salary }),
+  } as never).select("id").single();
+  if (error) {
+    if (proof) await supabaseAdmin.storage.from(AGENT_PROOF_BUCKET).remove([proof]);
+    return { success: false, error: error.message };
+  }
+  return { success: true, id: (data as { id: string }).id };
+}
+
+export type AgentPaymentRow = {
+  id: string; agent_id: string; agentName: string; period_start: string; period_end: string;
+  delivered_paid_count: number; commission_per_order: number; gross_amount: number; paid_amount: number;
+  remaining_amount: number; status: string; paid_at: string | null; created_at: string; paid_by: string | null; payerName: string;
+  text: string; method: string | null; ref: string | null; salary: number; proofUrl: string | null; proofIsPdf: boolean;
+};
+
+/** Paiements agents (avec lien signé du justificatif). Un agent ne voit que les siens. */
+export async function getAgentPayments(opts: { agentId?: string; id?: string; limit?: number } = {}): Promise<AgentPaymentRow[]> {
+  const session = await requireRole([...CC_ROLES]);
+  const { parseAgentPayNotes } = await import("@/lib/call-center/agent-payment-meta");
+  const isAgent = session.role === "call_center_agent";
+  let q = supabaseAdmin.from("call_center_agent_payments")
+    .select("id, agent_id, period_start, period_end, delivered_paid_count, commission_per_order, gross_amount, paid_amount, remaining_amount, status, paid_at, paid_by, notes, created_at")
+    .order("created_at", { ascending: false }).limit(opts.limit ?? 200);
+  if (isAgent) q = q.eq("agent_id", session.authId);
+  else if (opts.agentId) q = q.eq("agent_id", opts.agentId);
+  if (opts.id) q = q.eq("id", opts.id);
+  const { data } = await q;
+  type Raw = Omit<AgentPaymentRow, "agentName" | "payerName" | "text" | "method" | "ref" | "salary" | "proofUrl" | "proofIsPdf"> & { notes: string | null };
+  const rows = (data ?? []) as unknown as Raw[];
+  if (!rows.length) return [];
+  const userIds = [...new Set(rows.flatMap((r) => [r.agent_id, r.paid_by]).filter(Boolean))] as string[];
+  const { data: users } = await supabaseAdmin.from("users").select("id, full_name").in("id", userIds);
+  const names = new Map(((users ?? []) as { id: string; full_name: string }[]).map((u) => [u.id, u.full_name]));
+  const metas = rows.map((r) => parseAgentPayNotes(r.notes));
+  const paths = metas.map((m) => m.proof).filter(Boolean) as string[];
+  const signed = new Map<string, string>();
+  if (paths.length) {
+    const { data: urls } = await supabaseAdmin.storage.from(AGENT_PROOF_BUCKET).createSignedUrls(paths, 3600);
+    for (const u of urls ?? []) if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
+  }
+  return rows.map((r, i) => {
+    const m = metas[i];
+    const { notes: _n, ...rest } = r; void _n;
+    return {
+      ...rest, agentName: names.get(r.agent_id) ?? "Agent", payerName: r.paid_by ? names.get(r.paid_by) ?? "Administration" : "Administration",
+      text: m.text, method: m.method, ref: m.ref, salary: m.salary ?? 0,
+      proofUrl: m.proof ? signed.get(m.proof) ?? null : null, proofIsPdf: !!m.proof?.toLowerCase().endsWith(".pdf"),
+    };
+  });
+}
+
 export async function getAllAgentsCommissions() {
   await requireRole(["super_admin", "admin", "manager"]);
 

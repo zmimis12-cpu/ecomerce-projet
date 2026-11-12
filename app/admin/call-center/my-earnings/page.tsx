@@ -4,6 +4,8 @@ import { requireRole } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { Award, CheckCircle, Clock, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getAgentPayments } from "@/lib/call-center/agent-queries";
+import { AgentPaymentsList } from "@/components/call-center/agent-payments-list";
 
 export const metadata: Metadata = { title: "Mes Gains — Call Center" };
 export const dynamic = "force-dynamic";
@@ -41,6 +43,7 @@ export default async function MyEarningsPage() {
   const paymentRows = (payments ?? []) as Payment[];
   const totalPaid = paymentRows.reduce((s, p) => s + (p.paid_amount ?? 0), 0);
   const totalRemaining = Math.max(0, totalEarned - totalPaid);
+  const detailed = await getAgentPayments({ agentId });
 
   function mad(n: number) {
     return n.toLocaleString("fr-MA", { minimumFractionDigits: 2 }) + " MAD";
@@ -114,36 +117,7 @@ export default async function MyEarningsPage() {
           <div className="px-4 py-3 border-b">
             <p className="font-semibold text-sm">Historique paiements</p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-secondary/30">
-                  {["Période", "Livrés", "Brut", "Payé", "Restant", "Statut"].map((h) => (
-                    <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {paymentRows.map((p) => (
-                  <tr key={p.id} className="hover:bg-secondary/10">
-                    <td className="px-4 py-2.5 font-mono text-xs">{p.period_start} → {p.period_end}</td>
-                    <td className="px-4 py-2.5 text-center font-bold">{p.delivered_paid_count}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs">{mad(p.gross_amount)}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-green-700 font-semibold">{mad(p.paid_amount)}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-amber-700">{mad(p.remaining_amount)}</td>
-                    <td className="px-4 py-2.5">
-                      <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                        p.status === "paid" ? "bg-green-100 text-green-700" :
-                        p.status === "partially_paid" ? "bg-amber-100 text-amber-700" :
-                        "bg-red-100 text-red-700")}>
-                        {p.status === "paid" ? "Payé" : p.status === "partially_paid" ? "Partiel" : "Non payé"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <AgentPaymentsList rows={detailed} />
         </div>
       ) : (
         <div className="rounded-xl border bg-card flex flex-col items-center justify-center py-12 text-center gap-2">

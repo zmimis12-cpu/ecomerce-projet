@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth/session";
-import { getAllAgentsCommissions } from "@/lib/call-center/agent-queries";
+import { getAllAgentsCommissions, getAgentPayments } from "@/lib/call-center/agent-queries";
+import { AgentPaymentsList } from "@/components/call-center/agent-payments-list";
 import { PayAgentButton } from "@/components/call-center/pay-agent-button";
 import { Award, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CommissionsPage() {
   await requireRole(["super_admin", "admin", "manager"]);
-  const agents = await getAllAgentsCommissions();
+  const [agents, payments] = await Promise.all([getAllAgentsCommissions(), getAgentPayments({ limit: 100 })]);
 
   function mad(n: number) { return n.toLocaleString("fr-MA", { minimumFractionDigits: 2 }) + " MAD"; }
 
@@ -93,6 +94,12 @@ export default async function CommissionsPage() {
           </tbody>
         </table>
       </div>
+      {payments.length > 0 && (
+        <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="px-4 py-3 border-b"><p className="font-semibold text-sm">Historique des paiements (justificatifs et reçus)</p></div>
+          <AgentPaymentsList rows={payments} showAgent />
+        </div>
+      )}
     </div>
   );
 }
