@@ -71,6 +71,14 @@ export async function GET(req: NextRequest) {
     const short = (r: unknown) => (r as { ok: boolean }).ok ? "ok" : (r as { error?: string }).error;
     result.metaSpend   = short(await safe(() => syncMetaAdSpendCore(from, days[0])));
     result.tiktokSpend = short(await safe(() => syncTikTokAdSpendCore(from, days[0])));
+    { // Google Ads : dépense par campagne → produit (11/11 : compte 7186317988 ; 1re fois depuis le 10/11)
+      const { syncGoogleAdSpend } = await import("@/lib/ads/google-spend");
+      const { data: gflag } = await supabaseAdmin.from("app_settings").select("value").eq("key", "google_spend_backfill_done").maybeSingle();
+      const gFrom = gflag ? days[2] : "2026-11-10";
+      result.googleSpend = await safe(() => syncGoogleAdSpend(gFrom, days[0]));
+      if (!gflag && (result.googleSpend as { ok?: boolean })?.ok) await supabaseAdmin.from("app_settings").upsert(
+        { key: "google_spend_backfill_done", value: new Date().toISOString(), category: "system", label: "Backfill dépense Google Ads" } as never, { onConflict: "key" });
+    }
     result.metaInsights   = await safe(() => syncMetaAdInsights(from, days[0]));
     result.tiktokInsights = await safe(() => syncTikTokAdInsights(from, days[0]));
     result.creativeStatuses = await safe(() => syncCreativeStatuses());
