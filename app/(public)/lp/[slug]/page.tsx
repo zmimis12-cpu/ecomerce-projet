@@ -429,7 +429,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     <>
       <LpFunnelTracker slug={slug} />
       <div dangerouslySetInnerHTML={{ __html: cleanCustomHtml(d.customHtml) }} />
-      <script dangerouslySetInnerHTML={{ __html: htmlBridgeJs({ slug, productId: product.id, productName: product.name, pixelId: pixel || null, tiktokPixelId: tt || null, offers: offers.map((o) => ({ id: String(o.id), qty: Number(o.qty), price: Number(o.price) })) }) }} />
+      <script dangerouslySetInnerHTML={{ __html: htmlBridgeJs({ slug, productId: product.id, productName: product.name, pixelId: pixel || null, tiktokPixelId: tt || null, offers: offers.map((o) => ({ id: String(o.id), qty: Number(o.qty), price: Number(o.price) })), cities }) }} />
     </>
   ) : null;
 

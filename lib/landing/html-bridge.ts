@@ -14,10 +14,26 @@ export type HtmlBridgeCfg = {
   pixelId: string | null;
   tiktokPixelId: string | null;
   offers: { id: string; qty: number; price: number }[];
+  cities?: string[];               // villes du transporteur (même liste que les autres formulaires)
+};
+
+/** Ville arabe → nom latin du transporteur (copie du dictionnaire de order-form-public). */
+const CITY_AR: Record<string, string> = {
+  "الدار البيضاء":"casablanca", "كازا":"casablanca", "كازابلانكا":"casablanca",
+  "الرباط":"rabat", "مراكش":"marrakech", "فاس":"fes fez", "طنجة":"tanger tangier",
+  "أكادير":"agadir", "مكناس":"meknes", "وجدة":"oujda", "القنيطرة":"kenitra",
+  "تطوان":"tetouan", "سلا":"sale", "الجديدة":"jadida", "خريبكة":"khouribga",
+  "بني ملال":"beni mellal", "تازة":"taza", "الناظور":"nador", "سطات":"settat",
+  "آسفي":"safi", "العرائش":"larache", "الحسيمة":"hoceima", "الرشيدية":"rachidia errachidia",
+  "ورزازات":"ouarzazate", "إفران":"ifrane", "زاكورة":"zagora", "طاطا":"tata",
+  "العيون":"laayoune", "الداخلة":"dakhla", "برشيد":"berrechid", "الفقيه بن صالح":"fquih ben saleh",
+  "تارودانت":"taroudant", "تيفلت":"tiflet", "بركان":"berkane", "الصويرة":"essaouira",
+  "شفشاون":"chefchaouen", "ميدلت":"midelt", "قلعة السراغنة":"kelaa sraghna", "خنيفرة":"khenifra",
+  "سيدي قاسم":"sidi kacem", "سيدي سليمان":"sidi slimane", "تاونات":"taounate",
 };
 
 export function htmlBridgeJs(cfg: HtmlBridgeCfg): string {
-  const c = JSON.stringify(cfg).replace(/</g, "\\u003c");
+  const c = JSON.stringify({ ...cfg, ar: CITY_AR }).replace(/</g, "\\u003c");
   return `(function(){var C=${c};
 function lpf(t,f){try{window.dispatchEvent(new CustomEvent('lpf',{detail:{t:t,f:f}}))}catch(e){}}
 function ck(n){var m=document.cookie.match('(?:^|; )'+n+'=([^;]*)');return m?decodeURIComponent(m[1]):null}
@@ -25,6 +41,7 @@ var Q=new URLSearchParams(location.search);
 function cr(){var c=Q.get('cr');if(!c){var u=Q.get('utm_content');if(u&&/^V\\d+$/i.test(u))c=u}var ok=c&&/^[A-Za-z0-9_-]{1,20}$/.test(c)?c.toUpperCase():null;try{if(ok){sessionStorage.setItem('hz_cr',ok);return ok}return sessionStorage.getItem('hz_cr')}catch(e){return ok}}
 cr();
 function intl(p){var d=String(p).replace(/\\D/g,'');if(d.indexOf('00212')===0)d=d.slice(5);else if(d.indexOf('212')===0)d=d.slice(3);else if(d.charAt(0)==='0')d=d.slice(1);return '+212'+d}
+function cityFix(t){var L=C.cities||[],x=String(t).trim(),lo=x.toLowerCase();for(var i=0;i<L.length;i++)if(L[i]===x||L[i].toLowerCase()===lo)return L[i];var tk=C.ar[x];if(tk){var ts=tk.split(' ');for(var j=0;j<L.length;j++){var n=L[j].toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');for(var k=0;k<ts.length;k++)if(n.indexOf(ts[k])>-1)return L[j]}}return x}
 function go(){
 var f=document.getElementById('orderForm')||document.querySelector('form[data-hz-order]');if(!f)return;
 var $=function(id){return document.getElementById(id)};
@@ -48,7 +65,7 @@ var err=[];if(name.length<3)err.push('name');if(!/^(?:\\+212|00212|0)[5-8]\\d{8}
 if(err.length){lpf('err',err.join(','));msg(err[0]==='name'?'دخل الاسم الكامل':err[0]==='phone'?'دخل رقم هاتف مغربي صحيح (06 أو 07)':'اختار المدينة');return}
 var o=offer();busy=true;if(btn){btn.disabled=true;btn.dataset.t=btn.textContent;btn.textContent='جاري الإرسال…'}
 var tr={};['gclid','gbraid','wbraid','utm_source','utm_campaign'].forEach(function(k){var v=Q.get(k);if(v)tr[k]=v.slice(0,200)});
-var body={customer_name:name,customer_phone:phone,customer_city:city,customer_address:'سيتم تأكيد العنوان عبر الهاتف',quantity:o.qty,offer_id:o.id,bundle_price:o.price,bumps:[],variants:[],product_id:C.productId,product_slug:C.slug,meta_pixel_id:C.pixelId,meta_fbp:ck('_fbp'),meta_fbc:ck('_fbc'),tiktok_pixel_id:C.tiktokPixelId,tiktok_ttp:ck('_ttp'),tiktok_ttclid:Q.get('ttclid'),creative_code:cr()};
+var body={customer_name:name,customer_phone:phone,customer_city:cityFix(city),customer_address:'سيتم تأكيد العنوان عبر الهاتف',quantity:o.qty,offer_id:o.id,bundle_price:o.price,bumps:[],variants:[],product_id:C.productId,product_slug:C.slug,meta_pixel_id:C.pixelId,meta_fbp:ck('_fbp'),meta_fbc:ck('_fbc'),tiktok_pixel_id:C.tiktokPixelId,tiktok_ttp:ck('_ttp'),tiktok_ttclid:Q.get('ttclid'),creative_code:cr()};
 if(Object.keys(tr).length)body.tracking=tr;
 fetch('/api/public/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){
 busy=false;if(btn){btn.disabled=false;btn.textContent=btn.dataset.t||btn.textContent}
