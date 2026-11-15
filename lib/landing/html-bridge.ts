@@ -3,8 +3,8 @@
  * Ce script relie son formulaire au vrai système de commandes, comme OrderFormPublic :
  *  - formulaire = <form id="orderForm"> (ou data-hz-order) ; champs nom (fullName / customer_name),
  *    téléphone (phone / customer_phone), ville (city / customer_city)
- *  - quantité : #plus / #minus / #quantity ; prix affichés dans #subtotal / #total = offres de la LP (1, 2, 3 pièces…)
- *  - message dans #status ; Lead Meta / TikTok / Google envoyés seulement si la commande est enregistrée
+ *  - quantité : #plus / #minus / #quantity (ou #q) ; prix affichés dans #subtotal / #total = offres de la LP (1, 2, 3 pièces…)
+ *  - message dans #status (ou #result) ; Lead Meta / TikTok / Google envoyés seulement si la commande est enregistrée
  * Aucun script du HTML collé n'est exécuté (sécurité) : tout passe par ce pont.
  */
 export type HtmlBridgeCfg = {
@@ -51,14 +51,14 @@ var offers=(C.offers||[]).slice().sort(function(a,b){return a.qty-b.qty});
 var maxQ=offers.length?offers[offers.length-1].qty:1;
 var q=1;
 function offer(){for(var i=0;i<offers.length;i++)if(offers[i].qty===q)return offers[i];return offers[0]||{id:'',qty:1,price:0}}
-function show(){var o=offer();if($('quantity'))$('quantity').textContent=q;var t=o.price+' درهم';if($('subtotal'))$('subtotal').textContent=t;if($('total'))$('total').textContent=t}
+function show(){var o=offer();var qe=$('quantity')||$('q');if(qe)qe.textContent=q;var t=o.price+' درهم';if($('subtotal'))$('subtotal').textContent=t;if($('total'))$('total').textContent=t}
 function step(n){var qs=offers.map(function(o){return o.qty});var i=qs.indexOf(q)+n;if(i<0)i=0;if(i>qs.length-1)i=qs.length-1;q=qs[i]||1;show()}
 if($('plus'))$('plus').addEventListener('click',function(){step(1)});
 if($('minus'))$('minus').addEventListener('click',function(){step(-1)});
 show();
 [[nameEl,'name'],[phoneEl,'phone'],[cityEl,'city']].forEach(function(p){if(p[0])p[0].addEventListener('focus',function(){lpf('f',p[1])},{once:true})});
-var st=$('status'),btn=f.querySelector('[type=submit]'),busy=false;
-function msg(t,ok){if(!st){alert(t);return}st.textContent=t;st.style.background=ok?'#e8f6ec':'#fde8e8';st.style.color=ok?'#0b5a33':'#a1221c';st.classList.add('show');st.style.display='block'}
+var st=$('status')||$('result'),btn=f.querySelector('[type=submit]'),busy=false;
+function msg(t,ok){if(!st){alert(t);return}st.textContent=t;st.style.background=ok?'#e8f6ec':'#fde8e8';st.style.color=ok?'#0b5a33':'#a1221c';st.hidden=false;st.classList.add('show');st.style.display='block'}
 f.addEventListener('submit',function(e){e.preventDefault();if(busy)return;lpf('click');
 var name=(nameEl&&nameEl.value||'').trim(),phone=(phoneEl&&phoneEl.value||'').replace(/[\\s.-]/g,''),city=(cityEl&&cityEl.value||'').trim();
 var err=[];if(name.length<3)err.push('name');if(!/^(?:\\+212|00212|0)[5-8]\\d{8}$/.test(phone))err.push('phone');if(!city)err.push('city');
