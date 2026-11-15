@@ -86,6 +86,19 @@ export async function logCall(data: {
 
   if (data.notes?.trim()) updatePayload.notes = data.notes.trim();
 
+  // ── Rappel automatique des « pas de réponse » (règles réglables dans Agents) ──
+  if (data.result === "no_answer" || data.result === "unreachable") {
+    const { normalizeCallbackRules, nextCallbackAt } = await import("@/lib/call-center/callback-rules");
+    const { data: rr } = await supabaseAdmin.from("app_settings").select("value").eq("key", "cc_callback_rules").maybeSingle();
+    const rules = normalizeCallbackRules((rr as { value?: unknown } | null)?.value);
+    const attempts = (cur?.call_attempts ?? 0) + 1;
+    const next = nextCallbackAt(attempts, rules);
+    updatePayload.callback_scheduled_at = next ? next.toISOString() : null;
+    updatePayload.callback_reason = next ? `Auto · rappel ${attempts + 1}/${rules.maxAttempts}` : `${attempts} tentatives sans réponse`;
+  } else if (data.result !== "callback_requested") {
+    updatePayload.callback_scheduled_at = null; // traitée : plus de rappel
+  }
+
   if (data.result === "confirmed") {
     updatePayload.confirmed_by = session.authId;
     updatePayload.confirmed_at = data.endedAt;
@@ -318,4 +331,14 @@ export async function updateCcQuantity(orderId: string, itemId: string, qty: num
   revalidatePath(`/admin/call-center/orders/${orderId}`);
   revalidatePath(`/admin/orders/${orderId}`);
   return { ok: true, total: subtotal - disc + ship };
+}
+
+export async function saveCallbackRules(raw: { enabled: boolean; delays: string; maxAttempts: number; hourStart: number; hourEnd: number }) {
+  await requireRole([...MANAGER_ROLES]);
+  const { normalizeCallbackRules } = await import("@/lib/call-center/callback-rules");
+  const rules = normalizeCallbackRules({ ...raw, delays: raw.delays.split(/[,\s;]+/).map(Number).filter((n) => n > 0) });
+  const { error } = await supabaseAdmin.from("app_settings").upsert(
+    { key: "cc_callback_rules", value: rules, category: "call_center", label: "Rappels automatiques (pas de réponse)" } as never, { onConflict: "key" });
+  revalidatePath("/admin/call-center/agents");
+  return error ? { success: false, error: error.message } : { success: true, rules };
 }

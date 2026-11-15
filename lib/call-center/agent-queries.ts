@@ -86,8 +86,8 @@ export async function getMyCallbacks() {
   const session = await requireRole([...CC_ROLES]);
   const supabase = await createClient();
 
-  const { data } = await supabase.from("orders").select("id, order_number, customer_name, customer_phone, callback_scheduled_at, callback_reason, total_amount_mad").eq("assigned_to", session.authId).not("callback_scheduled_at", "is", null).lte("callback_scheduled_at", new Date(Date.now() + 86400000).toISOString()).order("callback_scheduled_at", { ascending: true });
-  return (data ?? []) as { id: string; order_number: string; customer_name: string; customer_phone: string; callback_scheduled_at: string; callback_reason: string | null; total_amount_mad: number }[];
+  const { data } = await supabase.from("orders").select("id, order_number, customer_name, customer_phone, customer_city, callback_scheduled_at, callback_reason, total_amount_mad, call_attempts, order_items(product_name)").eq("assigned_to", session.authId).eq("status", "no_answer").not("callback_scheduled_at", "is", null).lte("callback_scheduled_at", new Date(Date.now() + 86400000).toISOString()).order("callback_scheduled_at", { ascending: true });
+  return (data ?? []) as { id: string; order_number: string; customer_name: string; customer_phone: string; customer_city: string | null; callback_scheduled_at: string; callback_reason: string | null; total_amount_mad: number; call_attempts: number | null; order_items: { product_name: string }[] | null }[];
 }
 
 export async function recordAgentPayment(params: { agentId: string; periodStart: string; periodEnd: string; paidAmount: number; notes?: string }): Promise<{ success: boolean; error?: string }> {

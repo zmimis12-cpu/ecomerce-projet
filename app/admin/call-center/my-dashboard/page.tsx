@@ -5,6 +5,8 @@ import { getMyStats, getMyCallbacks, getMyCommissions, getMyAssignedOrders } fro
 import { CheckCircle2, XCircle, Award, TrendingUp, CalendarClock, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { normalizeCcWa, fillCcWa, waLink } from "@/lib/call-center/whatsapp-templates";
 
 export const metadata: Metadata = { title: "Mon Dashboard — Call Center" };
 export const dynamic = "force-dynamic";
@@ -12,12 +14,14 @@ export const dynamic = "force-dynamic";
 export default async function AgentDashboardPage() {
   const session = await requireRole(["call_center_agent", "super_admin", "admin", "manager"]);
 
-  const [stats, callbacks, commissions, orders] = await Promise.all([
+  const [stats, callbacks, commissions, orders, { data: waRow }] = await Promise.all([
     getMyStats(),
     getMyCallbacks(),
     getMyCommissions(),
     getMyAssignedOrders(),
+    supabaseAdmin.from("app_settings").select("value").eq("key", "cc_whatsapp_templates").maybeSingle(),
   ]);
+  const waNoAnswer = normalizeCcWa((waRow as { value?: unknown } | null)?.value).no_answer;
 
   const pendingOrders   = orders.filter((o) => !["confirmed", "refused", "cancelled"].includes(o.status));
   const callbacksDueNow = callbacks.filter((c) => new Date(c.callback_scheduled_at) <= new Date());
@@ -33,22 +37,30 @@ export default async function AgentDashboardPage() {
         <p className="text-sm text-muted-foreground mt-1">Vos performances et commissions personnelles.</p>
       </div>
 
-      {/* Callbacks alert */}
+      {/* À rappeler maintenant (pas de réponse → rappel automatique) */}
       {callbacksDueNow.length > 0 && (
-        <div className="rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3 flex items-center gap-3">
-          <CalendarClock className="h-5 w-5 text-amber-700 shrink-0" />
-          <div className="flex-1">
-            <p className="font-semibold text-amber-800 text-sm">
-              {callbacksDueNow.length} rappel(s) en attente maintenant
-            </p>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {callbacksDueNow.slice(0, 3).map((c) => (
-                <Link key={c.id} href={`/admin/call-center/orders/${c.id}`}
-                  className="text-xs text-amber-700 hover:underline">
-                  {c.customer_name} ({c.order_number})
-                </Link>
-              ))}
-            </div>
+        <div className="rounded-xl border-2 border-amber-300 bg-amber-50 overflow-hidden">
+          <div className="px-4 py-3 flex items-center gap-2 border-b border-amber-200">
+            <CalendarClock className="h-5 w-5 text-amber-700 shrink-0" />
+            <p className="font-semibold text-amber-800 text-sm">À rappeler maintenant : {callbacksDueNow.length}</p>
+          </div>
+          <div className="divide-y divide-amber-200">
+            {callbacksDueNow.map((c) => {
+              const product = (c.order_items ?? []).map((i) => i.product_name).join(" + ");
+              const wa = waLink(c.customer_phone, fillCcWa(waNoAnswer, { name: c.customer_name, product, total: c.total_amount_mad, city: c.customer_city, order: c.order_number }));
+              return (
+                <div key={c.id} className="px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
+                  <Link href={`/admin/call-center/orders/${c.id}`} className="font-medium hover:underline">{c.customer_name}</Link>
+                  <span className="font-mono text-xs text-muted-foreground">{c.order_number}</span>
+                  <span className="text-xs text-amber-800">{c.call_attempts ?? 0} appel(s) · {c.callback_reason ?? "Rappel"}</span>
+                  <span className="ml-auto flex gap-2">
+                    <a href={`tel:${c.customer_phone}`} className="rounded-lg bg-emerald-600 text-white px-3 py-1 text-xs font-semibold">Appeler</a>
+                    <a href={wa} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-green-500 text-white px-3 py-1 text-xs font-semibold">WhatsApp</a>
+                    <Link href={`/admin/call-center/orders/${c.id}`} className="rounded-lg border px-3 py-1 text-xs font-semibold bg-white">Ouvrir</Link>
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

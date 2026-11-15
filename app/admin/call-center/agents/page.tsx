@@ -6,6 +6,8 @@ import { getAgentStats } from "@/lib/call-center/queries";
 import { LiveAgentsTable } from "@/components/call-center/live-agents-table";
 import { CcWhatsappEditor } from "@/components/call-center/cc-whatsapp-editor";
 import { normalizeCcWa } from "@/lib/call-center/whatsapp-templates";
+import { CcCallbackEditor } from "@/components/call-center/cc-callback-editor";
+import { normalizeCallbackRules } from "@/lib/call-center/callback-rules";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = { title: "Agents — Call Center" };
@@ -15,9 +17,10 @@ export default async function AgentsPage() {
   await requireRole(["super_admin", "admin", "manager"]);
 
   // Use getAgentStats — same logic as agent detail page
-  const [agents, { data: waRow }] = await Promise.all([
+  const [agents, { data: waRow }, { data: cbRow }] = await Promise.all([
     getAgentStats(),
     supabaseAdmin.from("app_settings").select("value").eq("key", "cc_whatsapp_templates").maybeSingle(),
+    supabaseAdmin.from("app_settings").select("value").eq("key", "cc_callback_rules").maybeSingle(),
   ]);
 
   return (
@@ -35,6 +38,7 @@ export default async function AgentsPage() {
         <p className="text-sm text-muted-foreground mt-1">Performance et statistiques des agents.</p>
       </div>
       <LiveAgentsTable initialAgents={agents} />
+      <CcCallbackEditor initial={normalizeCallbackRules((cbRow as { value?: unknown } | null)?.value)} />
       <CcWhatsappEditor initial={normalizeCcWa((waRow as { value?: unknown } | null)?.value)} />
     </div>
   );
