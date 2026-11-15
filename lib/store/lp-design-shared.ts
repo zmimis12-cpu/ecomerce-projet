@@ -35,7 +35,7 @@ export type LpDesign = {
   submitText: string;
   clarityId: string;
   gadsTag: string;                   // Google Ads : « AW-xxxx/label » de la conversion (vide = désactivé), chargé après la photo
-  template: "classic" | "bm" | "bm2" | "html"; // « html » = page HTML fournie (customHtml), formulaire relié au système
+  template: "classic" | "bm" | "bm2" | "html" | "shop"; // « html » = page HTML fournie (customHtml), formulaire relié au système
   customHtml: string;                // modèle « html » : HTML complet de la LP (styles + contenu), scripts retirés         // modèle visuel : classique ou « bm » (barre rouge, bandeaux bleus, boutons orange — style LP COD concurrentes)                 // Microsoft Clarity (enregistrements des visites) — vide = désactivé
   bmNote: string;                    // « BM2 » : ligne rouge sous le bouton commander
   bmBadges: string;                  // « BM2 » : 4 badges ronds sous le bouton, séparés par |
@@ -57,6 +57,7 @@ export type LpDesign = {
   bmCountdownText: string;           // « BM2 » : texte au-dessus du compteur
   bmPrivacy: string;                 // « BM2 » : phrase confidentialité sous le formulaire (+ lien politique) — vide = rien
   bmCompare: string;                 // « BM2 » : tableau comparatif — 1re ligne = titre|colonne A|colonne B, puis critère|A|B                 // « BM2 » : texte du bouton vert du formulaire
+  shopTicker: string; shopTrust: string; shopReassure: string; shopColor: string; // « SHOP » : bandeau défilant (|), lignes de confiance (|), phrase au-dessus du formulaire, couleur boutons
   formFrame: boolean;                // formulaire encadré (bordure verte + bandeau titre)
   formFrameTitle: string;                // texte du bouton commander (court) — le prix s'affiche en petit dessous             // bloc « المجموع » au-dessus du bouton (le total est déjà sur le bouton)        // quantité sous les champs nom / téléphone / ville
   showStoreHeader: boolean;          // logo + menu « القائمة »
@@ -113,7 +114,7 @@ export type LpDesign = {
 
 export const DEFAULT_LP_DESIGN: LpDesign = {
   blocks: LP_BLOCKS.map((b) => ({ key: b.key, on: true })),
-  heroSource: "product", heroImage: "", heroPosition: "top", heroRatio: "auto", heroMaxH: 310, formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, showTotalBox: false, submitText: "اطلب الآن", clarityId: "", gadsTag: "", template: "classic", customHtml: "", bmNote: "التوصيل بالمجان والدفع عند الاستلام", bmBadges: "الدفع عند الاستلام|توصيل مجاني|شوف المنتج قبل ما تخلص|توصيل آمن", bmStars: false, bmTitleColor: "#3aa0b4", bmReviewsTitle: "آراء زبنائنا", bmFaqTitle: "الأسئلة الشائعة", bmBuyText: "إضغط هنا للشراء", bmFormPlus: false, bmDemoVideo: "", bmDemoPoster: "", bmChips: "", bmShort: false, bmValue: "", bmAnim: false, bmCountdown: false, bmCountdownEnd: "", bmCountdownDaily: false, bmCountdownText: "⏳ العرض كيسالي من بعد", bmPrivacy: "", bmCompare: "", formFrame: true, formFrameTitle: "👇 للطلب عمّر المعلومات ديالك", crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
+  heroSource: "product", heroImage: "", heroPosition: "top", heroRatio: "auto", heroMaxH: 310, formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, showTotalBox: false, submitText: "اطلب الآن", clarityId: "", gadsTag: "", template: "classic", customHtml: "", bmNote: "التوصيل بالمجان والدفع عند الاستلام", bmBadges: "الدفع عند الاستلام|توصيل مجاني|شوف المنتج قبل ما تخلص|توصيل آمن", bmStars: false, bmTitleColor: "#3aa0b4", bmReviewsTitle: "آراء زبنائنا", bmFaqTitle: "الأسئلة الشائعة", bmBuyText: "إضغط هنا للشراء", bmFormPlus: false, bmDemoVideo: "", bmDemoPoster: "", bmChips: "", bmShort: false, bmValue: "", bmAnim: false, bmCountdown: false, bmCountdownEnd: "", bmCountdownDaily: false, bmCountdownText: "⏳ العرض كيسالي من بعد", bmPrivacy: "", bmCompare: "", shopTicker: "🚚 التوصيل لجميع المدن|💵 الدفع عند الاستلام|💬 خدمة العملاء على واتساب", shopTrust: "🚚 التوصيل لجميع مدن المغرب|💵 الدفع عند الاستلام|📦 تقدر تحل الكولية وتشوف المنتج قبل ما تخلص", shopReassure: "عمّر الاستمارة بكل أمان، ما غادي تخلص حتى توصلك الكوموند وتشوفها", shopColor: "#e74c4c", formFrame: true, formFrameTitle: "👇 للطلب عمّر المعلومات ديالك", crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
   showOldPrice: true, showCodBar: true, freeShip: true, freeShipText: "🚚 التوصيل مجاني لجميع المدن", trust3: true, trust3Text: "الدفع|عند الاستلام ; التوصيل|24-72h ; إرجاع|خلال 7 أيام", askAddress: true, addressRequired: false, showWhatsapp: true, showWhatsappFloat: true,
   sticky: true, showFooter: true,
   topBar: "", badge: "عرض خاص", codBar: "🚚 التوصيل لجميع المدن | الدفع عند الاستلام", orderTitle: "🛒 اطلب الآن", orderSub: "",

@@ -139,6 +139,7 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
               <option value="classic">Classique (actuel)</option>
               <option value="bm">« BM » — barre rouge en haut, bandeaux bleus, boutons orange, listes « (style LP COD concurrentes)</option>
               <option value="bm2">« BM2 » — page séparée, copie de la LP concurrente (barre rouge, formulaire en pointillés, bandeaux bleus, FAQ noire)</option>
+              <option value="shop">« SHOP » — style boutique Shopify (galerie, prix, formulaire tout de suite, grandes images, garanties)</option>
               <option value="html">« HTML » — ma propre page HTML (collée ci-dessous), formulaire relié aux commandes</option>
             </select>
           </L>
@@ -151,6 +152,13 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
             {B("bmCountdown", "Compte à rebours de la promo (BM2 : au-dessus du prix · HTML : bloc [data-hz-countdown])")}
             {B("bmCountdownDaily", "Compteur remis à zéro chaque jour à minuit (heure Maroc) — la date ci-dessous est alors ignorée")}
             <L t="Fin RÉELLE de la promo (heure Maroc ; vide ou date passée = compteur caché)"><input dir="ltr" type="datetime-local" className={field} value={d.bmCountdownEnd} onChange={(e) => set("bmCountdownEnd", e.target.value)} /></L>
+          </>)}
+          {d.template === "shop" && (<>
+            <L t="SHOP — bandeau défilant en haut (phrases séparées par |)"><input dir="auto" className={field} value={d.shopTicker} onChange={(e) => set("shopTicker", e.target.value)} /></L>
+            <L t="SHOP — lignes de confiance sous le formulaire (séparées par |, que des infos vraies)"><input dir="auto" className={field} value={d.shopTrust} onChange={(e) => set("shopTrust", e.target.value)} /></L>
+            <L t="SHOP — phrase au-dessus du formulaire"><input dir="auto" className={field} value={d.shopReassure} onChange={(e) => set("shopReassure", e.target.value)} /></L>
+            <L t="SHOP — couleur des boutons et du prix"><input type="color" className={field} value={d.shopColor} onChange={(e) => set("shopColor", e.target.value)} /></L>
+            <L t="SHOP — texte du bouton du formulaire (ex. تأكيد الطلب)"><input dir="auto" className={field} value={d.bmBuyText} onChange={(e) => set("bmBuyText", e.target.value)} /></L>
           </>)}
           {d.template === "bm2" && (<>
             <L t="BM2 — texte du bouton vert du formulaire"><input dir="auto" className={field} value={d.bmBuyText} onChange={(e) => set("bmBuyText", e.target.value)} /></L>

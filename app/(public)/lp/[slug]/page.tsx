@@ -12,6 +12,7 @@ import { FaqAccordion } from "@/components/landing/faq-accordion";
 import { CrossSell } from "@/components/store/cross-sell";
 import { getLpDesignFor, DEFAULT_LP_DESIGN, type LpBlockKey } from "@/lib/store/lp-design";
 import { viaCdn } from "@/lib/media";
+import { ShopLanding } from "@/components/landing/shop-landing";
 import { Bm2Landing } from "@/components/landing/bm2-landing";
 import { htmlBridgeJs, cleanCustomHtml } from "@/lib/landing/html-bridge";
 
@@ -425,6 +426,30 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     />
   ) : null;
 
+  // Modèle « SHOP » : style boutique Shopify COD (galerie, prix, formulaire tout de suite, grandes images, garanties)
+  const shop = d.template === "shop" ? (
+    <ShopLanding
+      title={title} subtitle={String(lp.subtitle ?? lp.hero_subheadline ?? "")} price={one.price} oldPrice={d.showOldPrice ? oldShown : null}
+      ctaText={d.submitText || "تأكيد الطلب"} color={d.shopColor || "#e74c4c"}
+      gallery={[...new Set([heroImg ?? "", ...productImgs.slice(0, 5)])].filter(Boolean).slice(0, 6)}
+      images={moreImgs} groups={bulletGroups} faq={faqItems.filter((f) => f.q && f.a)}
+      titleScript={angles.length > 0 ? `(function(){try{${angleJs}if(!m)return;var t=document.getElementById('sp-title');if(t&&m.h)t.textContent=m.h;var s=document.getElementById('sp-angle-sub');if(s&&m.s)s.textContent=m.s;}catch(e){}})();` : undefined}
+      form={<>
+        <LpFunnelTracker slug={slug} />
+        <OrderFormPublic product={product} productSlug={slug} ctaText={ctaText} look="bm"
+          b1={b1} b2={b2} b3={b3} offers={offers} askAddress={d.askAddress} addressRequired={d.addressRequired}
+          pixelId={pixel || undefined} tiktokPixelId={tt || undefined}
+          variants={(Array.isArray(lp.variant_options) ? lp.variant_options : []) as { name: string; options: { label: string; image?: string }[] }[]}
+          bumps={d.showBumps ? bumps : []} cities={cities} submitText={d.bmBuyText || "تأكيد الطلب"} plus={true} />
+      </>}
+      ticker={d.shopTicker.split("|").map((x) => x.trim()).filter(Boolean)}
+      trust={d.shopTrust.split("|").map((x) => x.trim()).filter(Boolean)}
+      reassure={d.shopReassure} shipText={d.freeShip ? (d.freeShipText || "التوصيل") : ""}
+      storeName={String(lp.store_name || "HajtekZone")} logo={lp.store_logo_url ? viaCdn(String(lp.store_logo_url)) : undefined}
+      waHref={waHref || undefined} valueLine={d.bmValue || undefined}
+    />
+  ) : null;
+
   // Modèle « HTML » : page HTML fournie (admin), formulaire relié aux commandes par htmlBridgeJs — mêmes pixels / suivi
   const htmlTpl = d.template === "html" && d.customHtml.trim() ? (
     <>
@@ -461,7 +486,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         (function(){function buy(){var f=document.getElementById('sp-order-form');if(!f){var c=document.getElementById('sp-form');if(c)c.scrollIntoView({behavior:'smooth'});return;}if(f.requestSubmit)f.requestSubmit();else f.dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));}document.addEventListener('click',function(e){var t=e.target;if(t&&t.closest&&t.closest('#sp-buy')){e.preventDefault();buy();}var y=t&&t.closest&&t.closest('.sp-yt');if(y){var f=document.createElement('iframe');f.src=y.getAttribute('data-yt')+'&autoplay=1';f.allow='autoplay; encrypted-media; picture-in-picture';f.allowFullscreen=true;y.replaceWith(f);}});})();
         (function(){function go(){var b=document.getElementById('sp-sticky'),f=document.getElementById('sp-form');if(!f||!('IntersectionObserver' in window))return;var w=document.getElementById('sp-wa-float');new IntersectionObserver(function(e){if(b)b.classList.toggle('sp-hide',e[0].isIntersecting);if(w)w.classList.toggle('sp-hide-wa',e[0].isIntersecting);},{threshold:0.05}).observe(f);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`
       }} />
-      {htmlTpl ?? bm2 ?? (<>
+      {htmlTpl ?? shop ?? bm2 ?? (<>
             <style>{CSS}</style>
             {d.heroMaxH !== 310 && <style>{`@media (max-width:600px){.sp-hero{max-height:${d.heroMaxH}px}}`}</style>}
 
