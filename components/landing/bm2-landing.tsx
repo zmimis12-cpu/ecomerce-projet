@@ -25,7 +25,8 @@ export function Bm2Landing(p: {
   /** Phrase confidentialité sous le formulaire */
   privacy?: string;
 }) {
-  const endMs = (() => { const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(p.countdownEnd || ""); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 1, +m[5]) : 0; })();
+  const daily = p.countdownEnd === "daily";
+  const endMs = daily ? 1 : (() => { const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(p.countdownEnd || ""); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 1, +m[5]) : 0; })();
   const cmp = (p.compare || "").split("\n").map((l) => l.split("|").map((x) => x.trim())).filter((r) => r.length >= 3 && r.some(Boolean));
   const chips = p.chips && p.chips.length > 0 ? p.chips : p.short ? (p.groups[0]?.items ?? []).slice(0, 4).map((t) => t.split(":")[0].trim()) : [];
   const titleEl = (<>
@@ -67,7 +68,7 @@ export function Bm2Landing(p: {
             <div className="b2-cd-t">{p.countdownText || "⏳ العرض كيسالي من بعد"}</div>
             <div className="b2-cd-b" dir="ltr">{[["d", "يوم"], ["h", "ساعة"], ["m", "دقيقة"], ["s", "ثانية"]].map(([k, l]) => <span key={k}><b data-k={k}>00</b><i>{l}</i></span>)}</div>
           </div>
-          <script dangerouslySetInnerHTML={{ __html: "(function(){var c=document.getElementById('b2-cd');if(!c)return;var e=+c.getAttribute('data-end');function z(n){return(n<10?'0':'')+n}function t(){var d=e-Date.now();if(d<=0){c.hidden=true;return false}c.hidden=false;var v={d:Math.floor(d/864e5),h:Math.floor(d/36e5)%24,m:Math.floor(d/6e4)%60,s:Math.floor(d/1e3)%60};var b=c.querySelectorAll('b');for(var i=0;i<b.length;i++){var k=b[i].getAttribute('data-k');b[i].textContent=z(v[k]);if(k==='d')b[i].parentNode.style.display=v.d?'':'none'}return true}if(t())var iv=setInterval(function(){if(!t())clearInterval(iv)},1000)})();" }} />
+          <script dangerouslySetInnerHTML={{ __html: "(function(){var c=document.getElementById('b2-cd');if(!c)return;var dl=c.getAttribute('data-end')==='1';function nx(){var n=Date.now()+36e5;return n-n%864e5+864e5-36e5}var e=dl?nx():+c.getAttribute('data-end');function z(n){return(n<10?'0':'')+n}function t(){var d=e-Date.now();if(d<=0&&dl){e=nx();d=e-Date.now()}if(d<=0){c.hidden=true;return false}c.hidden=false;var v={d:Math.floor(d/864e5),h:Math.floor(d/36e5)%24,m:Math.floor(d/6e4)%60,s:Math.floor(d/1e3)%60};var b=c.querySelectorAll('b');for(var i=0;i<b.length;i++){var k=b[i].getAttribute('data-k');b[i].textContent=z(v[k]);if(k==='d')b[i].parentNode.style.display=v.d?'':'none'}return true}if(t())var iv=setInterval(function(){if(!t())clearInterval(iv)},1000)})();" }} />
         </>)}
         {p.oldPrice && p.oldPrice > p.price && <div className="b2-old">{p.oldPrice.toFixed(0)}د.م</div>}
         <div className="b2-now">{p.price.toFixed(0)}د.م</div>

@@ -7,7 +7,7 @@
  *  - message dans #status (ou #result) ; Lead Meta / TikTok / Google envoyés seulement si la commande est enregistrée
  *  - animations au scroll : éléments avec la classe « hz-reveal » (apparaissent en glissant ; visibles sans JS)
  *  - compte à rebours : élément [data-hz-countdown] contenant <b data-k="d|h|m|s"> ; date de fin = réglage admin
- *    « fin RÉELLE de la promo » (ou valeur de l'attribut « YYYY-MM-DDTHH:mm » heure Maroc) ; caché si pas de date / date passée
+ *    « fin RÉELLE de la promo » (ou valeur de l'attribut « YYYY-MM-DDTHH:mm » heure Maroc, ou « daily » = minuit Maroc chaque jour) ; caché si pas de date / date passée
  * Aucun script du HTML collé n'est exécuté (sécurité) : tout passe par ce pont.
  */
 export type HtmlBridgeCfg = {
@@ -90,8 +90,8 @@ var rv=function(){var R=document.querySelectorAll('.hz-reveal');if(R.length&&'In
 if(document.readyState==='complete')setTimeout(rv,50);else addEventListener('load',function(){setTimeout(rv,50)});
 }catch(e){}
 try{var tm=function(v){var m=/^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})/.exec(v||'');return m?Date.UTC(+m[1],+m[2]-1,+m[3],+m[4]-1,+m[5]):0};
-var D=document.querySelectorAll('[data-hz-countdown]');[].forEach.call(D,function(c){var e=tm(C.countdownEnd)||tm(c.getAttribute('data-hz-countdown'));if(!e)return;var z=function(n){return(n<10?'0':'')+n};
-function t(){var d=e-Date.now();if(d<=0){c.hidden=true;return false}c.hidden=false;var v={d:Math.floor(d/864e5),h:Math.floor(d/36e5)%24,m:Math.floor(d/6e4)%60,s:Math.floor(d/1e3)%60};[].forEach.call(c.querySelectorAll('[data-k]'),function(b){var k=b.getAttribute('data-k');b.textContent=z(v[k]);if(k==='d'&&b.parentNode!==c)b.parentNode.style.display=v.d?'':'none'});return true}
+var D=document.querySelectorAll('[data-hz-countdown]');[].forEach.call(D,function(c){var dly=C.countdownEnd==='daily';var nx=function(){var n=Date.now()+36e5;return n-n%864e5+864e5-36e5};var e=dly?nx():(tm(C.countdownEnd)||tm(c.getAttribute('data-hz-countdown')));if(!e)return;var z=function(n){return(n<10?'0':'')+n};
+function t(){var d=e-Date.now();if(d<=0&&dly){e=nx();d=e-Date.now()}if(d<=0){c.hidden=true;return false}c.hidden=false;var v={d:Math.floor(d/864e5),h:Math.floor(d/36e5)%24,m:Math.floor(d/6e4)%60,s:Math.floor(d/1e3)%60};[].forEach.call(c.querySelectorAll('[data-k]'),function(b){var k=b.getAttribute('data-k');b.textContent=z(v[k]);if(k==='d'&&b.parentNode!==c)b.parentNode.style.display=v.d?'':'none'});return true}
 if(t()){var iv=setInterval(function(){if(!t())clearInterval(iv)},1000)}})}catch(e){}}
 function boot(){fx();go()}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();})();`;

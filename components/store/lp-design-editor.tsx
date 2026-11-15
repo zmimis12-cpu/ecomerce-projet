@@ -149,6 +149,7 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
           )}
           {(d.template === "bm2" || d.template === "html") && (<>
             {B("bmCountdown", "Compte à rebours de la promo (BM2 : au-dessus du prix · HTML : bloc [data-hz-countdown])")}
+            {B("bmCountdownDaily", "Compteur remis à zéro chaque jour à minuit (heure Maroc) — la date ci-dessous est alors ignorée")}
             <L t="Fin RÉELLE de la promo (heure Maroc ; vide ou date passée = compteur caché)"><input dir="ltr" type="datetime-local" className={field} value={d.bmCountdownEnd} onChange={(e) => set("bmCountdownEnd", e.target.value)} /></L>
           </>)}
           {d.template === "bm2" && (<>
