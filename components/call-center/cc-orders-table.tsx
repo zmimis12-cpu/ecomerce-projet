@@ -19,11 +19,27 @@ interface CCOrdersTableProps {
   canManage: boolean;
 }
 
+const CALL_LABELS: Record<string, string> = {
+  confirmed: "Confirmé", refused: "Refusé", no_answer: "Pas de réponse", unreachable: "Injoignable",
+  callback_requested: "Rappel demandé", wrong_number: "Faux numéro",
+};
+/** Groupes de statut commande (filtre call center). */
+const ORDER_GROUPS: Record<string, string[]> = {
+  "Livrées":        ["delivered", "paid", "exchanged"],
+  "En route":       ["sent_to_delivery", "shipped", "in_transit", "picked_up", "out_for_delivery"],
+  "Confirmées (pas encore expédiées)": ["confirmed"],
+  "Sans réponse":   ["no_answer"],
+  "Nouvelles":      ["new", "pending"],
+  "Refusées / retours": ["refused", "returned", "refused_delivery"],
+  "Annulées":       ["cancelled"],
+};
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function CCOrdersTable({ orders, agents, canManage, mode = "all" }: CCOrdersTableProps) {
   const [search, setSearch]       = useState("");
   const [agentFilter, setAgent]   = useState("");
   const [statusFilter, setStatus] = useState("");
+  const [orderFilter, setOrderF]  = useState("");
   const [selected, setSelected]   = useState<string[]>([]);
 
   const filtered = orders.filter((o) => {
@@ -33,7 +49,8 @@ export function CCOrdersTable({ orders, agents, canManage, mode = "all" }: CCOrd
     ].some((v) => v.toLowerCase().includes(q));
     const matchAgent  = !agentFilter || o.assigned_to === agentFilter;
     const matchStatus = !statusFilter || o.call_status === statusFilter;
-    return matchSearch && matchAgent && matchStatus;
+    const matchOrder  = !orderFilter || (ORDER_GROUPS[orderFilter]?.includes(o.status) ?? false);
+    return matchSearch && matchAgent && matchStatus && matchOrder;
   });
 
   function toggleSelect(id: string) {
@@ -63,9 +80,16 @@ export function CCOrdersTable({ orders, agents, canManage, mode = "all" }: CCOrd
         )}
         <select value={statusFilter} onChange={(e) => setStatus(e.target.value)}
           className="h-9 rounded-lg border border-input bg-background px-2 text-sm focus:outline-none">
-          <option value="">Tous résultats</option>
-          {["confirmed","refused","no_answer","unreachable","callback_requested","wrong_number"].map((s) => (
-            <option key={s} value={s}>{s}</option>
+          <option value="">Tous résultats d'appel</option>
+          {Object.entries(CALL_LABELS).map(([k, l]) => (
+            <option key={k} value={k}>{l}</option>
+          ))}
+        </select>
+        <select value={orderFilter} onChange={(e) => setOrderF(e.target.value)}
+          className="h-9 rounded-lg border border-input bg-background px-2 text-sm focus:outline-none">
+          <option value="">Tous statuts commande</option>
+          {Object.keys(ORDER_GROUPS).map((k) => (
+            <option key={k} value={k}>{k} ({orders.filter((o) => ORDER_GROUPS[k].includes(o.status)).length})</option>
           ))}
         </select>
         <span className="text-xs text-muted-foreground ml-auto">
