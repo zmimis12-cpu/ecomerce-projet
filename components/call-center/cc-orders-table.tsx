@@ -80,7 +80,7 @@ export function CCOrdersTable({ orders, agents, canManage, mode = "all" }: CCOrd
         )}
         <select value={statusFilter} onChange={(e) => setStatus(e.target.value)}
           className="h-9 rounded-lg border border-input bg-background px-2 text-sm focus:outline-none">
-          <option value="">Tous résultats d'appel</option>
+          <option value="">Tous résultats d’appel</option>
           {Object.entries(CALL_LABELS).map(([k, l]) => (
             <option key={k} value={k}>{l}</option>
           ))}
