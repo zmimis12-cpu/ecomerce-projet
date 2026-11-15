@@ -139,8 +139,14 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
               <option value="classic">Classique (actuel)</option>
               <option value="bm">« BM » — barre rouge en haut, bandeaux bleus, boutons orange, listes « (style LP COD concurrentes)</option>
               <option value="bm2">« BM2 » — page séparée, copie de la LP concurrente (barre rouge, formulaire en pointillés, bandeaux bleus, FAQ noire)</option>
+              <option value="html">« HTML » — ma propre page HTML (collée ci-dessous), formulaire relié aux commandes</option>
             </select>
           </L>
+          {d.template === "html" && (
+            <L t="HTML de la page (styles + contenu ; scripts ignorés). Formulaire : <form id=&quot;orderForm&quot;> avec champs fullName / phone / city, quantité #plus #minus #quantity, total #total, message #status. Prix = offres de la LP. Images : liens https (pas de data:), photo principale avec class=&quot;sp-hero&quot;.">
+              <textarea dir="ltr" rows={14} className={field} style={{ fontFamily: "monospace", fontSize: 12 }} value={d.customHtml} onChange={(e) => set("customHtml", e.target.value)} />
+            </L>
+          )}
           {d.template === "bm2" && (<>
             <L t="BM2 — texte du bouton vert du formulaire"><input dir="auto" className={field} value={d.bmBuyText} onChange={(e) => set("bmBuyText", e.target.value)} /></L>
             <L t="BM2 — vidéo démo en haut (lien .mp4 court, vide = photo)"><input dir="ltr" className={field} value={d.bmDemoVideo} onChange={(e) => set("bmDemoVideo", e.target.value)} /></L>
