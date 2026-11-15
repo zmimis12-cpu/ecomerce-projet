@@ -18,7 +18,14 @@ export function Bm2Landing(p: {
   demoVideo?: string; demoPoster?: string; chips?: string[];
   /** Version COURTE : photo d'abord, avantages, formulaire, FAQ courte (pas de tableau / sections longues / captures) */
   short?: boolean;
+  /** Animations douces au scroll (sections, prix, badges) */
+  anim?: boolean;
+  /** Fin RÉELLE de la promo (heure Maroc « YYYY-MM-DDTHH:mm ») — vide/passée = pas de compteur */
+  countdownEnd?: string; countdownText?: string;
+  /** Phrase confidentialité sous le formulaire */
+  privacy?: string;
 }) {
+  const endMs = (() => { const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(p.countdownEnd || ""); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 1, +m[5]) : 0; })();
   const cmp = (p.compare || "").split("\n").map((l) => l.split("|").map((x) => x.trim())).filter((r) => r.length >= 3 && r.some(Boolean));
   const chips = p.chips && p.chips.length > 0 ? p.chips : p.short ? (p.groups[0]?.items ?? []).slice(0, 4).map((t) => t.split(":")[0].trim()) : [];
   const titleEl = (<>
@@ -28,7 +35,7 @@ export function Bm2Landing(p: {
   </>);
   const cta = <div className="b2-cta-w"><a href="#sp-form" className="b2-cta">{p.ctaText}</a></div>;
   return (
-    <div className="b2" dir="rtl" lang="ar">
+    <div className={p.anim ? "b2 b2-anim" : "b2"} dir="rtl" lang="ar">
       <style>{CSS}</style>
       <header className="b2-head">
         {p.logo && (
@@ -55,12 +62,20 @@ export function Bm2Landing(p: {
       <div id="sp-form" className="b2-form">
         <h2 className="b2-form-h">{p.formTitle}</h2>
         {p.shipText && <div className="b2-ship">{p.shipText}</div>}
+        {endMs > 0 && (<>
+          <div className="b2-cd" id="b2-cd" data-end={endMs} hidden>
+            <div className="b2-cd-t">{p.countdownText || "⏳ العرض كيسالي من بعد"}</div>
+            <div className="b2-cd-b" dir="ltr">{[["d", "يوم"], ["h", "ساعة"], ["m", "دقيقة"], ["s", "ثانية"]].map(([k, l]) => <span key={k}><b data-k={k}>00</b><i>{l}</i></span>)}</div>
+          </div>
+          <script dangerouslySetInnerHTML={{ __html: "(function(){var c=document.getElementById('b2-cd');if(!c)return;var e=+c.getAttribute('data-end');function z(n){return(n<10?'0':'')+n}function t(){var d=e-Date.now();if(d<=0){c.hidden=true;return false}c.hidden=false;var v={d:Math.floor(d/864e5),h:Math.floor(d/36e5)%24,m:Math.floor(d/6e4)%60,s:Math.floor(d/1e3)%60};var b=c.querySelectorAll('b');for(var i=0;i<b.length;i++){var k=b[i].getAttribute('data-k');b[i].textContent=z(v[k]);if(k==='d')b[i].parentNode.style.display=v.d?'':'none'}return true}if(t())var iv=setInterval(function(){if(!t())clearInterval(iv)},1000)})();" }} />
+        </>)}
         {p.oldPrice && p.oldPrice > p.price && <div className="b2-old">{p.oldPrice.toFixed(0)}د.م</div>}
         <div className="b2-now">{p.price.toFixed(0)}د.م</div>
         {p.valueLine && <div className="b2-val">{p.valueLine}</div>}
         {p.stars && <div className="b2-stars" aria-hidden="true">★★★★★</div>}
         <div className="b2-f">{p.form}</div>
         {p.note && <p className="b2-note">{p.note}</p>}
+        {p.privacy && <p className="b2-priv"><span aria-hidden="true">🔒</span> {p.privacy} · <a href="/confidentialite">سياسة الخصوصية</a></p>}
         {p.badges.length > 0 && (
           <div className="b2-badges">
             {p.badges.slice(0, 4).map((t, i) => (
@@ -139,6 +154,7 @@ export function Bm2Landing(p: {
         <a href="#sp-form" className="b2-bot" id="b2-bot">{p.ctaText}</a>
         <script dangerouslySetInnerHTML={{ __html: "(function(){try{var b=document.getElementById('b2-bot'),f=document.getElementById('sp-form');if(!b||!f||!('IntersectionObserver' in window))return;new IntersectionObserver(function(e){b.classList.toggle('b2-bot-h',e[0].isIntersecting)},{threshold:0.15}).observe(f);}catch(e){}})();" }} />
       </>)}
+      {p.anim && <script dangerouslySetInnerHTML={{ __html: "(function(){try{if(!('IntersectionObserver' in window)||matchMedia('(prefers-reduced-motion:reduce)').matches)return;var r=document.querySelector('.b2-anim');var els=r.querySelectorAll('.b2-sec,.b2-faq-i,.b2-badge,.b2-chips li');var io=new IntersectionObserver(function(es){es.forEach(function(x){if(x.isIntersecting){x.target.classList.add('b2-in');io.unobserve(x.target)}})},{rootMargin:'0px 0px -8% 0px'});for(var i=0;i<els.length;i++){var b=els[i].getBoundingClientRect();if(b.top>innerHeight){els[i].classList.add('b2-rv');els[i].style.transitionDelay=(els[i].classList.contains('b2-badge')||els[i].tagName==='LI'?(i%4)*90:0)+'ms';io.observe(els[i])}}}catch(e){}})();" }} />}
       <footer className="b2-foot">
         <a href="/a-propos">من نحن</a> · <a href="/conditions">شروط البيع والاسترجاع</a> · <a href="/confidentialite">سياسة الخصوصية</a>
         <div>© {new Date().getFullYear()} {p.storeName}</div>
@@ -220,5 +236,17 @@ html,body{background:#fff;margin:0}
 .b2-bot-h{opacity:0;pointer-events:none;transform:translateY(90px)}
 .b2-foot{margin-top:26px;padding-bottom:70px;text-align:center;font-size:12px;color:#6b7280;line-height:2}
 .b2-foot a{color:#6b7280}
-@media (prefers-reduced-motion:reduce){.b2-cta,.b2-top,.b2-hand{animation:none}}
+.b2-cd{margin:6px 12px 10px;padding:8px 6px 10px;border-radius:14px;background:#fff7ed;border:2px solid #fdba74;text-align:center}
+.b2-cd-t{font-size:16px;font-weight:800;color:#c2410c;margin-bottom:6px}
+.b2-cd-b{display:flex;justify-content:center;gap:8px}
+.b2-cd-b span{display:flex;flex-direction:column;align-items:center;min-width:54px;background:#ea580c;color:#fff;border-radius:10px;padding:4px 2px}
+.b2-cd-b b{font-size:24px;font-weight:900;line-height:1.15;font-variant-numeric:tabular-nums}
+.b2-cd-b i{font-style:normal;font-size:11px;font-weight:700;opacity:.95}
+.b2-priv{margin:10px 12px 0;font-size:12.5px;color:#4b5563;text-align:center;line-height:1.6}
+.b2-priv a{color:#4b5563;text-decoration:underline}
+.b2-anim .b2-rv{opacity:0;transform:translateY(26px);transition:opacity .55s ease-out,transform .55s ease-out}
+.b2-anim .b2-rv.b2-in{opacity:1;transform:none}
+.b2-anim .b2-now{animation:b2p 2.2s ease-in-out infinite;display:inline-block}
+.b2-anim .b2-cd-b span{animation:b2p 2.2s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.b2-anim .b2-rv{opacity:1;transform:none}.b2-anim .b2-now,.b2-anim .b2-cd-b span{animation:none}.b2-cta,.b2-top,.b2-hand{animation:none}}
 `;

@@ -147,6 +147,10 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
               <textarea dir="ltr" rows={14} className={field} style={{ fontFamily: "monospace", fontSize: 12 }} value={d.customHtml} onChange={(e) => set("customHtml", e.target.value)} />
             </L>
           )}
+          {(d.template === "bm2" || d.template === "html") && (<>
+            {B("bmCountdown", "Compte à rebours de la promo (BM2 : au-dessus du prix · HTML : bloc [data-hz-countdown])")}
+            <L t="Fin RÉELLE de la promo (heure Maroc ; vide ou date passée = compteur caché)"><input dir="ltr" type="datetime-local" className={field} value={d.bmCountdownEnd} onChange={(e) => set("bmCountdownEnd", e.target.value)} /></L>
+          </>)}
           {d.template === "bm2" && (<>
             <L t="BM2 — texte du bouton vert du formulaire"><input dir="auto" className={field} value={d.bmBuyText} onChange={(e) => set("bmBuyText", e.target.value)} /></L>
             <L t="BM2 — vidéo démo en haut (lien .mp4 court, vide = photo)"><input dir="ltr" className={field} value={d.bmDemoVideo} onChange={(e) => set("bmDemoVideo", e.target.value)} /></L>
@@ -162,6 +166,9 @@ export function LpDesignEditor({ initial, pages }: { initial: LpDesignStore; pag
             {B("bmStars", "BM2 — étoiles ★★★★★ sous le prix")}
             {B("bmShort", "BM2 — version COURTE : photo d'abord, avantages, formulaire, FAQ courte (sans tableau ni sections longues)")}
             {B("bmFormPlus", "BM2 — formulaire simplifié (total sur le bouton, contrôle du téléphone, aide pour la ville)")}
+            {B("bmAnim", "BM2 — animations (sections qui apparaissent au scroll, prix et badges animés)")}
+            <L t="BM2 — texte au-dessus du compteur"><input dir="auto" className={field} value={d.bmCountdownText} onChange={(e) => set("bmCountdownText", e.target.value)} /></L>
+            <L t="BM2 — phrase confidentialité sous le formulaire (+ lien politique ; vide = rien)"><input dir="auto" className={field} value={d.bmPrivacy} onChange={(e) => set("bmPrivacy", e.target.value)} /></L>
           </>)}
           <L t="Microsoft Clarity — ID du projet (vide = désactivé)"><input className={field} value={d.clarityId} onChange={(e) => set("clarityId", e.target.value.trim())} /></L>
           <L t="Google Ads — conversion « AW-123456789/libellé » (vide = désactivé)"><input className={field} value={d.gadsTag} onChange={(e) => set("gadsTag", e.target.value.trim())} /></L>

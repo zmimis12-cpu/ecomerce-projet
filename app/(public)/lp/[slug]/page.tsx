@@ -421,6 +421,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       reviewsTitle={d.bmReviewsTitle} reviewImages={d.proofImages}
       faqTitle={d.bmFaqTitle} faq={faqItems.filter((f) => f.q && f.a)}
       storeName={String(lp.store_name || "HajtekZone")} logo={lp.store_logo_url ? viaCdn(String(lp.store_logo_url)) : undefined} waHref={waHref || undefined} shipText={d.freeShip ? d.freeShipText : undefined} stickyBottom={d.sticky !== false} valueLine={d.bmValue || undefined} compare={d.bmCompare || undefined} short={d.bmShort} demoVideo={d.bmDemoVideo || undefined} demoPoster={d.bmDemoPoster || undefined} chips={d.bmChips ? d.bmChips.split("|").map((x) => x.trim()).filter(Boolean) : undefined}
+      anim={d.bmAnim} countdownEnd={d.bmCountdown ? d.bmCountdownEnd : ""} countdownText={d.bmCountdownText} privacy={d.bmPrivacy || undefined}
     />
   ) : null;
 
@@ -429,7 +430,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     <>
       <LpFunnelTracker slug={slug} />
       <div dangerouslySetInnerHTML={{ __html: cleanCustomHtml(d.customHtml) }} />
-      <script dangerouslySetInnerHTML={{ __html: htmlBridgeJs({ slug, productId: product.id, productName: product.name, pixelId: pixel || null, tiktokPixelId: tt || null, offers: offers.map((o) => ({ id: String(o.id), qty: Number(o.qty), price: Number(o.price) })), cities }) }} />
+      <script dangerouslySetInnerHTML={{ __html: htmlBridgeJs({ slug, productId: product.id, productName: product.name, pixelId: pixel || null, tiktokPixelId: tt || null, offers: offers.map((o) => ({ id: String(o.id), qty: Number(o.qty), price: Number(o.price) })), cities, countdownEnd: d.bmCountdown ? d.bmCountdownEnd : "" }) }} />
     </>
   ) : null;
 

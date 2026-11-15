@@ -5,6 +5,9 @@
  *    téléphone (phone / customer_phone), ville (city / customer_city)
  *  - quantité : #plus / #minus / #quantity (ou #q) ; prix affichés dans #subtotal / #total = offres de la LP (1, 2, 3 pièces…)
  *  - message dans #status (ou #result) ; Lead Meta / TikTok / Google envoyés seulement si la commande est enregistrée
+ *  - animations au scroll : éléments avec la classe « hz-reveal » (apparaissent en glissant ; visibles sans JS)
+ *  - compte à rebours : élément [data-hz-countdown] contenant <b data-k="d|h|m|s"> ; date de fin = réglage admin
+ *    « fin RÉELLE de la promo » (ou valeur de l'attribut « YYYY-MM-DDTHH:mm » heure Maroc) ; caché si pas de date / date passée
  * Aucun script du HTML collé n'est exécuté (sécurité) : tout passe par ce pont.
  */
 export type HtmlBridgeCfg = {
@@ -15,6 +18,7 @@ export type HtmlBridgeCfg = {
   tiktokPixelId: string | null;
   offers: { id: string; qty: number; price: number }[];
   cities?: string[];               // villes du transporteur (même liste que les autres formulaires)
+  countdownEnd?: string;           // fin RÉELLE de la promo (heure Maroc « YYYY-MM-DDTHH:mm »), vide = attribut du HTML
 };
 
 /** Ville arabe → nom latin du transporteur (copie du dictionnaire de order-form-public). */
@@ -80,7 +84,17 @@ else if(d&&d.errors){var k=Object.keys(d.errors);lpf('err','srv:'+k.join(','));i
 else{lpf('err','srv');msg((d&&d.error)||'وقع خطأ، عاود المحاولة')}
 }).catch(function(){busy=false;if(btn){btn.disabled=false;btn.textContent=btn.dataset.t||btn.textContent}lpf('err','net');msg('خطأ في الاتصال، عاود المحاولة')})});
 }
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();})();`;
+function fx(){try{
+var rv=function(){var R=document.querySelectorAll('.hz-reveal');if(R.length&&'IntersectionObserver' in window&&!matchMedia('(prefers-reduced-motion:reduce)').matches){var io=new IntersectionObserver(function(es){es.forEach(function(x){if(x.isIntersecting){x.target.classList.add('hz-in');io.unobserve(x.target)}})},{rootMargin:'0px 0px -8% 0px'});for(var i=0;i<R.length;i++){if(R[i].getBoundingClientRect().top>innerHeight){R[i].classList.add('hz-hide');io.observe(R[i])}}}};
+// après la fin du chargement : le HTML peut encore être dans un bloc caché (streaming) au moment où le script tourne
+if(document.readyState==='complete')setTimeout(rv,50);else addEventListener('load',function(){setTimeout(rv,50)});
+}catch(e){}
+try{var tm=function(v){var m=/^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})/.exec(v||'');return m?Date.UTC(+m[1],+m[2]-1,+m[3],+m[4]-1,+m[5]):0};
+var D=document.querySelectorAll('[data-hz-countdown]');[].forEach.call(D,function(c){var e=tm(C.countdownEnd)||tm(c.getAttribute('data-hz-countdown'));if(!e)return;var z=function(n){return(n<10?'0':'')+n};
+function t(){var d=e-Date.now();if(d<=0){c.hidden=true;return false}c.hidden=false;var v={d:Math.floor(d/864e5),h:Math.floor(d/36e5)%24,m:Math.floor(d/6e4)%60,s:Math.floor(d/1e3)%60};[].forEach.call(c.querySelectorAll('[data-k]'),function(b){var k=b.getAttribute('data-k');b.textContent=z(v[k]);if(k==='d'&&b.parentNode!==c)b.parentNode.style.display=v.d?'':'none'});return true}
+if(t()){var iv=setInterval(function(){if(!t())clearInterval(iv)},1000)}})}catch(e){}}
+function boot(){fx();go()}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();})();`;
 }
 
 /** Nettoie le HTML collé : garde <style> + contenu du <body>, retire scripts et attributs on*. */

@@ -50,6 +50,11 @@ export type LpDesign = {
   bmChips: string;
   bmShort: boolean;                  // « BM2 » : version COURTE (photo d'abord, avantages, formulaire, FAQ courte)                   // « BM2 » : avantages courts sous la photo/vidéo (séparés par |)               // « BM2 » : formulaire simplifié (total sur le bouton, contrôle du téléphone, aide ville)
   bmValue: string;                   // « BM2 » : phrase de valeur sous le prix
+  bmAnim: boolean;                   // « BM2 » : animations douces (sections qui apparaissent au scroll, prix/badges)
+  bmCountdown: boolean;              // « BM2 » : compte à rebours de la promo (au-dessus du prix)
+  bmCountdownEnd: string;            // « BM2 » : date/heure RÉELLE de fin de promo (heure Maroc, ex 2026-11-30T23:59) — vide = pas de compteur ; après la date le compteur disparaît
+  bmCountdownText: string;           // « BM2 » : texte au-dessus du compteur
+  bmPrivacy: string;                 // « BM2 » : phrase confidentialité sous le formulaire (+ lien politique) — vide = rien
   bmCompare: string;                 // « BM2 » : tableau comparatif — 1re ligne = titre|colonne A|colonne B, puis critère|A|B                 // « BM2 » : texte du bouton vert du formulaire
   formFrame: boolean;                // formulaire encadré (bordure verte + bandeau titre)
   formFrameTitle: string;                // texte du bouton commander (court) — le prix s'affiche en petit dessous             // bloc « المجموع » au-dessus du bouton (le total est déjà sur le bouton)        // quantité sous les champs nom / téléphone / ville
@@ -107,7 +112,7 @@ export type LpDesign = {
 
 export const DEFAULT_LP_DESIGN: LpDesign = {
   blocks: LP_BLOCKS.map((b) => ({ key: b.key, on: true })),
-  heroSource: "product", heroImage: "", heroPosition: "top", heroRatio: "auto", heroMaxH: 310, formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, showTotalBox: false, submitText: "اطلب الآن", clarityId: "", gadsTag: "", template: "classic", customHtml: "", bmNote: "التوصيل بالمجان والدفع عند الاستلام", bmBadges: "الدفع عند الاستلام|توصيل مجاني|شوف المنتج قبل ما تخلص|توصيل آمن", bmStars: false, bmTitleColor: "#3aa0b4", bmReviewsTitle: "آراء زبنائنا", bmFaqTitle: "الأسئلة الشائعة", bmBuyText: "إضغط هنا للشراء", bmFormPlus: false, bmDemoVideo: "", bmDemoPoster: "", bmChips: "", bmShort: false, bmValue: "", bmCompare: "", formFrame: true, formFrameTitle: "👇 للطلب عمّر المعلومات ديالك", crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
+  heroSource: "product", heroImage: "", heroPosition: "top", heroRatio: "auto", heroMaxH: 310, formFirst: true, stickyAlways: true, offerThumbs: true, offersAfterFields: true, showTotalBox: false, submitText: "اطلب الآن", clarityId: "", gadsTag: "", template: "classic", customHtml: "", bmNote: "التوصيل بالمجان والدفع عند الاستلام", bmBadges: "الدفع عند الاستلام|توصيل مجاني|شوف المنتج قبل ما تخلص|توصيل آمن", bmStars: false, bmTitleColor: "#3aa0b4", bmReviewsTitle: "آراء زبنائنا", bmFaqTitle: "الأسئلة الشائعة", bmBuyText: "إضغط هنا للشراء", bmFormPlus: false, bmDemoVideo: "", bmDemoPoster: "", bmChips: "", bmShort: false, bmValue: "", bmAnim: false, bmCountdown: false, bmCountdownEnd: "", bmCountdownText: "⏳ العرض كيسالي من بعد", bmPrivacy: "", bmCompare: "", formFrame: true, formFrameTitle: "👇 للطلب عمّر المعلومات ديالك", crossAtBottom: true, showBumps: true, showStoreHeader: true, showTopBar: true, showBadge: true, showDiscount: true,
   showOldPrice: true, showCodBar: true, freeShip: true, freeShipText: "🚚 التوصيل مجاني لجميع المدن", trust3: true, trust3Text: "الدفع|عند الاستلام ; التوصيل|24-72h ; إرجاع|خلال 7 أيام", askAddress: true, addressRequired: false, showWhatsapp: true, showWhatsappFloat: true,
   sticky: true, showFooter: true,
   topBar: "", badge: "عرض خاص", codBar: "🚚 التوصيل لجميع المدن | الدفع عند الاستلام", orderTitle: "🛒 اطلب الآن", orderSub: "",
