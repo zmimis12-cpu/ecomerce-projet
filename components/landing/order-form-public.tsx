@@ -169,6 +169,12 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
   }, []);
 
   function changeOffer(o: Offer) {
+    // AddToCart (comme Shopify) : le client choisit une offre (1, 2, 3 pièces…)
+    if (typeof window !== "undefined" && o.id !== offerId) {
+      const w = window as unknown as { fbq?: (...args: unknown[]) => void; ttq?: { track: (...args: unknown[]) => void } };
+      w.fbq?.("track", "AddToCart", { value: o.price, currency: "MAD", content_name: product.name, content_ids: [product.id], content_type: "product", num_items: o.qty });
+      w.ttq?.track("AddToCart", { value: o.price, currency: "MAD", content_id: product.id, content_name: product.name, quantity: o.qty });
+    }
     setOfferId(o.id);
     const qty = o.qty;
     setBundle(qty);
@@ -265,7 +271,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           }),
         });
         const data = await res.json() as {
-          success:boolean; orderNumber?:string;
+          success:boolean; orderNumber?:string; isDuplicate?:boolean;
           errors?:Record<string,string>; error?:string;
         };
         if (data.success) {
@@ -293,6 +299,9 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
             }
             w.fbq?.("track", "Lead", { value: total, currency: "MAD", content_name: product.name },
               { eventID: `lead_${data.orderNumber ?? ""}` }); // = event_id serveur → dédupliqué
+            // Purchase (comme Shopify COD : commande passée) — pour les campagnes objectif Ventes
+            if (!data.isDuplicate) w.fbq?.("track", "Purchase", { value: total, currency: "MAD", content_name: product.name, content_ids: [product.id], content_type: "product" },
+              { eventID: `purchase_${data.orderNumber ?? ""}` }); // = event_id serveur → dédupliqué
 
             const wt = window as unknown as { ttq?: { identify: (...args: unknown[]) => void; track: (...args: unknown[]) => void } };
             wt.ttq?.identify({ phone_number: toInternationalMorocco(form.customer_phone) });

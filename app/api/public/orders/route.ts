@@ -373,6 +373,15 @@ export async function POST(request: NextRequest) {
             clientIp: ip, clientUserAgent: request.headers.get("user-agent"),
             eventId: `lead_${orderNumber}`, eventName: "Lead", actionSource: "website", contentIds: [p.id],
           }).catch(() => {});
+          // Purchase (comme Shopify COD) : commande passée — même event_id que le navigateur → dédupliqué
+          if (!isDuplicate) await sendMetaPurchaseEvent({
+            pixelId, accessToken: token, value: subtotal, currency: "MAD",
+            phone: normalizedPhone, city: String(customer_city ?? ""), fullName: String(customer_name ?? ""),
+            fbp: typeof body.meta_fbp === "string" ? body.meta_fbp : null,
+            fbc: typeof body.meta_fbc === "string" ? body.meta_fbc : null,
+            clientIp: ip, clientUserAgent: request.headers.get("user-agent"),
+            eventId: `purchase_${orderNumber}`, eventName: "Purchase", actionSource: "website", contentIds: [p.id],
+          }).catch(() => {});
         }
       } catch { /* ne bloque jamais la commande */ }
     });

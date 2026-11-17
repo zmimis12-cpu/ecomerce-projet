@@ -56,7 +56,7 @@ var maxQ=offers.length?offers[offers.length-1].qty:1;
 var q=1;
 function offer(){for(var i=0;i<offers.length;i++)if(offers[i].qty===q)return offers[i];return offers[0]||{id:'',qty:1,price:0}}
 function show(){var o=offer();var qe=$('quantity')||$('q');if(qe)qe.textContent=q;var t=o.price+' درهم';if($('subtotal'))$('subtotal').textContent=t;if($('total'))$('total').textContent=t}
-function step(n){var qs=offers.map(function(o){return o.qty});var i=qs.indexOf(q)+n;if(i<0)i=0;if(i>qs.length-1)i=qs.length-1;q=qs[i]||1;show()}
+function step(n){var qs=offers.map(function(o){return o.qty});var i=qs.indexOf(q)+n;if(i<0)i=0;if(i>qs.length-1)i=qs.length-1;var nq=qs[i]||1;var ch=nq!==q;q=nq;show();if(ch){try{var o=offer();window.fbq&&fbq('track','AddToCart',{value:o.price,currency:'MAD',content_name:C.productName,content_ids:[C.productId],content_type:'product',num_items:o.qty})}catch(x){}}}
 if($('plus'))$('plus').addEventListener('click',function(){step(1)});
 if($('minus'))$('minus').addEventListener('click',function(){step(-1)});
 show();
@@ -74,7 +74,7 @@ if(Object.keys(tr).length)body.tracking=tr;
 fetch('/api/public/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()}).then(function(d){
 busy=false;if(btn){btn.disabled=false;btn.textContent=btn.dataset.t||btn.textContent}
 if(d&&d.success){lpf('ok');var on=String(d.orderNumber||''),ph=intl(phone);
-try{(C.pixelId||'').split(/[,\\s]+/).filter(Boolean).forEach(function(id){window.fbq&&fbq('init',id,{ph:ph.replace('+',''),fn:name.split(' ')[0]||'',ln:name.split(' ').slice(1).join(' '),ct:city,country:'ma'})});window.fbq&&fbq('track','Lead',{value:o.price,currency:'MAD',content_name:C.productName},{eventID:'lead_'+on})}catch(x){}
+try{(C.pixelId||'').split(/[,\\s]+/).filter(Boolean).forEach(function(id){window.fbq&&fbq('init',id,{ph:ph.replace('+',''),fn:name.split(' ')[0]||'',ln:name.split(' ').slice(1).join(' '),ct:city,country:'ma'})});window.fbq&&fbq('track','Lead',{value:o.price,currency:'MAD',content_name:C.productName},{eventID:'lead_'+on});if(!d.isDuplicate&&window.fbq)fbq('track','Purchase',{value:o.price,currency:'MAD',content_name:C.productName,content_ids:[C.productId],content_type:'product'},{eventID:'purchase_'+on})}catch(x){}
 try{if(window.ttq){ttq.identify({phone_number:ph});ttq.track('SubmitForm',{value:o.price,currency:'MAD',content_id:C.productId,content_type:'product',content_name:C.productName},{event_id:'lead_'+on})}}catch(x){}
 try{if(window.gtag&&window.__gadsSendTo){gtag('set','user_data',{phone_number:ph});gtag('event','conversion',{send_to:window.__gadsSendTo,value:o.price,currency:'MAD',transaction_id:on})}}catch(x){}
 var box=document.createElement('div');box.style.cssText='text-align:center;padding:26px 14px;background:#e8f6ec;border:2px solid #b7e2c4;border-radius:16px';
