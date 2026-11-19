@@ -132,3 +132,5 @@ Campagne « MEULEUSE – SEARCH – 11/11 » 24450769179 (EN PAUSE à la créati
 - 17/11 23:55 (demandé par Zack) : Projecteur → page SHOP à 100 % (/lp/projector-pro : abBaseSlug="", abSlug=projector-pro-shop, abPct 100). Vérifié 15/15. Test 15–17/11 : SHOP 8 cmd / 4 conf / ≈394 visites vs v3 7 / 4 / ≈480. Retour : abSlug=projector-pro-v3.
 
 - 19/11 00:50 (MA) : méthode scaling PDF — 2 campagnes CBO Ventes/Purchase 50$/j créées ACTIVE : PROJECTEUR V046 (camp 120261468827620537) + RAKAAT V108 (camp 120261468829020537), 1 adset broad chacune, même post. Anciennes campagnes non touchées. Règle : +30%/48h si CPA ok.
+
+- 19/11 13:25 : SPLIT 650 scaling 5 comptes (B validé, total ~226$) — campagnes CBO Ventes/Purchase 14$/j, start 20/11 00:00 : HZ2 camp 120261476972660537 (ads V010+V012 OK) ; S1 120251825426910219, S2 120249473685550240, S3 120250442729020031, S4 120259220949290197 créées mais ads bloquées « Aucun moyen de paiement » → script /tmp/claude-0/split5_ads.py après ajout cartes. Exclusions clients livrés seulement sur HZ2 (audiences HZ2).
