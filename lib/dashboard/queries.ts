@@ -790,9 +790,17 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
       )();
       if (liveResult.ok && liveResult.campaigns.length > 0) {
         const productList = ps.map((p) => ({ id: p.id, sku: p.sku, name: p.name }));
-        const { matches } = matchCampaignsToProducts(productList, liveResult.campaigns);
+        const { loadCampaignKeywordMap, productByCampaignKeyword } = await import("@/lib/ads/matcher");
+        const kwMap = await loadCampaignKeywordMap();
+        const rest: typeof liveResult.campaigns = [];
+        for (const c of liveResult.campaigns) {
+          const pid = productByCampaignKeyword(c.campaign_name, kwMap);
+          if (pid) liveSpendByProduct.set(pid, (liveSpendByProduct.get(pid) ?? 0) + Number(c.spend));
+          else rest.push(c);
+        }
+        const { matches } = matchCampaignsToProducts(productList, rest);
         for (const m of matches) {
-          if (m.total_spend > 0) liveSpendByProduct.set(m.product_id, m.total_spend);
+          if (m.total_spend > 0) liveSpendByProduct.set(m.product_id, (liveSpendByProduct.get(m.product_id) ?? 0) + m.total_spend);
         }
       }
     }

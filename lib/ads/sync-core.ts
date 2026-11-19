@@ -87,6 +87,20 @@ async function syncMetaAdSpendOneRange(dateFrom: string, dateTo: string) {
     }
   }
 
+  // Puis mot du nom de campagne → produit (réglable : app_settings campaign_products)
+  const { loadCampaignKeywordMap, productByCampaignKeyword } = await import("./matcher");
+  const kwMap = await loadCampaignKeywordMap();
+  for (const campaign of result.campaigns) {
+    if (campaign.spend === 0 || manualMap.has(campaign.campaign_id)) continue;
+    const pid = productByCampaignKeyword(campaign.campaign_name, kwMap);
+    if (!pid) continue;
+    manualMap.set(campaign.campaign_id, pid);
+    const existing = spendByProduct.get(pid) ?? { spend: 0, campaign_names: [] };
+    existing.spend += campaign.spend;
+    existing.campaign_names.push(campaign.campaign_name);
+    spendByProduct.set(pid, existing);
+  }
+
   // Fallback SKU matching for unassigned campaigns
   const assignedCampaignIds = new Set(manualMap.keys());
   const unassignedCampaigns = result.campaigns.filter((c) => !assignedCampaignIds.has(c.campaign_id) && c.spend > 0);
