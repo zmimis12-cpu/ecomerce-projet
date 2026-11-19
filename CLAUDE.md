@@ -134,3 +134,5 @@ Campagne « MEULEUSE – SEARCH – 11/11 » 24450769179 (EN PAUSE à la créati
 - 19/11 00:50 (MA) : méthode scaling PDF — 2 campagnes CBO Ventes/Purchase 50$/j créées ACTIVE : PROJECTEUR V046 (camp 120261468827620537) + RAKAAT V108 (camp 120261468829020537), 1 adset broad chacune, même post. Anciennes campagnes non touchées. Règle : +30%/48h si CPA ok.
 
 - 19/11 13:25 : SPLIT 650 scaling 5 comptes (B validé, total ~226$) — campagnes CBO Ventes/Purchase 14$/j, start 20/11 00:00 : HZ2 camp 120261476972660537 (ads V010+V012 OK) ; S1 120251825426910219, S2 120249473685550240, S3 120250442729020031, S4 120259220949290197 créées mais ads bloquées « Aucun moyen de paiement » → script /tmp/claude-0/split5_ads.py après ajout cartes. Exclusions clients livrés seulement sur HZ2 (audiences HZ2).
+
+- 19/11 13:56 (validé « shop c'est bon ») : Split → page SHOP 100 % (/lp/split : abSlug split-v2 → split-shop, abPct 100). Sauvegarde scratchpad lp_design_before_splitshop.json. Retour : abSlug=split-v2.
