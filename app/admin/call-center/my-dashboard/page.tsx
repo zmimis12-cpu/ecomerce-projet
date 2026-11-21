@@ -161,7 +161,7 @@ export default async function AgentDashboardPage() {
               <Link key={o.id} href={`/admin/call-center/orders/${o.id}`}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-secondary/20 transition-colors">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{o.customer_name}</p>
+                  <p className="text-sm font-medium">{o.customer_name}{o.status === "new" && (o.call_attempts ?? 0) > 0 && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">🔁 Rappel n° {(o.call_attempts ?? 0) + 1}</span>}</p>
                   <p className="text-xs text-muted-foreground">{o.order_number} · {o.customer_phone} · {o.customer_city}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {o.order_items.map((i) => `${i.product_name} ×${i.quantity}`).join(", ")}

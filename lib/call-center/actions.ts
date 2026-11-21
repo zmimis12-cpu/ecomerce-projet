@@ -333,7 +333,7 @@ export async function updateCcQuantity(orderId: string, itemId: string, qty: num
   return { ok: true, total: subtotal - disc + ship };
 }
 
-export async function saveCallbackRules(raw: { enabled: boolean; delays: string; maxAttempts: number; hourStart: number; hourEnd: number }) {
+export async function saveCallbackRules(raw: { enabled: boolean; delays: string; maxAttempts: number; hourStart: number; hourEnd: number; requeueAsNew?: boolean; requeueDays?: number }) {
   await requireRole([...MANAGER_ROLES]);
   const { normalizeCallbackRules } = await import("@/lib/call-center/callback-rules");
   const rules = normalizeCallbackRules({ ...raw, delays: raw.delays.split(/[,\s;]+/).map(Number).filter((n) => n > 0) });

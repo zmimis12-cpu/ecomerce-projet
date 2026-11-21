@@ -4,9 +4,13 @@
  * délais en minutes (1er, 2e, 3e…), dans les heures d'appel (heure Maroc), jusqu'au max de tentatives.
  * Utilisable client + serveur.
  */
-export type CallbackRules = { enabled: boolean; delays: number[]; maxAttempts: number; hourStart: number; hourEnd: number };
+export type CallbackRules = { enabled: boolean; delays: number[]; maxAttempts: number; hourStart: number; hourEnd: number;
+  /** À l'heure du rappel, la commande « pas de réponse » redevient « Nouvelle » chez la confirmatrice */
+  requeueAsNew: boolean;
+  /** … seulement si la commande a moins de N jours */
+  requeueDays: number };
 
-export const CALLBACK_DEFAULTS: CallbackRules = { enabled: true, delays: [30, 120, 240, 1080, 1440], maxAttempts: 6, hourStart: 9, hourEnd: 21 };
+export const CALLBACK_DEFAULTS: CallbackRules = { enabled: true, delays: [30, 120, 240, 1080, 1440], maxAttempts: 6, hourStart: 9, hourEnd: 21, requeueAsNew: true, requeueDays: 15 };
 
 export function normalizeCallbackRules(v: unknown): CallbackRules {
   let o = v;
@@ -20,11 +24,13 @@ export function normalizeCallbackRules(v: unknown): CallbackRules {
     maxAttempts: n(r.maxAttempts, CALLBACK_DEFAULTS.maxAttempts, 1, 20),
     hourStart: n(r.hourStart, CALLBACK_DEFAULTS.hourStart, 0, 23),
     hourEnd: n(r.hourEnd, CALLBACK_DEFAULTS.hourEnd, 1, 24),
+    requeueAsNew: r.requeueAsNew !== false,
+    requeueDays: n(r.requeueDays, CALLBACK_DEFAULTS.requeueDays, 1, 60),
   };
 }
 
 /** Heure Maroc (0–23) d'une date. */
-function maHour(d: Date): number {
+export function maHour(d: Date): number {
   return Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Casablanca", hour: "2-digit", hourCycle: "h23" }).format(d));
 }
 

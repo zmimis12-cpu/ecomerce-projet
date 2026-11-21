@@ -35,6 +35,18 @@ export function CcCallbackEditor({ initial }: { initial: CallbackRules }) {
             <input type="number" min={1} max={24} className={inp + " w-full"} value={r.hourEnd} onChange={(e) => setR({ ...r, hourEnd: Number(e.target.value) })} /></label>
         </div>
       </div>
+      <div className="rounded-lg border bg-secondary/20 p-3 space-y-2 text-sm">
+        <label className="flex items-center gap-2 font-medium">
+          <input type="checkbox" checked={r.requeueAsNew} onChange={(e) => { setR({ ...r, requeueAsNew: e.target.checked }); setMsg(null); }} />
+          À l’heure du rappel, la commande redevient « Nouvelle » chez la confirmatrice
+        </label>
+        <label className="flex items-center gap-2">
+          <span>Seulement les commandes de moins de</span>
+          <input type="number" min={1} max={60} className={inp + " w-20"} value={r.requeueDays} onChange={(e) => setR({ ...r, requeueDays: Number(e.target.value) })} />
+          <span>jours</span>
+        </label>
+        <p className="text-[11px] text-muted-foreground">Vérifié toutes les 15 min pendant les heures d’appel. Les tentatives, notes et l’historique sont gardés ; badge « Rappel n° X » dans la liste.</p>
+      </div>
       <div className="flex items-center gap-3">
         <button type="button" disabled={pending}
           onClick={() => run(async () => { const x = await saveCallbackRules(r); setMsg(x.success ? "✓ Enregistré" : `✕ ${x.error}`); })}

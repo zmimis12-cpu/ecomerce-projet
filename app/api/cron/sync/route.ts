@@ -48,6 +48,8 @@ export async function GET(req: NextRequest) {
     const { syncSpeedafActiveOrders } = await import("@/lib/delivery/speedaf/sync");
     result.speedaf = await safe(() => syncSpeedafActiveOrders());
   }
+  // Call center : « pas de réponse » → « Nouvelle » à l'heure du rappel (< 15 j, heures d'appel)
+  result.ccRequeue = await safe(async () => { const { requeueNoAnswerOrders } = await import("@/lib/call-center/requeue"); return requeueNoAnswerOrders(); });
   // Gains éditeurs figés dès qu'une commande vidéo est livrée
   result.editorEarnings = await safe(() => snapshotEditorEarnings());
   // Livraisons → Meta (Purchase) + audience "Acheteurs livrés"

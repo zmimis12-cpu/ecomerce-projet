@@ -160,6 +160,9 @@ export function CCOrdersTable({ orders, agents, canManage, mode = "all" }: CCOrd
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={order.status as OrderStatus} />
+                      {order.status === "new" && (order.call_attempts ?? 0) > 0 && (
+                        <span className="ml-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">🔁 Rappel n° {(order.call_attempts ?? 0) + 1}</span>
+                      )}
                       {order.delivery_external_status && (
                         <div className="mt-1">
                           <DigylogStatusBadge label={order.delivery_external_status} id={order.delivery_external_status_id ?? null}
