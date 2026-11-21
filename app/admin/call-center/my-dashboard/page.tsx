@@ -23,7 +23,8 @@ export default async function AgentDashboardPage() {
   ]);
   const waNoAnswer = normalizeCcWa((waRow as { value?: unknown } | null)?.value).no_answer;
 
-  const pendingOrders   = orders.filter((o) => !["confirmed", "refused", "cancelled"].includes(o.status));
+  const pendingOrders   = orders.filter((o) => !["confirmed", "refused", "cancelled"].includes(o.status))
+    .sort((a, b) => (a.status === "new" ? 0 : 1) - (b.status === "new" ? 0 : 1));
   const callbacksDueNow = callbacks.filter((c) => new Date(c.callback_scheduled_at) <= new Date());
 
   function mad(n: number) { return n.toLocaleString("fr-MA", { minimumFractionDigits: 2 }) + " MAD"; }

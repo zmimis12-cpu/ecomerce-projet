@@ -145,6 +145,10 @@ export async function getCallCenterOrders(
     visible = rows.filter((o) => agentAllows(allowed, options.authId!, pidsOf[o.id] ?? []));
   }
 
+  // « Nouvelle » d'abord (y compris les « pas de réponse » revenues en Nouvelle), puis le reste ; date desc dans chaque groupe
+  const rank = (st: string) => (st === "new" ? 0 : st === "no_answer" ? 1 : 2);
+  visible = [...visible].sort((a, b) => rank(a.status) - rank(b.status));
+
   return visible.map((o) => ({
     ...o,
     agent_name: o.assigned_to ? (agentMap[o.assigned_to] ?? null) : null,
