@@ -720,7 +720,7 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
 
   const { data: products } = await supabase
     .from("products")
-    .select("id,name,sku,sale_price_mad,total_cost_mad,estimated_profit_mad,ads_cost_mad,packaging_cost_mad,confirmation_cost_mad,shipping_cost_mad")
+    .select("id,name,sku,sale_price_mad,total_cost_mad,estimated_profit_mad,ads_cost_mad,packaging_cost_mad,confirmation_cost_mad,shipping_cost_mad,purchase_price_mad")
     .order("name");
 
   if (!products?.length) return [];
@@ -730,6 +730,7 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
     total_cost_mad: number; estimated_profit_mad: number;
     ads_cost_mad: number; packaging_cost_mad: number;
     confirmation_cost_mad: number; shipping_cost_mad: number;
+    purchase_price_mad: number | null;
   }[];
 
   // Fetch primary image per product in one batched query
@@ -819,20 +820,21 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
   if (!periodOrderIds.length) return ps.map((p) => makeEmptyPerf(p, imageByProduct.get(p.id) ?? null, realAdSpendByProduct.get(p.id)));
 
   const productIds = ps.map((p) => p.id);
-  const items = await inChunks<{ product_id: string; order_id: string }>(periodOrderIds, (c) => supabase
-    .from("order_items").select("product_id,order_id").in("product_id", productIds).in("order_id", c));
+  const items = await inChunks<{ product_id: string; order_id: string; quantity: number | null }>(periodOrderIds, (c) => supabase
+    .from("order_items").select("product_id,order_id,quantity").in("product_id", productIds).in("order_id", c));
   if (!items?.length) return ps.map((p) => makeEmptyPerf(p, imageByProduct.get(p.id) ?? null, realAdSpendByProduct.get(p.id)));
 
   const orderIds = [...new Set((items as { order_id: string }[]).map((i) => i.order_id))];
 
   const orders = await inChunks<unknown>(orderIds, (c) => supabase
     .from("orders")
-    .select("id,status,is_paid,total_amount_mad,estimated_profit,real_profit_mad,cogs_total,delivery_cost_real_mad,return_cost_mad")
+    .select("id,status,is_paid,total_amount_mad,estimated_profit,real_profit_mad,cogs_total,delivery_cost_real_mad,return_cost_mad,actual_delivery_cost,expected_delivery_cost,is_exchange")
     .in("id", c));
   type OrderRow = {
     id: string; status: string; is_paid: boolean; total_amount_mad: number;
     estimated_profit: number; real_profit_mad: number | null;
     cogs_total: number; delivery_cost_real_mad: number; return_cost_mad: number;
+    actual_delivery_cost: number | null; expected_delivery_cost: number | null; is_exchange: boolean | null;
   };
   const ordersMap = new Map<string, OrderRow>();
   for (const o of (orders ?? []) as unknown as OrderRow[]) {
@@ -857,6 +859,11 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
     }
   }
 
+  const qtyByProdOrder = new Map<string, number>();
+  for (const it of items as { product_id: string; order_id: string; quantity: number | null }[]) {
+    const k = it.product_id + ":" + it.order_id;
+    qtyByProdOrder.set(k, (qtyByProdOrder.get(k) ?? 0) + (it.quantity ?? 1));
+  }
   const productOrders = new Map<string, string[]>();
   for (const item of (items as { product_id: string; order_id: string }[])) {
     if (!productOrders.has(item.product_id)) productOrders.set(item.product_id, []);
@@ -865,11 +872,7 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
 
   return ps.map((p) => {
     const oIds = productOrders.get(p.id) ?? [];
-    const rows = oIds.map((id) => ordersMap.get(id)).filter(Boolean) as {
-      id: string; status: string; is_paid: boolean; total_amount_mad: number;
-      estimated_profit: number; real_profit_mad: number | null;
-      cogs_total: number; delivery_cost_real_mad: number; return_cost_mad: number;
-    }[];
+    const rows = [...new Set(oIds)].map((id) => ordersMap.get(id)).filter(Boolean) as OrderRow[];
 
     const SHIPPED  = new Set(["sent_to_delivery","in_transit","delivered","paid","exchanged","returned","refused_delivery"]);
     const DELV     = new Set(["delivered","paid","exchanged"]);
@@ -914,18 +917,32 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
     // real_profit_mad stored on each order already nets out the product's
     // manual ads_cost_mad at order time. When a real synced spend exists for
     // the period, replace that estimate with the real total instead.
-    const real_profit_base = rows.filter((r) => r.is_paid).reduce((s, r) => s + (r.real_profit_mad ?? 0), 0);
-    const real_profit = is_real_ad_spend
-      ? real_profit_base + (p.ads_cost_mad ?? 0) * rows.filter((r) => r.is_paid).length - realAdSpend!
-      : real_profit_base;
 
-    const real_margin_pct  = real_revenue > 0
-      ? Math.round(real_profit / real_revenue * 1000) / 10 : 0;
+    // « Profit Réel » affiché (demande de Zack 22/11) = profit de CHAQUE commande
+    // LIVRÉE (payée ou pas encore versée), SANS la pub : prix − (achat + emballage
+    // de la fiche × qté) − livraison. Échange = 0 produit. Même calcul que
+    // « Profit en attente » du dashboard. Le statut Perte/Rentable garde la pub.
+    const unitGoods = p.purchase_price_mad != null
+      ? Number(p.purchase_price_mad) + Number(p.packaging_cost_mad ?? 0)
+      : null;
+    const deliveredRows = rows.filter((r) => DELV.has(r.status));
+    const delivered_profit = Math.round(deliveredRows.reduce((s, r) => {
+      const qty = qtyByProdOrder.get(p.id + ":" + r.id) ?? 1;
+      const goods = r.is_exchange ? 0 : unitGoods != null ? unitGoods * qty : (r.cogs_total ?? 0);
+      const delivery = r.actual_delivery_cost ?? r.expected_delivery_cost ?? 35;
+      return s + (r.total_amount_mad ?? 0) - goods - delivery;
+    }, 0) * 100) / 100;
+    const delivered_revenue = deliveredRows.reduce((s, r) => s + (r.total_amount_mad ?? 0), 0);
 
+    const real_margin_pct  = delivered_revenue > 0
+      ? Math.round(delivered_profit / delivered_revenue * 1000) / 10 : 0;
+
+    // Statut = profit des livrées MOINS la pub de la période
+    const net_after_ads = delivered_profit - (is_real_ad_spend ? adsCostToUse : (p.ads_cost_mad ?? 0) * lead_count);
     const performance_status =
       lead_count === 0 ? "no_data" :
-      real_profit < 0  ? "losing" :
-      real_margin_pct >= 15 ? "profitable" : "needs_review";
+      net_after_ads < 0 ? "losing" :
+      delivered_revenue > 0 && net_after_ads / delivered_revenue >= 0.15 ? "profitable" : "needs_review";
 
     // ── Ads budget analysis ─────────────────────────────────────────────────
     // Number of days in the selected period (default 30 if no filter)
@@ -973,7 +990,7 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
       lead_count, confirmed_count, delivered_count, returned_count, refused_count,
       cancelled_after_confirm, shipped_count,
       confirmation_rate, cancellation_rate, shipping_rate, delivery_rate, refusal_rate,
-      total_revenue, real_revenue, estimated_profit, real_profit,
+      total_revenue, real_revenue, estimated_profit, real_profit: delivered_profit,
       total_cogs, total_delivery_cost, return_losses, real_margin_pct,
       performance_status: performance_status as ProductPerformance["performance_status"],
       ads_total, ads_max_estimation, ads_max_real, cost_per_delivered, cost_per_lead,
