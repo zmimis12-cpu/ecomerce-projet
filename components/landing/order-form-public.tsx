@@ -271,7 +271,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           }),
         });
         const data = await res.json() as {
-          success:boolean; orderNumber?:string; isDuplicate?:boolean;
+          success:boolean; orderNumber?:string; isDuplicate?:boolean; blocked?:boolean;
           errors?:Record<string,string>; error?:string;
         };
         if (data.success) {
@@ -281,6 +281,7 @@ export function OrderFormPublic({ product, productSlug, ctaText = "اطلب ال
           // "Lead" (not "Purchase") since payment happens on delivery (COD),
           // not at submission time — this is the correct Meta standard event
           // for COD funnels and lets Meta Ads actually learn who converts.
+          if (data.blocked) { window.scrollTo({top:0,behavior:"smooth"}); return; } // liste noire : aucun pixel
           if (typeof window !== "undefined") {
             const w = window as unknown as { fbq?: (...args: unknown[]) => void; dataLayer?: unknown[] };
             // Advanced matching — pixel.js hashes these client-side automatically.

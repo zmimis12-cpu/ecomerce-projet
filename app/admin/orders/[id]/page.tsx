@@ -18,6 +18,8 @@ import { ResendWhatsAppButton } from "@/components/whatsapp/resend-whatsapp-butt
 import { ManualWhatsAppPanel } from "@/components/whatsapp/manual-whatsapp-panel";
 import { SelfDeliveryTicketButton } from "@/components/orders/self-delivery-ticket-button";
 import { DeleteOrderButton } from "@/components/orders/delete-order-button";
+import { BlockCustomerButton } from "@/components/orders/block-customer-button";
+import { loadBlocklist } from "@/lib/orders/blocklist";
 import { hasRole } from "@/lib/auth/roles";
 import { DuplicateBadge } from "@/components/orders/duplicate-badge";
 import { formatOrderDate } from "@/types/orders";
@@ -50,6 +52,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   if (isAgent && order.assigned_to !== session.authId) notFound();
 
   const agents      = canManage ? await getAgents() : [];
+  const blocked     = canManage ? (await loadBlocklist()).some((e) => e.phone === order.customer_phone) : false;
   const allProducts = canManage ? await getProducts() : [];
   const profit      = order.estimated_profit ?? 0;
   const canExchange = canManage && ["delivered", "paid"].includes(order.status) && !order.is_exchange;
@@ -83,6 +86,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <Pencil className="h-3.5 w-3.5" /> Modifier
             </Link>
           )}
+          {canManage && <BlockCustomerButton orderId={id} phone={order.customer_phone} blocked={blocked} />}
           {canManage && <DeleteOrderButton orderId={id} orderNumber={order.order_number} />}
         </div>
       </div>

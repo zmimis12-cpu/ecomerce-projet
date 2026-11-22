@@ -101,6 +101,15 @@ export async function POST(request: NextRequest) {
 
   const normalizedPhone = validation.phone!;
 
+  // ── Liste noire (fake orders) : réponse « succès » mais rien d'enregistré, aucun pixel ──
+  {
+    const { loadBlocklist, isBlocked } = await import("@/lib/orders/blocklist");
+    if (isBlocked(await loadBlocklist(), normalizedPhone, hashIp(ip))) {
+      return NextResponse.json({ success: true, blocked: true, isDuplicate: true, orderNumber: "",
+        message: "تم استلام طلبك بنجاح. سيتصل بك فريقنا للتأكيد." }, { status: 201 });
+    }
+  }
+
   // ── 3+4. Rate limit, produit, LP, commandes récentes, agent — EN PARALLÈLE ──
   // Avant: ~8 requêtes Supabase l'une après l'autre → le client attendait
   // plusieurs secondes après "Valider". Ces requêtes sont indépendantes.

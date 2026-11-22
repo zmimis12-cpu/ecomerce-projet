@@ -151,3 +151,5 @@ Campagne « MEULEUSE – SEARCH – 11/11 » 24450769179 (EN PAUSE à la créati
 - 21/11 21:55 (demandé par Zack) : achat Projecteur 390 → 360 DH (fiche produit : purchase_price_mad 360, total_cost_mad 446). Le dashboard recalcule le coût d achat de TOUTES les commandes depuis la fiche → Profit Net Final ≈ −33 250 (avant −37 754). Les 209 $ restent comptés (Zack : « mchat, khasha trja3 »).
 
 - 22/11 09:50 : PAUSE PROJECTEUR – TEST – HZ2 – ABO – 06/11 (120261272646400537), validé par Zack. Le filtre a aussi touché 5 autres "TEST – HZ2 – ABO – 06/11" (Tente, Selfie, 3 Qodban, Twist, Split), mais 0$ dépensé hier et aujourd hui (Tente ABO 30$ plus tôt dans la semaine) : déjà inactifs, aucun impact. Zack avait déjà pausé le Cost Cap. Budget total ~286$/j.
+
+- 22/11 12:15 : Liste noire clients (option A validée). app_settings order_blocklist ; /api/public/orders renvoie success+blocked sans créer de commande ni de pixel (numéro à vie, IP 7 j) ; bouton « Bloquer ce client » sur /admin/orders/[id] ; page /admin/orders/blocklist. Bloqués : 0661914177, 0600579644 (HC-02081/86/87, même iPhone, Nador).
