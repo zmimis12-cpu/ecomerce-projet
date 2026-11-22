@@ -46,7 +46,7 @@ export function ProductPerformanceTable({ data }: ProductPerformanceTableProps) 
             {[
               "Photo","Produit","SKU","Pub","Leads","Conf.","Livré","Retourné",
               "Tx Conf","Tx Livr","Coût / Lead","Coût / Livré","CA Total","CA Réel",
-              "Profit Est.","Profit Réel (livré, sans pub)","Marge",
+              "Profit Est.","Profit Réel (livré)","Marge",
               "Ads Total","Ads Max Est.","Ads Max Réel","ADS/O",
               "Statut"
             ].map((h) => (
