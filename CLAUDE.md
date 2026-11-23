@@ -18,7 +18,7 @@ Pour lancer du code serveur hors Next : `SUPABASE_SERVICE_ROLE_KEY=… NEXT_PUBL
 
 ## Business
 COD Maroc. Livraison Digylog (webhook → payé auto) + Speedaf (pas d'auto-payé : marquer payé à la main au virement) + livreurs propres. 1 $ ≈ 9,82 DH.
-Taux admin : confirmation = commandes ayant atteint « confirmé » / toutes ; livraison = livrées (delivered/paid/exchanged) / expédiées.
+Taux admin : confirmation = commandes ayant atteint « confirmé » / toutes ; livraison = livrées (delivered/paid/exchanged) / colis TERMINÉS (livrés + retours/refus + perdus) — les colis en route ne comptent pas (depuis 23/11).
 Projecteur HY300 549 DH : livrée/commande ≈ 0,49 ; marge ≈ 91,5 DH/livrée ; CPL d'équilibre ≈ 45 DH. Objectif : récupérer la perte cumulée (~ −17 000 DH au 26/10) puis profit chaque jour.
 Taxe Meta : seulement compte Hajtek Ads, 20 % depuis 2026-10-02 (≈ 10 $) ; Hajtekzone et Dealsdt 0 %.
 
@@ -164,3 +164,4 @@ Campagne « MEULEUSE – SEARCH – 11/11 » 24450769179 (EN PAUSE à la créati
 - 23/11 12:15 (A+B validés) : Barbecue RETOUR HZ2 = 5,4 $ / 3 confirmées à 11:45. Campagne PRÉPARÉE EN PAUSE « BARBECUE – DUP – HZ2 – LEADS ABO – 24/11 » 120261524039690537 : 2 adsets à 12 $, start 24/11 00:00 — DUP V093/V095 120261524040490537 + V097/V099 120261524042220537 (IDs /tmp/claude-0/retour/bbq.json). Activation à 20:00 (tâche trig_01WVPcj6iB4Y8vuvbQnCAJAz) seulement si RETOUR ≤ 3 $/confirmée sur le 23/11.
 - 23/11 13:00 (demandé par Zack « gad hadchi l rask ») : token system user deals (permanent, + whatsapp_business_messaging/management) généré et collé dans /admin/settings/whatsapp (via presse-papier, jamais affiché). App « Hajtek Zone sisteme » : use case WhatsApp ajouté. deals assigné full access aux WABA 1728436452205920 (Default AM PMA) et 1109210655412349 (Hajtek Zone). PROBLÈME : ces 2 WABA n ont que le numéro TEST Meta +1 555-709-0858 (id 1397919010080535) ; le phone_number_id configuré 1256359494216338 n appartient à aucun WABA accessible → envoi toujours impossible. Il faut enregistrer un vrai numéro marocain sur Cloud API (choix de Zack).
 - 23/11 13:25 (B validé) : TEST – TENTE – S3 120250474286630031 réactivée (CBO 10 $) avec SEUL l adset BIGDEALS 120250474293810031 ACTIVE ; HAJTEKZONE + LAHMIZA en PAUSE. 22/11 : 14,4 $ → 5 cmd (2 conf, 2 sans réponse), Bigdeals 8,5 $ → 4 cmd. Total ≈ 78 $/j.
+- 23/11 13:45 (demandé par Zack) : taux de livraison (dashboard + performance par produit) = livrées ÷ colis terminés (livrés + returned/refused_delivery + annulés après expédition) ; les colis encore en route (sent_to_delivery/in_transit) exclus. Avant : livrées ÷ toutes expédiées → taux trop bas.

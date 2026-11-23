@@ -414,8 +414,13 @@ export async function getDashboardSummary(filter?: DateFilter): Promise<Dashboar
     ? Math.round(cancelled_after_confirm / confirmed_count * 1000) / 10 : 0;
   const shipping_rate = confirmed_count > 0            // Taux d'expédition
     ? Math.round(shipped_count / confirmed_count * 1000) / 10 : 0;
-  const delivery_rate = shipped_count > 0              // Taux de livraison
-    ? Math.round(delivered_count / shipped_count * 1000) / 10 : 0;
+  // Taux de livraison = livrées ÷ colis TERMINÉS (livrés + retours/refus + perdus
+  // annulés après expédition). Les colis encore en route ne comptent pas (sinon
+  // le taux baisse à tort tant qu'ils ne sont pas arrivés).
+  const lost_after_ship = rows.filter((r) => r.status === "cancelled" && everShippedIds.has(r.id)).length;
+  const finished_count  = delivered_count + returned_count + lost_after_ship;
+  const delivery_rate = finished_count > 0
+    ? Math.round(delivered_count / finished_count * 1000) / 10 : 0;
   const return_rate = shipped_count > 0                // Taux de retour
     ? Math.round(returned_count / shipped_count * 1000) / 10 : 0;
   const net_margin_pct = real_revenue > 0
@@ -894,8 +899,11 @@ export async function getProductPerformance(filter?: DateFilter): Promise<Produc
       ? Math.round(cancelled_after_confirm / confirmed_count * 1000) / 10 : 0;
     const shipping_rate = confirmed_count > 0            // Taux d'expédition
       ? Math.round(shipped_count / confirmed_count * 1000) / 10 : 0;
-    const delivery_rate = shipped_count > 0              // Taux de livraison
-      ? Math.round(delivered_count / shipped_count * 1000) / 10 : 0;
+    // Taux de livraison = livrées ÷ colis terminés (hors colis encore en route)
+    const finished_count = delivered_count + returned_count
+      + rows.filter((r) => r.status === "cancelled" && everShippedIds.has(r.id)).length;
+    const delivery_rate = finished_count > 0
+      ? Math.round(delivered_count / finished_count * 1000) / 10 : 0;
     const refusal_rate = shipped_count > 0               // Taux de retour
       ? Math.round(returned_count / shipped_count * 1000) / 10 : 0;
 
