@@ -33,8 +33,11 @@ export async function sendTikTokCompletePayment(input: TikTokPurchaseInput): Pro
     // TikTok exige le format E.164 AVEC le "+" avant hachage (contrairement
     // à Meta qui exige le numéro SANS le "+") — bug trouvé en test réel.
     phone: [sha256(toInternationalMorocco(input.phone))],
+    // external_id = même client sur tous ses événements → meilleur matching TikTok
+    external_id: [sha256(toInternationalMorocco(input.phone))],
   };
   if (input.ttp) userData.ttp = input.ttp;
+  if (input.ttclid) userData.ttclid = input.ttclid;
   if (input.clientIp) userData.ip = input.clientIp;
   if (input.clientUserAgent) userData.user_agent = input.clientUserAgent;
 
@@ -113,7 +116,10 @@ export async function sendTikTokLead(input: {
   ttp?: string | null; ttclid?: string | null; clientIp?: string | null; clientUserAgent?: string | null;
   productId: string; productName?: string; pageUrl?: string | null;
 }): Promise<{ ok: boolean; error?: string }> {
-  const user: Record<string, unknown> = { phone: [sha256(toInternationalMorocco(input.phone))] };
+  const user: Record<string, unknown> = {
+    phone: [sha256(toInternationalMorocco(input.phone))],
+    external_id: [sha256(toInternationalMorocco(input.phone))],
+  };
   if (input.ttp) user.ttp = input.ttp;
   if (input.ttclid) user.ttclid = input.ttclid;
   if (input.clientIp) user.ip = input.clientIp;
