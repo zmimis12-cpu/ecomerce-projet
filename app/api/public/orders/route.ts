@@ -88,7 +88,11 @@ export async function POST(request: NextRequest) {
   }
 
   // Exemples / numéros bidon (ancien placeholder recopié, 0612345678…) → refusés poliment, pas de fausse commande
-  const fakePhone = /^0?6?12345678$|^0?(\d)\1{8}$/.test(String(customer_phone).replace(/\D/g, "").replace(/^212/, "0"));
+  // + 6 chiffres identiques à la suite (0600000001, 0611111112…) ou suite 12345678 / 98765432
+  const phoneDigits = String(customer_phone).replace(/\D/g, "").replace(/^212/, "0");
+  const fakePhone = /^0?6?12345678$|^0?(\d)\1{8}$/.test(phoneDigits)
+    || /(\d)\1{5,}/.test(phoneDigits.slice(-8))
+    || /12345678|23456789|98765432|87654321/.test(phoneDigits);
   const fakeCity = /كتب المدينة/.test(String(customer_city));
   const fakeName = /^مثال/.test(String(customer_name).trim());
   if (fakePhone || fakeCity || fakeName) {
