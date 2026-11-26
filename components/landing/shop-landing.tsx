@@ -2,6 +2,7 @@
 // titre + prix, formulaire tout de suite, confiance, grandes images, description, garanties, pied de page,
 // bouton fixe en bas). Même formulaire / pixels / suivi que les autres modèles. Réglages : Admin → Boutique → Landing pages.
 import type React from "react";
+import { LpCountdown } from "./lp-countdown";
 
 type Group = { title: string; items: string[] };
 
@@ -65,14 +66,7 @@ export function ShopLanding(p: {
           const daily = p.countdownEnd === "daily";
           const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(p.countdownEnd || "");
           const endMs = daily ? 1 : m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 1, +m[5]) : 0;
-          if (!endMs) return null;
-          return (<>
-            <div className="sh-cd" id="sh-cd" data-end={endMs} hidden>
-              <div className="sh-cd-t">{p.countdownText || "⏳ العرض كيسالي من بعد"}</div>
-              <div className="sh-cd-b" dir="ltr">{[["d", "يوم"], ["h", "ساعة"], ["m", "دقيقة"], ["s", "ثانية"]].map(([k, l]) => <span key={k}><b data-k={k}>00</b><i>{l}</i></span>)}</div>
-            </div>
-            <script dangerouslySetInnerHTML={{ __html: "(function(){var c=document.getElementById('sh-cd');if(!c)return;var dl=c.getAttribute('data-end')==='1';function nx(){var n=Date.now()+36e5;return n-n%864e5+864e5-36e5}var e=dl?nx():+c.getAttribute('data-end');function z(n){return(n<10?'0':'')+n}function t(){var d=e-Date.now();if(d<=0&&dl){e=nx();d=e-Date.now()}if(d<=0){c.hidden=true;return false}c.hidden=false;var v={d:Math.floor(d/864e5),h:Math.floor(d/36e5)%24,m:Math.floor(d/6e4)%60,s:Math.floor(d/1e3)%60};var b=c.querySelectorAll('b');for(var i=0;i<b.length;i++){var k=b[i].getAttribute('data-k');b[i].textContent=z(v[k]);if(k==='d')b[i].parentNode.style.display=v.d?'':'none'}return true}if(t())var iv=setInterval(function(){if(!t())clearInterval(iv)},1000)})();" }} />
-          </>);
+          return endMs ? <LpCountdown endMs={endMs} daily={daily} text={p.countdownText} /> : null;
         })()}
         {p.valueLine && <p className="sh-val">{p.valueLine}</p>}
 
