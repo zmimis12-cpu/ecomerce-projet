@@ -6,6 +6,8 @@ import type React from "react";
 type Group = { title: string; items: string[] };
 
 export function ShopLanding(p: {
+  /** Compte à rebours : date de fin réelle (heure Maroc, "AAAA-MM-JJTHH:MM") ou "daily" ; vide = caché */
+  countdownEnd?: string; countdownText?: string;
   title: string; subtitle: string; price: number; oldPrice: number | null; ctaText: string;
   gallery: string[]; images: string[]; groups: Group[]; faq: { q: string; a: string }[];
   form: React.ReactNode; ticker: string[]; trust: string[]; reassure: string; shipText: string;
@@ -59,6 +61,19 @@ export function ShopLanding(p: {
           <b>{p.price.toFixed(2)} dh</b>
           {p.oldPrice && p.oldPrice > p.price && <><s>{p.oldPrice.toFixed(2)} dh</s><em>SAVE {Math.round((1 - p.price / p.oldPrice) * 100)}%</em></>}
         </div>
+        {p.countdownEnd && (() => {
+          const daily = p.countdownEnd === "daily";
+          const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(p.countdownEnd || "");
+          const endMs = daily ? 1 : m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 1, +m[5]) : 0;
+          if (!endMs) return null;
+          return (<>
+            <div className="sh-cd" id="sh-cd" data-end={endMs} hidden>
+              <div className="sh-cd-t">{p.countdownText || "⏳ العرض كيسالي من بعد"}</div>
+              <div className="sh-cd-b" dir="ltr">{[["d", "يوم"], ["h", "ساعة"], ["m", "دقيقة"], ["s", "ثانية"]].map(([k, l]) => <span key={k}><b data-k={k}>00</b><i>{l}</i></span>)}</div>
+            </div>
+            <script dangerouslySetInnerHTML={{ __html: "(function(){var c=document.getElementById('sh-cd');if(!c)return;var dl=c.getAttribute('data-end')==='1';function nx(){var n=Date.now()+36e5;return n-n%864e5+864e5-36e5}var e=dl?nx():+c.getAttribute('data-end');function z(n){return(n<10?'0':'')+n}function t(){var d=e-Date.now();if(d<=0&&dl){e=nx();d=e-Date.now()}if(d<=0){c.hidden=true;return false}c.hidden=false;var v={d:Math.floor(d/864e5),h:Math.floor(d/36e5)%24,m:Math.floor(d/6e4)%60,s:Math.floor(d/1e3)%60};var b=c.querySelectorAll('b');for(var i=0;i<b.length;i++){var k=b[i].getAttribute('data-k');b[i].textContent=z(v[k]);if(k==='d')b[i].parentNode.style.display=v.d?'':'none'}return true}if(t())var iv=setInterval(function(){if(!t())clearInterval(iv)},1000)})();" }} />
+          </>);
+        })()}
         {p.valueLine && <p className="sh-val">{p.valueLine}</p>}
 
         <div id="sp-form" className="sh-card">
@@ -133,6 +148,7 @@ const CSS = `
 .sh-price{display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-direction:row-reverse;margin:6px 0 10px}
 .sh-price b{color:var(--c);font-size:21px;font-weight:800}.sh-price s{color:#777;font-size:15px}
 .sh-price em{font-style:normal;font-size:11px;font-weight:800;border:1px solid #ddd;border-radius:6px;padding:2px 6px;background:#fff}
+.sh-cd{margin:10px 0;padding:8px 6px 10px;border-radius:14px;background:#fff7ed;border:2px solid #fdba74;text-align:center}.sh-cd-t{font-size:15px;font-weight:800;color:#c2410c;margin-bottom:6px}.sh-cd-b{display:flex;justify-content:center;gap:8px}.sh-cd-b span{display:flex;flex-direction:column;align-items:center;min-width:52px;background:#ea580c;color:#fff;border-radius:10px;padding:4px 2px}.sh-cd-b b{font-size:22px;font-weight:900;line-height:1.15;font-variant-numeric:tabular-nums}.sh-cd-b i{font-style:normal;font-size:11px;font-weight:700}
 .sh-val{background:#fff;border-radius:10px;padding:8px 12px;font-size:14px;font-weight:600;margin:0 0 10px;border-inline-start:4px solid var(--c)}
 .sh-card{background:#fff;border-radius:14px;padding:14px;box-shadow:0 2px 14px rgba(0,0,0,.07);scroll-margin-top:12px}
 .sh-ship{display:flex;align-items:center;gap:10px;border:1px solid #e5e5e5;border-radius:10px;padding:10px 12px;font-size:14px}

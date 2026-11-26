@@ -431,6 +431,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     <ShopLanding
       title={title} subtitle={String(lp.subtitle ?? lp.hero_subheadline ?? "")} price={one.price} oldPrice={d.showOldPrice ? oldShown : null}
       ctaText={d.submitText || "تأكيد الطلب"} color={d.shopColor || "#e74c4c"}
+      countdownEnd={d.bmCountdown ? (d.bmCountdownDaily ? "daily" : d.bmCountdownEnd) : ""} countdownText={d.bmCountdownText}
       gallery={[...new Set([heroImg ?? "", ...productImgs.slice(0, 5)])].filter(Boolean).slice(0, 6)}
       images={moreImgs} groups={bulletGroups} faq={faqItems.filter((f) => f.q && f.a)}
       titleScript={angles.length > 0 ? `(function(){try{${angleJs}if(!m)return;var t=document.getElementById('sp-title');if(t&&m.h)t.textContent=m.h;var s=document.getElementById('sp-angle-sub');if(s&&m.s)s.textContent=m.s;}catch(e){}})();` : undefined}
