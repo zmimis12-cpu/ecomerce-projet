@@ -89,9 +89,66 @@ async function accountSpend(id: string, token: string, from?: string, to?: strin
   return Number(json.data?.[0]?.spend ?? 0);
 }
 
+// ── Copie de secours de la dépense JOURNALIÈRE de chaque compte ────────────────
+// Si le token d'un compte expire (ou si on perd l'accès), sa dépense passée ne doit
+// PAS disparaître du dashboard (sinon le profit devient faux d'un coup).
+// → on garde en base la dépense jour par jour de chaque compte (copie rafraîchie
+// toutes les 6 h quand le compte est lisible) et on l'utilise quand Meta refuse.
+const SNAP_KEY = "meta_spend_snapshot";
+type Snap = { accounts: Record<string, { label: string; days: Record<string, number>; at: string }> };
+async function readSnap(): Promise<Snap> {
+  const { data } = await supabaseAdmin.from("app_settings").select("value").eq("key", SNAP_KEY).maybeSingle();
+  let v = (data as { value?: unknown } | null)?.value;
+  while (typeof v === "string") { try { v = JSON.parse(v); } catch { v = null; } }
+  return (v as Snap) ?? { accounts: {} };
+}
+async function fetchDailySpend(id: string, token: string): Promise<Record<string, number>> {
+  const min = new Date(); min.setUTCMonth(min.getUTCMonth() - 36);
+  const tr = encodeURIComponent(JSON.stringify({ since: min.toISOString().slice(0, 10), until: new Date().toISOString().slice(0, 10) }));
+  const days: Record<string, number> = {};
+  let next: string | undefined = `${META}/${id}/insights?fields=spend&time_increment=1&limit=500&time_range=${tr}&access_token=${encodeURIComponent(token)}`;
+  for (let g = 0; next && g < 20; g++) {
+    const res: Response = await fetch(next, { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok || json.error) throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
+    for (const r of (json.data ?? []) as { spend?: string; date_start: string }[]) days[r.date_start] = Number(r.spend ?? 0);
+    next = json.paging?.next;
+  }
+  return days;
+}
+async function refreshSnap(list: { id: string; label: string; token: string }[], snap: Snap) {
+  const old = Date.now() - 6 * 3600_000;
+  const todo = list.filter((a) => !snap.accounts[a.id] || new Date(snap.accounts[a.id].at).getTime() < old);
+  if (!todo.length) return;
+  let changed = false;
+  await Promise.all(todo.map(async (a) => {
+    try {
+      const days = await fetchDailySpend(a.id, a.token);
+      // on garde les anciens jours (au cas où Meta n'en renvoie plus), les nouveaux écrasent
+      snap.accounts[a.id] = { label: a.label, days: { ...(snap.accounts[a.id]?.days ?? {}), ...days }, at: new Date().toISOString() };
+      changed = true;
+    } catch { /* compte illisible : on garde l'ancienne copie */ }
+  }));
+  if (changed) await supabaseAdmin.from("app_settings").upsert(
+    { key: SNAP_KEY, value: snap as never, category: "ads", label: "Dépense Meta par compte (copie de secours)" } as never,
+    { onConflict: "key" });
+}
+const snapSpend = (snap: Snap, id: string, from?: string, to?: string): number | null => {
+  const a = snap.accounts[id];
+  if (!a) return null;
+  let s = 0;
+  for (const [d, v] of Object.entries(a.days)) { if ((from && d < from) || (to && d > to)) continue; s += v; }
+  return s;
+};
+
 export async function getMetaChargedMad(from?: string, to?: string): Promise<ChargedResult> {
-  const { activeMetaAccounts, act } = await import("./meta-accounts");
-  const [accounts, fx, cache] = await Promise.all([activeMetaAccounts(), getUsdToMad(), readCache()]);
+  const { getMetaAccounts, act } = await import("./meta-accounts");
+  // ⚠️ on garde aussi les comptes dont le token a expiré (status "error") :
+  // leur dépense passée vient alors de la copie de secours au lieu de disparaître.
+  const [all, fx, cache, snap] = await Promise.all([getMetaAccounts(), getUsdToMad(), readCache(), readSnap()]);
+  const accounts = all.filter((a) => a.isActive && a.adAccountId && a.token);
+  // copie de secours (max 1 fois / 6 h par compte, seulement les comptes lisibles)
+  await refreshSnap(accounts.filter((a) => a.status !== "error").map((a) => ({ id: act(a)!, label: a.label, token: a.token })), snap).catch(() => {});
   const rate = fx.base; // marché × frais banque (sans TVA : ajoutée par compte ci-dessous)
   const out: ChargedResult = { mad: 0, usd: 0, count: 0, byAccount: [] };
   const seen = new Set<string>();
@@ -112,7 +169,15 @@ export async function getMetaChargedMad(from?: string, to?: string): Promise<Cha
       return { label: a.label, usd, mad: usd * rate, count, error: null as string | null };
     }
     try { // pas encore lu par la synchro → dépense du compte (rapide)
-      const spend = await accountSpend(id, a.token, from, to);
+      let spend: number;
+      try {
+        if (a.status === "error") throw new Error(a.lastError ?? "token");
+        spend = await accountSpend(id, a.token, from, to);
+      } catch (e) {
+        const s = snapSpend(snap, id, from, to);
+        if (s === null) throw e;
+        spend = s; // token expiré / accès perdu → copie de secours
+      }
       const f = taxFactorFor(to ?? new Date().toISOString().slice(0, 10), tax);
       return { label: a.label, usd: spend * f, mad: spend * f * rate, count: 0, error: null as string | null };
     } catch (e) {
